@@ -27,3 +27,7 @@
 *.exe
 *.out
 *.app
+
+# Build and Temp
+build/
+*.swp
