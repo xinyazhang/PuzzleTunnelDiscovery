@@ -19,7 +19,7 @@ vector<string> write_blend_rules(const vector<string>& meshes, int tier, bool re
 		else
 			fn = out;
 		cout << fn << ": " << meshes[i] << " " << meshes[i+1] << endl;
-		cout << "\t../blend -prefix " << prefix << " $?" << endl;
+		cout << "\t../blend -NI -prefix " << prefix << " $?" << endl;
 		if (remeshing)
 			cout << "\t../remeshing " << out << " " << fn << " 0.05 1" << endl;
 		cout << endl;

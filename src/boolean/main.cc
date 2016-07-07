@@ -131,10 +131,12 @@ bool has_suffix(const std::string &str, const std::string &suffix)
 }
 enum {
 	OPT_PREFIX,
+	OPT_NOINTERMEDIATE,
 };
 
 static struct option opts[] = {
 	{"prefix", required_argument, NULL, OPT_PREFIX},
+	{"NI", no_argument, NULL, OPT_NOINTERMEDIATE},
 	{0, 0, 0, 0},
 };
 
@@ -143,11 +145,15 @@ int main(int argc, char *argv[])
 #if 1
 	std::string prefix("blend-");
 	int o;
+	bool no_intermediate = false;
 	do {
 		o = getopt_long_only(argc, argv, "", opts, NULL);
 		switch (o) {
 			case OPT_PREFIX:
 				prefix = optarg;
+				break;
+			case OPT_NOINTERMEDIATE:
+				no_intermediate = false;
 				break;
 		};
 	} while (o > 0);
@@ -236,8 +242,11 @@ int main(int argc, char *argv[])
 		} catch (...) {
 			std::cerr << "  (" << i << ")";
 		}
-		igl::writeOBJ(prefix+std::to_string(i)+".obj", VC, FC);
-		igl::writePLY(prefix+std::to_string(i)+".ply", VC, FC);
+
+		if (!no_intermediate) {
+			igl::writeOBJ(prefix+std::to_string(i)+".obj", VC, FC);
+			igl::writePLY(prefix+std::to_string(i)+".ply", VC, FC);
+		}
 		std::cerr << "  " << i <<"(f: " << FC.rows() <<") ";
 	}
 #else
