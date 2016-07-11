@@ -27,6 +27,12 @@ FUNCTION(EASYADD place)
 	FINALIZE(${place} "${CMAKE_BINARY_DIR}/${place}")
 ENDFUNCTION()
 
+FUNCTION(FILTERADD filter)
+	SET(FT_LOCAL_SRC src/filters/${filter}.cc)
+	ADD_EXECUTABLE(${filter} ${FT_LOCAL_SRC})
+	FINALIZE(${filter} "${CMAKE_BINARY_DIR}/${filter}")
+ENDFUNCTION()
+
 #THIRD PARTIES
 # OBJ2PLY
 include(ExternalProject)
@@ -63,6 +69,8 @@ TARGET_LINK_LIBRARIES(subtract ${BOOLEAN_LIB})
 
 EASYADD(meshgen)
 EASYADD(mkgen)
+FILTERADD(flipfaces)
+FILTERADD(addbb)
 
 #FILE(COPY ${BINARIES} DESTINATION ${CMAKE_SOURCE_DIR}/bin)
 
