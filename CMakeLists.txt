@@ -15,22 +15,34 @@ set(CMAKE_CXX_FLAGS "--std=c++14 -g -ggdb3 -Wno-ignored-attributes -Wno-deprecat
 set(CMAKE_EXE_LINKER_FLAGS "-g")
 
 # Define function to copy binaries to bin/
-FUNCTION(FINALIZE target files)
+FUNCTION(FINALCOPY target files)
 	add_custom_command(TARGET ${target} POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy ${files} ${CMAKE_SOURCE_DIR}/bin
+	)
+ENDFUNCTION()
+FUNCTION(FINALIZE target)
+	add_custom_command(TARGET ${target} POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${target}> ${CMAKE_SOURCE_DIR}/bin
 	)
 ENDFUNCTION()
 
 FUNCTION(EASYADD place)
 	AUX_SOURCE_DIRECTORY(src/${place}/ EASY_LOCAL_SRC)
 	ADD_EXECUTABLE(${place} ${EASY_LOCAL_SRC})
-	FINALIZE(${place} "${CMAKE_BINARY_DIR}/${place}")
+	FINALIZE(${place})
+ENDFUNCTION()
+
+FUNCTION(EASYLIB place)
+	AUX_SOURCE_DIRECTORY(lib/${place}/ EASY_LOCAL_SRC)
+	ADD_LIBRARY(${place} SHARED ${EASY_LOCAL_SRC})
+	INCLUDE_DIRECTORIES(lib/${place})
+	FINALIZE(${place})
 ENDFUNCTION()
 
 FUNCTION(FILTERADD filter)
 	SET(FT_LOCAL_SRC src/filters/${filter}.cc)
 	ADD_EXECUTABLE(${filter} ${FT_LOCAL_SRC})
-	FINALIZE(${filter} "${CMAKE_BINARY_DIR}/${filter}")
+	FINALIZE(${filter})
 ENDFUNCTION()
 
 #THIRD PARTIES
@@ -45,15 +57,15 @@ ExternalProject_Add(OBJ2PLY
 	CMAKE_ARGS ${OBJ2PLY_ARGS}
 	INSTALL_COMMAND ""
 	BINARY_DIR "${OBJ2PLY_BIN}")
-FINALIZE(OBJ2PLY ${OBJ2PLY_BIN}/obj2ply)
+FINALCOPY(OBJ2PLY ${OBJ2PLY_BIN}/obj2ply)
 
 
 # Main program
 SET(BOOLEAN_SRC src/boolean/join.cc src/boolean/join.h)
 ADD_EXECUTABLE(blend ${BOOLEAN_SRC} src/boolean/main.cc)
 ADD_EXECUTABLE(subtract ${BOOLEAN_SRC} src/boolean/substract.cc)
-FINALIZE(blend "${CMAKE_BINARY_DIR}/blend")
-FINALIZE(subtract "${CMAKE_BINARY_DIR}/subtract")
+FINALIZE(blend)
+FINALIZE(subtract)
 
 find_package(Threads REQUIRED)
 find_package(CGAL COMPONENTS Core REQUIRED)
@@ -72,12 +84,14 @@ SET(BOOLEAN_LIB ${CGAL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${GMP_LIBRARIES} ${M
 TARGET_LINK_LIBRARIES(blend ${BOOLEAN_LIB})
 TARGET_LINK_LIBRARIES(subtract ${BOOLEAN_LIB})
 
+EASYLIB(tetread)
+
 EASYADD(meshgen)
 EASYADD(mkgen)
 FILTERADD(flipfaces)
 FILTERADD(addbb)
 EASYADD(dlap)
-TARGET_LINK_LIBRARIES(dlap ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
+TARGET_LINK_LIBRARIES(dlap ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES} tetread)
 
 #FILE(COPY ${BINARIES} DESTINATION ${CMAKE_SOURCE_DIR}/bin)
 

@@ -15,7 +15,6 @@
 void readtet(Eigen::MatrixXd& V,
 	     Eigen::MatrixXi& E,
 	     Eigen::MatrixXi& P,
-	     const std::string& prefix,
-	     const std::string& ofn);
+	     const std::string& prefix);
 
 #endif

@@ -68,7 +68,7 @@ int main(int argc, char* argv[])
 	Eigen::MatrixXi P;
 	Eigen::SparseMatrix<double> lap;
 	try {
-		readtet(V, E, P, iprefix, ofn);
+		readtet(V, E, P, iprefix);
 		tet2lap(lap, V, E, P);
 	} catch (std::runtime_error& e) {
 		std::cerr << e.what() << std::endl;

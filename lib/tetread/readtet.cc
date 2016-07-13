@@ -123,7 +123,7 @@ void read_tetrahedron(MatrixXi& P, std::istream& fin, int base)
 	}
 }
 
-void readtet(MatrixXd& V, MatrixXi& E, MatrixXi& P, const string& iprefix, const string& ofn)
+void readtet(MatrixXd& V, MatrixXi& E, MatrixXi& P, const string& iprefix)
 {
 	std::ifstream nodef(iprefix+".node");
 	if (!nodef.is_open())
@@ -134,10 +134,6 @@ void readtet(MatrixXd& V, MatrixXi& E, MatrixXi& P, const string& iprefix, const
 	std::ifstream elef(iprefix+".ele");
 	if (!elef.is_open())
 		throw runtime_error("Cannot open "+iprefix+".ele for read");
-
-	std::ofstream mf(ofn);
-	if (!mf.is_open())
-		throw runtime_error("Cannot open "+ofn+".ele for write");
 
 	int base = read_vertices(V, nodef);
 	read_edges(E, edgef, base);

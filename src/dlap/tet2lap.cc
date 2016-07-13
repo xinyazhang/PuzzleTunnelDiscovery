@@ -20,7 +20,8 @@ void calc_voronoi_volumes(
 	vector<int> nadjtet(V.rows());
 	Eigen::MatrixXd tetvolumes;
 	igl::volume(V, P, tetvolumes);
-	for(int i = 0; i < V.rows(); i++) {
+	//std::cerr << P << std::endl;
+	for(int i = 0; i < P.rows(); i++) {
 		double quarter = tetvolumes(i, 0);
 		for(int j = 0; j < 4; j++)
 			volumes[P(i,j)] += quarter;
