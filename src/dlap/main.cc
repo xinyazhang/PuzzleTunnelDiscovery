@@ -35,7 +35,6 @@ void usage()
 	std::cerr << "Options: -i <tetgen file prefix> [-o output_file]" << endl;
 }
 
-
 int main(int argc, char* argv[])
 {
 	int opt;
