@@ -6,8 +6,12 @@
 #include <igl/dihedral_angles.h>
 #include <igl/edge_lengths.h>
 #include <boost/progress.hpp>
+#include <iostream>
 
 using std::vector;
+using std::endl;
+
+#define VERBOSE 1
 
 // Not "real" Voronoi volume
 void calc_voronoi_volumes(
@@ -67,6 +71,15 @@ const int proto_edge_number[][2] = {
 	{0, 1}
 };
 
+const int opposite_edge[] = {
+	3,
+	4,
+	5,
+	0,
+	1,
+	2
+};
+
 void tet2lap(Eigen::SparseMatrix<double>& lap,
 	     const Eigen::MatrixXd& V,
 	     const Eigen::MatrixXi& E,
@@ -84,18 +97,26 @@ void tet2lap(Eigen::SparseMatrix<double>& lap,
 	Eigen::MatrixXd edge_lengths;
 	igl::edge_lengths(V, P, edge_lengths);
 
+#if !VERBOSE
 	boost::progress_display prog(P.rows());
+#endif
 	for(int ti = 0; ti < P.rows(); ti++) {
-		for(int ei = 0; ei < P.cols(); ei++) {
+		for(int ei = 0; ei < 6; ei++) {
 			int i = P(ti, proto_edge_number[ei][0]);
 			int j = P(ti, proto_edge_number[ei][1]);
 			double el = edge_lengths(ti, ei);
-			double w = el * (1.0 / std::tan(dihedral_angles(ti, ei)));
+			int opposite_ei = opposite_edge[ei];
+			//double cot = (1.0 / std::tan(dihedral_angles(ti, opposite_ei)/2)) / 6.0;
+			double cot = (1.0 / std::tan(dihedral_angles(ti, opposite_ei))) / 6.0;
+			double w = el * cot;
+			std::cerr << " apply weight " << w << " = " << el << " * " << cot << " on edge " << V.row(i) <<"(id: "<< i << ") --- " << V.row(j) <<"(id: "<< j << ")" << endl;
 			lap.coeffRef(i, j) += w;
 			lap.coeffRef(j, i) += w;
 			lap.coeffRef(i, i) -= w;
 			lap.coeffRef(j, j) -= w;
 		}
+#if !VERBOSE
 		++prog;
+#endif
 	}
 }

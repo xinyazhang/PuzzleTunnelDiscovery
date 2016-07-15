@@ -10,25 +10,7 @@
 using std::string;
 using std::endl;
 using std::cerr;
-using std::fixed;
 using std::vector;
-
-bool has_suffix(const string &str, const string &suffix)
-{
-	return str.size() >= suffix.size() &&
-		str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
-}
-
-std::string replace_suffix(const string &str,
-			   const string &suffix,
-			   const string &newsuffix)
-{
-	if (!has_suffix(str, suffix))
-		return std::string();
-	std::string ret(str);
-	ret.replace(str.size() - suffix.size(), suffix.size(), newsuffix);
-	return ret;
-}
 
 void usage()
 {
@@ -73,6 +55,8 @@ int main(int argc, char* argv[])
 		std::cerr << e.what() << std::endl;
 		return -1;
 	}
+	if (V.rows() < 16)
+		std::cerr << lap << endl;
 	Eigen::saveMarket(lap, ofn);
 	return 0;
 }
