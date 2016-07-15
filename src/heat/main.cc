@@ -26,16 +26,17 @@ void simulate(std::ostream& fout,
 {
 	Eigen::VectorXd VF = IV;
 	fout.precision(17);
-	for(double tnow = delta_t; tnow < end_t; tnow += delta_t) {
+	for(double tnow = 0.0; tnow < end_t; tnow += delta_t) {
 #if 0
 		Eigen::VectorXd nextVF(VF.rows());
 		for(int i = 0; i < V.rows(); i++) {
 			nextVF(i) = lap.row(i).dot(VF);
 		}
 #endif
-		VF += lap * VF;
-		fout << "t: " << tnow;
-		fout << VF.rows() << endl << VF << endl;
+		fout << "t: " << tnow << "\t" << VF.rows() << endl;
+		fout << VF << endl;
+		fout << "sum: " << VF.sum() << endl;
+		VF += (alpha * lap) * VF;
 	}
 }
 
