@@ -26,6 +26,17 @@ private:
 	Eigen::MatrixXd B;
 	vector<Eigen::VectorXd>& fields_;
 	int frameid_ = 0;
+
+	void calibre_frameid()
+	{
+		frameid_ = std::max(frameid_, 0);
+		frameid_ = std::min(int(fields_.size() - 1), frameid_);
+	}
+
+	vector<int> tetleft_;
+	Eigen::MatrixXd V_temp_;
+	Eigen::MatrixXi F_temp_;
+	Eigen::VectorXd Z_temp_;
 public:
 	KeyDown(
 		Eigen::MatrixXd& V,
@@ -36,8 +47,59 @@ public:
 		: V_(V), E_(E), P_(P), fields_(fields)
 	{
 		igl::barycenter(V,P,B);
-		frameid_ = fields_.size()/2;
+		frameid_ = 0;
 		std::cerr << "KeyDown constructor was called " << endl;
+		adjust_slice_plane(0.5);
+	}
+
+	void adjust_slice_plane(double t)
+	{
+		Eigen::VectorXd v = B.col(2).array() - B.col(2).minCoeff();
+		v /= v.col(0).maxCoeff();
+
+		tetleft_.clear();
+		for (unsigned i = 0; i < v.size(); ++i)
+			if (v(i) < t)
+				tetleft_.emplace_back(i);
+
+		V_temp_.resize(tetleft_.size()*4,3);
+		F_temp_.resize(tetleft_.size()*4,3);
+		Z_temp_.resize(tetleft_.size()*4);
+		for (unsigned i = 0; i < tetleft_.size(); ++i) {
+			V_temp_.row(i*4+0) = V_.row(P_(tetleft_[i],0));
+			V_temp_.row(i*4+1) = V_.row(P_(tetleft_[i],1));
+			V_temp_.row(i*4+2) = V_.row(P_(tetleft_[i],2));
+			V_temp_.row(i*4+3) = V_.row(P_(tetleft_[i],3));
+			F_temp_.row(i*4+0) << (i*4)+0, (i*4)+1, (i*4)+3;
+			F_temp_.row(i*4+1) << (i*4)+0, (i*4)+2, (i*4)+1;
+			F_temp_.row(i*4+2) << (i*4)+3, (i*4)+2, (i*4)+0;
+			F_temp_.row(i*4+3) << (i*4)+1, (i*4)+2, (i*4)+3;
+		}
+	}
+
+	void update_frame(igl::viewer::Viewer& viewer)
+	{
+		Eigen::VectorXd& FV(fields_[frameid_]);
+		for (unsigned i = 0; i < tetleft_.size(); ++i) {
+#if 0
+			Z_temp_(i*4+0) = FV(P_(tetleft_[i],0));
+			Z_temp_(i*4+1) = FV(P_(tetleft_[i],1));
+			Z_temp_(i*4+2) = FV(P_(tetleft_[i],2));
+			Z_temp_(i*4+3) = FV(P_(tetleft_[i],3));
+#else
+			Z_temp_(i*4+0) = V_(P_(tetleft_[i],0), 2);
+			Z_temp_(i*4+1) = V_(P_(tetleft_[i],1), 2);
+			Z_temp_(i*4+2) = V_(P_(tetleft_[i],2), 2);
+			Z_temp_(i*4+3) = V_(P_(tetleft_[i],3), 2);
+#endif
+		}
+		Eigen::MatrixXd C(tetleft_.size()*4, 3);
+		igl::jet(Z_temp_, true, C);
+
+		viewer.data.clear();
+		viewer.data.set_mesh(V_temp_, F_temp_);
+		viewer.data.set_colors(C);
+		viewer.data.set_face_based(false);
 	}
 
 	bool operator()(igl::viewer::Viewer& viewer, unsigned char key, int modifier)
@@ -50,56 +112,28 @@ public:
 		} else if (key == 'J') {
 			frameid_ += fields_.size()/10;
 		}
-		frameid_ = std::max(frameid_, 0);
-		frameid_ = std::min(int(fields_.size() - 1), frameid_);
+		calibre_frameid();
+
 		std::cerr << "Frame ID: " << frameid_
 			<< "\tStepping: " << fields_.size() / 10
 			<< "\tKey: " << key << " was pressed "
 			<< endl;
 
-		if (key >= '1' && key <= '9')
-		{
+		if (key >= '1' && key <= '9') {
 			double t = double((key - '1')+1) / 9.0;
-
-			VectorXd v = B.col(2).array() - B.col(2).minCoeff();
-			v /= v.col(0).maxCoeff();
-
-			vector<int> s;
-
-			for (unsigned i=0; i<v.size();++i)
-				if (v(i) < t)
-					s.push_back(i);
-
-			MatrixXd V_temp(s.size()*4,3);
-			MatrixXi F_temp(s.size()*4,3);
-			VectorXd Z_temp(s.size()*4);
-			VectorXd& FV(fields_[frameid_]);
-			MatrixXd C(s.size()*4, 3);
-
-			for (unsigned i=0; i<s.size();++i)
-			{
-				V_temp.row(i*4+0) = V_.row(P_(s[i],0));
-				V_temp.row(i*4+1) = V_.row(P_(s[i],1));
-				V_temp.row(i*4+2) = V_.row(P_(s[i],2));
-				V_temp.row(i*4+3) = V_.row(P_(s[i],3));
-				F_temp.row(i*4+0) << (i*4)+0, (i*4)+1, (i*4)+3;
-				F_temp.row(i*4+1) << (i*4)+0, (i*4)+2, (i*4)+1;
-				F_temp.row(i*4+2) << (i*4)+3, (i*4)+2, (i*4)+0;
-				F_temp.row(i*4+3) << (i*4)+1, (i*4)+2, (i*4)+3;
-				Z_temp(i*4+0) = FV(P_(s[i],0));
-				Z_temp(i*4+1) = FV(P_(s[i],1));
-				Z_temp(i*4+2) = FV(P_(s[i],2));
-				Z_temp(i*4+3) = FV(P_(s[i],3));
-			}
-			igl::jet(Z_temp,true,C);
-
-			viewer.data.clear();
-			viewer.data.set_mesh(V_temp,F_temp);
-			viewer.data.set_colors(C);
-			viewer.data.set_face_based(false);
+			adjust_slice_plane(t);
+			update_frame(viewer);
+			std::cerr << "Tet left: " << tetleft_.size() << endl;
 		}
 
 		return false;
+	}
+
+	void next_frame() 
+	{
+		frameid_++;
+		std::cerr << frameid_ << ' ';
+		calibre_frameid();
 	}
 };
 
@@ -167,7 +201,11 @@ int main(int argc, char* argv[])
 	}
 
 	igl::viewer::Viewer viewer;
-	viewer.callback_key_down = KeyDown(V,E,P, fields);
+	KeyDown kd(V,E,P, fields);
+	viewer.callback_key_pressed = [&kd](igl::viewer::Viewer& viewer, unsigned char key, int modifier) -> bool { return kd.operator()(viewer, key, modifier); } ;
+	viewer.callback_pre_draw = [&kd](igl::viewer::Viewer& viewer) -> bool { kd.next_frame(); kd.update_frame(viewer); return false; };
+	viewer.core.is_animating = true;
+	viewer.core.animation_max_fps = 30.;
 	viewer.launch();
 
 	return 0;
