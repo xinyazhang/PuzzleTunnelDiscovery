@@ -125,7 +125,7 @@ public:
 		}
 #endif
 		Eigen::MatrixXd C(vertback_.size(), 3);
-		igl::jet(Z_temp_, true, C);
+		igl::jet(Z_temp_, 0.0, 1.0, C);
 
 		viewer.data.clear();
 		viewer.data.set_mesh(V_temp_, F_temp_);
