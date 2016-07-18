@@ -138,9 +138,9 @@ public:
 		using namespace std;
 		using namespace Eigen;
 
-		if (key == 'K') {
+		if (toupper(key) == 'K') {
 			frameid_ -= fields_.size()/10;
-		} else if (key == 'J') {
+		} else if (toupper(key) == 'J') {
 			frameid_ += fields_.size()/10;
 		}
 		calibre_frameid();
@@ -263,7 +263,14 @@ int main(int argc, char* argv[])
 	igl::viewer::Viewer viewer;
 	KeyDown kd(V,E,P, fields);
 	viewer.callback_key_pressed = [&kd](igl::viewer::Viewer& viewer, unsigned char key, int modifier) -> bool { return kd.operator()(viewer, key, modifier); } ;
-	viewer.callback_pre_draw = [&kd](igl::viewer::Viewer& viewer) -> bool { kd.next_frame(); kd.update_frame(viewer); return false; };
+	viewer.callback_pre_draw = [&kd](igl::viewer::Viewer& viewer) -> bool
+	{
+		if (viewer.core.is_animating) {
+			kd.next_frame();
+			kd.update_frame(viewer);
+		}
+		return false;
+	};
 	viewer.core.is_animating = true;
 	viewer.core.animation_max_fps = 30.;
 	viewer.launch();
