@@ -211,20 +211,49 @@ int main(int argc, char* argv[])
 		std::ifstream fin(ffn);
 		if (!fin.is_open())
 			throw std::runtime_error("Cannot open " + ffn + " for read");
-		while (true) {
-			skip_to_needle(fin, "t:");
-			if (fin.eof())
-				break;
-			double t;
-			size_t nvert;
-			fin >> t >> nvert;
-			times.emplace_back(t);
-			Eigen::VectorXd field;
-			field.resize(nvert);
-			for(size_t i = 0; i < nvert; i++) {
-				fin >> field(i);
+		bool binary = false;
+		if (fin.peek() == 0) {
+			binary = true;
+		}
+		if (!binary) {
+			while (true) {
+				skip_to_needle(fin, "t:");
+				if (fin.eof())
+					break;
+				double t;
+				size_t nvert;
+				fin >> t >> nvert;
+				times.emplace_back(t);
+				Eigen::VectorXd field;
+				field.resize(nvert);
+				for(size_t i = 0; i < nvert; i++) {
+					fin >> field(i);
+				}
+				fields.emplace_back(field);
 			}
-			fields.emplace_back(field);
+		} else {
+			fin.get(); fin.get(); // Skip "\0\n" header
+			std::cerr.precision(17);
+			while (!fin.eof()) {
+				double t;
+				uint32_t nvert;
+				fin.read((char*)&t, sizeof(t));
+				if (fin.eof())
+					break;
+				times.emplace_back(t);
+				fin.read((char*)&nvert, sizeof(nvert));
+				Eigen::VectorXd field;
+				field.resize(nvert);
+				fin.read((char*)field.data(), sizeof(double) * nvert);
+				fields.emplace_back(field);
+				double sum;
+				fin.read((char*)&sum, sizeof(sum));
+#if 0
+				std::cerr << "t: " << t << "\t" << field.rows() << endl;
+				std::cerr << field << endl;
+				std::cerr << "sum: " << field.sum() << endl;
+#endif
+			}
 		}
 	} catch (std::runtime_error& e) {
 		std::cerr << e.what() << std::endl;
