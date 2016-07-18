@@ -11,7 +11,7 @@
 using std::vector;
 using std::endl;
 
-#define VERBOSE 1
+#define VERBOSE 0
 
 // Not "real" Voronoi volume
 void calc_voronoi_volumes(
@@ -109,7 +109,9 @@ void tet2lap(Eigen::SparseMatrix<double>& lap,
 			//double cot = (1.0 / std::tan(dihedral_angles(ti, opposite_ei)/2)) / 6.0;
 			double cot = (1.0 / std::tan(dihedral_angles(ti, opposite_ei))) / 6.0;
 			double w = el * cot;
+#if VERBOSE
 			std::cerr << " apply weight " << w << " = " << el << " * " << cot << " on edge " << V.row(i) <<"(id: "<< i << ") --- " << V.row(j) <<"(id: "<< j << ")" << endl;
+#endif
 			lap.coeffRef(i, j) += w;
 			lap.coeffRef(j, i) += w;
 			lap.coeffRef(i, i) -= w;
