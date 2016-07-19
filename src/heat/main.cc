@@ -4,6 +4,7 @@
 #include <Eigen/SparseCore>
 #include <iostream>
 #include <string>
+#include <set>
 #include <memory>
 #include <unsupported/Eigen/SparseExtra>
 
@@ -15,8 +16,9 @@ using std::vector;
 
 void usage()
 {
-	std::cerr << "Options: [-b] -0 <boundary condition file> -l <Laplacian matrix> [-o output_file -t <end time> -d <time delta> -a <thermal conductivity factor>]" << endl
-		<< "\t-b: enable binary output" << endl;
+	std::cerr << "Options: [-bD] -0 <boundary condition file> -l <Laplacian matrix> [-o output_file -t <end time> -d <time delta> -a <thermal conductivity factor>]" << endl
+		<< "\t-b: enable binary output" << endl
+		<< "\t-D: use initial boundary condition as Dirichlet condition" << endl;
 }
 
 void simulate(std::ostream& fout,
@@ -58,13 +60,20 @@ void simulate(std::ostream& fout,
 	}
 }
 
+enum BOUNDARY_CONDITION {
+	BC_NONE,
+	BC_DIRICHLET,
+	BC_NEUMANN, // FIXME: add support for Neumann BC
+};
+
 int main(int argc, char* argv[])
 {
 	int opt;
 	string ofn, lmf, ivf;
 	double end_t = 10.0, delta_t = 0.1, alpha = 1;
 	bool binary = false;
-	while ((opt = getopt(argc, argv, "0:o:t:d:a:l:b")) != -1) {
+	BOUNDARY_CONDITION bc;
+	while ((opt = getopt(argc, argv, "0:o:t:d:a:l:bD")) != -1) {
 		switch (opt) {
 			case 'o':
 				ofn = optarg;
@@ -87,13 +96,16 @@ int main(int argc, char* argv[])
 			case 'b':
 				binary = true;
 				break;
+			case 'D':
+				bc = BC_DIRICHLET;
+				break;
 			default:
 				std::cerr << "Unrecognized option: " << optarg << endl;
 				usage();
 				return -1;
 		}
 	}
-	Eigen::VectorXd F;
+	Eigen::VectorXd F; // F means 'field' not 'faces'
 	if (ivf.empty()) {
 		std::cerr << "Missing boundary condition file" << endl;
 		usage();
@@ -121,6 +133,22 @@ int main(int argc, char* argv[])
 	if (!Eigen::loadMarket(lap, lmf)) {
 		std::cerr << "Failed to load Laplacian matrix from file: " << lmf << endl;
 		return -1;
+	}
+	// Fix dlap matrix for Dirichlet condition
+	if (bc == BC_DIRICHLET) {
+		std::set<int> to_prune;
+		for(int i = 0; i < F.size(); i++) {
+			if (F(i) != 0) {
+				to_prune.emplace(i);
+			}
+		}
+		lap.prune([&to_prune](const int& row, const int&, const int&) -> bool
+				{
+					if (to_prune.find(row) == to_prune.end())
+						return true; // Keep
+					return false;
+				}
+			 );
 	}
 
 	std::unique_ptr<std::ostream> pfout_guard;
