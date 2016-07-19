@@ -1,4 +1,5 @@
-#include "readtet.h"
+#include <readtet.h>
+#include <write_ply_vc.h>
 #include <unistd.h>
 #include <string>
 #include <unordered_map>
@@ -7,6 +8,7 @@
 #include <igl/barycenter.h>
 #include <igl/viewer/Viewer.h>
 #include <igl/jet.h>
+#include <time.h>
 
 using std::string;
 using std::endl;
@@ -54,6 +56,22 @@ public:
 		frameid_ = 0;
 		std::cerr << "KeyDown constructor was called " << endl;
 		adjust_slice_plane(0.5);
+	}
+
+	void save_frame()
+	{
+		time_t tnow = time(NULL);
+		string now = ctime(&tnow);
+		now = now.substr(0, now.size() - 1);
+		Eigen::MatrixXd C;
+		igl::jet(Z_temp_, 0.0, 1.0, C);
+		string fn = "visheat-snapshot-at-"+now+"-frame-"+std::to_string(frameid_)+".ply";
+		std::cerr << "Saving model to file " << fn;
+		write_ply_vc(fn,
+				V_temp_,
+				F_temp_,
+				C);
+		std::cerr << " done" << endl;
 	}
 
 	void adjust_slice_plane(double t)
@@ -155,7 +173,7 @@ public:
 		} else if (toupper(key) == 'J') {
 			frameid_ += fields_.size()/10;
 			redraw = true;
-		}
+		} 
 		calibre_frameid();
 
 		std::cerr << "Frame ID: " << frameid_
@@ -171,6 +189,11 @@ public:
 		}
 		if (redraw)
 			update_frame(viewer);
+
+		if (toupper(key) == 'S') {
+			save_frame();
+			viewer.core.is_animating = false;
+		}
 
 		return false;
 	}
