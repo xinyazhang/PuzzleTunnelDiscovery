@@ -137,11 +137,14 @@ public:
 	{
 		using namespace std;
 		using namespace Eigen;
+		bool redraw = false;
 
 		if (toupper(key) == 'K') {
 			frameid_ -= fields_.size()/10;
+			redraw = true;
 		} else if (toupper(key) == 'J') {
 			frameid_ += fields_.size()/10;
+			redraw = true;
 		}
 		calibre_frameid();
 
@@ -152,10 +155,12 @@ public:
 
 		if (key >= '1' && key <= '9') {
 			double t = double((key - '1')+1) / 8.0;
+			redraw = true;
 			adjust_slice_plane(t);
-			update_frame(viewer);
 			std::cerr << "Tet left: " << tetleft_.size() << endl;
 		}
+		if (redraw)
+			update_frame(viewer);
 
 		return false;
 	}
