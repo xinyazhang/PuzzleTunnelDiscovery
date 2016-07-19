@@ -40,6 +40,7 @@ private:
 	Eigen::VectorXd Z_temp_;
 	std::unordered_map<int, int> vertidmap_; // Old vert id -> New vert id
 	vector<int> vertback_;
+	bool flush_viewer_ = false;
 public:
 	KeyDown(
 		Eigen::MatrixXd& V,
@@ -100,6 +101,8 @@ public:
 			for(unsigned k = 0; k < 3; k++)
 				F_temp_(j,k) = vertidmap_[F_temp_(j,k)];
 		Z_temp_.resize(vertback_.size());
+
+		flush_viewer_ = true;
 	}
 
 	void update_frame(igl::viewer::Viewer& viewer)
@@ -124,13 +127,20 @@ public:
 			Z_temp_(i) = FV(vertback_[i]);
 		}
 #endif
-		Eigen::MatrixXd C(vertback_.size(), 3);
-		igl::jet(Z_temp_, 0.0, 1.0, C);
-
-		viewer.data.clear();
-		viewer.data.set_mesh(V_temp_, F_temp_);
-		viewer.data.set_colors(C);
+		if (flush_viewer_) {
+			viewer.data.clear();
+			viewer.data.set_mesh(V_temp_, F_temp_);
+			flush_viewer_ = false;
+		}
 		viewer.data.set_face_based(false);
+		viewer.data.V_material_diffuse.resize(vertback_.size(), 3);
+		igl::jet(Z_temp_, 0.0, 1.0, viewer.data.V_material_diffuse);
+		viewer.data.V_material_ambient = 0.1 * viewer.data.V_material_diffuse;
+		constexpr double grey = 0.3;
+		viewer.data.V_material_specular = grey+0.1*(viewer.data.V_material_diffuse.array()-grey);
+		viewer.data.dirty |= igl::viewer::ViewerData::DIRTY_DIFFUSE;
+		// The code above replaces viewer.data.set_colors(C);
+		// to calculate the result in-place
 	}
 
 	bool operator()(igl::viewer::Viewer& viewer, unsigned char key, int modifier)
@@ -229,12 +239,12 @@ int main(int argc, char* argv[])
 				size_t nvert;
 				fin >> t >> nvert;
 				times.emplace_back(t);
-				Eigen::VectorXd field;
+				fields.emplace_back();
+				Eigen::VectorXd& field = fields.back();
 				field.resize(nvert);
 				for(size_t i = 0; i < nvert; i++) {
 					fin >> field(i);
 				}
-				fields.emplace_back(field);
 			}
 		} else {
 			fin.get(); fin.get(); // Skip "\0\n" header
@@ -247,10 +257,10 @@ int main(int argc, char* argv[])
 					break;
 				times.emplace_back(t);
 				fin.read((char*)&nvert, sizeof(nvert));
-				Eigen::VectorXd field;
+				fields.emplace_back();
+				Eigen::VectorXd& field = fields.back();
 				field.resize(nvert);
 				fin.read((char*)field.data(), sizeof(double) * nvert);
-				fields.emplace_back(field);
 				double sum;
 				fin.read((char*)&sum, sizeof(sum));
 #if 0

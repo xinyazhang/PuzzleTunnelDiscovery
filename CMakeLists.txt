@@ -11,7 +11,7 @@ INCLUDE_DIRECTORIES(${IGL_INCLUDE_DIR})
 
 # C++11 and Debug
 # Note: we focus on gcc/clang right now, so we uses compiler specific solutions.
-set(CMAKE_CXX_FLAGS "--std=c++14 -g -ggdb3 -Wno-ignored-attributes -Wno-deprecated-declarations -Wno-deprecated ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "--std=c++14 -g -O2 -march=haswell -ggdb3 -Wno-ignored-attributes -Wno-deprecated-declarations -Wno-deprecated ${CMAKE_CXX_FLAGS}")
 set(CMAKE_EXE_LINKER_FLAGS "-g")
 
 # Define function to copy binaries to bin/
