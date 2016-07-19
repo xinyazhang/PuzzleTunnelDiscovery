@@ -14,7 +14,10 @@ using std::vector;
 
 void usage()
 {
-	std::cerr << "Options: -i <tetgen file prefix> [-o output_file]" << endl;
+	std::cerr << "Options: -i <tetgen file prefix> [-o output_initial_vector -m output_boundary_laplacian_matrix -0 boundary_value -D -N <fp value>] Boundary Description" << endl;
+	std::cerr << "\t-D: enable Dirichlet condition on the boundary" << endl
+		  << "\t-N: enable and set Neumann condition on the boundary" << endl
+		  << "\tBoundary Description: X- X+ Y- Y+ Z- Z+" << endl;
 }
 
 const int kCoords[][2] = {
@@ -33,6 +36,12 @@ const char* kCoordsName[] = {
         "Y+",
         "Z-",
         "Z+"
+};
+
+enum BOUNDARY_CONDITION {
+	BC_NONE,
+	BC_DIRICHLET,
+	BC_NEUMANN
 };
 
 inline bool fpclose(double f0, double f1)
@@ -56,12 +65,15 @@ void set_IV(Eigen::VectorXd& iv,
 	}
 }
 
+
 int main(int argc, char* argv[])
 {
 	int opt;
-	string iprefix, ofn;
+	string iprefix, ofn, omn;
 	double bv0 = 1.0;
-	while ((opt = getopt(argc, argv, "i:o:0:")) != -1) {
+	double nv0 = -1.0;
+	BOUNDARY_CONDITION bc = BC_NONE;
+	while ((opt = getopt(argc, argv, "i:o:m:0:DN")) != -1) {
 		switch (opt) {
 			case 'i': 
 				iprefix = optarg;
@@ -69,8 +81,18 @@ int main(int argc, char* argv[])
 			case 'o':
 				ofn = optarg;
 				break;
+			case 'm':
+				omn = optarg;
+				break;
 			case '0':
 				bv0 = atof(optarg);
+				break;
+			case 'D':
+				bc = BC_DIRICHLET;
+				break;
+			case 'N':
+				bc = BC_NEUMANN;
+				nv0 = atof(optarg);
 				break;
 			default:
 				std::cerr << "Unrecognized option: " << optarg << endl;
@@ -94,6 +116,9 @@ int main(int argc, char* argv[])
 	}
 	if (ofn.empty()) {
 		ofn = iprefix + ".Bcond";
+	}
+	if (omn.empty()) {
+		omn = iprefix + ".dlapbc";
 	}
 
 	Eigen::MatrixXd V;
@@ -123,6 +148,12 @@ int main(int argc, char* argv[])
 		fout.open(ofn);
 		fout << IV.rows() << endl << IV << endl;
 		fout.close();
+		// FIXME: Support Neumann BC. (Dirichlet BC is supported by
+		// heat directly.
+#if 0
+		auto dlapbc = 
+		Eigen::saveMarket(dlapbc, omn);
+#endif
 	} catch (std::runtime_error& e) {
 		std::cerr << e.what() << std::endl;
 		return -1;
