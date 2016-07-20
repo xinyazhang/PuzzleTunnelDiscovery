@@ -3,6 +3,7 @@
 #include <iostream>
 #include <algorithm>
 #include <stdlib.h>
+#include "options.h"
 
 constexpr int kNInterp = 16; //16;
 constexpr int kNSlices = 32; //32;
@@ -237,16 +238,22 @@ LayerPolygon build_parallelogram(const MazeSegment& wall,
 	return LayerPolygon(vs, theta, wall);
 }
 
+Obstacle::Obstacle(Options& o)
+	:opt(o)
+{
+}
 void Obstacle::construct(const MazeSegment& wall,
 		const MazeSegment& stick,
 		const MazeVert& stick_center)
 {
 	std::vector<LayerPolygon> layers;
 	double DeltaTheta = kDeltaTheta * (1 + 0.05 * drand48());
-	for(int i = 0; i < kNLayers; i++) {
-		double theta = DeltaTheta * i + kBaseTheta;
-		if (theta > kEndTheta)
-			theta = kEndTheta;
+	double EndTheta = kEndTheta + opt.margin();
+	double BaseTheta = kBaseTheta - opt.margin();
+	for(int i = 0; true; i++) {
+		double theta = DeltaTheta * i + BaseTheta;
+		if (theta > EndTheta)
+			theta = EndTheta;
 		auto parallelogram = build_parallelogram(wall, stick, stick_center, theta);
 #if 0
 		auto rs = rotate(stick, stick_center, theta);
@@ -254,7 +261,7 @@ void Obstacle::construct(const MazeSegment& wall,
 		parallelogram.expand();
 #endif
 		layers.emplace_back(parallelogram);
-		if (theta == kEndTheta)
+		if (theta == EndTheta)
 			break;
 	}
 	// Add singularity layers

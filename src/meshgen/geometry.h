@@ -7,33 +7,6 @@
 #include <boost/range/irange.hpp>
 #include <vector>
 
-#if 0
-class GeometryGroup;
-
-struct IndexedGeometry {
-public:
-	IndexedGeometry(GeometryGroup* = nullptr);
-
-	int get_local_index();
-	int get_global_index();
-	void migrate_to(GeometryGroup*);
-private:
-	int local_index_ = -1;
-	int global_index_ = -1;
-	GeometryGroup* group_ = nullptr;
-};
-
-class GeometryGroup {
-public:
-	static GeometryGroup* global_instance();
-	int get_geometry_index(IndexedGeometry*);
-
-private:
-	int gindex_ = 0;
-	std::unordered_map<IndexedGeometry*, int> maps_;
-};
-#endif
-
 typedef Eigen::Vector2d MazeVert;
 typedef std::vector<MazeVert, Eigen::aligned_allocator<MazeVert> > MazeVertArray;
 
@@ -62,9 +35,11 @@ struct ObFace {
 };
 
 class LayerPolygon;
+class Options;
 
 class Obstacle {
 public:
+	Obstacle(Options& o);
 	void construct(const MazeSegment& wall,
 		const MazeSegment& stick,
 		const MazeVert& stick_center);
@@ -82,6 +57,7 @@ private:
 	int vi_ = 0;
 
 	void seal(LayerPolygon&, bool reverse);
+	Options& opt;
 };
 
 #endif

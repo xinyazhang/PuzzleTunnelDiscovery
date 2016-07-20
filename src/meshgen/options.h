@@ -13,6 +13,10 @@ public:
 	void write_geo(const std::string& suffix,
 		       const Eigen::MatrixXd& V,
 		       const Eigen::MatrixXi& F);
+
+	double margin() const;
+private:
+	double margin_ = 0.0;
 };
 
 #endif

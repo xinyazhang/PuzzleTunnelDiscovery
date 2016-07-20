@@ -11,7 +11,7 @@ int main(int argc, char* argv[])
 
 	for (auto wallid : wall.irange()) {
 		for(auto stickid : stick.irange()) {
-			Obstacle obs;
+			Obstacle obs(opt);
 			obs.construct(wall.get_prim(wallid),
 				    stick.get_prim(stickid),
 				    stick.get_center());
