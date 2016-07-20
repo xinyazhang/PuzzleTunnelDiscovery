@@ -57,6 +57,6 @@ int main(int argc, char* argv[])
 		tier++;
 	}
 	cout << "done.obj: " << meshes.front() << endl;
-	cout << "\taddcover " << meshes.front() << " covered.obj" << endl;
+	cout << "\t$(BIN)/addcover <" << meshes.front() << " > covered.obj" << endl;
 	cout << "\tfix_mesh.py " << "covered.obj done.obj" << endl;
 }
