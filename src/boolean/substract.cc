@@ -3,7 +3,7 @@
 #include <igl/MeshBooleanType.h>
 //#define IGL_NO_CORK
 //#undef IGL_STATIC_LIBRARY
-#include "join.h"
+#include <join.h>
 
 #include <iostream>
 
