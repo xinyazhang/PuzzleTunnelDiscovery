@@ -12,6 +12,7 @@ using std::vector;
 using std::endl;
 
 #define VERBOSE 0
+#define CUT_OFF_PERIODICAL_PART 0
 
 // Not "real" Voronoi volume
 void calc_voronoi_volumes(
@@ -80,6 +81,18 @@ const int opposite_edge[] = {
 	2
 };
 
+#if CUT_OFF_PERIODICAL_PART
+/*
+ * Note: we want to cut off boundaries that intersect with Z = 0 or Z = 2Pi.
+ */
+inline bool cross_theta_boundary(const Eigen::VectorXd& v0, const Eigen::VectorXd& v1)
+{
+	bool v0in = (v0(2) <= M_PI * 2 && v0(2) >= 0);
+	bool v1in = (v1(2) <= M_PI * 2 && v1(2) >= 0);
+	return (v0in != v1in);
+}
+#endif
+
 void tet2lap(Eigen::SparseMatrix<double>& lap,
 	     const Eigen::MatrixXd& V,
 	     const Eigen::MatrixXi& E,
@@ -104,6 +117,10 @@ void tet2lap(Eigen::SparseMatrix<double>& lap,
 		for(int ei = 0; ei < 6; ei++) {
 			int i = P(ti, proto_edge_number[ei][0]);
 			int j = P(ti, proto_edge_number[ei][1]);
+#if CUT_OFF_PERIODICAL_PART
+			if (cross_theta_boundary(V.row(i), V.row(j)))
+				continue;
+#endif
 			double el = edge_lengths(ti, ei);
 			int opposite_ei = opposite_edge[ei];
 			//double cot = (1.0 / std::tan(dihedral_angles(ti, opposite_ei)/2)) / 6.0;
