@@ -27,7 +27,6 @@ void simulate(std::ostream& fout,
 	      const Eigen::VectorXd& IV,
 	      double delta_t,
 	      double end_t,
-	      double alpha,
 	      bool binary,
 	      double snapshot_interval)
 {
@@ -62,7 +61,7 @@ void simulate(std::ostream& fout,
 			}
 			last_snapshot += snapshot_interval;
 		}
-		VF += (alpha * lap) * VF;
+		VF += lap * VF;
 		++prog;
 	}
 }
@@ -75,6 +74,8 @@ enum BOUNDARY_CONDITION {
 
 int main(int argc, char* argv[])
 {
+	Eigen::initParallel();
+
 	int opt;
 	string ofn, lmf, ivf;
 	double end_t = 10.0, delta_t = 0.1, alpha = 1;
@@ -176,7 +177,8 @@ int main(int argc, char* argv[])
 		pfout_guard.reset(new std::ofstream(ofn));
 		pfout = pfout_guard.get();
 	}
-	simulate(*pfout, lap, F, delta_t, end_t, alpha, binary, snapshot_interval);
+	lap *= alpha;
+	simulate(*pfout, lap, F, delta_t, end_t, binary, snapshot_interval);
 	pfout_guard.reset();
 
 	return 0;

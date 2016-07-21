@@ -4,6 +4,8 @@ project(mkobs3d)
 set (mkobs3d_VERSION_MAJOR 0)
 set (mkobj3d_VERSION_MINOR 2)
 
+FIND_PACKAGE(OpenMP)
+
 # Include Eigen3 and IGL
 FIND_PACKAGE(Eigen3 REQUIRED)
 INCLUDE_DIRECTORIES(${EIGEN3_INCLUDE_DIR})
@@ -12,6 +14,7 @@ INCLUDE_DIRECTORIES(${IGL_INCLUDE_DIR})
 # C++11 and Debug
 # Note: we focus on gcc/clang right now, so we uses compiler specific solutions.
 set(CMAKE_CXX_FLAGS "--std=c++14 -g -O2 -march=haswell -ggdb3 -Wno-ignored-attributes -Wno-deprecated-declarations -Wno-deprecated ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "${OpenMP_CXX_FLAGS} ${CMAKE_CXX_FLAGS}")
 set(CMAKE_EXE_LINKER_FLAGS "-g")
 
 # Define function to copy binaries to bin/
@@ -100,6 +103,8 @@ EASYADD(Bcond)
 TARGET_LINK_LIBRARIES(Bcond tetread)
 
 EASYADD(heat)
+TARGET_LINK_LIBRARIES(hollow meshbool)
+TARGET_INCLUDE_DIRECTORIES(heat BEFORE PRIVATE ${CMAKE_SOURCE_DIR}/third-party/eigen)
 
 find_package(GLEW REQUIRED)
 find_package(OpenGL REQUIRED)
