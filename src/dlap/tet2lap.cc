@@ -13,7 +13,7 @@ using std::endl;
 
 #define VERBOSE 0
 #define CUT_OFF_PERIODICAL_PART 0
-#define SET_FROM_TRIPPLETS 0 // this requires Eigen 3.3 and above.
+#define SET_FROM_TRIPPLETS 1
 
 // Not "real" Voronoi volume
 void calc_voronoi_volumes(
@@ -153,9 +153,17 @@ void tet2lap(Eigen::SparseMatrix<double>& lap,
 #endif
 	}
 #if SET_FROM_TRIPPLETS
+#if EIGEN_VERSION_AT_LEAST(3,3,0)
 	lap.setFromTriplets(tris.begin(),
 			    tris.end(),
 			    [] (const double& a, const double &b) -> double { return a+b; }
 			   );
+#else // A slower fix for Eigen < 3.3
+	lap.setFromTriplets(tris.begin(), tris.end()); // Stuffing data to it
+	for (auto tri : tris) // Reset to zero
+		lap.coeffRef(tri.row(), tri.col()) = 0.0;
+	for (auto tri : tris) // Accumulate to the correct value
+		lap.coeffRef(tri.row(), tri.col()) += tri.value();
+#endif
 #endif
 }
