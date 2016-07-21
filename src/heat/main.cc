@@ -7,6 +7,7 @@
 #include <set>
 #include <memory>
 #include <unsupported/Eigen/SparseExtra>
+#include <boost/progress.hpp>
 
 using std::string;
 using std::endl;
@@ -27,7 +28,8 @@ void simulate(std::ostream& fout,
 	      double delta_t,
 	      double end_t,
 	      double alpha,
-	      bool binary)
+	      bool binary,
+	      double snapshot_interval)
 {
 	Eigen::VectorXd VF = IV;
 	fout.precision(17);
@@ -37,26 +39,31 @@ void simulate(std::ostream& fout,
 	} else {
 		fout << "#\n";
 	}
-	for(double tnow = 0.0; tnow < end_t; tnow += delta_t) {
+	boost::progress_display prog(end_t / delta_t);
+	for(double tnow = 0.0, last_snapshot = tnow; tnow < end_t; tnow += delta_t) {
 #if 0
 		Eigen::VectorXd nextVF(VF.rows());
 		for(int i = 0; i < V.rows(); i++) {
 			nextVF(i) = lap.row(i).dot(VF);
 		}
 #endif
-		if (!binary) {
-			fout << "t: " << tnow << "\t" << VF.rows() << endl;
-			fout << VF << endl;
-			fout << "sum: " << VF.sum() << endl;
-		} else {
-			fout.write((const char*)&tnow, sizeof(tnow));
-			uint32_t nrow = VF.rows();
-			fout.write((const char*)&nrow, sizeof(nrow));
-			fout.write((const char*)VF.data(), VF.size() * sizeof(double));
-			double sum = VF.sum();
-			fout.write((const char*)&sum, sizeof(sum));
+		if (tnow - last_snapshot >= snapshot_interval) {
+			if (!binary) {
+				fout << "t: " << tnow << "\t" << VF.rows() << endl;
+				fout << VF << endl;
+				fout << "sum: " << VF.sum() << endl;
+			} else {
+				fout.write((const char*)&tnow, sizeof(tnow));
+				uint32_t nrow = VF.rows();
+				fout.write((const char*)&nrow, sizeof(nrow));
+				fout.write((const char*)VF.data(), VF.size() * sizeof(double));
+				double sum = VF.sum();
+				fout.write((const char*)&sum, sizeof(sum));
+			}
+			last_snapshot += snapshot_interval;
 		}
 		VF += (alpha * lap) * VF;
+		++prog;
 	}
 }
 
@@ -71,9 +78,10 @@ int main(int argc, char* argv[])
 	int opt;
 	string ofn, lmf, ivf;
 	double end_t = 10.0, delta_t = 0.1, alpha = 1;
+	double snapshot_interval = -1.0;
 	bool binary = false;
 	BOUNDARY_CONDITION bc;
-	while ((opt = getopt(argc, argv, "0:o:t:d:a:l:bD")) != -1) {
+	while ((opt = getopt(argc, argv, "0:o:t:d:a:l:bDs:")) != -1) {
 		switch (opt) {
 			case 'o':
 				ofn = optarg;
@@ -99,12 +107,17 @@ int main(int argc, char* argv[])
 			case 'D':
 				bc = BC_DIRICHLET;
 				break;
+			case 's':
+				snapshot_interval = atof(optarg);
+				break;
 			default:
 				std::cerr << "Unrecognized option: " << optarg << endl;
 				usage();
 				return -1;
 		}
 	}
+	if (snapshot_interval < 0)
+		snapshot_interval = delta_t;
 	Eigen::VectorXd F; // F means 'field' not 'faces'
 	if (ivf.empty()) {
 		std::cerr << "Missing boundary condition file" << endl;
@@ -163,7 +176,7 @@ int main(int argc, char* argv[])
 		pfout_guard.reset(new std::ofstream(ofn));
 		pfout = pfout_guard.get();
 	}
-	simulate(*pfout, lap, F, delta_t, end_t, alpha, binary);
+	simulate(*pfout, lap, F, delta_t, end_t, alpha, binary, snapshot_interval);
 	pfout_guard.reset();
 
 	return 0;
