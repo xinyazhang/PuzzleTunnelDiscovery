@@ -57,6 +57,7 @@ int main(int argc, char* argv[])
 		tier++;
 	}
 	cout << "done.obj: " << meshes.front() << endl;
-	cout << "\t$(BIN)/addcover <" << meshes.front() << " > covered.obj" << endl;
-	cout << "\tfix_mesh.py " << "covered.obj done.obj" << endl;
+	//cout << "\t$(BIN)/addcover -z 0.25 <" << meshes.front() << " > covered.obj" << endl;
+	cout << "\t$(BIN)/hollow <" << meshes.front() << " > hollowed.obj" << endl;
+	cout << "\tobj2ply " << "hollowed.obj" << endl;
 }
