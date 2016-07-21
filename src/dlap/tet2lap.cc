@@ -13,6 +13,7 @@ using std::endl;
 
 #define VERBOSE 0
 #define CUT_OFF_PERIODICAL_PART 0
+#define SET_FROM_TRIPPLETS 0 // this requires Eigen 3.3 and above.
 
 // Not "real" Voronoi volume
 void calc_voronoi_volumes(
@@ -102,7 +103,13 @@ void tet2lap(Eigen::SparseMatrix<double>& lap,
 	calc_voronoi_volumes(vertex_weight, V, P);
 
 	lap.resize(V.rows(), V.rows());
+#if SET_FROM_TRIPPLETS
+	typedef Eigen::Triplet<double> tri_t;
+	std::vector<tri_t> tris;
+	tris.reserve(P.rows() * P.cols() * 4);
+#else
 	lap.reserve(P.rows() * P.cols() * 4);
+#endif
 
 	Eigen::MatrixXd dihedral_angles, dihedral_cosines;
 	igl::dihedral_angles(V, P, dihedral_angles, dihedral_cosines);
@@ -129,13 +136,26 @@ void tet2lap(Eigen::SparseMatrix<double>& lap,
 #if VERBOSE
 			std::cerr << " apply weight " << w << " = " << el << " * " << cot << " on edge " << V.row(i) <<"(id: "<< i << ") --- " << V.row(j) <<"(id: "<< j << ")" << endl;
 #endif
+#if SET_FROM_TRIPPLETS
+			tris.emplace_back(i, j, w);
+			tris.emplace_back(j, i, w);
+			tris.emplace_back(i, i, -w);
+			tris.emplace_back(j, j, -w);
+#else
 			lap.coeffRef(i, j) += w;
 			lap.coeffRef(j, i) += w;
 			lap.coeffRef(i, i) -= w;
 			lap.coeffRef(j, j) -= w;
+#endif
 		}
 #if !VERBOSE
 		++prog;
 #endif
 	}
+#if SET_FROM_TRIPPLETS
+	lap.setFromTriplets(tris.begin(),
+			    tris.end(),
+			    [] (const double& a, const double &b) -> double { return a+b; }
+			   );
+#endif
 }
