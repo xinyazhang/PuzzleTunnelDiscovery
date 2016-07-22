@@ -1,7 +1,7 @@
 #!/bin/bash
 
 meshgen () {
-	$BIN/meshgen -margin 0.0625 < "$1" 2>/dev/null
+	$BIN/meshgen -margin 1.0 < "$1" 2>/dev/null
 }
 
 mkgen() {

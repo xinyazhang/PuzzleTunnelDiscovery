@@ -133,6 +133,7 @@ void tet2lap(Eigen::SparseMatrix<double>& lap,
 			//double cot = (1.0 / std::tan(dihedral_angles(ti, opposite_ei)/2)) / 6.0;
 			double cot = (1.0 / std::tan(dihedral_angles(ti, opposite_ei))) / 6.0;
 			double w = el * cot;
+			//double w = 0.05;
 #if VERBOSE
 			std::cerr << " apply weight " << w << " = " << el << " * " << cot << " on edge " << V.row(i) <<"(id: "<< i << ") --- " << V.row(j) <<"(id: "<< j << ")" << endl;
 #endif

@@ -17,8 +17,9 @@ using std::vector;
 
 void usage()
 {
-	std::cerr << "Options: [-bD] -0 <boundary condition file> -l <Laplacian matrix> [-o output_file -t <end time> -d <time delta> -a <thermal conductivity factor>]" << endl
+	std::cerr << "Options: [-bDv] -0 <boundary condition file> -l <Laplacian matrix> [-o output_file -t <end time> -d <time delta> -a <thermal conductivity factor>]" << endl
 		<< "\t-b: enable binary output" << endl
+		<< "\t-v: enable SPD check" << endl
 		<< "\t-D: use initial boundary condition as Dirichlet condition" << endl;
 }
 
@@ -28,7 +29,9 @@ void simulate(std::ostream& fout,
 	      double delta_t,
 	      double end_t,
 	      bool binary,
-	      double snapshot_interval)
+	      double snapshot_interval,
+	      bool check_spd = false
+	      )
 {
 	Eigen::VectorXd VF = IV;
 	fout.precision(17);
@@ -61,7 +64,11 @@ void simulate(std::ostream& fout,
 			}
 			last_snapshot += snapshot_interval;
 		}
-		VF += lap * VF;
+		Eigen::VectorXd delta = lap * VF;
+		if (check_spd && VF.dot(delta) < 0) {
+			std::cerr << "DLap Matrix is NOT SPD" << endl;
+		}
+		VF += delta;
 		++prog;
 	}
 }
@@ -81,8 +88,9 @@ int main(int argc, char* argv[])
 	double end_t = 10.0, delta_t = 0.1, alpha = 1;
 	double snapshot_interval = -1.0;
 	bool binary = false;
+	bool check_spd = false;
 	BOUNDARY_CONDITION bc;
-	while ((opt = getopt(argc, argv, "0:o:t:d:a:l:bDs:")) != -1) {
+	while ((opt = getopt(argc, argv, "0:o:t:d:a:l:bDs:v")) != -1) {
 		switch (opt) {
 			case 'o':
 				ofn = optarg;
@@ -110,6 +118,9 @@ int main(int argc, char* argv[])
 				break;
 			case 's':
 				snapshot_interval = atof(optarg);
+				break;
+			case 'v':
+				check_spd = true;
 				break;
 			default:
 				std::cerr << "Unrecognized option: " << optarg << endl;
@@ -178,7 +189,7 @@ int main(int argc, char* argv[])
 		pfout = pfout_guard.get();
 	}
 	lap *= alpha;
-	simulate(*pfout, lap, F, delta_t, end_t, binary, snapshot_interval);
+	simulate(*pfout, lap, F, delta_t, end_t, binary, snapshot_interval, check_spd);
 	pfout_guard.reset();
 
 	return 0;
