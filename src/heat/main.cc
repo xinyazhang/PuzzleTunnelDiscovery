@@ -8,6 +8,9 @@
 #include <memory>
 #include <unsupported/Eigen/SparseExtra>
 #include <boost/progress.hpp>
+//#include <Eigen/SparseLU> 
+//#include <Eigen/SparseCholesky>
+#include <Eigen/CholmodSupport>
 
 using std::string;
 using std::endl;
@@ -26,6 +29,7 @@ void usage()
 void simulate(std::ostream& fout,
 	      const Eigen::SparseMatrix<double, Eigen::RowMajor>& lap,
 	      const Eigen::VectorXd& IV,
+	      double alpha,
 	      double delta_t,
 	      double end_t,
 	      bool binary,
@@ -41,6 +45,14 @@ void simulate(std::ostream& fout,
 	} else {
 		fout << "#\n";
 	}
+	Eigen::SparseMatrix<double, Eigen::RowMajor> factor;
+	factor.resize(lap.rows(), lap.cols());
+	factor.setIdentity();
+	factor -= (alpha * delta_t) * lap;
+	//Eigen::SimplicialLDLT<Eigen::SparseMatrix<double, Eigen::RowMajor>> solver;
+	Eigen::CholmodSupernodalLLT<Eigen::SparseMatrix<double, Eigen::RowMajor>> solver;
+	solver.compute(factor);
+
 	boost::progress_display prog(end_t / delta_t);
 	for(double tnow = 0.0, last_snapshot = tnow; tnow < end_t; tnow += delta_t) {
 #if 0
@@ -64,11 +76,15 @@ void simulate(std::ostream& fout,
 			}
 			last_snapshot += snapshot_interval;
 		}
+#if 0
 		Eigen::VectorXd delta = lap * VF;
 		if (check_spd && VF.dot(delta) < 0) {
 			std::cerr << "DLap Matrix is NOT SPD" << endl;
 		}
 		VF += delta;
+#else
+		VF = solver.solve(VF);
+#endif
 		++prog;
 	}
 }
@@ -188,8 +204,7 @@ int main(int argc, char* argv[])
 		pfout_guard.reset(new std::ofstream(ofn));
 		pfout = pfout_guard.get();
 	}
-	lap *= alpha;
-	simulate(*pfout, lap, F, delta_t, end_t, binary, snapshot_interval, check_spd);
+	simulate(*pfout, lap, F, alpha, delta_t, end_t, binary, snapshot_interval, check_spd);
 	pfout_guard.reset();
 
 	return 0;

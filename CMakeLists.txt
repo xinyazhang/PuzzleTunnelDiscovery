@@ -11,6 +11,9 @@ FIND_PACKAGE(Eigen3 REQUIRED)
 INCLUDE_DIRECTORIES(${EIGEN3_INCLUDE_DIR})
 INCLUDE_DIRECTORIES(${IGL_INCLUDE_DIR})
 
+INCLUDE(${CMAKE_SOURCE_DIR}/cmake/FindSUITESPARSE.cmake)
+INCLUDE_DIRECTORIES(${SUITESPARSE_INCLUDE_DIRS})
+
 # C++11 and Debug
 # Note: we focus on gcc/clang right now, so we uses compiler specific solutions.
 set(CMAKE_CXX_FLAGS "--std=c++14 -g -O2 -march=haswell -ggdb3 -Wno-ignored-attributes -Wno-deprecated-declarations -Wno-deprecated ${CMAKE_CXX_FLAGS}")
@@ -103,8 +106,8 @@ EASYADD(Bcond)
 TARGET_LINK_LIBRARIES(Bcond tetread)
 
 EASYADD(heat)
-TARGET_LINK_LIBRARIES(hollow meshbool)
-TARGET_INCLUDE_DIRECTORIES(heat BEFORE PRIVATE ${CMAKE_SOURCE_DIR}/third-party/eigen)
+TARGET_LINK_LIBRARIES(heat ${SUITESPARSE_LIBRARIES})
+#TARGET_INCLUDE_DIRECTORIES(heat BEFORE PRIVATE ${CMAKE_SOURCE_DIR}/third-party/eigen)
 
 find_package(GLEW REQUIRED)
 find_package(OpenGL REQUIRED)
