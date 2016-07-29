@@ -3,9 +3,10 @@
 #include <stdexcept>
 #include <limits>
 #include <algorithm>
-#include <iostream>
+#include <iostream> // For std::cerr
 #include <fstream>
 #include <vector>
+#include "read.hpp"
 
 using Eigen::MatrixXd;
 using Eigen::MatrixXi;
@@ -13,17 +14,6 @@ using std::string;
 using std::vector;
 using std::runtime_error;
 using stream = std::numeric_limits<std::streamsize>;
-
-void skip_spaces_and_comments(std::istream& fin);
-
-template<typename T>
-T read(std::istream& fin)
-{
-	T ret;
-	skip_spaces_and_comments(fin);
-	fin >> ret;
-	return ret;
-}
 
 struct node {
 	int idx;
@@ -123,19 +113,27 @@ void read_tetrahedron(MatrixXi& P, std::istream& fin, int base)
 	}
 }
 
-void readtet(MatrixXd& V, MatrixXi& E, MatrixXi& P, const string& iprefix)
+void readtet(const string& iprefix, MatrixXd& V, MatrixXi& E, MatrixXi& P)
+{
+	int base = readtet(iprefix, V, P);
+	std::ifstream edgef(iprefix+".edge");
+	if (!edgef.is_open())
+		throw runtime_error("Cannot open "+iprefix+".edge for read");
+	read_edges(E, edgef, base);
+}
+
+int readtet(const std::string& iprefix,
+	     Eigen::MatrixXd& V,
+	     Eigen::MatrixXi& P)
 {
 	std::ifstream nodef(iprefix+".node");
 	if (!nodef.is_open())
 		throw runtime_error("Cannot open "+iprefix+".node for read");
-	std::ifstream edgef(iprefix+".edge");
-	if (!edgef.is_open())
-		throw runtime_error("Cannot open "+iprefix+".edge for read");
 	std::ifstream elef(iprefix+".ele");
 	if (!elef.is_open())
 		throw runtime_error("Cannot open "+iprefix+".ele for read");
 
 	int base = read_vertices(V, nodef);
-	read_edges(E, edgef, base);
 	read_tetrahedron(P, elef, base);
+	return base;
 }

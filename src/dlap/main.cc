@@ -1,4 +1,5 @@
-#include "readtet.h"
+#include <readtet.h>
+#include <readvoronoi.h>
 #include "tet2lap.h"
 #include <unistd.h>
 #include <string>
@@ -47,10 +48,16 @@ int main(int argc, char* argv[])
 	Eigen::MatrixXd V;
 	Eigen::MatrixXi E;
 	Eigen::MatrixXi P;
+	Eigen::MatrixXd VNodes;
+	std::vector<VoronoiEdge> VEdges;
+	std::vector<VoronoiFace> VFaces;
+	std::vector<VoronoiCell> VCells;
+
 	Eigen::SparseMatrix<double> lap;
 	try {
-		readtet(V, E, P, iprefix);
-		tet2lap(lap, V, E, P);
+		readtet(iprefix, V, E, P);
+		readvoronoi(iprefix, VNodes, VEdges, VFaces, VCells);
+		tet2lap(V, E, P, lap);
 	} catch (std::runtime_error& e) {
 		std::cerr << e.what() << std::endl;
 		return -1;

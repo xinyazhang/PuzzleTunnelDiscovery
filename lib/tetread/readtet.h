@@ -11,10 +11,19 @@
 // [out] P: simplex primitives
 // [in] prefix: the common prefix of tetgen .node and .ele files.
 //
+// [ret] base: the base of vertex index, tetgen doesn't specifiy it must be
+// zero
+//
 // Throws std::runtime_error
-void readtet(Eigen::MatrixXd& V,
+//
+void readtet(const std::string& prefix,
+	     Eigen::MatrixXd& V,
 	     Eigen::MatrixXi& E,
-	     Eigen::MatrixXi& P,
-	     const std::string& prefix);
+	     Eigen::MatrixXi& P);
+
+int readtet(const std::string& prefix,
+	     Eigen::MatrixXd& V,
+	     Eigen::MatrixXi& P);
+
 
 #endif

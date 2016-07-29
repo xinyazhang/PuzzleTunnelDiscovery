@@ -152,7 +152,11 @@ public:
 		}
 		viewer.data.set_face_based(false);
 		viewer.data.V_material_diffuse.resize(vertback_.size(), 3);
+#if 1
 		igl::jet(Z_temp_, 0.0, 1.0, viewer.data.V_material_diffuse);
+#else
+		igl::jet(Z_temp_, true, viewer.data.V_material_diffuse);
+#endif
 		viewer.data.V_material_ambient = 0.1 * viewer.data.V_material_diffuse;
 		constexpr double grey = 0.3;
 		viewer.data.V_material_specular = grey+0.1*(viewer.data.V_material_diffuse.array()-grey);
@@ -244,7 +248,7 @@ int main(int argc, char* argv[])
 	vector<Eigen::VectorXd> fields;
 	vector<double> times;
 	try {
-		readtet(V, E, P, iprefix);
+		readtet(iprefix, V, E, P);
 
 		std::ifstream fin(ffn);
 		if (!fin.is_open())

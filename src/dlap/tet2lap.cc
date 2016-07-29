@@ -94,10 +94,11 @@ inline bool cross_theta_boundary(const Eigen::VectorXd& v0, const Eigen::VectorX
 }
 #endif
 
-void tet2lap(Eigen::SparseMatrix<double>& lap,
-	     const Eigen::MatrixXd& V,
+void tet2lap(const Eigen::MatrixXd& V,
 	     const Eigen::MatrixXi& E,
-	     const Eigen::MatrixXi& P)
+	     const Eigen::MatrixXi& P,
+	     Eigen::SparseMatrix<double>& lap
+	     )
 {
 	vector<double> vertex_weight;
 	calc_voronoi_volumes(vertex_weight, V, P);
@@ -129,9 +130,10 @@ void tet2lap(Eigen::SparseMatrix<double>& lap,
 				continue;
 #endif
 			double el = edge_lengths(ti, ei);
-			int opposite_ei = opposite_edge[ei];
-			//double cot = (1.0 / std::tan(dihedral_angles(ti, opposite_ei)/2)) / 6.0;
-			double cot = (1.0 / std::tan(dihedral_angles(ti, opposite_ei))) / 6.0;
+			//int opposite_ei = opposite_edge[ei];
+			int opposite_ei = ei;
+			double cot = (1.0 / std::tan(dihedral_angles(ti, opposite_ei)/2)) / 6.0;
+			//double cot = (1.0 / std::tan(dihedral_angles(ti, opposite_ei))) / 6.0;
 			double w = el * cot;
 			//double w = 0.05;
 #if VERBOSE

@@ -4,9 +4,10 @@
 #include <Eigen/Core>
 #include <Eigen/SparseCore>
 
-void tet2lap(Eigen::SparseMatrix<double>& lap,
-	     const Eigen::MatrixXd& V,
+void tet2lap(const Eigen::MatrixXd& V,
 	     const Eigen::MatrixXi& E,
-	     const Eigen::MatrixXi& P);
+	     const Eigen::MatrixXi& P,
+	     Eigen::SparseMatrix<double>& lap
+	     );
 
 #endif
