@@ -9,9 +9,9 @@ element face 12
 property list uchar int vertex_indices
 end_header
 1 -1 -1 
-1 0.999999 1 
+1 1 1 
 -1 1 1 
-0.999999 -1 1 
+1 -1 1 
 1 1 -1 
 -1 -1 1 
 -1 -1 -1 
