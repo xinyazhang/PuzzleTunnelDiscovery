@@ -82,6 +82,61 @@ const int opposite_edge[] = {
 	2
 };
 
+double
+sine(const Eigen::VectorXd& v0, const Eigen::VectorXd& v1)
+{
+	Eigen::Vector3d x, y;
+	x << v0(0), v0(1), v0(2);
+	y << v1(0), v1(1), v1(2);
+	return x.cross(y).norm()/x.norm()/y.norm();
+}
+
+Eigen::VectorXd
+project_to(const Eigen::VectorXd& vert,
+		const Eigen::VectorXd& evert0,
+		const Eigen::VectorXd& evert1)
+{
+	Eigen::VectorXd edge = evert1 - evert0;
+	edge.normalize();
+	Eigen::VectorXd e2v = vert - evert0;
+	Eigen::VectorXd v_on_e = e2v.dot(edge) * edge + evert0;
+	return v_on_e;
+}
+
+void
+dihedral_sines_cosines(
+		const Eigen::MatrixXd& V,
+		const Eigen::MatrixXi& P,
+		Eigen::MatrixXd& sines,
+		Eigen::MatrixXd& cosines)
+{
+	using namespace Eigen;
+	sines.resize(P.rows(), 6);
+	cosines.resize(P.rows(), 6);
+	for(int p = 0; p < P.rows(); p++) {
+		Eigen::VectorXi vindices = P.row(p);
+		for(int i = 0; i < 6; i++) {
+			int weight_edge = i; // Which pair of vertices to apply the cos/sin weight
+			int angle_edge = i; //opposite_edge[weight_edge]; // Which edge the dihedral angle comes from.
+			int off_edge = opposite_edge[angle_edge]; // MUST NOT CHANGE
+			int off_v0idx = vindices(proto_edge_number[off_edge][0]);
+			int off_v1idx = vindices(proto_edge_number[off_edge][1]);
+			int angle_v0idx = vindices(proto_edge_number[angle_edge][0]);
+			int angle_v1idx = vindices(proto_edge_number[angle_edge][1]);
+			VectorXd v0 = V.row(off_v0idx);
+			VectorXd v1 = V.row(off_v1idx);
+			VectorXd ev0 = V.row(angle_v0idx);
+			VectorXd ev1 = V.row(angle_v1idx);
+			VectorXd dv0 = project_to(v0, ev0, ev1) - v0;
+			VectorXd dv1 = project_to(v1, ev0, ev1) - v1;
+			dv0.normalize();
+			dv1.normalize();
+			sines(p, weight_edge) = sine(dv0, dv1);
+			cosines(p, weight_edge) = dv0.dot(dv1);
+		}
+	}
+}
+
 #if CUT_OFF_PERIODICAL_PART
 /*
  * Note: we want to cut off boundaries that intersect with Z = 0 or Z = 2Pi.
@@ -118,8 +173,15 @@ void tet2lap(const Eigen::MatrixXd& V,
 	lap.reserve(P.rows() * P.cols() * 4);
 #endif
 
-	Eigen::MatrixXd dihedral_angles, dihedral_cosines;
-	igl::dihedral_angles(V, P, dihedral_angles, dihedral_cosines);
+	Eigen::MatrixXd dihedral_angles, dihedral_ref_cosines, dihedral_cosines, dihedral_sines;
+	igl::dihedral_angles(V, P, dihedral_angles, dihedral_ref_cosines);
+	dihedral_sines_cosines(V, P, dihedral_sines, dihedral_cosines);
+	std::cerr << "== SINES == " << endl
+		<< dihedral_sines << endl
+		<< "== COSINES ==" << endl
+		<< dihedral_cosines << endl
+		<< "== REFCOSINES ==" << endl
+		<< dihedral_ref_cosines << endl;
 
 	Eigen::MatrixXd edge_lengths;
 	igl::edge_lengths(V, P, edge_lengths);
@@ -136,10 +198,12 @@ void tet2lap(const Eigen::MatrixXd& V,
 				continue;
 #endif
 			double el = edge_lengths(ti, ei);
-			int opposite_ei = opposite_edge[ei];
-			//int opposite_ei = ei;
-			double cot = (1.0 / std::tan(dihedral_angles(ti, opposite_ei))) / 6.0;
+			//int opposite_ei = opposite_edge[ei];
+			int opposite_ei = ei;
+			//double cot = (1.0 / std::tan(dihedral_angles(ti, opposite_ei))) / 6.0;
+			double cot = (dihedral_cosines(ti, ei) / dihedral_sines(ti, ei)) / 6.0;
 			//double cot = (1.0 / std::tan(dihedral_angles(ti, opposite_ei)/2)) / 6.0;
+			//double w = cot;
 			double w = el * cot;
 			//double w = 0.05;
 #if VERBOSE
