@@ -146,3 +146,40 @@ int readtet(const std::string& iprefix,
 	read_tetrahedron(P, elef, base);
 	return base;
 }
+
+struct Face {
+	int idx;
+	int f0, f1, f2;
+};
+
+std::istream& operator>>(std::istream& fin, Face& f)
+{
+	skip_spaces_and_comments(fin);
+	fin >> f.idx >> f.f0 >> f.f1 >> f.f2;
+	return fin;
+}
+
+void readtet_face(const std::string& iprefix,
+	     Eigen::MatrixXi& F,
+	     Eigen::VectorXi* FBMarker)
+{
+	std::ifstream fin(iprefix+".face");
+	if (!fin.is_open())
+		throw runtime_error("Cannot open "+iprefix+".face for read");
+	int nface = read<int>(fin);
+	int nbm = read<int>(fin);
+	if (nbm == 1 && !FBMarker)
+		throw runtime_error("Require a boundary marker buffer to read " + iprefix + ".face");
+	F.resize(nface, 3);
+	FBMarker->resize(nface);
+	for(int i = 0; i < nface; i++) {
+		Face f = read<Face>(fin);
+		F(i, 0) = f.f0;
+		F(i, 1) = f.f1;
+		F(i, 2) = f.f2;
+		if (nbm > 0)
+			(*FBMarker)(i) = read<int>(fin);
+		else
+			(*FBMarker)(i) = 1;
+	}
+}

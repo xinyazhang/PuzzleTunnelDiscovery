@@ -28,5 +28,8 @@ int readtet(const std::string& prefix,
 	     Eigen::MatrixXd& V,
 	     Eigen::MatrixXi& P);
 
+void readtet_face(const std::string& prefix,
+	     Eigen::MatrixXi& F,
+	     Eigen::VectorXi* FBMarker);
 
 #endif
