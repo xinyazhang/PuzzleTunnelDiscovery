@@ -9,6 +9,7 @@
 // [out] V: vertices
 // [out] E: edges
 // [out] P: simplex primitives
+// [out] EBMarker: vector of edge boundary markers, set to null to read boundary edges only
 // [in] prefix: the common prefix of tetgen .node and .ele files.
 //
 // [ret] base: the base of vertex index, tetgen doesn't specifiy it must be
@@ -19,7 +20,9 @@
 void readtet(const std::string& prefix,
 	     Eigen::MatrixXd& V,
 	     Eigen::MatrixXi& E,
-	     Eigen::MatrixXi& P);
+	     Eigen::MatrixXi& P,
+	     Eigen::VectorXi* EBMarker
+	     );
 
 int readtet(const std::string& prefix,
 	     Eigen::MatrixXd& V,

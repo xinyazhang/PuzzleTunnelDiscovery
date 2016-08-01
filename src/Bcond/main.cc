@@ -124,9 +124,10 @@ int main(int argc, char* argv[])
 	Eigen::MatrixXd V;
 	Eigen::MatrixXi E;
 	Eigen::MatrixXi P;
+	Eigen::VectorXi EBM;
 	Eigen::MatrixXd IV;
 	try {
-		readtet(iprefix, V, E, P);
+		readtet(iprefix, V, E, P, &EBM);
 		Eigen::VectorXd IV;
 		IV.setZero(V.rows());
 		Eigen::VectorXd minV, maxV;

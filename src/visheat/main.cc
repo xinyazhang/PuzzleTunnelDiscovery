@@ -245,10 +245,11 @@ int main(int argc, char* argv[])
 	Eigen::MatrixXd V;
 	Eigen::MatrixXi E;
 	Eigen::MatrixXi P;
+	Eigen::VectorXi EBM;
 	vector<Eigen::VectorXd> fields;
 	vector<double> times;
 	try {
-		readtet(iprefix, V, E, P);
+		readtet(iprefix, V, E, P, &EBM);
 
 		std::ifstream fin(ffn);
 		if (!fin.is_open())

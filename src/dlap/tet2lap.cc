@@ -97,6 +97,12 @@ inline bool cross_theta_boundary(const Eigen::VectorXd& v0, const Eigen::VectorX
 void tet2lap(const Eigen::MatrixXd& V,
 	     const Eigen::MatrixXi& E,
 	     const Eigen::MatrixXi& P,
+#if 0
+	     const Eigen::MatrixXd& VNodes,
+	     const std::vector<VoronoiEdge>& VEdges,
+	     const std::vector<VoronoiFace>& VFaces,
+	     const std::vector<VoronoiCell>& VCells,
+#endif
 	     Eigen::SparseMatrix<double>& lap
 	     )
 {
@@ -130,10 +136,10 @@ void tet2lap(const Eigen::MatrixXd& V,
 				continue;
 #endif
 			double el = edge_lengths(ti, ei);
-			//int opposite_ei = opposite_edge[ei];
-			int opposite_ei = ei;
-			double cot = (1.0 / std::tan(dihedral_angles(ti, opposite_ei)/2)) / 6.0;
-			//double cot = (1.0 / std::tan(dihedral_angles(ti, opposite_ei))) / 6.0;
+			int opposite_ei = opposite_edge[ei];
+			//int opposite_ei = ei;
+			double cot = (1.0 / std::tan(dihedral_angles(ti, opposite_ei))) / 6.0;
+			//double cot = (1.0 / std::tan(dihedral_angles(ti, opposite_ei)/2)) / 6.0;
 			double w = el * cot;
 			//double w = 0.05;
 #if VERBOSE

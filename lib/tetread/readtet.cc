@@ -10,6 +10,7 @@
 
 using Eigen::MatrixXd;
 using Eigen::MatrixXi;
+using Eigen::VectorXi;
 using std::string;
 using std::vector;
 using std::runtime_error;
@@ -80,16 +81,24 @@ int read_vertices(MatrixXd& V, std::istream& fin)
 	return nodes.front().idx;
 }
 
-void read_edges(MatrixXi& E, std::istream& fin, int base)
+void read_edges(std::istream& fin, MatrixXi& E, VectorXi* EBM, int base)
 {
 	int nedge = read<int>(fin);
+	int bm = read<int>(fin);
 	fin.ignore(stream::max(), '\n'); // Goto next line
 	E.resize(nedge, 2);
+	if (EBM)
+		EBM->resize(nedge);
+	else if (bm)
+		throw runtime_error("readtet error: you must provide EBM vector for .edge files with boundary markers");
 	int rebase = 0 - base;
 	for(int i = 0; i < nedge; i++) {
 		(void)read<int>(fin); // Skip the edge index
 		E(i, 0) = read<int>(fin) + rebase;
 		E(i, 1) = read<int>(fin) + rebase;
+		if (bm) {
+			(*EBM)(i) = read<int>(fin);
+		}
 		fin.ignore(stream::max(), '\n'); // Goto next line
 	}
 }
@@ -113,13 +122,13 @@ void read_tetrahedron(MatrixXi& P, std::istream& fin, int base)
 	}
 }
 
-void readtet(const string& iprefix, MatrixXd& V, MatrixXi& E, MatrixXi& P)
+void readtet(const string& iprefix, MatrixXd& V, MatrixXi& E, MatrixXi& P, VectorXi* EBMarker)
 {
 	int base = readtet(iprefix, V, P);
 	std::ifstream edgef(iprefix+".edge");
 	if (!edgef.is_open())
 		throw runtime_error("Cannot open "+iprefix+".edge for read");
-	read_edges(E, edgef, base);
+	read_edges(edgef, E, EBMarker, base);
 }
 
 int readtet(const std::string& iprefix,
