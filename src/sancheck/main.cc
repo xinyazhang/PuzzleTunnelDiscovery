@@ -64,8 +64,9 @@ int main(int argc, char* argv[])
 	}
 	Eigen::MatrixXd V;
 	Eigen::MatrixXi E;
+	Eigen::MatrixXi F;
 	Eigen::MatrixXi P;
-	Eigen::VectorXi EBM;
+	Eigen::VectorXi EBM, FBM;
 	try {
 		Eigen::SparseMatrix<double, Eigen::RowMajor> lap;
 		if (!Eigen::loadMarket(lap, lmf)) {
@@ -73,15 +74,15 @@ int main(int argc, char* argv[])
 			return -1;
 		}
 		readtet(igf, V, E, P, &EBM);
+		readtet_face(igf, F, &FBM);
 		Eigen::VectorXi VBM;
 		VBM.setZero(V.rows());
-		for(int i = 0; i < EBM.size(); i++) {
-			if (EBM(i) == 0)
+		for(int i = 0; i < FBM.size(); i++) {
+			if (FBM(i) == 0)
 				continue;
-			int v0 = E(i, 0);
-			int v1 = E(i, 1);
-			VBM(v0) = 1;
-			VBM(v1) = 1;
+			for(int j = 0; j < F.cols(); j++) {
+				VBM(F(i, j)) = 1;
+			}
 		}
 		Eigen::VectorXd XV(V.rows()), YV(V.rows()), ZV(V.rows());
 #if 0
@@ -92,26 +93,44 @@ int main(int argc, char* argv[])
 			YV(i) = V(i, 1);
 			ZV(i) = V(i, 2);
 		}
+#else
+		XV = V.col(0);
+		YV = V.col(1);
+		ZV = V.col(2);
 #endif
-		XV = lap * V.col(0);
-		YV = lap * V.col(1);
-		ZV = lap * V.col(2);
+		XV = lap * XV;
+		YV = lap * YV;
+		ZV = lap * ZV;
+		double Xsum = 0, Ysum = 0, Zsum = 0;
 		for(int i = 0; i < VBM.size(); i++) {
+			Xsum += XV(i);
+			Ysum += YV(i);
+			Zsum += ZV(i);
 			if (VBM(i) > 0)
 				continue;
 			if (fabs(XV(i)) > 1e-6)
-				std::cerr << "Lx > 0 at node " << i << " value: " << XV(i) << endl;
+				std::cerr << "Lx <> 0 at node " << i << " value: " << XV(i) << endl;
 			else
 				std::cout << "Lx == 0 at node " << i << endl;
 			if (fabs(YV(i)) > 1e-6)
-				std::cerr << "Ly > 0 at node " << i << " value: " << YV(i) << endl;
+				std::cerr << "Ly <> 0 at node " << i << " value: " << YV(i) << endl;
 			else
 				std::cout << "Ly == 0 at node " << i << endl;
 			if (fabs(ZV(i)) > 1e-6)
-				std::cerr << "Lz > 0 at node " << i << " value: " << ZV(i) << endl;
+				std::cerr << "Lz <> 0 at node " << i << " value: " << ZV(i) << endl;
 			else
 				std::cout << "Lz == 0 at node " << i << endl;
+#if 0
+			double ttl = XV(i) + YV(i) + ZV(i);
+			if (fabs(ttl) > 1e-6)
+				std::cerr << "L(x+y+z) > 0 at node " << i << " value: " << ttl << endl;
+			else
+				std::cout << "L(x+y+z) == 0 at node " << i << endl;
+#endif
 		}
+		std::cerr << "Xsum " << Xsum << endl
+			<< "Ysum " << Ysum << endl
+			<< "Zsum " << Zsum << endl;
 	} catch (std::runtime_error& e) {
 		std::cerr << e.what() << std::endl;
 		return -1;
