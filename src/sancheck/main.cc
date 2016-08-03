@@ -21,7 +21,8 @@ using std::vector;
 
 void usage()
 {
-	std::cerr << "Options: -i <tetgen file prefix> -0 <boundary condition file> -l <Laplacian matrix>" << endl;
+	std::cerr << "Options: -i <tetgen file prefix> -l <Laplacian matrix> [List of vertices to print]" << endl;
+	std::cerr << "\t When list of vertices is given, these vertices will be print even if they are not internal vertices." << endl;
 }
 
 enum BOUNDARY_CONDITION {
@@ -50,6 +51,9 @@ int main(int argc, char* argv[])
 				return -1;
 		}
 	}
+	std::vector<int> probelist;
+	for (int i = optind; i < argc; i++)
+		probelist.emplace_back(atoi(argv[i]));
 	// Laplacian
 	if (lmf.empty()) {
 		std::cerr << "Missing Laplacian matrix file (-l)" << endl;
@@ -75,33 +79,42 @@ int main(int argc, char* argv[])
 		}
 		readtet(igf, V, E, P, &EBM);
 		readtet_face(igf, F, &FBM);
+		Eigen::VectorXd XV(V.rows()), YV(V.rows()), ZV(V.rows());
 		Eigen::VectorXi VBM;
 		VBM.setZero(V.rows());
-		for(int i = 0; i < FBM.size(); i++) {
-			if (FBM(i) == 0)
-				continue;
-			for(int j = 0; j < F.cols(); j++) {
-				VBM(F(i, j)) = 1;
+		if (probelist.empty()) {
+			for(int i = 0; i < FBM.size(); i++) {
+				if (FBM(i) == 0)
+					continue;
+				for(int j = 0; j < F.cols(); j++) {
+					VBM(F(i, j)) = 1;
+				}
 			}
-		}
-		Eigen::VectorXd XV(V.rows()), YV(V.rows()), ZV(V.rows());
 #if 0
-		for(int i = 0; i < VBM.size(); i++) {
-			if (VBM(i) > 0)
-				continue;
-			XV(i) = V(i, 0);
-			YV(i) = V(i, 1);
-			ZV(i) = V(i, 2);
-		}
+			for(int i = 0; i < VBM.size(); i++) {
+				if (VBM(i) > 0)
+					continue;
+				XV(i) = V(i, 0);
+				YV(i) = V(i, 1);
+				ZV(i) = V(i, 2);
+			}
 #else
+#endif
+		} else {
+			for(int i = 0; i < V.rows(); i++)
+				VBM(i) = 1;
+			for(auto pi : probelist)
+				VBM(pi) = 0;
+		}
 		XV = V.col(0);
 		YV = V.col(1);
 		ZV = V.col(2);
-#endif
+
 		XV = lap * XV;
 		YV = lap * YV;
 		ZV = lap * ZV;
 		double Xsum = 0, Ysum = 0, Zsum = 0;
+		std::cerr << VBM << endl;
 		for(int i = 0; i < VBM.size(); i++) {
 			Xsum += XV(i);
 			Ysum += YV(i);
