@@ -10,7 +10,7 @@ property list uchar int vertex_indices
 end_header
 1 0 0
 0 1 0
--1 0 0
+-1 1.0 0
 0 -1 0
 0 0 -1
 0 0 1
