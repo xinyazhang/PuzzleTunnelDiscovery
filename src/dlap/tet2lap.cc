@@ -123,7 +123,7 @@ void tet2lap(const Eigen::MatrixXd& V,
 #endif
 			Vector3d AiNi = surface_areas(ti, vi) * facenormals.block<1, 3>(ti, vi * 3);
 			Vector3d AjNj = surface_areas(ti, vj) * facenormals.block<1, 3>(ti, vj * 3);
-			double w = AiNi.dot(AjNj) / tetvolumes(ti);
+			double w = - (AiNi.dot(AjNj) / tetvolumes(ti));
 
 #if VERBOSE
 			std::cerr << " apply weight " << w << " from tet " << ti << " edge " << ei
