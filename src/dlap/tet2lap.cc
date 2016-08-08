@@ -4,14 +4,17 @@
 #include <cmath>
 #include <igl/volume.h>
 #include <igl/dihedral_angles.h>
+#include <igl/face_areas.h>
 #include <igl/edge_lengths.h>
 #include <boost/progress.hpp>
 #include <iostream>
 
 using std::vector;
 using std::endl;
+using Eigen::Vector3d;
+using Eigen::VectorXd;
 
-#define VERBOSE 0
+#define VERBOSE 1
 #define CUT_OFF_PERIODICAL_PART 0
 #define SET_FROM_TRIPPLETS 1
 
@@ -82,6 +85,7 @@ const int opposite_edge[] = {
 	2
 };
 
+#if 0
 double
 sine(const Eigen::VectorXd& v0, const Eigen::VectorXd& v1)
 {
@@ -117,7 +121,7 @@ dihedral_sines_cosines(
 		Eigen::VectorXi vindices = P.row(p);
 		for(int i = 0; i < 6; i++) {
 			int weight_edge = i; // Which pair of vertices to apply the cos/sin weight
-			int angle_edge = i; //opposite_edge[weight_edge]; // Which edge the dihedral angle comes from.
+			int angle_edge = opposite_edge[weight_edge]; // Which edge the dihedral angle comes from.
 			int off_edge = opposite_edge[angle_edge]; // MUST NOT CHANGE
 			int off_v0idx = vindices(proto_edge_number[off_edge][0]);
 			int off_v1idx = vindices(proto_edge_number[off_edge][1]);
@@ -137,6 +141,43 @@ dihedral_sines_cosines(
 	}
 }
 
+Vector3d
+project_to_surface(const Vector3d& v_to_proj,
+		   const Vector3d& v0,
+		   const Vector3d& v1,
+		   const Vector3d& v2)
+{
+	Vector3d normal = (v1 - v0).cross(v2 - v0);
+	normal.normalize();
+	double d = (v_to_proj - v0).dot(normal);
+	return v_to_proj - d * normal;
+}
+
+double
+dlap3d(const Vector3d& v0,
+	      const Vector3d& v1,
+	      const VectorXd& va,
+	      const VectorXd& vb)
+{
+	Vector3d pva = project_to_surface(va, v0, v1, vb);
+	//std::cerr << "Project " << va << " to (" << v0 << v1 << vb << "), get " << pva << endl;
+	Vector3d pvb = project_to_surface(vb, v0, v1, va);
+	Vector3d va_pvb = pvb - va;
+	Vector3d vb_pva = pva - vb;
+	Vector3d pva_va = pva - va;
+	Vector3d pvb_vb = pvb - vb;
+#if 0
+	return ((ab.dot(a_pb) / ab.cross(a_pb).norm())
+	     + (ba.dot(b_pa) / ba.cross(b_pa).norm())) / 2.0;
+#endif
+	//std::cerr << pvb.transpose() << endl;
+	//std::cerr << b_pa.transpose() << endl;
+	//std::cerr << a_pb.norm() << "\t" << b_pa.norm() << "\t" << ab.norm() << endl;
+	return ((va_pvb.norm() / pvb_vb.norm()) + (vb_pva.norm() / pva_va.norm())) / 2.0;
+}
+#endif
+
+
 #if CUT_OFF_PERIODICAL_PART
 /*
  * Note: we want to cut off boundaries that intersect with Z = 0 or Z = 2Pi.
@@ -148,6 +189,31 @@ inline bool cross_theta_boundary(const Eigen::VectorXd& v0, const Eigen::VectorX
 	return (v0in != v1in);
 }
 #endif
+
+const int
+proto_face_number[4][3] = {
+	{1, 3, 2},
+	{0, 2, 3},
+	{3, 1, 0},
+	{0, 1, 2}
+};
+
+void
+tet_face_normals(const Eigen::MatrixXd& V,
+		 const Eigen::MatrixXi& P,
+		 Eigen::MatrixXd& facenormals)
+{
+	facenormals.resize(P.rows(), 3 * 4);
+	for(int i = 0; i < P.rows(); i++) {
+		for(int vi = 0; vi < 4; vi++) {
+			Vector3d v0 = V.row(P(i, proto_face_number[vi][0]));
+			Vector3d v1 = V.row(P(i, proto_face_number[vi][1]));
+			Vector3d v2 = V.row(P(i, proto_face_number[vi][2]));
+			Vector3d n = (v1 - v0).cross(v2 - v0);
+			facenormals.block<1, 3>(i, vi * 3) = n.normalized();
+		}
+	}
+}
 
 void tet2lap(const Eigen::MatrixXd& V,
 	     const Eigen::MatrixXi& E,
@@ -162,7 +228,15 @@ void tet2lap(const Eigen::MatrixXd& V,
 	     )
 {
 	vector<double> vertex_weight;
-	calc_voronoi_volumes(vertex_weight, V, P);
+	//calc_voronoi_volumes(vertex_weight, V, P);
+	Eigen::VectorXd tetvolumes;
+	igl::volume(V, P, tetvolumes);
+	Eigen::MatrixXd facenormals;
+	tet_face_normals(V, P, facenormals);
+	Eigen::MatrixXd edge_lengths;
+	igl::edge_lengths(V, P, edge_lengths);
+	Eigen::MatrixXd surface_areas;
+	igl::face_areas(edge_lengths, surface_areas);
 
 	lap.resize(V.rows(), V.rows());
 #if SET_FROM_TRIPPLETS
@@ -173,6 +247,7 @@ void tet2lap(const Eigen::MatrixXd& V,
 	lap.reserve(P.rows() * P.cols() * 4);
 #endif
 
+#if 0
 	Eigen::MatrixXd dihedral_angles, dihedral_ref_cosines, dihedral_cosines, dihedral_sines;
 	igl::dihedral_angles(V, P, dihedral_angles, dihedral_ref_cosines);
 	dihedral_sines_cosines(V, P, dihedral_sines, dihedral_cosines);
@@ -182,32 +257,50 @@ void tet2lap(const Eigen::MatrixXd& V,
 		<< dihedral_cosines << endl
 		<< "== REFCOSINES ==" << endl
 		<< dihedral_ref_cosines << endl;
-
-	Eigen::MatrixXd edge_lengths;
-	igl::edge_lengths(V, P, edge_lengths);
+#endif
 
 #if !VERBOSE
 	boost::progress_display prog(P.rows());
 #endif
 	for(int ti = 0; ti < P.rows(); ti++) {
 		for(int ei = 0; ei < 6; ei++) {
-			int i = P(ti, proto_edge_number[ei][0]);
-			int j = P(ti, proto_edge_number[ei][1]);
+			int vi = proto_edge_number[ei][0];
+			int vj = proto_edge_number[ei][1];
+			int i = P(ti, vi);
+			int j = P(ti, vj);
 #if CUT_OFF_PERIODICAL_PART
 			if (cross_theta_boundary(V.row(i), V.row(j)))
 				continue;
 #endif
+#if 0
 			double el = edge_lengths(ti, ei);
-			//int opposite_ei = opposite_edge[ei];
-			int opposite_ei = ei;
+			int opposite_ei = opposite_edge[ei];
+#endif
+			//int opposite_ei = ei;
 			//double cot = (1.0 / std::tan(dihedral_angles(ti, opposite_ei))) / 6.0;
-			double cot = (dihedral_cosines(ti, ei) / dihedral_sines(ti, ei)) / 6.0;
+			//double cot = (1.0 / std::tan(M_PI - dihedral_angles(ti, opposite_ei))) / 6.0;
+			//double cot = (dihedral_cosines(ti, ei) / dihedral_sines(ti, ei)) / 6.0;
 			//double cot = (1.0 / std::tan(dihedral_angles(ti, opposite_ei)/2)) / 6.0;
 			//double w = cot;
-			double w = el * cot;
+			//double w = cot * el;
+			//double w = cot / el;
+			//double w = cot / (el * el);
+			//double w = el * cot * 2;
 			//double w = 0.05;
+			Vector3d AiNi = surface_areas(ti, vi) * facenormals.block<1, 3>(ti, vi * 3);
+			Vector3d AjNj = surface_areas(ti, vj) * facenormals.block<1, 3>(ti, vj * 3);
+			double w = AiNi.dot(AjNj) / tetvolumes(ti);
+
+			//int k = P(ti, proto_edge_number[opposite_ei][0]);
+			//int l = P(ti, proto_edge_number[opposite_ei][1]);
+			//double w = dlap3d(V.row(i), V.row(j), V.row(k), V.row(l));
 #if VERBOSE
-			std::cerr << " apply weight " << w << " = " << el << " * " << cot << " on edge " << V.row(i) <<"(id: "<< i << ") --- " << V.row(j) <<"(id: "<< j << ")" << endl;
+			std::cerr << " apply weight " << w << " from tet " << ti << " edge " << ei
+				  //<< " , = " << dihedral_cosines(ti, ei) << " / " << dihedral_sines(ti, ei) << " / 6.0"
+				  << " on edge "
+				  << V.row(i) <<" (id: "<< i << ") --- " << V.row(j) <<" (id: "<< j << ")"
+				  << " surface areas: " << surface_areas(ti, vi) << "\t" << surface_areas(ti, vj)
+				  << endl;
 #endif
 #if SET_FROM_TRIPPLETS
 			tris.emplace_back(i, j, w);
