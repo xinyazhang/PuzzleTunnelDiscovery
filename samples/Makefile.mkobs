@@ -1,0 +1,8 @@
+first: hollow.2.v.cell
+
+
+hollow.1.ele: hollow.ply
+	tetgen -pa0.1 hollow.ply
+
+hollow.2.v.cell: hollow.1.ele
+	tetgen -ve hollow.1

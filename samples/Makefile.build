@@ -1,0 +1,47 @@
+TETFILE=../tmp/hollow.1
+
+first: node
+
+node:
+	./dlap -i cubepick.v147.e3-4 -o cubepick.v147.e3-4.dlap
+	./sancheck -i cubepick.v147.e3-4 -l cubepick.v147.e3-4.dlap 1
+
+testdiamond:
+	make
+	./dlap -i ../assets/diamond.1 -o diamond.dlap
+	./sancheck -i ../assets/diamond.1 -l diamond.dlap
+
+testcube:
+	make
+	./dlap -i ../assets/cube.1 -o cube.dlap
+	./sancheck -i ../assets/cube.1 -l cube.dlap
+
+pick:
+	./ring1picker -i ../assets/cube.1 -o cubepick.v147 147
+	./dlap -i cubepick.v147 -o cubepick.v147.dlap
+	./sancheck -i cubepick.v147 -l cubepick.v147.dlap
+
+spick: pick
+	./ring1picker -e -i cubepick.v147 -o cubepick.v147.e3-4 3 4
+	./dlap -i cubepick.v147.e3-4 -o cubepick.v147.e3-4.dlap
+	./sancheck -i cubepick.v147.e3-4 -l cubepick.v147.e3-4.dlap 1
+
+mc.bc: Bcond
+	./Bcond -i $(TETFILE) -o mc.bc X+ X- Y+ Y-
+
+mc.dlap: dlap
+	./dlap -i $(TETFILE) -o mc.dlap
+
+#mc.bheat: mc.bc mc.dlap heat mk
+#	./heat -b -D -0 mc.bc -l mc.dlap -o mc.bheat -t 432000 -d 0.25 -a 0.125 -s 120
+
+mc.bheat: mc.bc mc.dlap heat mk
+	./heat -b -D -v -0 mc.bc -l mc.dlap -o mc.bheat -t 2160 -d 0.1 -a 50.0 -s 1
+
+follow:
+	./follow -i $(TETFILE) -t mc.bheat -b mc.bc 2.5 4.6 0.01 > mc.path
+
+vis: visheat mc.bheat
+	./visheat -i $(TETFILE) -f mc.bheat
+
+.PHONY: follow
