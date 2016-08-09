@@ -38,6 +38,7 @@ void simulate(std::ostream& fout,
 	      )
 {
 	Eigen::VectorXd VF = IV;
+
 	fout.precision(17);
 	if (binary) {
 		char zero[] = "\0\n";
@@ -52,6 +53,9 @@ void simulate(std::ostream& fout,
 	//Eigen::SimplicialLDLT<Eigen::SparseMatrix<double, Eigen::RowMajor>> solver;
 	Eigen::CholmodSupernodalLLT<Eigen::SparseMatrix<double, Eigen::RowMajor>> solver;
 	solver.compute(factor);
+
+	Eigen::MatrixXd VPair(IV.rows(), 2);
+	VPair.block(0, 1, IV.rows(), 1) = IV;
 
 	boost::progress_display prog(end_t / delta_t);
 	for(double tnow = 0.0, last_snapshot = tnow; tnow < end_t; tnow += delta_t) {
@@ -83,7 +87,8 @@ void simulate(std::ostream& fout,
 		}
 		VF += delta;
 #else
-		VF = solver.solve(VF);
+		VPair.block(0, 0, IV.rows(), 1) = solver.solve(VF);
+		VF = VPair.rowwise().maxCoeff();
 #endif
 		++prog;
 	}
@@ -117,8 +122,7 @@ int main(int argc, char* argv[])
 			case 'l':
 				lmf = optarg;
 				break;
-			case 't':
-				end_t = atof(optarg);
+			case 't': end_t = atof(optarg);
 				break;
 			case 'd':
 				delta_t = atof(optarg);
@@ -177,6 +181,7 @@ int main(int argc, char* argv[])
 	}
 	// Fix dlap matrix for Dirichlet condition
 	if (bc == BC_DIRICHLET) {
+#if 0 // Don't do this. It makes the matrix non-symmetric.
 		std::set<int> to_prune;
 		for(int i = 0; i < F.size(); i++) {
 			if (F(i) != 0) {
@@ -190,6 +195,7 @@ int main(int argc, char* argv[])
 					return false;
 				}
 			 );
+#endif
 	}
 
 	std::unique_ptr<std::ostream> pfout_guard;
