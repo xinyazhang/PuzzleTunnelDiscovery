@@ -27,19 +27,32 @@ void usage()
 	std::cerr << "Options: -i <tetgen file prefix> -t <temperature file> -b <boundary vertex file> [-o <output path file> -f time_frame] <x y z>" << endl;
 }
 
+#define FACE_PER_TET 4
+#define EDGE_PER_TET 6
+
 const int
-proto_face_number[4][3] = {
+proto_face_number[FACE_PER_TET][3] = {
 	{1, 3, 2},
 	{0, 2, 3},
 	{3, 1, 0},
 	{0, 1, 2}
 };
 
+const int
+proto_edge_number[EDGE_PER_TET][2] = {
+	{3, 0},
+	{3, 1}, 
+	{3, 2},
+	{1, 2},
+	{2, 0},
+	{0, 1}
+};
+
 bool
 in_tet(const Eigen::Vector3d& start_point,
        const Eigen::MatrixXd& T)
 {
-	for (int i = 0; i < 4; i++) {
+	for (int i = 0; i < FACE_PER_TET; i++) {
 		int v0i = proto_face_number[i][0];
 		int v1i = proto_face_number[i][1];
 		int v2i = proto_face_number[i][2];
@@ -47,7 +60,7 @@ in_tet(const Eigen::Vector3d& start_point,
 		Eigen::Vector3d v1 = T.col(v1i);
 		Eigen::Vector3d v2 = T.col(v2i);
 		Eigen::Vector3d n = (v1 - v0).cross(v2 - v0);
-		if (n.dot(start_point - v0) > 0)
+		if (n.dot(start_point - v0) < 0)
 			return false;
 	}
 	return true;
@@ -84,34 +97,42 @@ follow(const Eigen::Vector3d& start_point,
 	if (tet_id < 0)
 		throw std::runtime_error("Start point isn't in any tetrahedron.");
 	int next_vert = P(tet_id, 0);
-	double max_temp = V(next_vert);
+	double max_temp = H(next_vert);
 	for (int j = 1; j < P.cols(); j++) {
 		int vert = P(tet_id, j);
-		if (V(vert) > max_temp) {
-			max_temp = V(vert);
+		if (H(vert) > max_temp) {
+			max_temp = H(vert);
 			next_vert = vert;
 		}
 	}
-	std::unordered_map<int, std::vector<int>> neigh;
-	for (int i = 0; i < E.rows(); i++) {
-		int ei = E(i, 0);
-		int ej = E(i, 1);
-		neigh[ei].emplace_back(ej);
-		neigh[ej].emplace_back(ei);
-	}
-	while (MBM(next_vert) == 0.0) {
-		fout << V.row(next_vert) << "\t" << next_vert << endl;
-		const auto& nei = neigh[next_vert];
-		next_vert = nei.front();
-		max_temp = V(next_vert);
-		for (int vert : nei) {
-			if (V(vert) > max_temp) {
-				max_temp = V(vert);
-				next_vert = vert;
-			}
+	std::unordered_map<int, std::set<int>> neigh;
+	for (int i = 0; i < P.rows(); i++) {
+		for (int ei = 0; ei < EDGE_PER_TET; ei++) {
+			int vi = P(i, proto_edge_number[ei][0]);
+			int vj = P(i, proto_edge_number[ei][1]);
+			neigh[vi].emplace(vj);
+			neigh[vj].emplace(vi);
 		}
 	}
-	fout << V.row(next_vert) << "\t" << next_vert << endl;
+	while (MBM(next_vert) == 0.0) {
+		fout << V.row(next_vert) << "\t" << next_vert << "\t" << max_temp << endl;
+		const auto& nei = neigh[next_vert];
+		max_temp = H(next_vert);
+		bool halt = true;
+		for (int vert : nei) {
+			if (H(vert) > max_temp) {
+				max_temp = H(vert);
+				next_vert = vert;
+				halt = false;
+				break;
+			}
+		}
+		if (halt) {
+			std::cerr << "No temp. change detected, halt" << endl;
+			break;
+		}
+	}
+	fout << V.row(next_vert) << "\t" << next_vert << "\t" << max_temp << endl;
 }
 
 int main(int argc, char* argv[])
@@ -120,7 +141,7 @@ int main(int argc, char* argv[])
 	int opt;
 	string iprefix, tfn, ofn, ivf;
 	int frame_to_pick = INT_MAX;
-	while ((opt = getopt(argc, argv, "i:t:o:f:")) != -1) {
+	while ((opt = getopt(argc, argv, "i:t:o:b:f:")) != -1) {
 		switch (opt) {
 			case 'i': 
 				iprefix = optarg;
@@ -206,7 +227,7 @@ int main(int argc, char* argv[])
 		HeatReader hreader(tf);
 		HeatFrame hframe;
 		int frameid = 0;
-		while (frameid > frame_to_pick && hreader.read_frame(hframe))
+		while (frameid < frame_to_pick && hreader.read_frame(hframe))
 			frameid++;
 		std::ofstream fout;
 		if (!ofn.empty()) {
