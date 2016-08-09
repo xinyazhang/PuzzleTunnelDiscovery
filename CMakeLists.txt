@@ -121,6 +121,9 @@ find_package(OpenGL REQUIRED)
 EASYADD(visheat)
 TARGET_LINK_LIBRARIES(visheat vertcolorply ${CMAKE_THREAD_LIBS_INIT} ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} glfw tetio)
 
+EASYADD(follow)
+TARGET_LINK_LIBRARIES(follow tetio heatio)
+
 #FILE(COPY ${BINARIES} DESTINATION ${CMAKE_SOURCE_DIR}/bin)
 
 # vim: tw=0
