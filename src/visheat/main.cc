@@ -43,6 +43,8 @@ private:
 	std::unordered_map<int, int> vertidmap_; // Old vert id -> New vert id
 	vector<int> vertback_;
 	bool flush_viewer_ = false;
+	vector<int> pathvert_;
+	vector<int> pathvert_temp_;
 public:
 	KeyDown(
 		Eigen::MatrixXd& V,
@@ -65,6 +67,9 @@ public:
 		now = now.substr(0, now.size() - 1);
 		Eigen::MatrixXd C;
 		igl::jet(Z_temp_, 0.0, 1.0, C);
+		for(auto vert : pathvert_temp_) {
+			C.row(vert) = Eigen::Vector3d(1.0, 1.0, 1.0);
+		}
 		string fn = "visheat-snapshot-at-"+now+"-frame-"+std::to_string(frameid_)+".ply";
 		std::cerr << "Saving model to file " << fn;
 		write_ply_vc(fn,
@@ -120,6 +125,14 @@ public:
 				F_temp_(j,k) = vertidmap_[F_temp_(j,k)];
 		Z_temp_.resize(vertback_.size());
 
+		pathvert_temp_.clear();
+		for (int vert : pathvert_) {
+			auto iter = vertidmap_.find(vert);
+			if (iter == vertidmap_.end())
+				continue ;
+			pathvert_temp_.emplace_back(iter->second);
+		}
+
 		flush_viewer_ = true;
 	}
 
@@ -157,6 +170,9 @@ public:
 #else
 		igl::jet(Z_temp_, true, viewer.data.V_material_diffuse);
 #endif
+		for(auto vert : pathvert_temp_) {
+			viewer.data.V_material_diffuse.row(vert) = Eigen::Vector3d(1.0, 1.0, 1.0);
+		}
 		viewer.data.V_material_ambient = 0.1 * viewer.data.V_material_diffuse;
 		constexpr double grey = 0.3;
 		viewer.data.V_material_specular = grey+0.1*(viewer.data.V_material_diffuse.array()-grey);
@@ -208,6 +224,25 @@ public:
 		std::cerr << frameid_ << ' ';
 		calibre_frameid();
 	}
+
+	void load_path(const string& path_file)
+	{
+		if (path_file.empty())
+			return;
+		std::ifstream fin(path_file);
+		if (!fin.is_open())
+			return;
+		double x,y,z,tmp;
+		int vert;
+		while (true) {
+			fin >> x >> y >> z >> vert >> tmp;
+			if (!fin.eof()) {
+				pathvert_.emplace_back(vert);
+			} else {
+				break;
+			}
+		}
+	}
 };
 
 void skip_to_needle(std::istream& fin, const string& needle)
@@ -221,14 +256,17 @@ void skip_to_needle(std::istream& fin, const string& needle)
 int main(int argc, char* argv[])
 {
 	int opt;
-	string iprefix, ffn;
-	while ((opt = getopt(argc, argv, "i:f:")) != -1) {
+	string iprefix, ffn, pfn;
+	while ((opt = getopt(argc, argv, "i:f:p:")) != -1) {
 		switch (opt) {
 			case 'i': 
 				iprefix = optarg;
 				break;
 			case 'f':
 				ffn = optarg;
+				break;
+			case 'p':
+				pfn = optarg;
 				break;
 			default:
 				std::cerr << "Unrecognized option: " << optarg << endl;
@@ -305,6 +343,7 @@ int main(int argc, char* argv[])
 
 	igl::viewer::Viewer viewer;
 	KeyDown kd(V,E,P, fields);
+	kd.load_path(pfn);
 	viewer.callback_key_pressed = [&kd](igl::viewer::Viewer& viewer, unsigned char key, int modifier) -> bool { return kd.operator()(viewer, key, modifier); } ;
 	viewer.callback_pre_draw = [&kd](igl::viewer::Viewer& viewer) -> bool
 	{

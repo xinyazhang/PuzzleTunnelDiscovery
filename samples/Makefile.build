@@ -41,7 +41,10 @@ mc.bheat: mc.bc mc.dlap heat mk
 follow:
 	./follow -i $(TETFILE) -t mc.bheat -b mc.bc 2.5 4.6 0.01 > mc.path
 
-vis: visheat mc.bheat
+vis: visheat
 	./visheat -i $(TETFILE) -f mc.bheat
+
+vispath:
+	./visheat -i $(TETFILE) -f mc.bheat -p mc.path
 
 .PHONY: follow
