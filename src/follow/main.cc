@@ -117,14 +117,20 @@ follow(const Eigen::Vector3d& start_point,
 	while (MBM(next_vert) == 0.0) {
 		fout << V.row(next_vert) << "\t" << next_vert << "\t" << max_temp << endl;
 		const auto& nei = neigh[next_vert];
-		max_temp = H(next_vert);
+		Eigen::Vector3d cur_vert = V.row(next_vert);
+		double max_grad = 0.0;
+		double cur_temp = H(next_vert);
 		bool halt = true;
 		for (int vert : nei) {
-			if (H(vert) > max_temp) {
+			Eigen::Vector3d vert_pos = V.row(vert);
+			double distance = (vert_pos - cur_vert).norm();
+			double grad = (H(vert) - cur_temp) / distance;
+			//double grad = (H(vert) - cur_temp);
+			if (grad > max_grad) {
+				max_grad = grad;
 				max_temp = H(vert);
 				next_vert = vert;
 				halt = false;
-				break;
 			}
 		}
 		if (halt) {
