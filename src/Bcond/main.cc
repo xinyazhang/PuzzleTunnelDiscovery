@@ -193,14 +193,16 @@ int main(int argc, char* argv[])
 	}
 	Eigen::MatrixXd ObV;
 	Eigen::MatrixXi ObF;
-	if (detect_boundary && obfn.empty()) {
-		std::cerr << "Missing obstacle file (-p)" << endl;
-		usage();
-		return -1;
-	} else {
-		if (!igl::readOBJ(obfn, ObV, ObF)) {
-			std::cerr << "Cannot read " << obfn << " as OBJ file" << endl;
+	if (detect_boundary) {
+		if (obfn.empty()) {
+			std::cerr << "Missing obstacle file (-p)" << endl;
+			usage();
 			return -1;
+		} else {
+			if (!igl::readOBJ(obfn, ObV, ObF)) {
+				std::cerr << "Cannot read " << obfn << " as OBJ file" << endl;
+				return -1;
+			}
 		}
 	}
 	if (ofn.empty()) {
