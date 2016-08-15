@@ -20,15 +20,27 @@ using std::vector;
 
 void usage()
 {
-	std::cerr << "Options: [-bDv] -0 <boundary condition file> -l <Laplacian matrix> [-o output_file -t <end time> -d <time delta> -a <thermal conductivity factor>]" << endl
-		<< "\t-b: enable binary output" << endl
-		<< "\t-v: enable SPD check" << endl
-		<< "\t-D: use initial boundary condition as Dirichlet condition" << endl;
+	std::cerr <<
+R"xxx(
+Required Options:
+	-0 file: specify initial boundary condition
+	-l file: specify Laplacian matrix
+Optional options:
+	-o file: output file
+	-t number: end time
+	-d number: time delta
+	-a number: thermal conductivity factor
+	-b: enable binary output
+	-v: enable SPD check
+	-D: use initial boundary condition as Dirichlet condition
+	-N file: Neumann boundary condition file, aka Heat Source Vector File
+)xxx";
 }
 
 void simulate(std::ostream& fout,
 	      const Eigen::SparseMatrix<double, Eigen::RowMajor>& lap,
 	      const Eigen::VectorXd& IV,
+	      const Eigen::VectorXd& HSV,
 	      double alpha,
 	      double delta_t,
 	      double end_t,
@@ -87,6 +99,7 @@ void simulate(std::ostream& fout,
 		}
 		VF += delta;
 #else
+		VF += HSV;
 		VPair.block(0, 0, IV.rows(), 1) = solver.solve(VF);
 		VF = VPair.rowwise().maxCoeff();
 #endif
@@ -95,23 +108,24 @@ void simulate(std::ostream& fout,
 }
 
 enum BOUNDARY_CONDITION {
-	BC_NONE,
-	BC_DIRICHLET,
-	BC_NEUMANN, // FIXME: add support for Neumann BC
+	BC_NONE = 0,
+	BC_DIRICHLET = 1,
+	BC_NEUMANN = 2,
 };
 
+// FIXME: refactor this piece of mess
 int main(int argc, char* argv[])
 {
 	Eigen::initParallel();
 
 	int opt;
-	string ofn, lmf, ivf;
+	string ofn, lmf, ivf, nbcvfn;
 	double end_t = 10.0, delta_t = 0.1, alpha = 1;
 	double snapshot_interval = -1.0;
 	bool binary = false;
 	bool check_spd = false;
-	BOUNDARY_CONDITION bc;
-	while ((opt = getopt(argc, argv, "0:o:t:d:a:l:bDs:v")) != -1) {
+	int bc = BC_NONE;
+	while ((opt = getopt(argc, argv, "0:o:t:d:a:l:bDs:vN:")) != -1) {
 		switch (opt) {
 			case 'o':
 				ofn = optarg;
@@ -134,7 +148,11 @@ int main(int argc, char* argv[])
 				binary = true;
 				break;
 			case 'D':
-				bc = BC_DIRICHLET;
+				bc |= BC_DIRICHLET;
+				break;
+			case 'N':
+				bc |= BC_NEUMANN;
+				nbcvfn = optarg; // Neumann Boundary Condition Vector File Name
 				break;
 			case 's':
 				snapshot_interval = atof(optarg);
@@ -180,7 +198,7 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 	// Fix dlap matrix for Dirichlet condition
-	if (bc == BC_DIRICHLET) {
+	if (bc & BC_DIRICHLET) {
 #if 0 // Don't do this. It makes the matrix non-symmetric.
 		std::set<int> to_prune;
 		for(int i = 0; i < F.size(); i++) {
@@ -198,6 +216,25 @@ int main(int argc, char* argv[])
 #endif
 	}
 
+	Eigen::VectorXd HSV; // Heat Supply Vector
+	if (bc & BC_NEUMANN) {
+		std::ifstream fin(nbcvfn);
+		if (!fin.is_open()) {
+			std::cerr << "Cannot open file: " << ivf << endl;
+			return -1;
+		}
+		int nnode;
+		fin >> nnode;
+		HSV.resize(nnode);
+		for(int i = 0; i < nnode; i++) {
+			double v;
+			fin >> v;
+			HSV(i) = v;
+		}
+	} else {
+		HSV.setZero(F.size()); // No heat source
+	}
+
 	std::unique_ptr<std::ostream> pfout_guard;
 	std::ostream* pfout;
 	if (ofn.empty()) {
@@ -210,7 +247,7 @@ int main(int argc, char* argv[])
 		pfout_guard.reset(new std::ofstream(ofn));
 		pfout = pfout_guard.get();
 	}
-	simulate(*pfout, lap, F, alpha, delta_t, end_t, binary, snapshot_interval, check_spd);
+	simulate(*pfout, lap, F, HSV, alpha, delta_t, end_t, binary, snapshot_interval, check_spd);
 	pfout_guard.reset();
 
 	return 0;
