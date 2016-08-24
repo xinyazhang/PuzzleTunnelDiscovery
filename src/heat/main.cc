@@ -49,10 +49,24 @@ struct Simulator {
 	      bool binary;
 	      double snapshot_interval;
 	      bool check_spd = false;
+	      Eigen::VectorXd MVec; // Mass matrix
 
 	      void simulate(std::ostream& fout) const
 	      {
 		      Eigen::VectorXd VF = IV;
+
+		      Eigen::SparseMatrix<double, Eigen::RowMajor> IvM;
+		      IvM.resize(lap.rows(), lap.cols());
+		      IvM.setIdentity();
+		      if (MVec.rows() == lap.rows()) {
+			      typedef Eigen::Triplet<double> tri_t;
+			      std::vector<tri_t> tris;
+			      for(int i = 0; i < MVec.size(); i++)
+				      tris.emplace_back(i, i, 1/MVec(i));
+			      IvM.setFromTriplets(tris.begin(), tris.end());
+		      } else if (MVec.size() != 0) {
+			      std::cerr << "Mass vector size mismatch";
+		      }
 
 		      fout.precision(17);
 		      if (binary) {
@@ -93,7 +107,7 @@ struct Simulator {
 			      VF += delta;
 #else
 			      VF += HSV * 0.001 * delta_t; // Apply HSV
-			      Eigen::VectorXd VFNext = solver.solve(VF);
+			      Eigen::VectorXd VFNext = solver.solve(IvM * VF);
 			      // The New Dirichlet Cond
 #pragma omp parallel for
 			      for(int i = 0; i < IV.rows(); i++) {
@@ -142,11 +156,11 @@ int main(int argc, char* argv[])
 	simulator.snapshot_interval = -1.0;
 
 	int opt;
-	string ofn, lmf, ivf, nbcvfn;
+	string ofn, lmf, ivf, nbcvfn, massfn;
 	simulator.binary = false;
 	simulator.check_spd = false;
 	int bc = BC_NONE;
-	while ((opt = getopt(argc, argv, "0:o:t:d:a:l:bDs:vN:")) != -1) {
+	while ((opt = getopt(argc, argv, "0:o:t:d:a:l:bDs:vN:m:")) != -1) {
 		switch (opt) {
 			case 'o':
 				ofn = optarg;
@@ -181,6 +195,9 @@ int main(int argc, char* argv[])
 				break;
 			case 'v':
 				simulator.check_spd = true;
+				break;
+			case 'm':
+				massfn = optarg;
 				break;
 			default:
 				std::cerr << "Unrecognized option: " << optarg << endl;
@@ -245,6 +262,8 @@ int main(int argc, char* argv[])
 		} else {
 			HSV.setZero(simulator.IV.size()); // No heat source
 		}
+		if (!massfn.empty())
+			vecio::text_read(massfn, simulator.MVec);
 	} catch (std::exception& e) {
 		cerr << e.what() << endl;
 		return -1;
@@ -262,7 +281,7 @@ int main(int argc, char* argv[])
 		pfout_guard.reset(new std::ofstream(ofn));
 		pfout = pfout_guard.get();
 	}
-	simulator.simulate(*pfout); //, lap, F, HSV, alpha, delta_t, end_t, binary, snapshot_interval, check_spd);
+	simulator.simulate(*pfout);
 	pfout_guard.reset();
 
 	return 0;
