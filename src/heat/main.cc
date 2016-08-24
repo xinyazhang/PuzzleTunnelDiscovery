@@ -22,6 +22,7 @@ void usage()
 {
 	std::cerr <<
 R"xxx(
+Usage: heat -0 file -l file [-o file -t number -d number -b -v -D -N file]
 Required Options:
 	-0 file: specify initial boundary condition
 	-l file: specify Laplacian matrix
@@ -37,75 +38,91 @@ Optional options:
 )xxx";
 }
 
-void simulate(std::ostream& fout,
-	      const Eigen::SparseMatrix<double, Eigen::RowMajor>& lap,
-	      const Eigen::VectorXd& IV,
-	      const Eigen::VectorXd& HSV,
-	      double alpha,
-	      double delta_t,
-	      double end_t,
-	      bool binary,
-	      double snapshot_interval,
-	      bool check_spd = false
-	      )
-{
-	Eigen::VectorXd VF = IV;
+struct Simulator {
+	      Eigen::SparseMatrix<double, Eigen::RowMajor> lap;
+	      Eigen::VectorXd IV;
+	      Eigen::VectorXd HSV;
+	      double alpha;
+	      double delta_t;
+	      double end_t;
+	      bool binary;
+	      double snapshot_interval;
+	      bool check_spd = false;
 
-	fout.precision(17);
-	if (binary) {
-		char zero[] = "\0\n";
-		fout.write(zero, 2);
-	} else {
-		fout << "#\n";
-	}
-	Eigen::SparseMatrix<double, Eigen::RowMajor> factor;
-	factor.resize(lap.rows(), lap.cols());
-	factor.setIdentity();
-	factor -= (alpha * delta_t) * lap;
-	//Eigen::SimplicialLDLT<Eigen::SparseMatrix<double, Eigen::RowMajor>> solver;
-	Eigen::CholmodSupernodalLLT<Eigen::SparseMatrix<double, Eigen::RowMajor>> solver;
-	solver.compute(factor);
+	      void simulate(std::ostream& fout) const
+	      {
+		      Eigen::VectorXd VF = IV;
 
-	Eigen::MatrixXd VPair(IV.rows(), 2);
-	VPair.block(0, 1, IV.rows(), 1) = IV;
+		      fout.precision(17);
+		      if (binary) {
+			      char zero[] = "\0\n";
+			      fout.write(zero, 2);
+		      } else {
+			      fout << "#\n";
+		      }
+		      write_frame(fout, 0, IV);
+		      Eigen::SparseMatrix<double, Eigen::RowMajor> factor;
+		      factor.resize(lap.rows(), lap.cols());
+		      factor.setIdentity();
+		      factor -= (alpha * delta_t) * lap;
+		      //Eigen::SimplicialLDLT<Eigen::SparseMatrix<double, Eigen::RowMajor>> solver;
+		      Eigen::CholmodSupernodalLLT<Eigen::SparseMatrix<double, Eigen::RowMajor>> solver;
+		      solver.compute(factor);
 
-	boost::progress_display prog(end_t / delta_t);
-	for(double tnow = 0.0, last_snapshot = tnow; tnow < end_t; tnow += delta_t) {
+		      Eigen::MatrixXd VPair(IV.rows(), 2);
+		      VPair.block(0, 1, IV.rows(), 1) = IV;
+
+		      boost::progress_display prog(end_t / delta_t);
+		      for(double tnow = 0.0, last_snapshot = tnow; tnow < end_t; tnow += delta_t) {
 #if 0
-		Eigen::VectorXd nextVF(VF.rows());
-		for(int i = 0; i < V.rows(); i++) {
-			nextVF(i) = lap.row(i).dot(VF);
-		}
+			      Eigen::VectorXd nextVF(VF.rows());
+			      for(int i = 0; i < V.rows(); i++) {
+				      nextVF(i) = lap.row(i).dot(VF);
+			      }
 #endif
-		if (tnow - last_snapshot >= snapshot_interval) {
-			if (!binary) {
-				fout << "t: " << tnow << "\t" << VF.rows() << endl;
-				fout << VF << endl;
-				fout << "sum: " << VF.sum() << endl;
-			} else {
-				fout.write((const char*)&tnow, sizeof(tnow));
-				uint32_t nrow = VF.rows();
-				fout.write((const char*)&nrow, sizeof(nrow));
-				fout.write((const char*)VF.data(), VF.size() * sizeof(double));
-				double sum = VF.sum();
-				fout.write((const char*)&sum, sizeof(sum));
-			}
-			last_snapshot += snapshot_interval;
-		}
+			      if (tnow - last_snapshot >= snapshot_interval) {
+				      write_frame(fout, tnow, VF);
+				      last_snapshot += snapshot_interval;
+			      }
 #if 0
-		Eigen::VectorXd delta = lap * VF;
-		if (check_spd && VF.dot(delta) < 0) {
-			std::cerr << "DLap Matrix is NOT SPD" << endl;
-		}
-		VF += delta;
+			      Eigen::VectorXd delta = lap * VF;
+			      if (check_spd && VF.dot(delta) < 0) {
+				      std::cerr << "DLap Matrix is NOT SPD" << endl;
+			      }
+			      VF += delta;
 #else
-		VF += HSV;
-		VPair.block(0, 0, IV.rows(), 1) = solver.solve(VF);
-		VF = VPair.rowwise().maxCoeff();
+			      VF += HSV * 0.001 * delta_t; // Apply HSV
+			      Eigen::VectorXd VFNext = solver.solve(VF);
+			      // The New Dirichlet Cond
+#pragma omp parallel for
+			      for(int i = 0; i < IV.rows(); i++) {
+				      if (IV(i) != 0)
+					      VFNext(i) = IV(i);
+			      }
+			      VF.swap(VFNext);
+			      //VF = VPair.rowwise().maxCoeff(); // Dirichlet cond
+			      // VF = VPair.block(0, 0, IV.rows(), 1); // No dirichelt cond
 #endif
-		++prog;
-	}
-}
+			      ++prog;
+		      }
+	      }
+
+	      void write_frame(std::ostream& fout, double tnow, const Eigen::VectorXd& VF) const
+	      {
+		      if (!binary) {
+			      fout << "t: " << tnow << "\t" << VF.rows() << endl;
+			      fout << VF << endl;
+			      fout << "sum: " << VF.sum() << endl;
+		      } else {
+			      fout.write((const char*)&tnow, sizeof(tnow));
+			      uint32_t nrow = VF.rows();
+			      fout.write((const char*)&nrow, sizeof(nrow));
+			      fout.write((const char*)VF.data(), VF.size() * sizeof(double));
+			      double sum = VF.sum();
+			      fout.write((const char*)&sum, sizeof(sum));
+		      }
+	      }
+};
 
 enum BOUNDARY_CONDITION {
 	BC_NONE = 0,
@@ -117,13 +134,16 @@ enum BOUNDARY_CONDITION {
 int main(int argc, char* argv[])
 {
 	Eigen::initParallel();
+	Simulator simulator;
+	simulator.end_t = 10.0;
+	simulator.delta_t = 0.1;
+	simulator.alpha = 1;
+	simulator.snapshot_interval = -1.0;
 
 	int opt;
 	string ofn, lmf, ivf, nbcvfn;
-	double end_t = 10.0, delta_t = 0.1, alpha = 1;
-	double snapshot_interval = -1.0;
-	bool binary = false;
-	bool check_spd = false;
+	simulator.binary = false;
+	simulator.check_spd = false;
 	int bc = BC_NONE;
 	while ((opt = getopt(argc, argv, "0:o:t:d:a:l:bDs:vN:")) != -1) {
 		switch (opt) {
@@ -136,16 +156,17 @@ int main(int argc, char* argv[])
 			case 'l':
 				lmf = optarg;
 				break;
-			case 't': end_t = atof(optarg);
+			case 't':
+				simulator.end_t = atof(optarg);
 				break;
 			case 'd':
-				delta_t = atof(optarg);
+				simulator.delta_t = atof(optarg);
 				break;
 			case 'a':
-				alpha = atof(optarg);
+				simulator.alpha = atof(optarg);
 				break;
 			case 'b':
-				binary = true;
+				simulator.binary = true;
 				break;
 			case 'D':
 				bc |= BC_DIRICHLET;
@@ -155,10 +176,10 @@ int main(int argc, char* argv[])
 				nbcvfn = optarg; // Neumann Boundary Condition Vector File Name
 				break;
 			case 's':
-				snapshot_interval = atof(optarg);
+				simulator.snapshot_interval = atof(optarg);
 				break;
 			case 'v':
-				check_spd = true;
+				simulator.check_spd = true;
 				break;
 			default:
 				std::cerr << "Unrecognized option: " << optarg << endl;
@@ -166,9 +187,9 @@ int main(int argc, char* argv[])
 				return -1;
 		}
 	}
-	if (snapshot_interval < 0)
-		snapshot_interval = delta_t;
-	Eigen::VectorXd F; // F means 'field' not 'faces'
+	if (simulator.snapshot_interval < 0)
+		simulator.snapshot_interval = simulator.delta_t;
+	Eigen::VectorXd& IV = simulator.IV;
 	if (ivf.empty()) {
 		std::cerr << "Missing boundary condition file" << endl;
 		usage();
@@ -181,18 +202,18 @@ int main(int argc, char* argv[])
 		}
 		int nnode;
 		fin >> nnode;
-		F.resize(nnode);
+		IV.resize(nnode);
 		for(int i = 0; i < nnode; i++) {
 			double v;
 			fin >> v;
-			F(i) = v;
+			IV(i) = v;
 		}
 	}
 	if (lmf.empty()) {
 		std::cerr << "Missing Laplacian matrix file" << endl;
 		return -1;
 	}
-	Eigen::SparseMatrix<double, Eigen::RowMajor> lap;
+	Eigen::SparseMatrix<double, Eigen::RowMajor>& lap = simulator.lap;
 	if (!Eigen::loadMarket(lap, lmf)) {
 		std::cerr << "Failed to load Laplacian matrix from file: " << lmf << endl;
 		return -1;
@@ -216,11 +237,11 @@ int main(int argc, char* argv[])
 #endif
 	}
 
-	Eigen::VectorXd HSV; // Heat Supply Vector
+	Eigen::VectorXd& HSV = simulator.HSV; // Heat Supply Vector
 	if (bc & BC_NEUMANN) {
 		std::ifstream fin(nbcvfn);
 		if (!fin.is_open()) {
-			std::cerr << "Cannot open file: " << ivf << endl;
+			std::cerr << "Cannot open file: " << nbcvfn << endl;
 			return -1;
 		}
 		int nnode;
@@ -232,22 +253,22 @@ int main(int argc, char* argv[])
 			HSV(i) = v;
 		}
 	} else {
-		HSV.setZero(F.size()); // No heat source
+		HSV.setZero(simulator.IV.size()); // No heat source
 	}
 
 	std::unique_ptr<std::ostream> pfout_guard;
 	std::ostream* pfout;
 	if (ofn.empty()) {
 		std::cerr << "Missing output file name, output results to stdout instead." << endl;
-		if (binary && isatty(fileno(stdout)))
-			std::cerr << "Binary output format is disabled for stdout" << endl;
-		binary = false;
+		if (simulator.binary && isatty(fileno(stdout)))
+			std::cerr << "Binary output format is disabled for tty stdout" << endl;
+		simulator.binary = false;
 		pfout = &std::cout;
 	} else {
 		pfout_guard.reset(new std::ofstream(ofn));
 		pfout = pfout_guard.get();
 	}
-	simulate(*pfout, lap, F, HSV, alpha, delta_t, end_t, binary, snapshot_interval, check_spd);
+	simulator.simulate(*pfout); //, lap, F, HSV, alpha, delta_t, end_t, binary, snapshot_interval, check_spd);
 	pfout_guard.reset();
 
 	return 0;
