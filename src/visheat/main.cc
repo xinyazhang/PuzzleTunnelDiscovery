@@ -18,7 +18,8 @@ using std::vector;
 
 void usage()
 {
-	std::cerr << "Options: -i <tetgen file prefix> -f <heat field data file>" << endl;
+	cerr << "Options: -i <tetgen file prefix> -f <heat field data file> [-p <page No.> -r]" << endl
+	     << "\t-r: enable auto range. The default range is 0-1" << endl;
 }
 
 class KeyDown {
@@ -30,10 +31,12 @@ private:
 	vector<Eigen::VectorXd>& fields_;
 	int frameid_ = 0;
 
-	void calibre_frameid()
+	bool calibre_frameid()
 	{
+		int precalid = frameid_;
 		frameid_ = std::max(frameid_, 0);
 		frameid_ = std::min(int(fields_.size() - 1), frameid_);
+		return precalid != frameid_;
 	}
 
 	vector<int> tetleft_;
@@ -45,6 +48,7 @@ private:
 	bool flush_viewer_ = false;
 	vector<int> pathvert_;
 	vector<int> pathvert_temp_;
+	bool auto_range_ = false;
 public:
 	KeyDown(
 		Eigen::MatrixXd& V,
@@ -66,7 +70,10 @@ public:
 		string now = ctime(&tnow);
 		now = now.substr(0, now.size() - 1);
 		Eigen::MatrixXd C;
-		igl::jet(Z_temp_, 0.0, 1.0, C);
+		if (auto_range_)
+			igl::jet(Z_temp_, true, C);
+		else
+			igl::jet(Z_temp_, 0.0, 1.0, C);
 		for(auto vert : pathvert_temp_) {
 			C.row(vert) = Eigen::Vector3d(1.0, 1.0, 1.0);
 		}
@@ -77,6 +84,11 @@ public:
 				F_temp_,
 				C);
 		std::cerr << " done" << endl;
+	}
+
+	void set_auto_range(bool newvalue)
+	{
+		auto_range_ = newvalue;
 	}
 
 	void adjust_slice_plane(double t)
@@ -165,11 +177,11 @@ public:
 		}
 		viewer.data.set_face_based(false);
 		viewer.data.V_material_diffuse.resize(vertback_.size(), 3);
-#if 1
-		igl::jet(Z_temp_, 0.0, 1.0, viewer.data.V_material_diffuse);
-#else
-		igl::jet(Z_temp_, true, viewer.data.V_material_diffuse);
-#endif
+		
+		if (auto_range_)
+			igl::jet(Z_temp_, true, viewer.data.V_material_diffuse);
+		else
+			igl::jet(Z_temp_, 0.0, 1.0, viewer.data.V_material_diffuse);
 		for(auto vert : pathvert_temp_) {
 			viewer.data.V_material_diffuse.row(vert) = Eigen::Vector3d(1.0, 1.0, 1.0);
 		}
@@ -218,11 +230,11 @@ public:
 		return false;
 	}
 
-	void next_frame() 
+	bool next_frame() 
 	{
 		frameid_++;
 		std::cerr << frameid_ << ' ';
-		calibre_frameid();
+		return calibre_frameid();
 	}
 
 	void load_path(const string& path_file)
@@ -256,8 +268,9 @@ void skip_to_needle(std::istream& fin, const string& needle)
 int main(int argc, char* argv[])
 {
 	int opt;
+	bool auto_range = false;
 	string iprefix, ffn, pfn;
-	while ((opt = getopt(argc, argv, "i:f:p:")) != -1) {
+	while ((opt = getopt(argc, argv, "i:f:p:r")) != -1) {
 		switch (opt) {
 			case 'i': 
 				iprefix = optarg;
@@ -267,6 +280,9 @@ int main(int argc, char* argv[])
 				break;
 			case 'p':
 				pfn = optarg;
+				break;
+			case 'r':
+				auto_range = true;
 				break;
 			default:
 				std::cerr << "Unrecognized option: " << optarg << endl;
@@ -344,12 +360,13 @@ int main(int argc, char* argv[])
 	igl::viewer::Viewer viewer;
 	KeyDown kd(V,E,P, fields);
 	kd.load_path(pfn);
+	kd.set_auto_range(auto_range);
 	viewer.callback_key_pressed = [&kd](igl::viewer::Viewer& viewer, unsigned char key, int modifier) -> bool { return kd.operator()(viewer, key, modifier); } ;
 	viewer.callback_pre_draw = [&kd](igl::viewer::Viewer& viewer) -> bool
 	{
 		if (viewer.core.is_animating) {
-			kd.next_frame();
-			kd.update_frame(viewer);
+			if (!kd.next_frame())
+				kd.update_frame(viewer);
 		}
 		return false;
 	};
