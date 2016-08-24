@@ -11,6 +11,7 @@
 #include <unsupported/Eigen/SparseExtra>
 #include <igl/ray_mesh_intersect.h>
 #include <igl/readOBJ.h>
+#include <vecio/vecout.h>
 
 using std::string;
 using std::endl;
@@ -136,17 +137,7 @@ int main(int argc, char* argv[])
 			isBV(vid1) = 1;
 		}
 		set_boundary_value(isBV, IV, nv0);
-
-		std::ostream* pfout;
-		std::ofstream fout;
-		if (ofn.empty()) {
-			pfout = &std::cout;
-		} else {
-			fout.exceptions(std::ofstream::failbit | std::ofstream::badbit);
-			fout.open(ofn);
-			pfout = &fout;
-		}
-		(*pfout) << IV.rows() << endl << IV << endl;
+		vecio::text_write(ofn, IV);
 	} catch (std::runtime_error& e) {
 		std::cerr << e.what() << std::endl;
 		return -1;

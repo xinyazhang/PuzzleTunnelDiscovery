@@ -13,6 +13,7 @@ INCLUDE_DIRECTORIES(${IGL_INCLUDE_DIR})
 
 INCLUDE(${CMAKE_SOURCE_DIR}/cmake/FindSUITESPARSE.cmake)
 INCLUDE_DIRECTORIES(${SUITESPARSE_INCLUDE_DIRS})
+INCLUDE_DIRECTORIES(lib/)
 
 # C++11 and Debug
 # Note: we focus on gcc/clang right now, so we uses compiler specific solutions.
@@ -91,6 +92,7 @@ TARGET_LINK_LIBRARIES(subtract ${BOOLEAN_LIB})
 EASYLIB(tetio)
 EASYLIB(vertcolorply)
 EASYLIB(heatio)
+EASYLIB(vecio)
 
 EASYADD(meshgen)
 EASYADD(mkgen)
@@ -107,7 +109,7 @@ EASYADD(Bcond)
 TARGET_LINK_LIBRARIES(Bcond tetio)
 
 EASYADD(NBcond)
-TARGET_LINK_LIBRARIES(NBcond tetio)
+TARGET_LINK_LIBRARIES(NBcond tetio vecio)
 
 EASYADD(sancheck)
 TARGET_LINK_LIBRARIES(sancheck tetio)
@@ -116,8 +118,11 @@ EASYADD(ring1picker)
 TARGET_LINK_LIBRARIES(ring1picker tetio)
 
 EASYADD(heat)
-TARGET_LINK_LIBRARIES(heat ${SUITESPARSE_LIBRARIES})
+TARGET_LINK_LIBRARIES(heat ${SUITESPARSE_LIBRARIES} vecio)
 #TARGET_INCLUDE_DIRECTORIES(heat BEFORE PRIVATE ${CMAKE_SOURCE_DIR}/third-party/eigen)
+
+EASYADD(mass)
+TARGET_LINK_LIBRARIES(mass tetio vecio)
 
 find_package(GLEW REQUIRED)
 find_package(OpenGL REQUIRED)

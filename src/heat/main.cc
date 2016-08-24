@@ -11,6 +11,7 @@
 //#include <Eigen/SparseLU> 
 //#include <Eigen/SparseCholesky>
 #include <Eigen/CholmodSupport>
+#include <vecio/vecin.h>
 
 using std::string;
 using std::endl;
@@ -237,23 +238,16 @@ int main(int argc, char* argv[])
 #endif
 	}
 
-	Eigen::VectorXd& HSV = simulator.HSV; // Heat Supply Vector
-	if (bc & BC_NEUMANN) {
-		std::ifstream fin(nbcvfn);
-		if (!fin.is_open()) {
-			std::cerr << "Cannot open file: " << nbcvfn << endl;
-			return -1;
+	try { 
+		Eigen::VectorXd& HSV = simulator.HSV; // Heat Supply Vector
+		if (bc & BC_NEUMANN) {
+			vecio::text_read(nbcvfn, HSV);
+		} else {
+			HSV.setZero(simulator.IV.size()); // No heat source
 		}
-		int nnode;
-		fin >> nnode;
-		HSV.resize(nnode);
-		for(int i = 0; i < nnode; i++) {
-			double v;
-			fin >> v;
-			HSV(i) = v;
-		}
-	} else {
-		HSV.setZero(simulator.IV.size()); // No heat source
+	} catch (std::exception& e) {
+		cerr << e.what() << endl;
+		return -1;
 	}
 
 	std::unique_ptr<std::ostream> pfout_guard;

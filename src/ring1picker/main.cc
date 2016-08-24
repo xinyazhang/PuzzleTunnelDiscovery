@@ -27,12 +27,6 @@ void usage()
 	std::cerr << "\tNote: only V,E,P are printted" << endl;
 }
 
-enum BOUNDARY_CONDITION {
-	BC_NONE,
-	BC_DIRICHLET,
-	BC_NEUMANN, // FIXME: add support for Neumann BC
-};
-
 void mark(const Eigen::MatrixXi& P, // P for Primitives, can be tetrahedra or edges
 	const std::set<int>& pickset,
 	Eigen::VectorXi& markP,
