@@ -109,7 +109,7 @@ int main(int argc, char* argv[])
 	Eigen::VectorXd bMax = maxObV.array() + margin / 2;
 	Eigen::VectorXd bMin = minObV.array() - margin / 2;
 	bMax(2) = maxObV(2) - kEpsilon;
-	bMin(2) = minObV(2) - kEpsilon;
+	bMin(2) = minObV(2) + kEpsilon;
 
 	Eigen::MatrixXd V;
 	Eigen::MatrixXi E;
@@ -124,6 +124,8 @@ int main(int argc, char* argv[])
 		isBV.setZero(V.rows());
 
 		for (int i = 0; i < E.rows(); i++) {
+			if (EBM(i) == 0)
+				continue;
 			int vid0 = E(i, 0);
 			int vid1 = E(i, 1);
 			Eigen::Vector3d v0 = V.row(vid0);
