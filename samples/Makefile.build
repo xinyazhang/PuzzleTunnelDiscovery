@@ -26,9 +26,9 @@ spick: pick
 	./dlap -i cubepick.v147.e3-4 -o cubepick.v147.e3-4.dlap
 	./sancheck -i cubepick.v147.e3-4 -l cubepick.v147.e3-4.dlap 1
 
-mc.bc: Bcond
-	#./Bcond -i $(TETFILE) -o mc.bc X+ X- Y+ Y-
-	./Bcond -i $(TETFILE) -o mc.bc -p ../tmp/done.obj auto
+mc.bc: 
+	./Bcond -i $(TETFILE) -o mc.bc X+ X- Y+ Y-
+	#./Bcond -i $(TETFILE) -o mc.bc -p ../tmp/done.obj auto
 
 mc.dlap: dlap
 	./dlap -i $(TETFILE) -o mc.dlap
@@ -37,7 +37,7 @@ mc.dlap: dlap
 #	./heat -b -D -0 mc.bc -l mc.dlap -o mc.bheat -t 432000 -d 0.25 -a 0.125 -s 120
 
 mc.bheat: mc.bc mc.dlap heat mk
-	./heat -b -D -v -0 mc.bc -l mc.dlap -o mc.bheat -t 160 -d 0.1 -a 50.0 -s 1
+	./heat -b -D -v -0 mc.bc -l mc.dlap -o mc.bheat -t 2160 -d 0.1 -a 50.0 -s 1
 
 follow:
 	./follow -i $(TETFILE) -t mc.bheat -b mc.bc 2.5 4.6 0.01 > mc.path
