@@ -53,6 +53,9 @@ follow:
 nfollow:
 	./follow -i $(TETFILE) -t mc.nbheat -b mc.bc 2.5 4.6 0.01 > mc.npath
 
+cfollow:
+	./follow -c -i $(TETFILE) -t mc.nbheat -b mc.bc 2.5 4.6 0.01 > mc.cpath
+
 vis: visheat
 	./visheat -i $(TETFILE) -f mc.bheat
 

@@ -4,17 +4,20 @@
 #include <stdio.h>
 #include <Eigen/Core>
 #include <Eigen/Dense>
-#include <Eigen/SparseCore>
 #include <iostream>
 #include <unordered_map>
 #include <string>
 #include <set>
 #include <memory>
-#include <unsupported/Eigen/SparseExtra>
 #include <boost/progress.hpp>
+//#include <Eigen/SparseCore>
+//#include <unsupported/Eigen/SparseExtra>
 //#include <Eigen/SparseLU> 
 //#include <Eigen/SparseCholesky>
-#include <Eigen/CholmodSupport>
+//#include <Eigen/CholmodSupport>
+#include <unsupported/Eigen/BVH>
+#include <igl/barycentric_coordinates.h>
+#include <igl/ray_mesh_intersect.h>
 
 using std::string;
 using std::endl;
@@ -24,7 +27,8 @@ using std::vector;
 
 void usage()
 {
-	std::cerr << "Options: -i <tetgen file prefix> -t <temperature file> -b <boundary vertex file> [-o <output path file> -f time_frame] <x y z>" << endl;
+	std::cerr << "Options: -i <tetgen file prefix> -t <temperature file> -b <boundary vertex file> [-c -o <output path file> -f time_frame] <x y z>" << endl
+		<< "\t-c: continuous follow" << endl;
 }
 
 #define FACE_PER_TET 4
@@ -83,14 +87,190 @@ find_tet(const Eigen::Vector3d& start_point,
 	return -1;
 }
 
+typedef Eigen::AlignedBox<double, 3> BBox;
+
+BBox
+tet_bb(const std::vector<Eigen::VectorXd>& tetverts)
+{
+	Eigen::MatrixXd mat;
+	// each colume is a a tetvert
+	mat.resize(tetverts.front().size(), tetverts.size());
+	for(int i = 0; i < tetverts.size(); i++)
+		mat.col(i) = tetverts[i];
+	Eigen::VectorXd minV = mat.colwise().minCoeff();
+	Eigen::VectorXd maxV = mat.colwise().maxCoeff();
+	//std::cerr << minV.transpose() << "\t" << maxV.transpose() << endl;
+	return BBox(minV, maxV);
+}
+
+double
+tet_interp(const Eigen::MatrixXd& V,
+           const Eigen::MatrixXi& P,
+           const Eigen::VectorXd& H,
+           int i,
+           const Eigen::Vector3d& c)
+{
+	Eigen::MatrixXd barycoord;
+	Eigen::MatrixXd vertlist = c.transpose();
+	Eigen::MatrixXd v0 = V.row(P(i,0));
+	Eigen::MatrixXd v1 = V.row(P(i,1));
+	Eigen::MatrixXd v2 = V.row(P(i,2));
+	Eigen::MatrixXd v3 = V.row(P(i,3));
+
+	igl::barycentric_coordinates(vertlist, v0, v1, v2, v3, barycoord);
+	Eigen::VectorXd heatvec;
+	heatvec.resize(4);
+	heatvec(0) = H(P(i,0));
+	heatvec(1) = H(P(i,1));
+	heatvec(2) = H(P(i,2));
+	heatvec(3) = H(P(i,3));
+	std::cerr << "B. coord: " << barycoord << endl;
+	std::cerr << "Heat vec: " << heatvec.transpose() << endl;
+	double ret = heatvec.dot(barycoord.row(0));
+	std::cerr << "Heat value: " << ret << endl;
+	return ret;
+}
+
+Eigen::Vector3d
+tet_gradient(const Eigen::MatrixXd& V,
+             const Eigen::MatrixXi& P,
+             const Eigen::VectorXd& H,
+             int i)
+{
+	int vi0 = P(i,0);
+	int vi1 = P(i,1);
+	int vi2 = P(i,2);
+	int vi3 = P(i,3);
+	Eigen::Vector3d vec1 = V.row(vi1) - V.row(vi0);
+	Eigen::Vector3d vec2 = V.row(vi2) - V.row(vi0);
+	Eigen::Vector3d vec3 = V.row(vi3) - V.row(vi0);
+	double d1 = H(vi1) - H(vi0);
+	double d2 = H(vi2) - H(vi0);
+	double d3 = H(vi3) - H(vi0);
+
+	return (vec1 * d1) / vec1.squaredNorm() + 
+	       (vec2 * d2) / vec2.squaredNorm() + 
+	       (vec3 * d3) / vec3.squaredNorm();
+}
+
+double
+tet_intersect(const Eigen::MatrixXd& V,
+              const Eigen::MatrixXi& P,
+              int tetid,
+              const Eigen::Vector3d& center,
+              const Eigen::Vector3d& grad)
+{
+	Eigen::MatrixXi F;
+	F.resize(4, 3);
+	for (int i = 0; i < 4; i++) {
+		for (int j = 0; j < 3; j++) {
+			F(i, j) = P(tetid, proto_face_number[i][j]);
+		}
+	}
+	std::vector<igl::Hit> hits;
+	igl::ray_mesh_intersect(center, grad, V, F, hits);
+	return hits.front().t;
+}
+
+struct Intersector {
+	Eigen::Vector3d center_;
+	const Eigen::MatrixXd& V_;
+	const Eigen::MatrixXi& P_;
+	int result_ = -1;
+
+	Intersector(const Eigen::Vector3d& center,
+	            const Eigen::MatrixXd& V,
+	            const Eigen::MatrixXi& P)
+		:center_(center), V_(V), P_(P)
+	{
+	}
+
+	bool intersectVolume(const BBox &box)
+	{
+		//std::cerr << "Probing BBox " << box.min().transpose() << "\t" << box.max().transpose() << endl;
+		return box.contains(center_);
+	}
+
+	bool intersectObject(int tetid)
+	{
+		Eigen::MatrixXd tet(3, 4);
+		//std::cerr << "Probing tet " << tetid << endl;
+		int i = tetid;
+		for (int j = 0; j < P_.cols(); j++) {
+			tet.block<3, 1>(0, j) = V_.row(P_(i,j));
+		}
+		bool ret = in_tet(center_, tet);
+		if (ret)
+			result_ = tetid;
+		return ret;
+	}
+};
+
 void
-follow(const Eigen::Vector3d& start_point,
-       const Eigen::MatrixXd& V,
-       const Eigen::MatrixXi& E,
-       const Eigen::MatrixXi& P,
-       const Eigen::VectorXd& MBM,
-       const Eigen::VectorXd& H,
-       std::ostream& fout)
+cfollow(const Eigen::Vector3d& start_point,
+        const Eigen::MatrixXd& V,
+        const Eigen::MatrixXi& E,
+        const Eigen::MatrixXi& P,
+        const Eigen::VectorXd& MBM,
+        const Eigen::VectorXd& H,
+        std::ostream& fout)
+{
+	using namespace Eigen;
+
+	fout.precision(17);
+	std::vector<BBox> tetbbox(P.rows());
+	std::vector<int> tetidx(P.rows());
+	Eigen::VectorXd PBM;
+	PBM.setZero(P.rows());
+#pragma omp parallel for
+	for (int i = 0; i < P.rows(); i++) {
+		tetbbox[i] = tet_bb({V.row(P(i,0)), V.row(P(i,1)), V.row(P(i,2)), V.row(P(i,3))});
+		tetidx[i] = i;
+		for (int j = 0; j < P.cols(); j++) {
+			if (MBM(P(i,j))) {
+				PBM(i) = 1;
+				break;
+			}
+		}
+	}
+
+	//std::cerr << "Test tet_bb" << tetbbox[0].min().transpose() << "\t" << tetbbox[0].max().transpose() << endl;
+	KdBVH<double, 3, int> bvh(tetidx.begin(), tetidx.end(), tetbbox.begin(), tetbbox.end());
+	Intersector intersector(start_point, V, P);
+	BVIntersect(bvh, intersector);
+	if (intersector.result_ < 0)
+		throw std::runtime_error("Start point isn't in any tetrahedron.");
+	while (true) {
+		double tem = tet_interp(V, P, H, intersector.result_, intersector.center_);
+		fout << intersector.center_.transpose() << "\t" << tem;
+		auto grad = tet_gradient(V, P, H, intersector.result_);
+		Vector3d ngrad = grad.normalized();
+		double t = tet_intersect(V, P, intersector.result_, intersector.center_, ngrad);
+		fout << "\t#direction: " << ngrad.transpose() << "\tT: " << t << endl;
+
+		int prevtet = intersector.result_;
+		intersector.center_ += ngrad * (t + 1e-5);
+		intersector.result_ = -1;
+		BVIntersect(bvh, intersector);
+		if (intersector.result_ > 0)
+			continue;
+		if (PBM(prevtet) > 0) {
+			std::cerr << "Outsize of the boundary, halt" << endl;
+			break;
+		}
+		// FIXME: Handling oob
+	}
+	fout << intersector.center_.transpose() << "\tNaN\t#This is End" << endl;
+}
+
+void
+dfollow(const Eigen::Vector3d& start_point,
+        const Eigen::MatrixXd& V,
+        const Eigen::MatrixXi& E,
+        const Eigen::MatrixXi& P,
+        const Eigen::VectorXd& MBM,
+        const Eigen::VectorXd& H,
+        std::ostream& fout)
 {
 	fout.precision(17);
 	int tet_id = find_tet(start_point, V, P);
@@ -147,7 +327,8 @@ int main(int argc, char* argv[])
 	int opt;
 	string iprefix, tfn, ofn, ivf;
 	int frame_to_pick = INT_MAX;
-	while ((opt = getopt(argc, argv, "i:t:o:b:f:")) != -1) {
+	bool continuous = false;
+	while ((opt = getopt(argc, argv, "i:t:o:b:f:c")) != -1) {
 		switch (opt) {
 			case 'i': 
 				iprefix = optarg;
@@ -163,6 +344,9 @@ int main(int argc, char* argv[])
 				break;
 			case 'f':
 				frame_to_pick = atoi(optarg);
+				break;
+			case 'c':
+				continuous = true;
 				break;
 			default:
 				std::cerr << "Unrecognized option: " << optarg << endl;
@@ -242,7 +426,10 @@ int main(int argc, char* argv[])
 				throw std::runtime_error("Cannot open " + ofn + " for write.");
 			os = &fout;
 		}
-		follow(start_point, V, E, P, MBM, hframe.hvec, *os);
+		if (continuous)
+			cfollow(start_point, V, E, P, MBM, hframe.hvec, *os);
+		else 
+			dfollow(start_point, V, E, P, MBM, hframe.hvec, *os);
 	} catch (std::runtime_error& e) {
 		std::cerr << e.what() << std::endl;
 		return -1;
