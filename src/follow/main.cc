@@ -25,6 +25,8 @@ using std::cerr;
 using std::fixed;
 using std::vector;
 
+#define VERBOSE 1
+
 void usage()
 {
 	std::cerr << "Options: -i <tetgen file prefix> -t <temperature file> -b <boundary vertex file> [-c -o <output path file> -f time_frame] <x y z>" << endl
@@ -95,7 +97,7 @@ tet_bb(const std::vector<Eigen::VectorXd>& tetverts)
 	Eigen::MatrixXd mat;
 	// each colume is a a tetvert
 	mat.resize(tetverts.front().size(), tetverts.size());
-	for(int i = 0; i < tetverts.size(); i++)
+	for(size_t i = 0; i < tetverts.size(); i++)
 		mat.col(i) = tetverts[i];
 	Eigen::VectorXd minV = mat.colwise().minCoeff();
 	Eigen::VectorXd maxV = mat.colwise().maxCoeff();
@@ -169,6 +171,8 @@ tet_intersect(const Eigen::MatrixXd& V,
 	}
 	std::vector<igl::Hit> hits;
 	igl::ray_mesh_intersect(center, grad, V, F, hits);
+	if (hits.empty())
+		return -1.0;
 	return hits.front().t;
 }
 
@@ -177,6 +181,7 @@ struct Intersector {
 	const Eigen::MatrixXd& V_;
 	const Eigen::MatrixXi& P_;
 	int result_ = -1;
+	int vert_id_ = -1; // Neg value to represent we're not on any vertex
 
 	Intersector(const Eigen::Vector3d& center,
 	            const Eigen::MatrixXd& V,
@@ -205,6 +210,42 @@ struct Intersector {
 		return ret;
 	}
 };
+
+int max_temp_vert_in_tet(
+        const Eigen::MatrixXi& P,
+        const Eigen::VectorXd& H,
+        int tet_id)
+{
+	int next_vert = P(tet_id, 0);
+	double max_temp = H(next_vert);
+	for (int j = 1; j < P.cols(); j++) {
+		int vert = P(tet_id, j);
+		if (H(vert) > max_temp) {
+			max_temp = H(vert);
+			next_vert = vert;
+		}
+	}
+	return next_vert;
+}
+
+double tet_highest_temp(
+        const Eigen::MatrixXi& P,
+        const Eigen::VectorXd& H,
+        int tet_id)
+{
+	return H(max_temp_vert_in_tet(P, H, tet_id));
+}
+
+double tet_average_temp(
+        const Eigen::MatrixXi& P,
+        const Eigen::VectorXd& H,
+        int tet_id)
+{
+	double ret = 0;
+	for (int i = 0; i < P.cols(); i++)
+		ret += H(P(tet_id,i));
+	return ret;
+}
 
 void
 cfollow(const Eigen::Vector3d& start_point,
@@ -236,31 +277,116 @@ cfollow(const Eigen::Vector3d& start_point,
 
 	//std::cerr << "Test tet_bb" << tetbbox[0].min().transpose() << "\t" << tetbbox[0].max().transpose() << endl;
 	KdBVH<double, 3, int> bvh(tetidx.begin(), tetidx.end(), tetbbox.begin(), tetbbox.end());
-	Intersector intersector(start_point, V, P);
-	BVIntersect(bvh, intersector);
-	if (intersector.result_ < 0)
+	Intersector isect(start_point, V, P);
+	BVIntersect(bvh, isect);
+	if (isect.result_ < 0)
 		throw std::runtime_error("Start point isn't in any tetrahedron.");
-	while (true) {
-		double tem = tet_interp(V, P, H, intersector.result_, intersector.center_);
-		fout << intersector.center_.transpose() << "\t" << tem;
-		auto grad = tet_gradient(V, P, H, intersector.result_);
-		Vector3d ngrad = grad.normalized();
-		double t = tet_intersect(V, P, intersector.result_, intersector.center_, ngrad);
-		fout << "\t#direction: " << ngrad.transpose() << "\tT: " << t << endl;
 
-		int prevtet = intersector.result_;
-		intersector.center_ += ngrad * (t + 1e-5);
-		intersector.result_ = -1;
-		BVIntersect(bvh, intersector);
-		if (intersector.result_ > 0)
-			continue;
-		if (PBM(prevtet) > 0) {
-			std::cerr << "Outsize of the boundary, halt" << endl;
-			break;
+	std::unordered_map<int, std::vector<int>> vert2tet;
+	for (int i = 0; i < P.rows(); i++) {
+		for (int j = 0; j < P.cols(); j++) {
+			vert2tet[P(i,j)].emplace_back(i);
 		}
-		// FIXME: Handling oob
 	}
-	fout << intersector.center_.transpose() << "\tNaN\t#This is End" << endl;
+
+	std::unordered_map<int, std::set<int>> neigh;
+	for (int i = 0; i < P.rows(); i++) {
+		for (int ei = 0; ei < EDGE_PER_TET; ei++) {
+			int vi = P(i, proto_edge_number[ei][0]);
+			int vj = P(i, proto_edge_number[ei][1]);
+			neigh[vi].emplace(vj);
+			neigh[vj].emplace(vi);
+		}
+	}
+
+	while (true) {
+		double tem;
+		if (isect.vert_id_ >= 0) {
+			fout << V.row(isect.vert_id_)
+			     << "\t" << isect.vert_id_
+			     << '\t' << H(isect.vert_id_)
+			     << endl;
+			int tet_pick = vert2tet[isect.vert_id_].front();
+			double highest_temp = tet_highest_temp(P, H, tet_pick);
+			double average_temp = tet_average_temp(P, H, tet_pick);
+			for (auto tet : vert2tet[isect.vert_id_]) {
+				double high = tet_highest_temp(P, H, tet);
+				double ave = tet_average_temp(P, H, tet);
+#if VERBOSE
+				fout << "# tet: " << tet
+				     << " high: " << high
+				     << " ave: " << ave
+				     << endl;
+#endif
+				bool replace = false;
+				if (high > highest_temp)
+					replace = true;
+				else if (high == highest_temp && ave > average_temp)
+					replace = true;
+				if (replace) {
+					highest_temp = high;
+					average_temp = ave;
+					tet_pick = tet;
+				}
+			}
+			Vector3d center(0,0,0);
+			for (int i = 0; i < P.cols(); i++) {
+				center += V.row(P(tet_pick, i));
+			}
+			//isect.center_ = V.row(isect.vert_id_);
+			isect.center_ = center / P.cols();
+			isect.result_ = tet_pick;
+#if VERBOSE
+			fout << "# tetpick: " << tet_pick << " for vert: " << isect.vert_id_ << endl
+			     << "#\tnew center: " << isect.center_.transpose()
+			     << " in tet? " << isect.intersectObject(tet_pick)
+			     << endl;
+			
+			fout << "# Temperature list: " << endl;
+			for (int i = 0; i < P.cols(); i++) {
+				fout << "#\t" << H(P(tet_pick, i)) << endl;
+			}
+			fout << "# Neighbor Temperature list: " << endl;
+			const auto& nei = neigh[isect.vert_id_];
+			for (int vert : nei) {
+				fout << "#\t" << H(vert) << "\t" << (H(vert) > H(isect.vert_id_))
+				     << endl;
+			}
+#endif
+		}
+		tem = tet_interp(V, P, H, isect.result_, isect.center_);
+		// In practice, they are all off vertex
+		// Because we use the center of tet instead we need be on vertex
+		fout << isect.center_.transpose() << "\t" << -1 << '\t' << tem;
+		auto grad = tet_gradient(V, P, H, isect.result_);
+		Vector3d ngrad = grad.normalized();
+		double t = tet_intersect(V, P, isect.result_, isect.center_, ngrad);
+		fout << "\t#direction: " << ngrad.transpose()
+		     << "\tT: " << t
+		     << "\ton vert: " << isect.vert_id_;
+		fout << endl;
+
+		int prevtet = isect.result_;
+		if (t >= 0) {
+			isect.center_ += ngrad * (t + 1e-3);
+			isect.result_ = -1;
+			BVIntersect(bvh, isect);
+			if (isect.result_ > 0) {
+				isect.vert_id_ = -1; // In boundary, reset.
+				continue;
+			}
+			if (PBM(prevtet) > 0) {
+				std::cerr << "Outsize of the outer boundary, halt" << endl;
+				break;
+			}
+		}
+		// We leaves an inner boundary,
+		// or following the vertex doesn't help
+		// Handling oob by picking up a highest temp vertex.
+		int next_vert = max_temp_vert_in_tet(P, H, prevtet);
+		isect.vert_id_ = next_vert;
+	}
+	fout << isect.center_.transpose() << "\t-1\t1 #This is the End" << endl;
 }
 
 void
@@ -276,15 +402,8 @@ dfollow(const Eigen::Vector3d& start_point,
 	int tet_id = find_tet(start_point, V, P);
 	if (tet_id < 0)
 		throw std::runtime_error("Start point isn't in any tetrahedron.");
-	int next_vert = P(tet_id, 0);
+	int next_vert = max_temp_vert_in_tet(P, H, tet_id);
 	double max_temp = H(next_vert);
-	for (int j = 1; j < P.cols(); j++) {
-		int vert = P(tet_id, j);
-		if (H(vert) > max_temp) {
-			max_temp = H(vert);
-			next_vert = vert;
-		}
-	}
 	std::unordered_map<int, std::set<int>> neigh;
 	for (int i = 0; i < P.rows(); i++) {
 		for (int ei = 0; ei < EDGE_PER_TET; ei++) {

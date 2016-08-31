@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <Eigen/Core>
 #include <iostream>
+#include <limits>
 #include <igl/barycenter.h>
 #include <igl/viewer/Viewer.h>
 #include <igl/jet.h>
@@ -18,7 +19,7 @@ using std::vector;
 
 void usage()
 {
-	cerr << "Options: -i <tetgen file prefix> -f <heat field data file> [-p <page No.> -r]" << endl
+	cerr << "Options: -i <tetgen file prefix> -f <heat field data file> [-p <path file name> -r]" << endl
 	     << "\t-r: enable auto range. The default range is 0-1" << endl;
 }
 
@@ -46,9 +47,13 @@ private:
 	std::unordered_map<int, int> vertidmap_; // Old vert id -> New vert id
 	vector<int> vertback_;
 	bool flush_viewer_ = false;
-	vector<int> pathvert_;
-	vector<int> pathvert_temp_;
+	vector<int> pathvertid_;
+	vector<int> pathvertid_temp_;
 	bool auto_range_ = false;
+
+	vector<Eigen::Vector3d> pathvert_;
+	Eigen::MatrixXd pathV_; // We need add another vertex to make a face for each segment.
+	Eigen::MatrixXi pathF_;
 public:
 	KeyDown(
 		Eigen::MatrixXd& V,
@@ -64,19 +69,26 @@ public:
 		adjust_slice_plane(0.5);
 	}
 
+	void colorize_data(const Eigen::VectorXd& Z, Eigen::MatrixXd& C)
+	{
+		if (auto_range_)
+			igl::jet(Z, true, C);
+		else
+			igl::jet(Z, 0.0, 1.0, C);
+		for(auto vert : pathvertid_temp_) {
+			C.row(vert) = Eigen::Vector3d(1.0, 1.0, 1.0);
+		}
+		for (auto i = vertback_.size(); i < Z.rows(); i++)
+			C.row(i) = Eigen::Vector3d(1.0, 1.0, 1.0);
+	}
+
 	void save_frame()
 	{
 		time_t tnow = time(NULL);
 		string now = ctime(&tnow);
 		now = now.substr(0, now.size() - 1);
 		Eigen::MatrixXd C;
-		if (auto_range_)
-			igl::jet(Z_temp_, true, C);
-		else
-			igl::jet(Z_temp_, 0.0, 1.0, C);
-		for(auto vert : pathvert_temp_) {
-			C.row(vert) = Eigen::Vector3d(1.0, 1.0, 1.0);
-		}
+		colorize_data(Z_temp_, C);
 		string fn = "visheat-snapshot-at-"+now+"-frame-"+std::to_string(frameid_)+".ply";
 		std::cerr << "Saving model to file " << fn;
 		write_ply_vc(fn,
@@ -117,12 +129,14 @@ public:
 				vertid++;
 			}
 		}
-		V_temp_.resize(vertback_.size(), 3);
+		V_temp_.resize(vertback_.size() + pathV_.rows(), 3);
 		for(unsigned i = 0; i < vertback_.size(); i++) {
 			V_temp_.row(i) = V_.row(vertback_[i]);
 		}
+		V_temp_.block(vertback_.size(), 0, pathV_.rows(), 3)
+			= pathV_;
 
-		F_temp_.resize(tetleft_.size()*4,3);
+		F_temp_.resize(tetleft_.size()*4 + pathF_.rows(), 3);
 		// Put old vert id to F_temp_
 		for (unsigned i = 0; i < tetleft_.size(); ++i) {
 			Eigen::VectorXi tet = P_.row(tetleft_[i]);
@@ -131,18 +145,20 @@ public:
 			F_temp_.row(i*4+2) << tet(3), tet(2), tet(0);
 			F_temp_.row(i*4+3) << tet(1), tet(2), tet(3);
 		}
+		F_temp_.block(tetleft_.size() * 4, 0, pathF_.rows(), 3)
+			= pathF_.array() + vertback_.size();
 		// Translate to new vert id
 		for(unsigned j = 0; j < tetleft_.size()*4; j++)
 			for(unsigned k = 0; k < 3; k++)
 				F_temp_(j,k) = vertidmap_[F_temp_(j,k)];
-		Z_temp_.resize(vertback_.size());
+		Z_temp_.resize(V_temp_.rows());
 
-		pathvert_temp_.clear();
-		for (int vert : pathvert_) {
+		pathvertid_temp_.clear();
+		for (int vert : pathvertid_) {
 			auto iter = vertidmap_.find(vert);
 			if (iter == vertidmap_.end())
 				continue ;
-			pathvert_temp_.emplace_back(iter->second);
+			pathvertid_temp_.emplace_back(iter->second);
 		}
 
 		flush_viewer_ = true;
@@ -178,13 +194,7 @@ public:
 		viewer.data.set_face_based(false);
 		viewer.data.V_material_diffuse.resize(vertback_.size(), 3);
 		
-		if (auto_range_)
-			igl::jet(Z_temp_, true, viewer.data.V_material_diffuse);
-		else
-			igl::jet(Z_temp_, 0.0, 1.0, viewer.data.V_material_diffuse);
-		for(auto vert : pathvert_temp_) {
-			viewer.data.V_material_diffuse.row(vert) = Eigen::Vector3d(1.0, 1.0, 1.0);
-		}
+		colorize_data(Z_temp_, viewer.data.V_material_diffuse);
 		viewer.data.V_material_ambient = 0.1 * viewer.data.V_material_diffuse;
 		constexpr double grey = 0.3;
 		viewer.data.V_material_specular = grey+0.1*(viewer.data.V_material_diffuse.array()-grey);
@@ -246,14 +256,50 @@ public:
 			return;
 		double x,y,z,tmp;
 		int vert;
+		bool extra_path = false;
 		while (true) {
+			while (fin.peek() == '#' && !fin.eof())
+				fin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+			if (fin.eof())
+				break;
 			fin >> x >> y >> z >> vert >> tmp;
+			
+			std::cerr << x << ' ' << y << ' ' << z << ' ' << vert << ' ' << tmp << endl;
 			if (!fin.eof()) {
-				pathvert_.emplace_back(vert);
+				if (vert >= 0)
+					pathvertid_.emplace_back(vert);
+				else
+					extra_path = true;
+				pathvert_.emplace_back(x, y, z);
 			} else {
 				break;
 			}
+			fin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 		}
+		std::cerr << "Loading done" << endl;
+		if (extra_path)
+			build_path_geo();
+	}
+
+	void build_path_geo()
+	{
+		auto npathvert = pathvert_.size();
+		pathV_.resize(3 * (npathvert - 1), 3);
+		pathF_.resize(npathvert - 1, 3);
+		Eigen::Vector3d prev_vert = pathvert_.front();
+		for (size_t i = 1; i < npathvert; i++) {
+			Eigen::Vector3d vert = pathvert_[i];
+			size_t vstart = 3 * (i - 1);
+			pathV_.row(vstart) = prev_vert;
+			pathV_.row(vstart + 1) = vert;
+			vert(2) += 1e-2;
+			pathV_.row(vstart + 2) = vert;
+			pathF_(i - 1, 0) = vstart;
+			pathF_(i - 1, 1) = vstart + 1;
+			pathF_(i - 1, 2) = vstart + 2;
+			prev_vert = vert;
+		}
+		std::cerr << "path building done" << endl;
 	}
 };
 

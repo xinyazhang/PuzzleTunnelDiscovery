@@ -106,7 +106,7 @@ struct Simulator {
 			      }
 			      VF += delta;
 #else
-			      VF += HSV * 0.01 * delta_t; // Apply HSV
+			      VF += HSV * 0.001 * delta_t; // Apply HSV
 			      Eigen::VectorXd VFNext = solver.solve(IvM * VF);
 			      // The New Dirichlet Cond
 #pragma omp parallel for

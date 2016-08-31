@@ -68,6 +68,9 @@ vispath:
 nvispath:
 	./visheat -i $(TETFILE) -f mc.nbheat -p mc.npath
 
+cvispath:
+	./visheat -i $(TETFILE) -f mc.nbheat -p mc.cpath
+
 .PHONY: follow nvis vispath
 
 # vim: tw=0
