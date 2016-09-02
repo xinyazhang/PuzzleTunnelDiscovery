@@ -8,7 +8,7 @@
 constexpr int kNInterp = 16; //16;
 constexpr int kNSlices = 32; //32;
 constexpr int kNLayers = kNSlices + 1;
-constexpr double kDeltaTheta = M_PI/16; //2 * M_PI/kNSlices;
+constexpr double kDeltaTheta = M_PI/32; //2 * M_PI/kNSlices;
 constexpr double kEndTheta = 2 * M_PI; //2 * M_PI/kNSlices;
 constexpr double kEpsilon = 1e-6;
 constexpr double kWallEpsilon= 1.0/128.0; //0.01;
