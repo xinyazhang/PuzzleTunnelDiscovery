@@ -132,6 +132,8 @@ TARGET_LINK_LIBRARIES(visheat vertcolorply ${CMAKE_THREAD_LIBS_INIT} ${OPENGL_LI
 EASYADD(follow)
 TARGET_LINK_LIBRARIES(follow tetio heatio)
 
+EASYADD(invgen)
+
 #FILE(COPY ${BINARIES} DESTINATION ${CMAKE_SOURCE_DIR}/bin)
 
 # vim: tw=0
