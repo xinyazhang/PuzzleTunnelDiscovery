@@ -93,6 +93,7 @@ EASYLIB(tetio)
 EASYLIB(vertcolorply)
 EASYLIB(heatio)
 EASYLIB(vecio)
+EASYLIB(geopick)
 EASYLIB(mazeinfo)
 
 EASYADD(meshgen)
@@ -136,6 +137,9 @@ EASYADD(follow)
 TARGET_LINK_LIBRARIES(follow tetio heatio)
 
 EASYADD(invgen)
+
+EASYADD(periodicalize)
+TARGET_LINK_LIBRARIES(periodicalize tetio geopick)
 
 #FILE(COPY ${BINARIES} DESTINATION ${CMAKE_SOURCE_DIR}/bin)
 
