@@ -25,7 +25,7 @@ void print_circular(std::ostream& fout, const std::vector<Eigen::Vector2d>& vert
 int main(int argc, char* argv[])
 {
 	double radius = 1.0;
-	double width = 0.8;
+	double width = 1.6;
 	double dtheta = M_PI / 32;
 	double theta_start = M_PI;
 	double theta_final = 6 * M_PI;
