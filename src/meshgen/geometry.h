@@ -1,31 +1,10 @@
 #ifndef GEOMETRY_H
 #define GEOMETRY_H
 
-#include <Eigen/Core>
 #include <unordered_map>
 #include <memory>
-#include <boost/range/irange.hpp>
 #include <vector>
-
-typedef Eigen::Vector2d MazeVert;
-typedef std::vector<MazeVert, Eigen::aligned_allocator<MazeVert> > MazeVertArray;
-
-class MazeSegment {
-public:
-	MazeVert v0, v1;
-};
-
-class MazeBoundary {
-public:
-	MazeBoundary(std::istream&);
-
-	MazeSegment& get_prim(int idx);
-	MazeVert get_center();
-	auto irange() { return boost::irange(0, (int)segs_.size()); }
-private:
-	std::vector<MazeSegment> segs_;
-	MazeVert center_;
-};
+#include <mazeinfo/2d.h>
 
 typedef Eigen::Vector3d ObVertex;
 

@@ -15,31 +15,6 @@ constexpr double kWallEpsilon= 1.0/128.0; //0.01;
 constexpr double kBaseTheta = 0; // 0;
 constexpr double kExpandRatio = 1.0+1.0/1024.0; // 1 + small number
 
-MazeBoundary::MazeBoundary(std::istream& fin)
-{
-	int size;
-	fin >> size;
-	segs_.resize(size);
-	center_ << 0.0, 0.0;
-	for(auto& seg : segs_) {
-		fin >> seg.v0.x() >> seg.v0.y();
-		fin >> seg.v1.x() >> seg.v1.y();
-		center_ += seg.v0;
-		center_ += seg.v1;
-	}
-	center_ /= size*2;
-}
-
-MazeSegment& MazeBoundary::get_prim(int idx)
-{
-	return segs_[idx];
-}
-
-MazeVert MazeBoundary::get_center()
-{
-	return center_;
-}
-
 ObFace::ObFace(ObVertex* v0, ObVertex* v1, ObVertex* v2)
 {
 	verts[0] = v0;

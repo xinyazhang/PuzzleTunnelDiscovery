@@ -93,8 +93,11 @@ EASYLIB(tetio)
 EASYLIB(vertcolorply)
 EASYLIB(heatio)
 EASYLIB(vecio)
+EASYLIB(mazeinfo)
 
 EASYADD(meshgen)
+TARGET_LINK_LIBRARIES(meshgen mazeinfo)
+
 EASYADD(mkgen)
 FILTERADD(flipfaces)
 FILTERADD(addbb)

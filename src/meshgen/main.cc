@@ -1,5 +1,6 @@
 #include "geometry.h"
 #include "options.h"
+#include <mazeinfo/2d.h>
 
 int main(int argc, char* argv[])
 {
