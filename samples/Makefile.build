@@ -70,7 +70,12 @@ nvispath:
 
 cvispath:
 	./visheat -i $(TETFILE) -f mc.nbheat -p mc.cpath
+	
+tp:
+	make
+	./periodicalize -i ../inv/hollowed.1 -o period.obj
+	meshlab period.obj
 
-.PHONY: follow nvis vispath
+.PHONY: follow nvis vispath tp
 
 # vim: tw=0

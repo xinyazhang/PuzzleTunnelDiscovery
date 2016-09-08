@@ -17,11 +17,11 @@ using std::cerr;
 void usage()
 {
 	std::cerr << 
-R"xxx(This program generate the periodical part geometry from the obstacle space geometry
+R"zzz(This program generate the periodical part geometry from the obstacle space geometry
 Options: -i <prefix> [-o file]
 	-i prefix: input tetgen prefix" << endl
 	-o file: output the result to file instead of stdout
-)xxx";
+)zzz";
 }
 
 #define FACE_PER_TET 4
@@ -106,9 +106,12 @@ pick_closest_BL(const Eigen::MatrixXd& V,
 		i++;
 	if (i >= usedMarker.rows())
 		throw std::runtime_error("Unexpected calling to pick_closest_BL: all boundary lists have been matched");
+	//std::cerr << __func__ << " first i: " << i << endl;
 	double min_d = distance(V, objBL, BLcans[i], zdistance);
-	size_t retidx = 0;
+	size_t retidx = i;
 	for (; i < int(BLcans.size()); i++) {
+		if (usedMarker(i) > 0)
+			continue;
 		const std::vector<int>& BL = BLcans[i];
 		double d = distance(V, objBL, BL, zdistance);
 		if (d < min_d) {
@@ -116,7 +119,8 @@ pick_closest_BL(const Eigen::MatrixXd& V,
 			retidx = i;
 		}
 	}
-	usedMarker[retidx] = 1;
+	usedMarker(retidx) = 1;
+	//std::cerr << __func__ << " returns: " << retidx << endl;
 	return BLcans[retidx];
 }
 
@@ -128,10 +132,22 @@ seal(const Eigen::MatrixXd& V,
 {
 	Eigen::MatrixXi ret;
 	std::vector<Eigen::VectorXi> faces;
+#if 0
 	auto lambda = [&faces](int bc, int bn, int tc, int tn) {
+		std::cerr << "faces: " << bc << ' ' << bn << ' ' << tc << ' ' << tn << endl;
 		faces.emplace_back(Eigen::Vector3i(bc, bn, tc));
 		faces.emplace_back(Eigen::Vector3i(bn, tn, tc));
 	};
+#endif
+#if 0
+	std::cerr << "Sealing\nbtmBL:";
+	for (auto vi : btmBL)
+		std::cerr << ' ' << vi;
+	std::cerr << "\ntopBL:";
+	for (auto vi : topBL)
+		std::cerr << ' ' << vi;
+	std::cerr << endl;
+#endif
 	double sqzd = zdistance * zdistance;
 	// Find the btmBL.front() -> topBL.???
 	int topidx = 0;
@@ -150,23 +166,77 @@ seal(const Eigen::MatrixXd& V,
 	}
 	int direction = 0; // Uninitialized
 	{
+		Eigen::VectorXd topV = V.row(topBL[topidx]);
 		Eigen::VectorXd topVfwd = V.row(topBL[(topidx + 1)%topBL.size()]);
-		Eigen::VectorXd topVbwd = V.row(topBL[(topidx - 1)%topBL.size()]);
+		Eigen::VectorXd topVbwd = V.row(topBL[(topidx - 1 + topBL.size())%topBL.size()]);
+		Eigen::VectorXd btmVfwd = V.row(btmBL[1]);
+		//Eigen::VectorXd btmVbwd = V.row(topBL.back());
+		Eigen::VectorXd topfwdV = (topVfwd - topV).normalized();
+		Eigen::VectorXd topbwdV = (topVbwd - topV).normalized();
+		Eigen::VectorXd btmfwdV = (btmVfwd - btmV).normalized();
+		if (topfwdV.dot(btmfwdV) > topbwdV.dot(btmfwdV)) {
+			// Same direction
+			direction = 1;
+		} else {
+			// Opposite direction
+			direction = -1;
+		}
+		std::cerr << "top V: " << topV.transpose() << endl;
+		std::cerr << "top V (fwd): " << topVfwd.transpose() << endl;
+		std::cerr << "btm V: " << btmV.transpose() << endl;
+		std::cerr << "top fwd V: " << topfwdV.transpose() << endl;
+		std::cerr << "top bwd V: " << topbwdV.transpose() << endl;
+		std::cerr << "btm fwd V: " << btmfwdV.transpose() << endl;
+#if 0
 		double dfwd = (topVfwd - btmV).squaredNorm() - sqzd;
 		double dbwd = (topVbwd - btmV).squaredNorm() - sqzd;
 		if (dfwd <= dbwd)
 			direction = 1;
 		else
 			direction = -1;
+#endif
 	}
-	for (size_t i = 0; i < topBL.size(); i++) {
+	int init_topc = topidx;
+	int topc = init_topc;
+	int btmc = 0;
+#if 0
+	for (size_t i = 0; i < btmBL.size(); i++) {
 		int topc = topidx + i * direction;
-		int topn = topidx + i * direction;
-		topc = topc % topBL.size();
-		topn = topn % topBL.size();
+		int topn = topidx + (i + 1) * direction;
+		topc = (topc + topBL.size()) % int(topBL.size());
+		topn = (topn + topBL.size()) % int(topBL.size());
 		int btmc = i;
-		int btmn = (i+1) % btmBL.size();
-		lambda(btmc, btmn, topc, topn);
+		int btmn = (i + 1 + btmBL.size()) % int(btmBL.size());
+		lambda(btmBL[btmc], btmBL[btmn], topBL[topc], topBL[topn]);
+	}
+#endif
+	double topd = 0;
+	double btmd = 0;
+	while (faces.size() == 0 || topc != init_topc || btmc != 0) {
+		int topn = (topc + direction + topBL.size()) % topBL.size();
+		int btmn = (btmc + 1 + btmBL.size()) % btmBL.size();
+		int topcvi = topBL[topc];
+		int topnvi = topBL[topn];
+		int btmcvi = btmBL[btmc];
+		int btmnvi = btmBL[btmn];
+		Eigen::VectorXd topcV = V.row(topcvi);
+		Eigen::VectorXd topnV = V.row(topnvi);
+		double dtopd = (topcV - topnV).norm();
+		Eigen::VectorXd btmcV = V.row(btmcvi);
+		Eigen::VectorXd btmnV = V.row(btmnvi);
+		double dbtmd = (btmcV - btmnV).norm();
+		if (topd + dtopd < btmd + dbtmd) {
+			// pickup topn
+			faces.emplace_back(Eigen::Vector3i(topnvi, btmcvi, topcvi)); // Note: we are going to 'flip' bottom above top
+			topc = topn;
+			topd += dtopd;
+		} else {
+			// pickup btmn 
+			faces.emplace_back(Eigen::Vector3i(btmnvi, btmcvi, topcvi)); // Ditto
+			btmc = btmn;
+			btmd += dbtmd;
+		}
+		//std::cerr << "faces " << faces.back().transpose() << std::endl;
 	}
 	ret.resize(faces.size(), 3);
 	for (size_t i = 0; i < faces.size(); i++)
@@ -197,8 +267,20 @@ void glue_boundary(const Eigen::MatrixXd& V,
 	
 	Eigen::VectorXi usedMarker;
 	usedMarker.setZero(topBLs.size(), 1);
+	int iter = 0;
+	constexpr int ipick = 2;
 	for (const auto& btmBL : btmBLs) {
+#if 0
+		int i = iter++;
+		//if (i == 1)
+		//	continue;
+		//if (i != ipick)
+		//	continue ;
+		if (i > ipick)
+			break;
+#endif
 		const std::vector<int>& topBL = pick_closest_BL(V, btmBL, topBLs, kTopTheta - kBtmTheta, usedMarker);
+		//std::cerr << "usedMarker: " << usedMarker.transpose() << endl;
 		Fchain.emplace_back(seal(V, btmBL, topBL, kTopTheta - kBtmTheta));
 	}
 	size_t nrows = 0;
@@ -244,11 +326,14 @@ int main(int argc, char* argv[])
 		Eigen::MatrixXd prdcV; // PeRioDiCal Vertices
 		Eigen::MatrixXi prdcF; // PeRioDiCal Faces
 		geopick(V, {btmF, topF, glueF}, prdcV, prdcF);
+		//geopick(V, {glueF}, prdcV, prdcF);
+#if 1
 #pragma omp parallel for
 		for (int i = 0; i < prdcV.rows(); i++) {
 			if (fpclose(prdcV(i,2), kBtmTheta))
 				prdcV(i,2) = kTopTheta + M_PI/2;
 		}
+#endif
 		igl::writeOBJ(ofn, prdcV, prdcF);
 	} catch (std::runtime_error& e) {
 		std::cerr << e.what() << std::endl;

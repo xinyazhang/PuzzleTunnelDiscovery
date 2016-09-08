@@ -1,5 +1,8 @@
 #include "pick2d.h"
 #include <unordered_map>
+#include <iostream>
+
+using std::endl;
 
 void geopick(const Eigen::MatrixXd& V,
 	     std::vector<std::reference_wrapper<const Eigen::MatrixXi>> Fs,
@@ -12,8 +15,11 @@ void geopick(const Eigen::MatrixXd& V,
 	for (auto Fref : Fs) {
 		const Eigen::MatrixXi& F = Fref.get();
 		for (int i = 0; i < F.rows(); i++)
-			for (int j = 0; j < F.cols(); j++)
+			for (int j = 0; j < F.cols(); j++) {
+				if (F(i,j) > V.rows())
+					std::cerr << "shit: " << F(i,j) << std::endl;
 				usingMarker(F(i,j)) = 1;
+			}
 	}
 	outV.resize(usingMarker.sum(), V.cols());
 	int iter = 0;
@@ -22,6 +28,7 @@ void geopick(const Eigen::MatrixXd& V,
 			continue;
 		outV.row(iter) = V.row(i);
 		old2new[i] = iter;
+		std::cerr << "old: " << i << " new: " << iter << endl;
 		iter++;
 	}
 	size_t nf = 0;
@@ -32,8 +39,11 @@ void geopick(const Eigen::MatrixXd& V,
 	for (auto Fref : Fs) {
 		const Eigen::MatrixXi& F = Fref.get();
 		for (int i = 0; i < F.rows(); i++) {
-			for (int j = 0; j < outF.cols(); j++)
+			for (int j = 0; j < outF.cols(); j++) {
 				outF(iter, j) = old2new[F(i, j)];
+				std::cerr << F(i,j) << " ";
+			}
+			std::cerr << endl;
 			iter++;
 		}
 	}
