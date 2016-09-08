@@ -6,8 +6,8 @@
 #include <functional>
 
 void geopick(const Eigen::MatrixXd& V,
-	     std::vector<std::reference_wrapper<Eigen::MatrixXi>> Fs, // Copy matrix is way too expensive
-             Eigen::MatrixXd &prdcV,   // PeRioDiCal Vertices
-             Eigen::MatrixXi &prdcF);  // PeRioDiCal Faces
+	     std::vector<std::reference_wrapper<const Eigen::MatrixXi>> Fs, // Copy matrix is way too expensive
+             Eigen::MatrixXd &outV,   // PeRioDiCal Vertices
+             Eigen::MatrixXi &outF);  // PeRioDiCal Faces
 
 #endif

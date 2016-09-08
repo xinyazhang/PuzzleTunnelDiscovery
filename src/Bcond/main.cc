@@ -11,6 +11,7 @@
 #include <unsupported/Eigen/SparseExtra>
 #include <igl/ray_mesh_intersect.h>
 #include <igl/readOBJ.h>
+#include <numerical/stability.h>
 
 using std::string;
 using std::endl;
@@ -53,13 +54,6 @@ enum BOUNDARY_CONDITION {
 	BC_DIRICHLET,
 	BC_NEUMANN
 };
-
-inline bool fpclose(double f0, double f1)
-{
-	if (std::abs(f0 - f1) < 1e-4)
-		return true;
-	return false;
-}
 
 void set_IV(Eigen::VectorXd& iv,
 	    const Eigen::MatrixXd& V,
