@@ -14,14 +14,15 @@ using std::vector;
 
 void usage()
 {
-	std::cerr << "Options: -i <tetgen file prefix> [-o output_file]" << endl;
+	std::cerr << "Options: -i <tetgen file prefix> [-o output_file -s scale_factor]" << endl;
 }
 
 int main(int argc, char* argv[])
 {
 	int opt;
 	string iprefix, ofn;
-	while ((opt = getopt(argc, argv, "i:o:")) != -1) {
+	double scale_factor = 1.0;
+	while ((opt = getopt(argc, argv, "i:o:s:")) != -1) {
 		switch (opt) {
 			case 'i': 
 				iprefix = optarg;
@@ -29,8 +30,10 @@ int main(int argc, char* argv[])
 			case 'o':
 				ofn = optarg;
 				break;
+			case 's':
+				scale_factor = atof(optarg);
+				break;
 			default:
-				std::cerr << "Unrecognized option: " << optarg << endl;
 				usage();
 				return -1;
 		}
@@ -60,6 +63,7 @@ int main(int argc, char* argv[])
 		readtet(iprefix, V, E, P, &EBM);
 		//readvoronoi(iprefix, VNodes, VEdges, VFaces, VCells);
 		//tet2lap(V, E, P, VNodes, VEdges, VFaces, VCells, lap);
+		V.block(0, 2, V.rows(), 1) *= scale_factor;
 		tet2lap(V, E, P, lap);
 	} catch (std::runtime_error& e) {
 		std::cerr << e.what() << std::endl;
