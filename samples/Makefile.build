@@ -73,7 +73,7 @@ cvispath:
 	
 tp:
 	make
-	./periodicalize -i ../inv/hollowed.1 -o period.obj
+	./periodicalize -i ../inv/hollowed.1 -o period.obj -m period.map
 	meshlab period.obj
 	
 tetp:

@@ -9,6 +9,7 @@
 #include <igl/boundary_loop.h>
 #include <igl/all_edges.h>
 #include <igl/writeOBJ.h>
+#include <unordered_map>
 
 using std::string;
 using std::endl;
@@ -18,9 +19,10 @@ void usage()
 {
 	std::cerr << 
 R"zzz(This program generate the periodical part geometry from the obstacle space geometry
-Options: -i <prefix> [-o file]
+Options: -i <prefix> [-o file -m file]
 	-i prefix: input tetgen prefix" << endl
 	-o file: output the result to file instead of stdout
+	-m file: output the mapping from the vertex id in tet to the vertex id in the output geometry
 )zzz";
 }
 
@@ -297,14 +299,17 @@ void glue_boundary(const Eigen::MatrixXd& V,
 int main(int argc, char* argv[])
 {
 	int opt;
-	string iprefix, ofn("/dev/stdout");
-	while ((opt = getopt(argc, argv, "i:o:")) != -1) {
+	string iprefix, ofn("/dev/stdout"), mfn;
+	while ((opt = getopt(argc, argv, "i:o:m:")) != -1) {
 		switch (opt) {
 			case 'i': 
 				iprefix = optarg;
 				break;
 			case 'o':
 				ofn = optarg;
+				break;
+			case 'm':
+				mfn = optarg;
 				break;
 			default:
 				std::cerr << "Unrecognized option: " << optarg << endl;
@@ -325,7 +330,8 @@ int main(int argc, char* argv[])
 		glue_boundary(V, btmVI, btmF, topVI, topF, glueF);
 		Eigen::MatrixXd prdcV; // PeRioDiCal Vertices
 		Eigen::MatrixXi prdcF; // PeRioDiCal Faces
-		geopick(V, {btmF, topF, glueF}, prdcV, prdcF);
+		std::unordered_map<int, int> old2new;
+		geopick(V, {btmF, topF, glueF}, prdcV, prdcF, &old2new);
 		//geopick(V, {glueF}, prdcV, prdcF);
 #if 1
 #pragma omp parallel for
@@ -335,6 +341,13 @@ int main(int argc, char* argv[])
 		}
 #endif
 		igl::writeOBJ(ofn, prdcV, prdcF);
+		if (!mfn.empty()) {
+			std::ofstream fout(mfn);
+			fout.exceptions(std::ios::failbit);
+			for (const auto& pair : old2new) {
+				fout << pair.first << ' ' << pair.second << endl;
+			}
+		}
 	} catch (std::runtime_error& e) {
 		std::cerr << e.what() << std::endl;
 		return -1;

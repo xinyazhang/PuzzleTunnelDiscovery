@@ -7,7 +7,9 @@ using std::endl;
 void geopick(const Eigen::MatrixXd& V,
 	     std::vector<std::reference_wrapper<const Eigen::MatrixXi>> Fs,
              Eigen::MatrixXd &outV,
-             Eigen::MatrixXi &outF)
+             Eigen::MatrixXi &outF,
+             std::unordered_map<int, int> *map
+             )
 {
 	std::unordered_map<int, int> old2new;
 	Eigen::VectorXi usingMarker;
@@ -44,4 +46,6 @@ void geopick(const Eigen::MatrixXd& V,
 			iter++;
 		}
 	}
+	if (map)
+		*map = std::move(old2new);
 }
