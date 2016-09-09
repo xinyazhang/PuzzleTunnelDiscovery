@@ -141,6 +141,8 @@ EASYADD(invgen)
 EASYADD(periodicalize)
 TARGET_LINK_LIBRARIES(periodicalize tetio geopick)
 
+EASYADD(tet2obj)
+TARGET_LINK_LIBRARIES(tet2obj tetio geopick)
 #FILE(COPY ${BINARIES} DESTINATION ${CMAKE_SOURCE_DIR}/bin)
 
 # vim: tw=0

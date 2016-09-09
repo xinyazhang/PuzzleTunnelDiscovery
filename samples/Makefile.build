@@ -75,7 +75,13 @@ tp:
 	make
 	./periodicalize -i ../inv/hollowed.1 -o period.obj
 	meshlab period.obj
+	
+tetp:
+	obj2ply period.obj
+	tetgen -pYa0.1 period.ply
+	./tet2obj -i period.1 -o tetperiod.obj
+	meshlab tetperiod.obj
 
-.PHONY: follow nvis vispath tp
+.PHONY: follow nvis vispath tp tetp
 
 # vim: tw=0

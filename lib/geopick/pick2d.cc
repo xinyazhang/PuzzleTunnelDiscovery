@@ -28,7 +28,7 @@ void geopick(const Eigen::MatrixXd& V,
 			continue;
 		outV.row(iter) = V.row(i);
 		old2new[i] = iter;
-		std::cerr << "old: " << i << " new: " << iter << endl;
+		//std::cerr << "old: " << i << " new: " << iter << endl;
 		iter++;
 	}
 	size_t nf = 0;
@@ -39,11 +39,8 @@ void geopick(const Eigen::MatrixXd& V,
 	for (auto Fref : Fs) {
 		const Eigen::MatrixXi& F = Fref.get();
 		for (int i = 0; i < F.rows(); i++) {
-			for (int j = 0; j < outF.cols(); j++) {
+			for (int j = 0; j < outF.cols(); j++)
 				outF(iter, j) = old2new[F(i, j)];
-				std::cerr << F(i,j) << " ";
-			}
-			std::cerr << endl;
 			iter++;
 		}
 	}
