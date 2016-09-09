@@ -82,6 +82,15 @@ tetp:
 	./tet2obj -i period.1 -o tetperiod.obj
 	meshlab tetperiod.obj
 
+inv.m.dlap: dlap
+	./dlap -i ../inv/hollowed.1 -o inv.m.dlap
+	
+inv.p.dlap: dlap
+	./dlap -i ./period.1 -o inv.p.dlap -s 1e-4
+	
+inv.dlap: mergep inv.m.dlap inv.p.dlap
+	./mergep -d inv.m.dlap -p inv.p.dlap -m period.map -o inv.dlap
+
 .PHONY: follow nvis vispath tp tetp
 
 # vim: tw=0

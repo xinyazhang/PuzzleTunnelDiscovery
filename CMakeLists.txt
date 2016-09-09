@@ -145,4 +145,5 @@ EASYADD(tet2obj)
 TARGET_LINK_LIBRARIES(tet2obj tetio geopick)
 #FILE(COPY ${BINARIES} DESTINATION ${CMAKE_SOURCE_DIR}/bin)
 
+EASYADD(mergep)
 # vim: tw=0
