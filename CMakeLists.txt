@@ -131,7 +131,7 @@ TARGET_LINK_LIBRARIES(mass tetio vecio)
 find_package(GLEW REQUIRED)
 find_package(OpenGL REQUIRED)
 EASYADD(visheat)
-TARGET_LINK_LIBRARIES(visheat vertcolorply ${CMAKE_THREAD_LIBS_INIT} ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} glfw tetio)
+TARGET_LINK_LIBRARIES(visheat vertcolorply ${CMAKE_THREAD_LIBS_INIT} ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} glfw tetio heatio)
 
 EASYADD(follow)
 TARGET_LINK_LIBRARIES(follow tetio heatio)

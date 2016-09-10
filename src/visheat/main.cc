@@ -1,4 +1,5 @@
 #include <readtet.h>
+#include <heatio/readheat.h>
 #include <write_ply_vc.h>
 #include <unistd.h>
 #include <string>
@@ -29,14 +30,14 @@ private:
 	Eigen::MatrixXi& E_;
 	Eigen::MatrixXi& P_;
 	Eigen::MatrixXd B;
-	vector<Eigen::VectorXd>& fields_;
+	vector<HeatFrame>& frames_;
 	int frameid_ = 0;
 
 	bool calibre_frameid()
 	{
 		int precalid = frameid_;
 		frameid_ = std::max(frameid_, 0);
-		frameid_ = std::min(int(fields_.size() - 1), frameid_);
+		frameid_ = std::min(int(frames_.size() - 1), frameid_);
 		return precalid != frameid_;
 	}
 
@@ -59,9 +60,9 @@ public:
 		Eigen::MatrixXd& V,
 		Eigen::MatrixXi& E,
 		Eigen::MatrixXi& P,
-		vector<Eigen::VectorXd>& fields
+		vector<HeatFrame>& frames
 		)
-		: V_(V), E_(E), P_(P), fields_(fields)
+		: V_(V), E_(E), P_(P), frames_(frames)
 	{
 		igl::barycenter(V,P,B);
 		frameid_ = 0;
@@ -166,7 +167,7 @@ public:
 
 	void update_frame(igl::viewer::Viewer& viewer)
 	{
-		Eigen::VectorXd& FV(fields_[frameid_]);
+		Eigen::VectorXd& FV(frames_[frameid_].hvec);
 #if 0
 		for (unsigned i = 0; i < tetleft_.size(); ++i) {
 #if 0
@@ -210,16 +211,16 @@ public:
 		bool redraw = false;
 
 		if (toupper(key) == 'K') {
-			frameid_ -= fields_.size()/10;
+			frameid_ -= frames_.size()/10;
 			redraw = true;
 		} else if (toupper(key) == 'J') {
-			frameid_ += fields_.size()/10;
+			frameid_ += frames_.size()/10;
 			redraw = true;
 		} 
 		calibre_frameid();
 
 		std::cerr << "Frame ID: " << frameid_
-			<< "\tStepping: " << fields_.size() / 10
+			<< "\tStepping: " << frames_.size() / 10
 			<< "\tKey: " << key << " was pressed "
 			<< endl;
 
@@ -346,57 +347,18 @@ int main(int argc, char* argv[])
 	Eigen::MatrixXi E;
 	Eigen::MatrixXi P;
 	Eigen::VectorXi EBM;
-	vector<Eigen::VectorXd> fields;
+	vector<HeatFrame> frames;
 	vector<double> times;
 	try {
 		readtet(iprefix, V, E, P, &EBM);
 
 		std::ifstream fin(ffn);
-		if (!fin.is_open())
-			throw std::runtime_error("Cannot open " + ffn + " for read");
-		bool binary = false;
-		if (fin.peek() == 0) {
-			binary = true;
-		}
-		if (!binary) {
-			while (true) {
-				skip_to_needle(fin, "t:");
-				if (fin.eof())
-					break;
-				double t;
-				size_t nvert;
-				fin >> t >> nvert;
-				times.emplace_back(t);
-				fields.emplace_back();
-				Eigen::VectorXd& field = fields.back();
-				field.resize(nvert);
-				for(size_t i = 0; i < nvert; i++) {
-					fin >> field(i);
-				}
-			}
-		} else {
-			fin.get(); fin.get(); // Skip "\0\n" header
-			std::cerr.precision(17);
-			while (!fin.eof()) {
-				double t;
-				uint32_t nvert;
-				fin.read((char*)&t, sizeof(t));
-				if (fin.eof())
-					break;
-				times.emplace_back(t);
-				fin.read((char*)&nvert, sizeof(nvert));
-				fields.emplace_back();
-				Eigen::VectorXd& field = fields.back();
-				field.resize(nvert);
-				fin.read((char*)field.data(), sizeof(double) * nvert);
-				double sum;
-				fin.read((char*)&sum, sizeof(sum));
-#if 0
-				std::cerr << "t: " << t << "\t" << field.rows() << endl;
-				std::cerr << field << endl;
-				std::cerr << "sum: " << field.sum() << endl;
-#endif
-			}
+		HeatReader hreader(fin);
+		while (true) {
+			frames.emplace_back();
+			if (!hreader.read_frame(frames.back()))
+				break;
+			frames.back().hvec.conservativeResize(V.rows()); // Trim hidden nodes.
 		}
 	} catch (std::runtime_error& e) {
 		std::cerr << e.what() << std::endl;
@@ -404,7 +366,7 @@ int main(int argc, char* argv[])
 	}
 
 	igl::viewer::Viewer viewer;
-	KeyDown kd(V,E,P, fields);
+	KeyDown kd(V,E,P, frames);
 	kd.load_path(pfn);
 	kd.set_auto_range(auto_range);
 	viewer.callback_key_pressed = [&kd](igl::viewer::Viewer& viewer, unsigned char key, int modifier) -> bool { return kd.operator()(viewer, key, modifier); } ;

@@ -23,7 +23,7 @@ void
 HeatReader::common_init()
 {
 	if (!fin.is_open())
-		throw std::runtime_error("[HeatReader] Cannot open file  for read");
+		throw std::runtime_error("[HeatReader] Cannot open file for read");
 	if (fin.peek() == 0) {
 		binary_ = true;
 		fin.get(); fin.get(); // Skip "\0\n" header
