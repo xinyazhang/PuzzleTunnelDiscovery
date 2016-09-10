@@ -51,6 +51,19 @@ struct Simulator {
 	      bool check_spd = false;
 	      Eigen::VectorXd MVec; // Mass matrix
 
+	      void calibrate_for_hidden_nodes()
+	      {
+		      int nnodes = IV.rows();
+		      IV.resize(lap.rows());
+		      HSV.resize(lap.rows());
+		      MVec.resize(lap.rows());
+		      for (int i = nnodes; i < lap.rows(); i++) {
+			      IV(i) = 0;
+			      HSV(i) = 0;
+			      MVec(i) = 1;
+		      }
+	      }
+
 	      void simulate(std::ostream& fout) const
 	      {
 		      Eigen::VectorXd VF = IV;
@@ -207,25 +220,10 @@ int main(int argc, char* argv[])
 	}
 	if (simulator.snapshot_interval < 0)
 		simulator.snapshot_interval = simulator.delta_t;
-	Eigen::VectorXd& IV = simulator.IV;
 	if (ivf.empty()) {
 		std::cerr << "Missing boundary condition file" << endl;
 		usage();
 		return -1;
-	} else {
-		std::ifstream fin(ivf);
-		if (!fin.is_open()) {
-			std::cerr << "Cannot open file: " << ivf << endl;
-			return -1;
-		}
-		int nnode;
-		fin >> nnode;
-		IV.resize(nnode);
-		for(int i = 0; i < nnode; i++) {
-			double v;
-			fin >> v;
-			IV(i) = v;
-		}
 	}
 	if (lmf.empty()) {
 		std::cerr << "Missing Laplacian matrix file" << endl;
@@ -236,31 +234,14 @@ int main(int argc, char* argv[])
 		std::cerr << "Failed to load Laplacian matrix from file: " << lmf << endl;
 		return -1;
 	}
-	// Fix dlap matrix for Dirichlet condition
-	if (bc & BC_DIRICHLET) {
-#if 0 // Don't do this. It makes the matrix non-symmetric.
-		std::set<int> to_prune;
-		for(int i = 0; i < F.size(); i++) {
-			if (F(i) != 0) {
-				to_prune.emplace(i);
-			}
-		}
-		lap.prune([&to_prune](const int& row, const int&, const int&) -> bool
-				{
-					if (to_prune.find(row) == to_prune.end())
-						return true; // Keep
-					return false;
-				}
-			 );
-#endif
-	}
 
 	try { 
-		Eigen::VectorXd& HSV = simulator.HSV; // Heat Supply Vector
+		vecio::text_read(ivf, simulator.IV);
+
 		if (bc & BC_NEUMANN) {
-			vecio::text_read(nbcvfn, HSV);
+			vecio::text_read(nbcvfn, simulator.HSV);
 		} else {
-			HSV.setZero(simulator.IV.size()); // No heat source
+			simulator.HSV.setZero(simulator.IV.size()); // No heat source
 		}
 		if (!massfn.empty())
 			vecio::text_read(massfn, simulator.MVec);
@@ -281,6 +262,7 @@ int main(int argc, char* argv[])
 		pfout_guard.reset(new std::ofstream(ofn));
 		pfout = pfout_guard.get();
 	}
+	simulator.calibrate_for_hidden_nodes();
 	simulator.simulate(*pfout);
 	pfout_guard.reset();
 
