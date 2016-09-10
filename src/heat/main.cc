@@ -1,3 +1,5 @@
+#define EIGEN_USE_MKL_ALL
+
 #include <unistd.h>
 #include <stdio.h>
 #include <Eigen/Core>
@@ -10,7 +12,11 @@
 #include <boost/progress.hpp>
 //#include <Eigen/SparseLU> 
 //#include <Eigen/SparseCholesky>
-#include <Eigen/CholmodSupport>
+#ifdef EIGEN_USE_MKL_ALL
+#       include <Eigen/PardisoSupport>
+#else
+#       include <Eigen/CholmodSupport>
+#endif
 #include <vecio/vecin.h>
 
 using std::string;
@@ -93,8 +99,12 @@ struct Simulator {
 		      factor.resize(lap.rows(), lap.cols());
 		      factor.setIdentity();
 		      factor -= (alpha * delta_t) * lap;
+#ifdef EIGEN_USE_MKL_ALL
+		      Eigen::PardisoLDLT<decltype(factor)> solver;
+#else
 		      //Eigen::SimplicialLDLT<Eigen::SparseMatrix<double, Eigen::RowMajor>> solver;
 		      Eigen::CholmodSupernodalLLT<Eigen::SparseMatrix<double, Eigen::RowMajor>> solver;
+#endif
 		      solver.compute(factor);
 
 		      Eigen::MatrixXd VPair(IV.rows(), 2);

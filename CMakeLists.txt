@@ -121,8 +121,11 @@ TARGET_LINK_LIBRARIES(sancheck tetio)
 EASYADD(ring1picker)
 TARGET_LINK_LIBRARIES(ring1picker tetio)
 
+INCLUDE_DIRECTORIES(/opt/intel/mkl/include)
+LINK_DIRECTORIES(/opt/intel/mkl/lib/intel64_lin/)
+LINK_DIRECTORIES(/opt/intel/compilers_and_libraries/linux/lib/intel64/)
 EASYADD(heat)
-TARGET_LINK_LIBRARIES(heat ${SUITESPARSE_LIBRARIES} vecio)
+TARGET_LINK_LIBRARIES(heat ${SUITESPARSE_LIBRARIES} vecio mkl_core mkl_intel_thread mkl_intel_lp64 iomp5)
 #TARGET_INCLUDE_DIRECTORIES(heat BEFORE PRIVATE ${CMAKE_SOURCE_DIR}/third-party/eigen)
 
 EASYADD(mass)

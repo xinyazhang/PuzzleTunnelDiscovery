@@ -91,6 +91,18 @@ inv.p.dlap: dlap
 inv.dlap: mergep inv.m.dlap inv.p.dlap
 	./mergep -d inv.m.dlap -p inv.p.dlap -m period.map -o inv.dlap
 
+inv.bc: 
+	./Bcond -i ../inv/hollowed.1 -o inv.bc X+ X- Y+ Y-
+
+inv.nbc:  NBcond mk
+	./NBcond -i ../inv/hollowed.1 -g ../inv/Tier-10-Merge-0-re.obj -m 0.1 -o inv.nbc
+
+inv.nbheat: mk heat
+	./heat -b -D -0 inv.bc -N inv.nbc -l inv.dlap -o inv.nbheat -t 2160 -d 0.1 -a 50.0 -s 1
+	
+visinv: visheat
+	./visheat -i ../inv/hollowed.1 -f inv.nbheat
+
 .PHONY: follow nvis vispath tp tetp
 
 # vim: tw=0
