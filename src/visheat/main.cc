@@ -355,9 +355,10 @@ int main(int argc, char* argv[])
 		std::ifstream fin(ffn);
 		HeatReader hreader(fin);
 		while (true) {
-			frames.emplace_back();
-			if (!hreader.read_frame(frames.back()))
+			HeatFrame frame;
+			if (!hreader.read_frame(frame))
 				break;
+			frames.emplace_back(std::move(frame));
 			frames.back().hvec.conservativeResize(V.rows()); // Trim hidden nodes.
 		}
 	} catch (std::runtime_error& e) {
