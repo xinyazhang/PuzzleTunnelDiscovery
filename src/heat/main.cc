@@ -1,4 +1,5 @@
 #define EIGEN_USE_MKL_ALL
+//#undef EIGEN_USE_MKL_ALL
 
 #include <unistd.h>
 #include <stdio.h>
@@ -7,6 +8,7 @@
 #include <iostream>
 #include <string>
 #include <set>
+#include <chrono>
 #include <memory>
 #include <unsupported/Eigen/SparseExtra>
 #include <boost/progress.hpp>
@@ -16,6 +18,7 @@
 #       include <Eigen/PardisoSupport>
 #else
 #       include <Eigen/CholmodSupport>
+//#       include <Eigen/PaStiXSupport>
 #endif
 #include <vecio/vecin.h>
 
@@ -100,10 +103,11 @@ struct Simulator {
 		factor.setIdentity();
 		factor -= (alpha * delta_t) * lap;
 #ifdef EIGEN_USE_MKL_ALL
-		Eigen::PardisoLDLT<decltype(factor)> solver;
+		Eigen::PardisoLU<decltype(factor)> solver;
 #else
 		//Eigen::SimplicialLDLT<Eigen::SparseMatrix<double, Eigen::RowMajor>> solver;
 		Eigen::CholmodSupernodalLLT<Eigen::SparseMatrix<double, Eigen::RowMajor>> solver;
+		//Eigen::PastixLLT<Eigen::SparseMatrix<double, Eigen::RowMajor>, Eigen::Lower> solver;
 #endif
 		solver.compute(factor);
 
@@ -111,6 +115,7 @@ struct Simulator {
 		VPair.block(0, 1, IV.rows(), 1) = IV;
 
 		boost::progress_display prog(end_t / delta_t);
+		auto start_point = std::chrono::system_clock::now();
 		for(double tnow = 0.0, last_snapshot = tnow; tnow < end_t; tnow += delta_t) {
 #if 0
 			Eigen::VectorXd nextVF(VF.rows());
@@ -143,6 +148,9 @@ struct Simulator {
 #endif
 			++prog;
 		}
+		auto finish_point = std::chrono::system_clock::now(); 
+		std::chrono::duration<double> diff = finish_point - start_point;
+		std::cerr << "Performance: " << double(prog.count()) / double(diff.count()) << " iteration/second" << endl;
 	}
 
 	void write_frame(std::ostream& fout, double tnow, const Eigen::VectorXd& VF) const
@@ -172,6 +180,8 @@ enum BOUNDARY_CONDITION {
 int main(int argc, char* argv[])
 {
 	Eigen::initParallel();
+	//MPI_Init(1, argv);
+
 	Simulator simulator;
 	simulator.end_t = 10.0;
 	simulator.delta_t = 0.1;
@@ -275,6 +285,7 @@ int main(int argc, char* argv[])
 	simulator.calibrate_for_hidden_nodes();
 	simulator.simulate(*pfout);
 	pfout_guard.reset();
+	//MPI_Finalize();
 
 	return 0;
 }
