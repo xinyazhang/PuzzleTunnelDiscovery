@@ -46,120 +46,120 @@ Optional options:
 }
 
 struct Simulator {
-	      Eigen::SparseMatrix<double, Eigen::RowMajor> lap;
-	      Eigen::VectorXd IV;
-	      Eigen::VectorXd HSV;
-	      double alpha;
-	      double delta_t;
-	      double end_t;
-	      bool binary;
-	      double snapshot_interval;
-	      bool check_spd = false;
-	      Eigen::VectorXd MVec; // Mass matrix
+	Eigen::SparseMatrix<double, Eigen::RowMajor> lap;
+	Eigen::VectorXd IV;
+	Eigen::VectorXd HSV;
+	double alpha;
+	double delta_t;
+	double end_t;
+	bool binary;
+	double snapshot_interval;
+	bool check_spd = false;
+	Eigen::VectorXd MVec; // Mass matrix
 
-	      void calibrate_for_hidden_nodes()
-	      {
-		      int nnodes = IV.rows();
-		      IV.resize(lap.rows());
-		      HSV.resize(lap.rows());
-		      MVec.resize(lap.rows());
-		      for (int i = nnodes; i < lap.rows(); i++) {
-			      IV(i) = 0;
-			      HSV(i) = 0;
-			      MVec(i) = 1;
-		      }
-	      }
+	void calibrate_for_hidden_nodes()
+	{
+		int nnodes = IV.rows();
+		IV.resize(lap.rows());
+		HSV.resize(lap.rows());
+		MVec.resize(lap.rows());
+		for (int i = nnodes; i < lap.rows(); i++) {
+			IV(i) = 0;
+			HSV(i) = 0;
+			MVec(i) = 1;
+		}
+	}
 
-	      void simulate(std::ostream& fout) const
-	      {
-		      Eigen::VectorXd VF = IV;
+	void simulate(std::ostream& fout) const
+	{
+		Eigen::VectorXd VF = IV;
 
-		      Eigen::SparseMatrix<double, Eigen::RowMajor> IvM;
-		      IvM.resize(lap.rows(), lap.cols());
-		      IvM.setIdentity();
-		      if (MVec.rows() == lap.rows()) {
-			      typedef Eigen::Triplet<double> tri_t;
-			      std::vector<tri_t> tris;
-			      for(int i = 0; i < MVec.size(); i++)
-				      tris.emplace_back(i, i, 1/MVec(i));
-			      IvM.setFromTriplets(tris.begin(), tris.end());
-		      } else if (MVec.size() != 0) {
-			      std::cerr << "Mass vector size mismatch";
-		      }
+		Eigen::SparseMatrix<double, Eigen::RowMajor> IvM;
+		IvM.resize(lap.rows(), lap.cols());
+		IvM.setIdentity();
+		if (MVec.rows() == lap.rows()) {
+			typedef Eigen::Triplet<double> tri_t;
+			std::vector<tri_t> tris;
+			for(int i = 0; i < MVec.size(); i++)
+				tris.emplace_back(i, i, 1/MVec(i));
+			IvM.setFromTriplets(tris.begin(), tris.end());
+		} else if (MVec.size() != 0) {
+			std::cerr << "Mass vector size mismatch";
+		}
 
-		      fout.precision(17);
-		      if (binary) {
-			      char zero[] = "\0\n";
-			      fout.write(zero, 2);
-		      } else {
-			      fout << "#\n";
-		      }
-		      write_frame(fout, 0, IV);
-		      Eigen::SparseMatrix<double, Eigen::RowMajor> factor;
-		      factor.resize(lap.rows(), lap.cols());
-		      factor.setIdentity();
-		      factor -= (alpha * delta_t) * lap;
+		fout.precision(17);
+		if (binary) {
+			char zero[] = "\0\n";
+			fout.write(zero, 2);
+		} else {
+			fout << "#\n";
+		}
+		write_frame(fout, 0, IV);
+		Eigen::SparseMatrix<double, Eigen::RowMajor> factor;
+		factor.resize(lap.rows(), lap.cols());
+		factor.setIdentity();
+		factor -= (alpha * delta_t) * lap;
 #ifdef EIGEN_USE_MKL_ALL
-		      Eigen::PardisoLDLT<decltype(factor)> solver;
+		Eigen::PardisoLDLT<decltype(factor)> solver;
 #else
-		      //Eigen::SimplicialLDLT<Eigen::SparseMatrix<double, Eigen::RowMajor>> solver;
-		      Eigen::CholmodSupernodalLLT<Eigen::SparseMatrix<double, Eigen::RowMajor>> solver;
+		//Eigen::SimplicialLDLT<Eigen::SparseMatrix<double, Eigen::RowMajor>> solver;
+		Eigen::CholmodSupernodalLLT<Eigen::SparseMatrix<double, Eigen::RowMajor>> solver;
 #endif
-		      solver.compute(factor);
+		solver.compute(factor);
 
-		      Eigen::MatrixXd VPair(IV.rows(), 2);
-		      VPair.block(0, 1, IV.rows(), 1) = IV;
+		Eigen::MatrixXd VPair(IV.rows(), 2);
+		VPair.block(0, 1, IV.rows(), 1) = IV;
 
-		      boost::progress_display prog(end_t / delta_t);
-		      for(double tnow = 0.0, last_snapshot = tnow; tnow < end_t; tnow += delta_t) {
+		boost::progress_display prog(end_t / delta_t);
+		for(double tnow = 0.0, last_snapshot = tnow; tnow < end_t; tnow += delta_t) {
 #if 0
-			      Eigen::VectorXd nextVF(VF.rows());
-			      for(int i = 0; i < V.rows(); i++) {
-				      nextVF(i) = lap.row(i).dot(VF);
-			      }
+			Eigen::VectorXd nextVF(VF.rows());
+			for(int i = 0; i < V.rows(); i++) {
+				nextVF(i) = lap.row(i).dot(VF);
+			}
 #endif
-			      if (tnow - last_snapshot >= snapshot_interval) {
-				      write_frame(fout, tnow, VF);
-				      last_snapshot += snapshot_interval;
-			      }
+			if (tnow - last_snapshot >= snapshot_interval) {
+				write_frame(fout, tnow, VF);
+				last_snapshot += snapshot_interval;
+			}
 #if 0
-			      Eigen::VectorXd delta = lap * VF;
-			      if (check_spd && VF.dot(delta) < 0) {
-				      std::cerr << "DLap Matrix is NOT SPD" << endl;
-			      }
-			      VF += delta;
+			Eigen::VectorXd delta = lap * VF;
+			if (check_spd && VF.dot(delta) < 0) {
+				std::cerr << "DLap Matrix is NOT SPD" << endl;
+			}
+			VF += delta;
 #else
-			      VF += HSV * 0.001 * delta_t; // Apply HSV
-			      Eigen::VectorXd VFNext = solver.solve(IvM * VF);
-			      // The New Dirichlet Cond
+			VF += HSV * 0.001 * delta_t; // Apply HSV
+			Eigen::VectorXd VFNext = solver.solve(IvM * VF);
+			// The New Dirichlet Cond
 #pragma omp parallel for
-			      for(int i = 0; i < IV.rows(); i++) {
-				      if (IV(i) != 0)
-					      VFNext(i) = IV(i);
-			      }
-			      VF.swap(VFNext);
-			      //VF = VPair.rowwise().maxCoeff(); // Dirichlet cond
-			      // VF = VPair.block(0, 0, IV.rows(), 1); // No dirichelt cond
+			for(int i = 0; i < IV.rows(); i++) {
+				if (IV(i) != 0)
+					VFNext(i) = IV(i);
+			}
+			VF.swap(VFNext);
+			//VF = VPair.rowwise().maxCoeff(); // Dirichlet cond
+			// VF = VPair.block(0, 0, IV.rows(), 1); // No dirichelt cond
 #endif
-			      ++prog;
-		      }
-	      }
+			++prog;
+		}
+	}
 
-	      void write_frame(std::ostream& fout, double tnow, const Eigen::VectorXd& VF) const
-	      {
-		      if (!binary) {
-			      fout << "t: " << tnow << "\t" << VF.rows() << endl;
-			      fout << VF << endl;
-			      fout << "sum: " << VF.sum() << endl;
-		      } else {
-			      fout.write((const char*)&tnow, sizeof(tnow));
-			      uint32_t nrow = VF.rows();
-			      fout.write((const char*)&nrow, sizeof(nrow));
-			      fout.write((const char*)VF.data(), VF.size() * sizeof(double));
-			      double sum = VF.sum();
-			      fout.write((const char*)&sum, sizeof(sum));
-		      }
-	      }
+	void write_frame(std::ostream& fout, double tnow, const Eigen::VectorXd& VF) const
+	{
+		if (!binary) {
+			fout << "t: " << tnow << "\t" << VF.rows() << endl;
+			fout << VF << endl;
+			fout << "sum: " << VF.sum() << endl;
+		} else {
+			fout.write((const char*)&tnow, sizeof(tnow));
+			uint32_t nrow = VF.rows();
+			fout.write((const char*)&nrow, sizeof(nrow));
+			fout.write((const char*)VF.data(), VF.size() * sizeof(double));
+			double sum = VF.sum();
+			fout.write((const char*)&sum, sizeof(sum));
+		}
+	}
 };
 
 enum BOUNDARY_CONDITION {
