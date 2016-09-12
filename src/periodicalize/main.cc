@@ -189,6 +189,7 @@ seal(const Eigen::MatrixXd& V,
 		std::cerr << "top fwd V: " << topfwdV.transpose() << endl;
 		std::cerr << "top bwd V: " << topbwdV.transpose() << endl;
 		std::cerr << "btm fwd V: " << btmfwdV.transpose() << endl;
+		std::cerr << "direction: " << direction << endl;
 #if 0
 		double dfwd = (topVfwd - btmV).squaredNorm() - sqzd;
 		double dbwd = (topVbwd - btmV).squaredNorm() - sqzd;
@@ -214,7 +215,11 @@ seal(const Eigen::MatrixXd& V,
 #endif
 	double topd = 0;
 	double btmd = 0;
-	while (faces.size() == 0 || topc != init_topc || btmc != 0) {
+	constexpr int epick = 590;
+	int counter = 0;
+	bool top_stop = false;
+	bool btm_stop = false;
+	while (faces.size() == 0 || !top_stop || !btm_stop) {
 		int topn = (topc + direction + topBL.size()) % topBL.size();
 		int btmn = (btmc + 1 + btmBL.size()) % btmBL.size();
 		int topcvi = topBL[topc];
@@ -227,18 +232,24 @@ seal(const Eigen::MatrixXd& V,
 		Eigen::VectorXd btmcV = V.row(btmcvi);
 		Eigen::VectorXd btmnV = V.row(btmnvi);
 		double dbtmd = (btmcV - btmnV).norm();
-		if (topd + dtopd < btmd + dbtmd) {
+		if (!top_stop && (btm_stop || topd + dtopd < btmd + dbtmd)) {
 			// pickup topn
 			faces.emplace_back(Eigen::Vector3i(topnvi, btmcvi, topcvi)); // Note: we are going to 'flip' bottom above top
 			topc = topn;
 			topd += dtopd;
+			if (topc == init_topc)
+				top_stop = true;
 		} else {
 			// pickup btmn 
 			faces.emplace_back(Eigen::Vector3i(btmnvi, btmcvi, topcvi)); // Ditto
 			btmc = btmn;
 			btmd += dbtmd;
+			if (btmc == 0)
+				btm_stop = true;
 		}
 		//std::cerr << "faces " << faces.back().transpose() << std::endl;
+		//if (counter++ > epick)
+		//	break;
 	}
 	ret.resize(faces.size(), 3);
 	for (size_t i = 0; i < faces.size(); i++)
@@ -270,14 +281,14 @@ void glue_boundary(const Eigen::MatrixXd& V,
 	Eigen::VectorXi usedMarker;
 	usedMarker.setZero(topBLs.size(), 1);
 	int iter = 0;
-	constexpr int ipick = 2;
+	constexpr int ipick = 3;
 	for (const auto& btmBL : btmBLs) {
 #if 0
 		int i = iter++;
 		//if (i == 1)
 		//	continue;
-		//if (i != ipick)
-		//	continue ;
+		if (i != ipick)
+			continue ;
 		if (i > ipick)
 			break;
 #endif
