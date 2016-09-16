@@ -14,7 +14,8 @@ void tet2lap(const Eigen::MatrixXd& V,
 	     const std::vector<VoronoiFace>& VFaces,
 	     const std::vector<VoronoiCell>& VCells,
 #endif
-	     Eigen::SparseMatrix<double>& lap
+	     Eigen::SparseMatrix<double>& lap,
+	     bool unit_weight = false
 	     );
 
 #endif

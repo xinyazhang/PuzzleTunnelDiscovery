@@ -380,7 +380,7 @@ int main(int argc, char* argv[])
 		return false;
 	};
 	viewer.core.is_animating = true;
-	viewer.core.animation_max_fps = 30.;
+	viewer.core.animation_max_fps = 5.;
 	viewer.launch();
 
 	return 0;

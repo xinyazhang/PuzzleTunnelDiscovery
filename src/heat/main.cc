@@ -48,6 +48,12 @@ Optional options:
 )xxx";
 }
 
+enum BOUNDARY_CONDITION {
+	BC_NONE = 0,
+	BC_DIRICHLET = 1,
+	BC_NEUMANN = 2,
+};
+
 struct Simulator {
 	Eigen::SparseMatrix<double, Eigen::RowMajor> lap;
 	Eigen::VectorXd IV;
@@ -59,17 +65,22 @@ struct Simulator {
 	double snapshot_interval;
 	bool check_spd = false;
 	Eigen::VectorXd MVec; // Mass matrix
+	int bc;
 
 	void calibrate_for_hidden_nodes()
 	{
 		int nnodes = IV.rows();
-		IV.resize(lap.rows());
-		HSV.resize(lap.rows());
-		MVec.resize(lap.rows());
+		std::cerr << "Calibrate IVs from " << nnodes << " to " << lap.rows() << endl;
+		IV.conservativeResize(lap.rows());
+		HSV.conservativeResize(lap.rows());
 		for (int i = nnodes; i < lap.rows(); i++) {
 			IV(i) = 0;
 			HSV(i) = 0;
-			MVec(i) = 1;
+		}
+		if (MVec.size() > 0) {
+			MVec.conservativeResize(lap.rows());
+			for (int i = nnodes; i < lap.rows(); i++)
+				MVec(i) = 1;
 		}
 	}
 
@@ -134,13 +145,15 @@ struct Simulator {
 			}
 			VF += delta;
 #else
-			VF += HSV * 0.001 * delta_t; // Apply HSV
+			VF += HSV * 0.0000125 * delta_t; // Apply HSV
 			Eigen::VectorXd VFNext = solver.solve(IvM * VF);
 			// The New Dirichlet Cond
+			if (bc & BC_DIRICHLET) {
 #pragma omp parallel for
-			for(int i = 0; i < IV.rows(); i++) {
-				if (IV(i) != 0)
-					VFNext(i) = IV(i);
+				for(int i = 0; i < IV.rows(); i++) {
+					if (IV(i) != 0)
+						VFNext(i) = IV(i);
+				}
 			}
 			VF.swap(VFNext);
 			//VF = VPair.rowwise().maxCoeff(); // Dirichlet cond
@@ -170,12 +183,6 @@ struct Simulator {
 	}
 };
 
-enum BOUNDARY_CONDITION {
-	BC_NONE = 0,
-	BC_DIRICHLET = 1,
-	BC_NEUMANN = 2,
-};
-
 // FIXME: refactor this piece of mess
 int main(int argc, char* argv[])
 {
@@ -187,12 +194,12 @@ int main(int argc, char* argv[])
 	simulator.delta_t = 0.1;
 	simulator.alpha = 1;
 	simulator.snapshot_interval = -1.0;
+	simulator.bc = BC_NONE;
 
 	int opt;
 	string ofn, lmf, ivf, nbcvfn, massfn;
 	simulator.binary = false;
 	simulator.check_spd = false;
-	int bc = BC_NONE;
 	while ((opt = getopt(argc, argv, "0:o:t:d:a:l:bDs:vN:m:")) != -1) {
 		switch (opt) {
 			case 'o':
@@ -217,10 +224,10 @@ int main(int argc, char* argv[])
 				simulator.binary = true;
 				break;
 			case 'D':
-				bc |= BC_DIRICHLET;
+				simulator.bc |= BC_DIRICHLET;
 				break;
 			case 'N':
-				bc |= BC_NEUMANN;
+				simulator.bc |= BC_NEUMANN;
 				nbcvfn = optarg; // Neumann Boundary Condition Vector File Name
 				break;
 			case 's':
@@ -258,7 +265,7 @@ int main(int argc, char* argv[])
 	try { 
 		vecio::text_read(ivf, simulator.IV);
 
-		if (bc & BC_NEUMANN) {
+		if (simulator.bc & BC_NEUMANN) {
 			vecio::text_read(nbcvfn, simulator.HSV);
 		} else {
 			simulator.HSV.setZero(simulator.IV.size()); // No heat source

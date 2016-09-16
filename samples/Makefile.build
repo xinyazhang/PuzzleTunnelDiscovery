@@ -85,23 +85,54 @@ tetp:
 inv.m.dlap: dlap
 	./dlap -i ../inv/hollowed.1 -o inv.m.dlap
 	
-inv.p.dlap: dlap
-	./dlap -i ./period.1 -o inv.p.dlap -s 1e-4
+inv.p0.1.dlap: dlap mk
+	./dlap -i ./period.1 -o inv.p0.1.dlap -s 1e-1
 	
-inv.dlap: mergep inv.m.dlap inv.p.dlap
-	./mergep -d inv.m.dlap -p inv.p.dlap -m period.map -o inv.dlap
+inv.dlap: mergep inv.m.dlap inv.p0.1.dlap
+	./mergep -d inv.m.dlap -p inv.p0.1.dlap -m period.map -o inv.dlap
+
+inv.p1.dlap: dlap mk
+	./dlap -i ./period.1 -o inv.p1.dlap
+	
+inv.1.dlap: mergep inv.m.dlap inv.p1.dlap
+	./mergep -d inv.m.dlap -p inv.p1.dlap -m period.map -o inv.1.dlap
 
 inv.bc: 
 	./Bcond -i ../inv/hollowed.1 -o inv.bc X+ X- Y+ Y-
 
 inv.nbc:  NBcond mk
 	./NBcond -i ../inv/hollowed.1 -g ../inv/Tier-10-Merge-0-re.obj -m 0.1 -o inv.nbc
+	
+inv.heat: heat mk
+	#./heat -b -D -0 inv.bc -N inv.nbc -l inv.m.dlap -o inv.heat -t 60 -d 0.1 -a 1.0 -s 1
+	./heat -D -0 inv.bc -l inv.m.dlap -o inv.heat -t 1 -d 0.1 -a 20 -s 0.1
+	
+inv.bheat: mk heat
+	./heat -b -D -0 inv.bc -l inv.dlap -o inv.bheat -t 160 -d 0.1 -a 1.0 -s 0.1
 
 inv.nbheat: mk heat
-	./heat -b -D -0 inv.bc -N inv.nbc -l inv.dlap -o inv.nbheat -t 2160 -d 0.1 -a 50.0 -s 1
+	#./heat -b -D -0 inv.bc -N inv.nbc -l inv.dlap -o inv.nbheat -t 160 -d 0.1 -a 10.0 -s 0.1
+	./heat -b -D -0 inv.bc -N inv.nbc -l inv.dlap -o inv.nbheat -t 240 -d 0.01 -a 0.125 -s 0.1
+	
+inv.1.nbheat: mk heat
+	./heat -b -D -0 inv.bc -N inv.nbc -l inv.1.dlap -o inv.1.nbheat -t 240 -d 0.01 -a 0.125 -s 0.1
+	
+inv.0.1.nbheat: mk heat
+	./heat -bD -0 inv.bc -N inv.nbc -l inv.0.1.dlap -o inv.0.1.nbheat -t 2160 -d 0.1 -a 25.0 -s 1
+	
+inv.unit.dlap:
+	./dlap -i ../inv/hollowed.1 -o inv.m.unit.dlap -U
+	./dlap -i ./period.1 -o inv.p.unit.dlap -U
+	./mergep -d inv.m.unit.dlap -p inv.p.unit.dlap -m period.map -o inv.unit.dlap
+	
+inv.unit.nbheat:
+	./heat -b -D -0 inv.bc -N inv.nbc -l inv.unit.dlap -o inv.unit.nbheat -t 240 -d 0.01 -a 0.375 -s 0.1
 	
 visinv: visheat
-	./visheat -i ../inv/hollowed.1 -f inv.nbheat
+	./visheat -i ../inv/hollowed.1 -f inv.heat
+
+visinvn: visheat
+	./visheat -i ../inv/hollowed.1 -f inv.nbheat -r
 
 .PHONY: follow nvis vispath tp tetp
 

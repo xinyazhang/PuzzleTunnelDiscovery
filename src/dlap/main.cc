@@ -14,7 +14,7 @@ using std::vector;
 
 void usage()
 {
-	std::cerr << "Options: -i <tetgen file prefix> [-o output_file -s scale_factor]" << endl;
+	std::cerr << "Options: -i <tetgen file prefix> [-o output_file -s scale_factor -U]" << endl;
 }
 
 int main(int argc, char* argv[])
@@ -22,7 +22,8 @@ int main(int argc, char* argv[])
 	int opt;
 	string iprefix, ofn;
 	double scale_factor = 1.0;
-	while ((opt = getopt(argc, argv, "i:o:s:")) != -1) {
+	bool unit_weight = false;
+	while ((opt = getopt(argc, argv, "i:o:s:U")) != -1) {
 		switch (opt) {
 			case 'i': 
 				iprefix = optarg;
@@ -32,6 +33,9 @@ int main(int argc, char* argv[])
 				break;
 			case 's':
 				scale_factor = atof(optarg);
+				break;
+			case 'U':
+				unit_weight = true;
 				break;
 			default:
 				usage();
@@ -64,7 +68,7 @@ int main(int argc, char* argv[])
 		//readvoronoi(iprefix, VNodes, VEdges, VFaces, VCells);
 		//tet2lap(V, E, P, VNodes, VEdges, VFaces, VCells, lap);
 		V.block(0, 2, V.rows(), 1) *= scale_factor;
-		tet2lap(V, E, P, lap);
+		tet2lap(V, E, P, lap, unit_weight);
 	} catch (std::runtime_error& e) {
 		std::cerr << e.what() << std::endl;
 		return -1;

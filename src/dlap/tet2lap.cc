@@ -86,7 +86,8 @@ void tet2lap(const Eigen::MatrixXd& V,
 	     const std::vector<VoronoiFace>& VFaces,
 	     const std::vector<VoronoiCell>& VCells,
 #endif
-	     Eigen::SparseMatrix<double>& lap
+	     Eigen::SparseMatrix<double>& lap,
+	     bool unit_weight
 	     )
 {
 	vector<double> vertex_weight;
@@ -121,9 +122,14 @@ void tet2lap(const Eigen::MatrixXd& V,
 			if (cross_theta_boundary(V.row(i), V.row(j)))
 				continue;
 #endif
-			Vector3d AiNi = surface_areas(ti, vi) * facenormals.block<1, 3>(ti, vi * 3);
-			Vector3d AjNj = surface_areas(ti, vj) * facenormals.block<1, 3>(ti, vj * 3);
-			double w = - (AiNi.dot(AjNj) / tetvolumes(ti));
+			double w;
+			if (!unit_weight) {
+				Vector3d AiNi = surface_areas(ti, vi) * facenormals.block<1, 3>(ti, vi * 3);
+				Vector3d AjNj = surface_areas(ti, vj) * facenormals.block<1, 3>(ti, vj * 3);
+				w = - (AiNi.dot(AjNj) / tetvolumes(ti));
+			} else {
+				w = 1.0;
+			}
 
 #if VERBOSE
 			std::cerr << " apply weight " << w << " from tet " << ti << " edge " << ei

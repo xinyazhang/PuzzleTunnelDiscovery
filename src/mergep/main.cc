@@ -60,15 +60,22 @@ public:
 		init_blend();
 		for (int k = 0; k < plap_.outerSize(); ++k) {
 			for (decltype(plap_)::InnerIterator it(plap_, k); it; ++it) {
-				it.value();
-				it.row();   // row index
-				it.col();   // col index (here it is equal to k)
 				int oldvid0 = get_oldvid(it.row());
 				int oldvid1 = get_oldvid(it.col());
-				// Note: we must override the existing value,
-				// because node pairs in the same layer
-				// already have the value computed and stored.
-				mlap_.coeffRef(oldvid0, oldvid1) = it.value();
+				if (it.row() == 1) {
+					std::cerr << "Applying periodical (" << it.row() << ", " << it.col()
+						  << ") value: " << it.value()
+						  << " to main structure (" << oldvid0 << ", " << oldvid1 << ") "
+						  << " the main value was " << mlap_.coeffRef(oldvid0, oldvid1) << endl;
+				}
+#if 0
+				if (oldvid0 < dlap_.rows() && oldvid1 < dlap_.rows())
+					continue;
+#endif
+				mlap_.coeffRef(oldvid0, oldvid1) += it.value();
+				if (it.row() == 1) {
+					std::cerr << " is " << mlap_.coeffRef(oldvid0, oldvid1) << endl;
+				}
 			}
 		}
 	}
@@ -92,15 +99,17 @@ public:
 private:
 	Eigen::SparseMatrix<double, Eigen::RowMajor> dlap_, plap_, mlap_;
 	std::unordered_map<int, int> old2new_, new2old_;
-	size_t hidden_node_idx_;
+	int hidden_node_idx_;
+	
 	Eigen::VectorXi existingNodes_;
 };
 
 int main(int argc, char* argv[])
 {
 	string dfn, pfn, mfn, ofn;
+	string mainfn, periodfn;
 	int opt;
-	while ((opt = getopt(argc, argv, "d:o:p:m:")) != -1) {
+	while ((opt = getopt(argc, argv, "d:o:p:m:M:P:")) != -1) {
 		switch (opt) {
 			case 'd':
 				dfn = optarg;
@@ -113,6 +122,12 @@ int main(int argc, char* argv[])
 				break;
 			case 'm':
 				mfn = optarg;
+				break;
+			case 'M':
+				mainfn = optarg;
+				break;
+			case 'P':
+				periodfn = optarg;
 				break;
 			default:
 				usage();
