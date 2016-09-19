@@ -134,6 +134,11 @@ visinv: visheat
 visinvn: visheat
 	./visheat -i ../inv/hollowed.1 -f inv.nbheat -r
 
+inv.cpath: mk
+	./follow -c -i ../inv/hollowed.1 -o inv.cpath -t inv.0.1.nbheat -b inv.bc -- 0.0 -0.2 0.01
+visinvp: visheat
+	./visheat -i ../inv/hollowed.1 -f inv.0.1.nbheat -p inv.cpath 
+
 .PHONY: follow nvis vispath tp tetp
 
 # vim: tw=0

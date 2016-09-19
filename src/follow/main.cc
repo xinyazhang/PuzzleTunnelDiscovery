@@ -25,7 +25,7 @@ using std::cerr;
 using std::fixed;
 using std::vector;
 
-#define VERBOSE 1
+#define VERBOSE 0
 
 void usage()
 {
@@ -126,10 +126,12 @@ tet_interp(const Eigen::MatrixXd& V,
 	heatvec(1) = H(P(i,1));
 	heatvec(2) = H(P(i,2));
 	heatvec(3) = H(P(i,3));
+	double ret = heatvec.dot(barycoord.row(0));
+#if VERBOSE
 	std::cerr << "B. coord: " << barycoord << endl;
 	std::cerr << "Heat vec: " << heatvec.transpose() << endl;
-	double ret = heatvec.dot(barycoord.row(0));
 	std::cerr << "Heat value: " << ret << endl;
+#endif
 	return ret;
 }
 
@@ -369,6 +371,10 @@ cfollow(const Eigen::Vector3d& start_point,
 		int prevtet = isect.result_;
 		if (t >= 0) {
 			isect.center_ += ngrad * (t + 1e-3);
+			if (isect.center_(2) > 2 * M_PI)
+				isect.center_(2) -= 2 * M_PI;
+			else if (isect.center_(2) < 0.0)
+				isect.center_(2) += 2 * M_PI;
 			isect.result_ = -1;
 			BVIntersect(bvh, isect);
 			if (isect.result_ > 0) {
