@@ -304,14 +304,6 @@ public:
 	}
 };
 
-void skip_to_needle(std::istream& fin, const string& needle)
-{
-	string s;
-	do {
-		fin >> s;
-	} while(!fin.eof() && s != needle);
-}
-
 int main(int argc, char* argv[])
 {
 	int opt;

@@ -304,10 +304,6 @@ cfollow(const Eigen::Vector3d& start_point,
 	while (true) {
 		double tem;
 		if (isect.vert_id_ >= 0) {
-			fout << V.row(isect.vert_id_)
-			     << "\t" << isect.vert_id_
-			     << '\t' << H(isect.vert_id_)
-			     << endl;
 			int tet_pick = vert2tet[isect.vert_id_].front();
 			double highest_temp = tet_highest_temp(P, H, tet_pick);
 			double average_temp = tet_average_temp(P, H, tet_pick);
@@ -335,6 +331,11 @@ cfollow(const Eigen::Vector3d& start_point,
 			for (int i = 0; i < P.cols(); i++) {
 				center += V.row(P(tet_pick, i));
 			}
+			fout << V.row(isect.vert_id_)
+			     << "\t" << isect.vert_id_
+			     << '\t' << H(isect.vert_id_)
+			     << '\t' << tet_pick
+			     << endl;
 			//isect.center_ = V.row(isect.vert_id_);
 			isect.center_ = center / P.cols();
 			isect.result_ = tet_pick;
@@ -359,7 +360,7 @@ cfollow(const Eigen::Vector3d& start_point,
 		tem = tet_interp(V, P, H, isect.result_, isect.center_);
 		// In practice, they are all off vertex
 		// Because we use the center of tet instead we need be on vertex
-		fout << isect.center_.transpose() << "\t" << -1 << '\t' << tem;
+		fout << isect.center_.transpose() << "\t" << -1 << '\t' << tem << '\t' << isect.result_;
 		auto grad = tet_gradient(V, P, H, isect.result_);
 		Vector3d ngrad = grad.normalized();
 		double t = tet_intersect(V, P, isect.result_, isect.center_, ngrad);
@@ -382,7 +383,7 @@ cfollow(const Eigen::Vector3d& start_point,
 				continue;
 			}
 			if (PBM(prevtet) > 0) {
-				std::cerr << "Outsize of the outer boundary, halt" << endl;
+				std::cerr << "Successfully hit the maze boundary, halt" << endl;
 				break;
 			}
 		}
@@ -392,7 +393,7 @@ cfollow(const Eigen::Vector3d& start_point,
 		int next_vert = max_temp_vert_in_tet(P, H, prevtet);
 		isect.vert_id_ = next_vert;
 	}
-	fout << isect.center_.transpose() << "\t-1\t1 #This is the End" << endl;
+	fout << isect.center_.transpose() << "\t-1\t1\t-1#This is the End" << endl;
 }
 
 void
