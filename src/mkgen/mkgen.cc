@@ -21,7 +21,7 @@ vector<string> write_blend_rules(const vector<string>& meshes, int tier, bool re
 		cout << fn << ": " << meshes[i] << " " << meshes[i+1] << endl;
 		cout << "\t$(BIN)/blend -NI -prefix " << prefix << " $?" << endl;
 		if (remeshing)
-			cout << "\tfix_mesh.py " << out << " " << fn << endl; // Assumes PyMesh has been installed and available in $PATH
+			cout << "\tfix_mesh.py --detail high " << out << " " << fn << endl; // Assumes PyMesh has been installed and available in $PATH
 		cout << endl;
 		ret.emplace_back(fn);
 	}
