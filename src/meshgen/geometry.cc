@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include "options.h"
 
+using std::endl;
+
 constexpr int kNInterp = 16; //16;
 constexpr int kNSlices = 32; //32;
 constexpr int kNLayers = kNSlices + 1;
@@ -61,9 +63,19 @@ inline bool NClose(double value, double target)
 }
 inline double vector_angle(const Eigen::Vector2d& v0, const Eigen::Vector2d& v1)
 {
-	double dot = v0.dot(v1);
-	double det = cross2d(v0, v1);
-	return std::atan2(det, dot);
+	Eigen::Vector2d nv0 = v0.normalized();
+	Eigen::Vector2d nv1 = v1.normalized();
+#if 0
+	std::cerr << __func__ << "\t" << v0.transpose() << "\t" << v1.transpose() << endl;
+	std::cerr << __func__ << " normalized\t" << nv0.transpose() << "\t" << nv1.transpose() << endl;
+#endif
+	double dot = nv0.dot(nv1.normalized());
+	double det = cross2d(nv1.normalized(), nv0.normalized());
+	double ret = std::atan2(det, dot);
+#if 0
+	std::cerr << __func__ << " dot: " << dot << " cross: " << det << " atan2 " << ret << endl;
+#endif
+	return ret;
 }
 
 auto general_build_faces(const std::vector<ObVertex*>& lowline,
@@ -101,7 +113,9 @@ auto circular_build_faces(const std::vector<ObVertex*>& lowline,
 auto build_faces_unbalanced(const std::vector<ObVertex*>& lowline,
 		const std::vector<ObVertex*>& highline)
 {
+#if 0
 	std::cerr << "UNB Sizes: " << lowline.size() << "  " << highline.size() << std::endl;
+#endif
 	std::vector<ObFace> F;
 	size_t lb = 0, hb = 0;
 	size_t lsize = lowline.size(), hsize = highline.size();
@@ -112,16 +126,22 @@ auto build_faces_unbalanced(const std::vector<ObVertex*>& lowline,
 			if (lb + 1 >= lsize)
 				break;
 			nv = lowline[lb + 1];
+#if 0
 			std::cerr << "UNB(llh): " << lb << lb + 1 << hb << std::endl;
+#endif
 			lb++;
 		} else {
 			if (hb + 1 >= hsize)
 				break;
 			nv = highline[hb + 1];
+#if 0
 			std::cerr << "UNB(lhh): " << lb << hb + 1 << hb << std::endl;
+#endif
 			hb++;
 		}
+#if 0
 		std::cerr << cl << "  " << nv << "  " << ch << std::endl;
+#endif
 		F.emplace_back(cl, ch, nv);
 	}
 	return F;
@@ -176,7 +196,8 @@ MazeSegment rotate(const MazeSegment& seg, const MazeVert& center, double theta)
 LayerPolygon build_parallelogram(const MazeSegment& wall,
 		const MazeSegment& stick,
 		const MazeVert& stick_center,
-		double theta)
+		double theta,
+		bool enforce_singular = false)
 {
 	auto rs = rotate(stick, stick_center, theta);
 #if 0
@@ -189,8 +210,11 @@ LayerPolygon build_parallelogram(const MazeSegment& wall,
 	MazeVert v2 = wall.v1 - stick_offset + ctrl_offset;
 	MazeVert v3 = wall.v1 + ctrl_offset;
 	MazeVert wallv = wall.v1 - wall.v0;
-	double cross = cross2d(stick_offset, wallv);
-	bool singular = NClose(cross, 0.0);
+	double cross = cross2d(stick_offset.normalized(), wallv.normalized());
+#if 0
+	std::cerr << " theta: " << theta << "\t cross: " << cross << endl;
+#endif
+	bool singular = enforce_singular || NClose(cross, 0.0);
 	if (singular)
 		return LayerPolygon({v0, v1, v2, v3}, theta, wall, cross);
 	double dot = wallv.dot(stick_offset);
@@ -249,10 +273,13 @@ void Obstacle::construct(const MazeSegment& wall,
 		if (i * M_PI > max_theta)
 			continue;
 		double singular_angle = i * M_PI - base_theta;
+#if 0
+		std::cerr << "Planning to insert singular angle: " << singular_angle << endl;
+#endif
 		bool do_insert = true;
 		for(const auto& layer : layers) {
 			if (NClose(layer.rotate_angle(), singular_angle)) {
-				do_insert = false;
+				do_insert = false; // Remove duplicated
 				break;
 			}
 		}
@@ -276,7 +303,9 @@ void Obstacle::construct(const MazeSegment& wall,
 	}
 	std::cerr << "Base theta: " << base_theta << std::endl;
 	for(auto& layer: layers) {
-		std::cerr << "Layer theta: " << layer.rotate_angle() << std::endl;
+		std::cerr << "Layer theta: " << layer.rotate_angle()
+		          << " is singular: " << layer.is_singular()
+		          << std::endl;
 		append_V(layer.get_boundary());
 	}
 	seal(layers.front(), true);
@@ -415,7 +444,9 @@ void LayerPolygon::construct(MazeVertArray vs, double zcoord, const MazeSegment&
 
 	for(int i = 0; i < 4; i++) {
 		corners_[i] = new ObVertex(vs[i].x(), vs[i].y(), zcoord);
+#if 0
 		std::cerr << '(' << corners_[i]->transpose() << ")\t";
+#endif
 	}
 	// Expand
 	auto center = get_center();
