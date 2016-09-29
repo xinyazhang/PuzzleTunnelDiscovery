@@ -245,7 +245,7 @@ int main(int argc, char *argv[])
 
 		if (!no_intermediate) {
 			igl::writeOBJ(prefix+std::to_string(i)+".obj", VC, FC);
-			igl::writePLY(prefix+std::to_string(i)+".ply", VC, FC);
+			//igl::writePLY(prefix+std::to_string(i)+".ply", VC, FC);
 		}
 		std::cerr << "  " << i <<"(f: " << FC.rows() <<") ";
 	}
@@ -276,7 +276,7 @@ int main(int argc, char *argv[])
 	}
 #endif
 	igl::writeOBJ(prefix+"done.obj", VC, FC);
-	igl::writePLY(prefix+"done.ply", VC, FC);
+	//igl::writePLY(prefix+"done.ply", VC, FC);
 #if 0
 	// Plot the mesh with pseudocolors
 	igl::viewer::Viewer viewer;
