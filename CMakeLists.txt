@@ -156,4 +156,7 @@ TARGET_LINK_LIBRARIES(tet2obj tetio geopick)
 EASYADD(mergep)
 EASYADD(evadiff)
 TARGET_LINK_LIBRARIES(evadiff tetio heatio)
+
+EASYADD(mink)
+TARGET_LINK_LIBRARIES(mink ${CGAL_LIBRARIES} ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} glfw)
 # vim: tw=0
