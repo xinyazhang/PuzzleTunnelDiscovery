@@ -133,18 +133,17 @@ public:
 int main(int argc, char* argv[])
 {
 	igl::viewer::Viewer viewer;
+	viewer.launch_init(true, false);
 	viewer.core.orthographic = true;
 	Mink mink;
 	mink.init_viewer(viewer);
 	viewer.core.clear_framebuffers();
-	glClearColor(0.3f, 0.3f, 0.5f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT);
-	viewer.core.camera_eye << 0, 0, 10;
+	viewer.core.clear_bits = GL_DEPTH_BUFFER_BIT;
 
 #if 1
 	viewer.callback_key_pressed = [](igl::viewer::Viewer& viewer, unsigned char key, int modifier) -> bool
 	{
-		if (key == 'C') {
+		if (key == 'C' || key == 'c') {
 			glClearColor(0.3f, 0.3f, 0.5f, 1.0f);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		}
@@ -162,7 +161,7 @@ int main(int argc, char* argv[])
 	};
 	viewer.core.is_animating = false;
 	viewer.core.animation_max_fps = 60.;
-	viewer.launch();
+	viewer.launch(GL_DEPTH_BUFFER_BIT);
 
 	return 0;
 }
