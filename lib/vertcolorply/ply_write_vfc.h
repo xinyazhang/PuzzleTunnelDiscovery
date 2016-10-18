@@ -4,7 +4,8 @@
 #include <Eigen/Core>
 #include <string>
 
-void write_ply_vc(const std::string& fn,
+void ply_write_naive_header(std::ostream& fout, size_t vn, size_t fn);
+void ply_write_vfc(const std::string& fn,
 		const Eigen::MatrixXd& V,
 		const Eigen::MatrixXi& F,
 		const Eigen::MatrixXd& C);

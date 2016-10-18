@@ -1,6 +1,6 @@
 #include <readtet.h>
 #include <heatio/readheat.h>
-#include <write_ply_vc.h>
+#include <vertcolorply/ply_write_vfc.h>
 #include <unistd.h>
 #include <string>
 #include <unordered_map>
@@ -92,7 +92,7 @@ public:
 		colorize_data(Z_temp_, C);
 		string fn = "visheat-snapshot-at-"+now+"-frame-"+std::to_string(frameid_)+".ply";
 		std::cerr << "Saving model to file " << fn;
-		write_ply_vc(fn,
+		ply_write_vfc(fn,
 				V_temp_,
 				F_temp_,
 				C);

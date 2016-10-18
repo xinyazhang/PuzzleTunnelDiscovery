@@ -4,6 +4,7 @@
 #include <Eigen/Core>
 #include <boost/range/irange.hpp>
 #include <vector>
+#include <ostream>
 
 typedef Eigen::Vector2d MazeVert;
 typedef std::vector<MazeVert, Eigen::aligned_allocator<MazeVert> > MazeVertArray;
@@ -23,6 +24,9 @@ public:
 
 	void get_bbox(MazeVert& minV, MazeVert& maxV) const;
 	void merge_bbox(MazeVert& minV, MazeVert& maxV) const;
+
+	void writePLY(std::ostream&, Eigen::Vector3d color = Eigen::Vector3d(1.0, 1.0, 1.0));
+	void convertVF(Eigen::MatrixXd& V, Eigen::MatrixXi& F);
 private:
 	std::vector<MazeSegment> segs_;
 	MazeVert center_;

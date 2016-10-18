@@ -95,9 +95,13 @@ EASYLIB(heatio)
 EASYLIB(vecio)
 EASYLIB(geopick)
 EASYLIB(mazeinfo)
+TARGET_LINK_LIBRARIES(mazeinfo vertcolorply)
 
 EASYADD(meshgen)
 TARGET_LINK_LIBRARIES(meshgen mazeinfo)
+
+EASYADD(omplgen)
+TARGET_LINK_LIBRARIES(omplgen mazeinfo)
 
 EASYADD(mkgen)
 FILTERADD(flipfaces)

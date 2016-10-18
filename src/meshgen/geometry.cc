@@ -11,11 +11,12 @@ constexpr int kNInterp = 16; //16;
 constexpr int kNSlices = 32; //32;
 constexpr int kNLayers = kNSlices + 1;
 constexpr double kDeltaTheta = M_PI/32; //2 * M_PI/kNSlices;
-constexpr double kEndTheta = 2 * M_PI; //2 * M_PI/kNSlices;
+constexpr double kBaseTheta = 0; // 0;
+constexpr double kEndTheta = 2 * M_PI; // 2 * M_PI; //2 * M_PI/kNSlices;
 constexpr double kEpsilon = 1e-6;
 constexpr double kWallEpsilon= 1.0/1024.0; //0.01;
-constexpr double kBaseTheta = 0; // 0;
-constexpr double kExpandRatio = 1.0+1.0/1024.0; // 1 + small number
+//constexpr double kExpandRatio = 1.0+1.0/1024.0; // 1 + small number
+constexpr double kExpandRatio = 1.0;
 
 ObFace::ObFace(ObVertex* v0, ObVertex* v1, ObVertex* v2)
 {

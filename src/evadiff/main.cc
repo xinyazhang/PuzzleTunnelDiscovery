@@ -1,6 +1,5 @@
 #include <tetio/readtet.h>
 #include <heatio/readheat.h>
-#include <write_ply_vc.h>
 #include <unistd.h>
 #include <string>
 #include <unordered_map>

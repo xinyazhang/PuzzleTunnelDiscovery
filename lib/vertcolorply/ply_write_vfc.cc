@@ -1,4 +1,4 @@
-#include "write_ply_vc.h"
+#include "ply_write_vfc.h"
 #include <fstream>
 using std::endl;
 
@@ -14,7 +14,7 @@ property list uchar int vertex_indices
 end_header
 */
 
-void write_naive_header(std::ostream& fout, size_t vn, size_t fn)
+void ply_write_naive_header(std::ostream& fout, size_t vn, size_t fn)
 {
 	fout << "ply" << endl << "format ascii 1.0" << endl;
 	fout << "element vertex " << vn << endl;
@@ -29,13 +29,13 @@ void write_naive_header(std::ostream& fout, size_t vn, size_t fn)
 	fout << "end_header" << endl;
 }
 
-void write_ply_vc(const std::string& fn,
+void ply_write_vfc(const std::string& fn,
 		const Eigen::MatrixXd& V,
 		const Eigen::MatrixXi& F,
 		const Eigen::MatrixXd& Cfloat)
 {
 	std::ofstream fout(fn);
-	write_naive_header(fout, V.rows(), F.rows());
+	ply_write_naive_header(fout, V.rows(), F.rows());
 	fout.precision(17);
 	Eigen::MatrixXi C = (Cfloat * 255.0).cast<int>();
 	for(int i = 0; i < V.rows(); i++) {

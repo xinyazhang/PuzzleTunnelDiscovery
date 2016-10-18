@@ -3,6 +3,10 @@ OBFILE=../tmp/done.obj
 
 first: node
 
+gen: meshgen mk
+	./meshgen <<< "1 0 0 0 3.995   1 -1.7853981633974483 0. -1.7841936196026207 0.049067674327418015  -1.7841936196026207"
+	meshlab obs-wall-0-stick-0.ply
+
 node:
 	./dlap -i cubepick.v147.e3-4 -o cubepick.v147.e3-4.dlap
 	./sancheck -i cubepick.v147.e3-4 -l cubepick.v147.e3-4.dlap 1

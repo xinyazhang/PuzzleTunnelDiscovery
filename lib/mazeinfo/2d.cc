@@ -1,4 +1,7 @@
 #include "2d.h"
+#include <vertcolorply/ply_write_vfc.h>
+
+using std::endl;
 
 MazeBoundary::MazeBoundary(std::istream& fin)
 {
@@ -40,5 +43,68 @@ void MazeBoundary::merge_bbox(MazeVert& minV, MazeVert& maxV) const
 			maxV(i) = std::max(maxV(i), seg.v0(i));
 			maxV(i) = std::max(maxV(i), seg.v1(i));
 		}
+	}
+}
+
+void MazeBoundary::writePLY(std::ostream& fout, Eigen::Vector3d color)
+{
+	Eigen::MatrixXd V;
+	Eigen::MatrixXi F;
+	convertVF(V, F);
+	ply_write_naive_header(fout, V.rows(), F.rows());
+
+	fout.precision(17);
+	Eigen::VectorXi C = (color * 255.0).cast<int>();
+	for(int i = 0; i < V.rows(); i++) {
+		fout << V(i,0) << ' ' << V(i,1) << ' ' << V(i,2) << ' ';
+		fout << C(0) << ' ' << C(1) << ' ' << C(2) << endl;
+	}
+	for(int i = 0; i < F.rows(); i++) {
+		fout << F.cols();
+		for(int j = 0; j < F.cols(); j++)
+			fout << ' ' << F(i, j);
+		fout << endl;
+	}
+}
+
+void MazeBoundary::convertVF(Eigen::MatrixXd& V, Eigen::MatrixXi& F)
+{
+	MazeVertArray vertlist;
+	struct iseg {
+		int iv0, iv1;
+	};
+	std::vector<iseg> iseglist;
+	for (const auto& seg : segs_) {
+		iseg is = { -1, -1 };
+		for (int i = 0; i < int(vertlist.size()); i++) {
+			const auto& v = vertlist[i];
+			if (v == seg.v0) {
+				is.iv0 = i;
+			}
+			if (v == seg.v1) {
+				is.iv1 = i;
+			}
+		}
+		if (is.iv0 < 0) {
+			is.iv0 = vertlist.size();
+			vertlist.emplace_back(seg.v0);
+		}
+		if (is.iv1 < 0) {
+			is.iv1 = vertlist.size();
+			vertlist.emplace_back(seg.v1);
+		}
+		iseglist.emplace_back(is);
+	}
+	int nv2d = int(vertlist.size());
+	V.resize(vertlist.size() * 2, 3);
+	F.resize(iseglist.size() * 2, 3);
+	for(int i = 0; i < nv2d; i++) {
+		V.row(i) = Eigen::Vector3d(vertlist[i].x(), vertlist[i].y(), 0.0);
+		V.row(i + nv2d) = Eigen::Vector3d(vertlist[i].x(), vertlist[i].y(), 1.0);
+	}
+	for(int i = 0; i < int(iseglist.size()); i++) {
+		const auto& is = iseglist[i];
+		F.row(2 * i + 0) = Eigen::Vector3i(is.iv0, is.iv1, is.iv0 + nv2d);
+		F.row(2 * i + 1) = Eigen::Vector3i(is.iv1, is.iv1 + nv2d, is.iv0 + nv2d);
 	}
 }
