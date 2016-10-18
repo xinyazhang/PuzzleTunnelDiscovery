@@ -15,6 +15,10 @@ INCLUDE(${CMAKE_SOURCE_DIR}/cmake/FindSUITESPARSE.cmake)
 INCLUDE_DIRECTORIES(${SUITESPARSE_INCLUDE_DIRS})
 INCLUDE_DIRECTORIES(lib/)
 
+# GLFW
+FIND_PACKAGE(glfw3)
+MESSAGE("GLFW: ${GLFW3_LIBRARY}")
+
 # C++11 and Debug
 # Note: we focus on gcc/clang right now, so we uses compiler specific solutions.
 set(CMAKE_CXX_FLAGS "--std=c++14 -g -O2 -march=haswell -ggdb3 -Wno-ignored-attributes -Wno-deprecated-declarations -Wno-deprecated ${CMAKE_CXX_FLAGS}")
@@ -143,7 +147,7 @@ TARGET_LINK_LIBRARIES(mass tetio vecio)
 find_package(GLEW REQUIRED)
 find_package(OpenGL REQUIRED)
 EASYADD(visheat)
-TARGET_LINK_LIBRARIES(visheat vertcolorply ${CMAKE_THREAD_LIBS_INIT} ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} glfw tetio heatio)
+TARGET_LINK_LIBRARIES(visheat vertcolorply ${CMAKE_THREAD_LIBS_INIT} ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY} tetio heatio)
 
 EASYADD(follow)
 TARGET_LINK_LIBRARIES(follow tetio heatio)
@@ -162,5 +166,5 @@ EASYADD(evadiff)
 TARGET_LINK_LIBRARIES(evadiff tetio heatio)
 
 EASYADD(minkview2)
-TARGET_LINK_LIBRARIES(minkview2 ${CGAL_LIBRARIES} ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} glfw)
+TARGET_LINK_LIBRARIES(minkview2 ${CGAL_LIBRARIES} ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY})
 # vim: tw=0
