@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
 				return -1;
 		};
 	}
-	igl::readOBJ(stdin, V, F);
+	igl::readOBJ("/dev/stdin", V, F);
 	Eigen::VectorXd maxV = V.colwise().maxCoeff();
 	Eigen::VectorXd minV = V.colwise().minCoeff();
 

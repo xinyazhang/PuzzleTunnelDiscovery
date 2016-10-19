@@ -43,7 +43,7 @@ int main(int argc, char* argv[])
 	}
 	fprintf(stderr, "Margin = %f, ZMargin = %f\n", margin, zmargin);
 
-	igl::readOBJ(stdin, V, F);
+	igl::readOBJ("/dev/stdin", V, F);
 	Eigen::VectorXd maxV = V.colwise().maxCoeff();
 	Eigen::VectorXd minV = V.colwise().minCoeff();
 
