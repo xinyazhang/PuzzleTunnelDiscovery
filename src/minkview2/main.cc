@@ -29,11 +29,11 @@ private:
 	Eigen::MatrixXd WV_;
 	Eigen::MatrixXi WF_;
 	double t_ = 0.0;
+	double theta_ = 0.0;
 
 	void blend()
 	{
-		blend_vertices();
-		blend_faces();
+		blend_vertices(); blend_faces();
 	}
 	Eigen::MatrixXd V_;
 	Eigen::MatrixXi F_;
@@ -112,7 +112,7 @@ public:
 
 	bool next_frame() 
 	{
-		t_ += 1.0/128.0;
+		t_ += 1.0/60.0;
 		int it = int(t_);
 		double ratio = 1.0 - (t_ - double(it));
 		int vid0 = it % WV_.rows();
@@ -122,11 +122,30 @@ public:
 		Eigen::Vector3d handle = v0 * ratio + v1 * (1 - ratio);
 
 		Eigen::Vector3d tr = handle - robot_handle_;
+		calc_rotation(theta_);
 		for (int i = 0; i < RV_.rows(); i++) {
-			RV_.row(i) = initRV_.row(i) + tr.transpose();
+			RV_.row(i) = RV_.row(i) + tr.transpose();
 		}
 
 		return true;
+	}
+
+	void rotate(double direction)
+	{
+		theta_ += direction / 8.0 / M_PI;
+		t_ = 0.0;
+		calc_rotation(theta_);
+	}
+
+	void calc_rotation(double theta)
+	{
+		Eigen::Matrix3d rot;
+		rot << cos(theta), -sin(theta), 0.0,
+		       sin(theta), cos(theta), 0.0,
+		       0.0, 0.0, 1.0;
+		for (int i = 0; i < RV_.rows(); i++) {
+			RV_.row(i) = rot * (initRV_.row(i).transpose() - robot_handle_) + robot_handle_;
+		}
 	}
 };
 
@@ -138,12 +157,26 @@ int main(int argc, char* argv[])
 	Mink mink;
 	mink.init_viewer(viewer);
 	viewer.core.clear_framebuffers();
+	viewer.core.camera_eye << 0, 0, 10;
 	viewer.core.clear_bits = GL_DEPTH_BUFFER_BIT;
 
 #if 1
-	viewer.callback_key_pressed = [](igl::viewer::Viewer& viewer, unsigned char key, int modifier) -> bool
-	{
+	viewer.callback_key_up = [&mink](igl::viewer::Viewer& viewer, unsigned int key, int modifier) -> bool {
+		bool do_clear = false;
+		//std::cerr << "Key " << key << " pressed" << std::endl;
 		if (key == 'C' || key == 'c') {
+			do_clear = true;
+		} else if (key == GLFW_KEY_LEFT) {
+			do_clear = true;
+			mink.rotate(-1.0);
+			mink.update_frame(viewer);
+			//std::cerr << "Left pressed" << std::endl;
+		} else if (key == GLFW_KEY_RIGHT) {
+			do_clear = true;
+			mink.rotate(1.0);
+			mink.update_frame(viewer);
+		}
+		if (do_clear) {
 			glClearColor(0.3f, 0.3f, 0.5f, 1.0f);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		}
@@ -156,6 +189,12 @@ int main(int argc, char* argv[])
 			if (mink.next_frame()) {
 				mink.update_frame(viewer);
 			}
+		}
+		static bool first_clear = true;
+		if (first_clear) {
+			glClearColor(0.3f, 0.3f, 0.5f, 1.0f);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			first_clear = false;
 		}
 		return false;
 	};
