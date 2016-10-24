@@ -79,7 +79,11 @@ public:
 	{
 		build_robot();
 		build_ws();
-		robot_handle_ = RV_.row(0);
+		Eigen::Vector3d centroid(0.0, 0.0, 0.0);
+		for (int i = 0; i < RV_.rows(); i++)
+			centroid += RV_.row(i);
+		centroid /= RV_.rows();
+		robot_handle_ = centroid;
 
 		blend_vertices();
 		blend_faces();
