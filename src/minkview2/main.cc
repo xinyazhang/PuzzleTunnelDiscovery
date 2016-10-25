@@ -24,33 +24,79 @@ void usage()
 
 class Mink {
 private:
-	Eigen::MatrixXd RV_, initRV_;
+	Eigen::MatrixXd RV_, initRV_, negrotRV_;
 	Eigen::MatrixXi RF_, initRF_;
 	Eigen::MatrixXd WV_;
 	Eigen::MatrixXi WF_;
 	double t_ = 0.0;
 	double theta_ = 0.0;
 
-	void blend()
-	{
-		blend_vertices(); blend_faces();
-	}
 	Eigen::MatrixXd V_;
+	Eigen::MatrixXd C_;
 	Eigen::MatrixXi F_;
 
-	void blend_vertices()
+	void do_blend_vertices(std::vector<Eigen::MatrixXd> mats,
+			std::vector<Eigen::Vector3d> colors)
 	{
-		V_.resize(RV_.rows() + WV_.rows(), RV_.cols());
-		V_.block(0, 0, RV_.rows(), RV_.cols()) = RV_;
-		V_.block(RV_.rows(), 0, WV_.rows(), RV_.cols()) = WV_;
+		int nrows = 0;
+		for(const auto& m : mats) {
+			nrows += m.rows();
+		}
+		V_.resize(nrows, mats.front().cols());
+		C_.resize(nrows, 3);
+		int rowiter = 0;
+		int coloriter = 0;
+		for (const auto& m : mats) {
+			V_.block(rowiter, 0, m.rows(), m.cols()) = m;
+			for (int i = rowiter; i < rowiter + m.rows(); i++) {
+				C_.row(i) = colors[coloriter];
+			}
+			rowiter += m.rows();
+			coloriter++;
+		}
 	}
 
-	void blend_faces()
+	void do_blend_faces(std::vector<Eigen::MatrixXi> mats,
+			std::vector<Eigen::MatrixXd> vmats)
 	{
-		F_.resize(RF_.rows() + WF_.rows(), RF_.cols());
-		F_.block(0, 0, RF_.rows(), RF_.cols()) = RF_;
-		F_.block(RF_.rows(), 0, WF_.rows(), RF_.cols()) = WF_.array() + RV_.rows();
+		int nrows = 0;
+		for(const auto& m : mats) {
+			nrows += m.rows();
+		}
+		F_.resize(nrows, mats.front().cols());
+		int rowiter = 0;
+		int vrows = 0;
+		int viter = 0;
+		for (auto m : mats) {
+			F_.block(rowiter, 0, m.rows(), m.cols()) = m.array() + vrows;
+			//std::cerr << rowiter << std::endl;
+			//std::cerr << m << std::endl;
+			rowiter += m.rows();
+			vrows += vmats[viter].rows();
+			viter++;
+		}
 	}
+
+	void blend()
+	{
+		Eigen::MatrixXd dispInitRV = initRV_;
+		for (int i = 0; i < dispInitRV.rows(); i++)
+			dispInitRV.row(i) -= Eigen::Vector3d(2.0,0.0,0.0);
+		do_blend_vertices({RV_, WV_, negrotRV_, dispInitRV},
+				{ Eigen::Vector3d(1.0, 0.0, 0.0),
+				  Eigen::Vector3d(0.0, 1.0, 0.0),
+				  Eigen::Vector3d(1.0, 0.0, 0.0),
+				  Eigen::Vector3d(1.0, 1.0, 0.0),
+				}
+				);
+		//do_blend_vertices({RV_, WV_}, {Eigen::Vector3d(1.0, 0.0, 0.0), Eigen::Vector3d(0.0, 1.0, 0.0)});
+		//do_blend_faces({RF_, WF_}, {RV_, WV_});
+		do_blend_faces({RF_, WF_, RF_, RF_},
+			{RV_, WV_, negrotRV_, dispInitRV}
+			);
+		
+	}
+
 	Eigen::Vector3d robot_handle_;
 
 	void build_robot()
@@ -74,19 +120,45 @@ private:
 		WF_.resize(1, 3);
 		WF_.row(0) << 0, 1, 2;
 	}
+
+	void pickup_handle()
+	{
+		Eigen::Vector3d centroid(0.0, 0.0, 0.0);
+		for (int i = 0; i < initRV_.rows(); i++)
+			centroid += initRV_.row(i);
+		centroid /= initRV_.rows();
+		robot_handle_ = centroid;
+	}
+
+	void rebuild_basic_mink()
+	{
+		double theta = theta_;
+
+		Eigen::Matrix3d rot;
+		rot << cos(theta), -sin(theta), 0.0,
+		       sin(theta), cos(theta), 0.0,
+		       0.0, 0.0, 1.0;
+		negrotRV_ = initRV_;
+		for (int i = 0; i < RV_.rows(); i++) {
+			negrotRV_.row(i) = rot * (initRV_.row(i).transpose() -
+					robot_handle_);
+		}
+		for (int i = 0; i < RV_.rows(); i++) {
+			negrotRV_.row(i) = robot_handle_ + (- negrotRV_.row(i).transpose());
+		}
+	}
 public:
 	Mink()
 	{
 		build_robot();
 		build_ws();
-		Eigen::Vector3d centroid(0.0, 0.0, 0.0);
-		for (int i = 0; i < RV_.rows(); i++)
-			centroid += RV_.row(i);
-		centroid /= RV_.rows();
-		robot_handle_ = centroid;
+		pickup_handle();
 
-		blend_vertices();
-		blend_faces();
+		theta_ = 0.0;
+		rebuild_basic_mink();
+
+		blend();
+		//std::cerr << V_ << std::endl << F_;
 	}
 
 	void init_viewer(igl::viewer::Viewer& viewer)
@@ -94,18 +166,12 @@ public:
 		viewer.data.set_mesh(V_, F_);
 		viewer.data.set_face_based(false);
 
-		Eigen::MatrixXd C;
-		C.resize(V_.rows(), 3);
-		for (int i = 0; i < RV_.rows(); i++)
-			C.row(i) = Eigen::Vector3d(1.0, 0.0, 0.0);
-		for (int i = RV_.rows(); i < V_.rows(); i++)
-			C.row(i) = Eigen::Vector3d(0.0, 1.0, 0.0);
-		viewer.data.set_colors(C);
+		viewer.data.set_colors(C_);
 	} 
 
 	void update_frame(igl::viewer::Viewer& viewer)
 	{
-		blend_vertices();
+		blend();
 		viewer.data.set_mesh(V_, F_);
 	}
 
@@ -126,9 +192,9 @@ public:
 		Eigen::Vector3d handle = v0 * ratio + v1 * (1 - ratio);
 
 		Eigen::Vector3d tr = handle - robot_handle_;
-		calc_rotation(theta_);
 		for (int i = 0; i < RV_.rows(); i++) {
-			RV_.row(i) = RV_.row(i) + tr.transpose();
+			//std::cerr << "negrotRV_: " << i << std::endl;
+			RV_.row(i) = negrotRV_.row(i) + tr.transpose();
 		}
 
 		return true;
@@ -138,18 +204,12 @@ public:
 	{
 		theta_ += direction / 8.0 / M_PI;
 		t_ = 0.0;
-		calc_rotation(theta_);
+		//calc_rotation(theta_);
+		rebuild_basic_mink();
 	}
 
 	void calc_rotation(double theta)
 	{
-		Eigen::Matrix3d rot;
-		rot << cos(theta), -sin(theta), 0.0,
-		       sin(theta), cos(theta), 0.0,
-		       0.0, 0.0, 1.0;
-		for (int i = 0; i < RV_.rows(); i++) {
-			RV_.row(i) = rot * (initRV_.row(i).transpose() - robot_handle_) + robot_handle_;
-		}
 	}
 };
 
