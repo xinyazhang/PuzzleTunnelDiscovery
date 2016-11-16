@@ -84,6 +84,11 @@ SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CGAL_MODULES_DIR}")
 FIND_PACKAGE(GMP REQUIRED)
 FIND_PACKAGE(MPFR REQUIRED)
 
+# FCL (Flexible Collision Library) support
+ADD_SUBDIRECTORY(third-party/fcl/)
+INCLUDE_DIRECTORIES(${CMAKE_BINARY_DIR}/third-party/fcl/include/)
+INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/third-party/fcl/include/)
+
 # Main program
 ADD_EXECUTABLE(blend src/boolean/main.cc)
 ADD_EXECUTABLE(subtract src/boolean/substract.cc)
@@ -170,4 +175,7 @@ TARGET_LINK_LIBRARIES(evadiff tetio heatio)
 
 EASYADD(minkview2)
 TARGET_LINK_LIBRARIES(minkview2 ${CGAL_LIBRARIES} ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY})
+
+EASYADD(freecube)
+TARGET_LINK_LIBRARIES(freecube fcl)
 # vim: tw=0

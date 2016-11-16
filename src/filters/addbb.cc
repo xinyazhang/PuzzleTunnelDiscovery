@@ -22,7 +22,7 @@ int main(int argc, char* argv[])
 	}
 	fprintf(stderr, "Margin = %f\n", margin);
 
-	igl::readOBJ(stdin, V, F);
+	igl::readOBJ("/dev/stdin", V, F);
 	Eigen::VectorXd maxV = V.colwise().maxCoeff();
 	Eigen::VectorXd minV = V.colwise().minCoeff();
 	double coords[3][2] = { {minV(0) - margin, maxV(0) + margin},

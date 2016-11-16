@@ -4,3 +4,6 @@
 [submodule "third-party/rrt"]
 	path = third-party/rrt
 	url = https://github.com/RoboJackets/rrt.git
+[submodule "third-party/fcl"]
+	path = third-party/fcl
+	url = https://github.com/flexible-collision-library/fcl.git
