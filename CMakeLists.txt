@@ -86,8 +86,8 @@ FIND_PACKAGE(MPFR REQUIRED)
 
 # FCL (Flexible Collision Library) support
 ADD_SUBDIRECTORY(third-party/fcl/)
-INCLUDE_DIRECTORIES(${CMAKE_BINARY_DIR}/third-party/fcl/include/)
-INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/third-party/fcl/include/)
+INCLUDE_DIRECTORIES(SYSTEM ${CMAKE_BINARY_DIR}/third-party/fcl/include/)
+INCLUDE_DIRECTORIES(SYSTEM ${CMAKE_SOURCE_DIR}/third-party/fcl/include/)
 
 # Main program
 ADD_EXECUTABLE(blend src/boolean/main.cc)
