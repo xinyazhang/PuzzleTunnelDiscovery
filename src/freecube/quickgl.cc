@@ -1,8 +1,14 @@
 #include "quickgl.h"
+#include "debuggl.h"
 #include <stdlib.h>
+#include <iostream>
 
 int window_width = 800, window_height = 600;
 const char* window_title = "Alpha Animation";
+
+void ErrorCallback(int error, const char* description) {
+	std::cerr << "GLFW Error: " << description << "\n";
+}
 
 GLFWwindow* init_glefw()
 {
