@@ -10,12 +10,16 @@
 #include <Eigen/Geometry> 
 #include <igl/readOBJ.h>
 #include <igl/per_vertex_normals.h>
+#include <fcl/narrowphase/detail/traversal/collision_node.h>
+#include <fcl/narrowphase/distance.h>
+#include <fcl/narrowphase/distance_result.h>
 //#include <igl/barycenter.h>
 
 using std::string;
 
 struct Geo {
-	Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> V;
+	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> V;
+	Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> GPUV;
 	Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> F;
 	Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> N;
 
@@ -28,7 +32,8 @@ struct Geo {
 		center = V.colwise().mean().cast<double>();
 		//center << 16.973146438598633, 1.2278236150741577, 10.204807281494141;
 		// From OMPL.app, no idea how they get this.
-		igl::per_vertex_normals(V, F, N);
+		GPUV = V.cast<float>();
+		igl::per_vertex_normals(GPUV, F, N);
 		std::cerr << "center: " << center << std::endl;
 #if 0
 		std::cerr << N << std::endl;;
@@ -39,8 +44,8 @@ struct Geo {
 struct Path {
 	typedef Eigen::Matrix<float, 4, 4, Eigen::ColMajor> GLMatrix;
 	typedef Eigen::Matrix<double, 4, 4, Eigen::ColMajor> GLMatrixd;
-	Eigen::aligned_vector<Eigen::Vector3d> T;
-	Eigen::aligned_vector<Eigen::Quaternion<double>> Q;
+	std::vector<Eigen::Vector3d> T;
+	std::vector<Eigen::Quaternion<double>> Q;
 	//Eigen::aligned_vector<fcl::Transform3d> M;
 
 	void readPath(const string& fn)
@@ -67,7 +72,7 @@ struct Path {
 		std::cerr << "T size: " << T.size() << std::endl;
 	}
 
-	GLMatrix interpolate(const Geo& robot, double t)
+	GLMatrixd interpolate(const Geo& robot, double t)
 	{
 		int i = std::floor(t);
 		double c = t - double(i);
@@ -90,7 +95,70 @@ struct Path {
 		trback.setIdentity();
 		trback.block<3,1>(0, 3) = translate;
 		ret = trback * ret; // Trback * Rot * Tr2Origin
-		return ret.cast<float>();
+		return ret;
+	}
+};
+
+template<typename BV>
+class ClearanceCalculator {
+private:
+	const Geo &rob_, &env_;
+	using Scalar = typename BV::S;
+	using BVHModel = fcl::BVHModel<BV>;
+	using Transform3 = fcl::Transform3<Scalar>;
+	using TraversalNode = fcl::detail::MeshDistanceTraversalNodeOBBRSS<Scalar>;
+	static constexpr int qsize = 2; // What's qsize?
+
+	BVHModel rob_bvh_, env_bvh_;
+	fcl::detail::SplitMethodType split_method_ = fcl::detail::SPLIT_METHOD_MEDIAN;
+public:
+	ClearanceCalculator(const Geo& rob, Geo& env)
+		:rob_(rob), env_(env)
+	{
+		buildBVHs();
+	}
+
+	double getDistance(const Eigen::Matrix<double, 4, 4>& trmat) const
+	{
+		fcl::DistanceResult<Scalar> result;
+		TraversalNode node;
+		Transform3 tf;
+		tf = trmat.block<3,4>(0,0);
+		if(!fcl::detail::initialize(node,
+		                    rob_bvh_, tf,
+		                    env_bvh_, Transform3::Identity(),
+		                    fcl::DistanceRequest<Scalar>(true),
+				    result)
+		  ) {
+			std::cerr << "initialize error" << std::endl;
+		}
+#if 1
+		fcl::detail::distance(&node, nullptr, qsize);
+#endif
+		
+		return result.min_distance;
+	}
+protected:
+	void buildBVHs()
+	{
+		initBVH(rob_bvh_, split_method_, rob_);
+		initBVH(env_bvh_, split_method_, env_);
+	}
+
+	static void initBVH(fcl::BVHModel<BV> &bvh, fcl::detail::SplitMethodType split_method, const Geo& geo)
+	{
+		bvh.bv_splitter.reset(new fcl::detail::BVSplitter<BV>(split_method));
+		bvh.beginModel();
+		std::vector<Eigen::Vector3d> Vs(geo.V.rows());
+		std::vector<fcl::Triangle> Fs(geo.F.rows());
+		for (int i = 0; i < geo.V.rows(); i++)
+			Vs[i] = geo.V.row(i);
+		for (int i = 0; i < geo.F.rows(); i++) {
+			Eigen::Vector3i F = geo.F.row(i);
+			Fs[i] = fcl::Triangle(F(0), F(1), F(2));
+		}
+		bvh.addSubModel(Vs, Fs);
+		bvh.endModel();
 	}
 };
 
@@ -126,9 +194,11 @@ int main(int argc, char* argv[])
 	path.readPath(pathfn);
 
 	double t = 0.0;
-	Path::GLMatrix alpha_model_matrix = path.interpolate(robot, 0.0);
+	Path::GLMatrixd robot_transform_matrix = path.interpolate(robot, 0.0);
+	Path::GLMatrix alpha_model_matrix = robot_transform_matrix.cast<float>();
 	glm::vec4 light_position = glm::vec4(0.0f, 100.0f, 0.0f, 1.0f);
 	MatrixPointers mats;
+	ClearanceCalculator<fcl::OBBRSS<double>> cc(robot, env);
 	
 	auto matrix_binder = [](int loc, const void* data) {
 		glUniformMatrix4fv(loc, 1, GL_FALSE, (const GLfloat*)data);
@@ -189,7 +259,7 @@ int main(int argc, char* argv[])
 	ShaderUniform robot_model = { "model", matrix_binder, robot_model_data };
 
 	RenderDataInput robot_pass_input;
-	robot_pass_input.assign(0, "vertex_position", robot.V.data(), robot.V.rows(), 3, GL_FLOAT);
+	robot_pass_input.assign(0, "vertex_position", robot.GPUV.data(), robot.GPUV.rows(), 3, GL_FLOAT);
 	robot_pass_input.assign(1, "normal", robot.N.data(), robot.N.rows(), 3, GL_FLOAT);
 	robot_pass_input.assign_index(robot.F.data(), robot.F.rows(), 3);
 	RenderPass robot_pass(-1,
@@ -211,7 +281,7 @@ int main(int argc, char* argv[])
 			);
 
 	RenderDataInput obs_pass_input;
-	obs_pass_input.assign(0, "vertex_position", env.V.data(), env.V.rows(), 3, GL_FLOAT);
+	obs_pass_input.assign(0, "vertex_position", env.GPUV.data(), env.GPUV.rows(), 3, GL_FLOAT);
 	obs_pass_input.assign(1, "normal", env.N.data(), env.N.rows(), 3, GL_FLOAT);
 	obs_pass_input.assign_index(env.F.data(), env.F.rows(), 3);
 	RenderPass obs_pass(-1,
@@ -250,8 +320,9 @@ int main(int argc, char* argv[])
 		gui.updateMatrices();
 		mats = gui.getMatrixPointers();
 
-		t += 1.0/24.0;
-		alpha_model_matrix = path.interpolate(robot, t);
+		//t += 1.0/12.0;
+		robot_transform_matrix = path.interpolate(robot, t);
+		alpha_model_matrix = robot_transform_matrix.cast<float>();
 
 		robot_pass.setup();
 		CHECK_GL_ERROR(glDrawElements(GL_TRIANGLES, robot.F.rows() * 3,
@@ -265,6 +336,7 @@ int main(int argc, char* argv[])
 		// Poll and swap.
 		glfwPollEvents();
 		glfwSwapBuffers(window);
+		std::cerr << "Distance " << cc.getDistance(robot_transform_matrix) << std::endl;
 	}
 	glfwDestroyWindow(window);
 	glfwTerminate();
