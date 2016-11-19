@@ -187,14 +187,15 @@ int main(int argc, char* argv[])
 	string envfn = "../res/alpha/alpha_env-1.2.org.obj";
 	string pathfn = "../res/alpha/alpha-1.2.org.path";
 	Geo robot, env;
-	//robot.center << 16.973146438598633, 1.2278236150741577, 10.204807281494141; // From OMPL.app, no idea how they get this.
 	Path path;
 	robot.read(robotfn);
 	env.read(envfn);
 	path.readPath(pathfn);
+	robot.center << 16.973146438598633, 1.2278236150741577, 10.204807281494141; // From OMPL.app, no idea how they get this.
 
 	double t = 0.0;
 	Path::GLMatrixd robot_transform_matrix = path.interpolate(robot, 0.0);
+	std::cerr << "Initial transformation matrix" << std::endl << robot_transform_matrix << std::endl;
 	Path::GLMatrix alpha_model_matrix = robot_transform_matrix.cast<float>();
 	glm::vec4 light_position = glm::vec4(0.0f, 100.0f, 0.0f, 1.0f);
 	MatrixPointers mats;
@@ -320,7 +321,7 @@ int main(int argc, char* argv[])
 		gui.updateMatrices();
 		mats = gui.getMatrixPointers();
 
-		//t += 1.0/12.0;
+		t += 1.0/12.0;
 		robot_transform_matrix = path.interpolate(robot, t);
 		alpha_model_matrix = robot_transform_matrix.cast<float>();
 
