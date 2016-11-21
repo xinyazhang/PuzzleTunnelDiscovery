@@ -138,6 +138,35 @@ public:
 		
 		return result.min_distance;
 	}
+
+	Eigen::VectorXd getClearanceCube(const Eigen::Matrix<double, 4, 4>& trmat, double distance = -1) const
+	{
+		Transform3 tf;
+		tf = trmat.block<3,4>(0,0);
+		Eigen::Vector3d nrcenter = tf * rob_.center;
+
+		if (distance < 0)
+			distance = getDistance(trmat);
+
+		const Eigen::MatrixXd& RV = rob_.V;
+		double dany = 2 * M_PI;
+		for (int i = 0; i < RV.rows(); i++) {
+			// v: relative coordinates w.r.t. robot center.
+			Eigen::Vector3d v = tf * Eigen::Vector3d(RV.row(i)) - nrcenter;
+			double r = v.norm();
+			double dalpha = binsolve(r, distance);
+			dany = std::min(dalpha, dany);
+		}
+		Eigen::VectorXd ret;
+		ret.resize(6);
+#if 0
+		ret << 2 * M_PI, 2 * M_PI, 2 * M_PI,
+		       2 * M_PI, 2 * M_PI, 2 * M_PI;
+#endif
+		ret << dany, dany, dany, dany, dany, dany;
+		return ret;
+	}
+
 protected:
 	void buildBVHs()
 	{
@@ -147,9 +176,7 @@ protected:
 
 	static void initBVH(fcl::BVHModel<BV> &bvh, fcl::detail::SplitMethodType split_method, const Geo& geo)
 	{
-		bvh.bv_splitter.reset(new fcl::detail::BVSplitter<BV>(split_method));
-		bvh.beginModel();
-		std::vector<Eigen::Vector3d> Vs(geo.V.rows());
+		bvh.bv_splitter.reset(new fcl::detail::BVSplitter<BV>(split_method)); bvh.beginModel(); std::vector<Eigen::Vector3d> Vs(geo.V.rows());
 		std::vector<fcl::Triangle> Fs(geo.F.rows());
 		for (int i = 0; i < geo.V.rows(); i++)
 			Vs[i] = geo.V.row(i);
@@ -159,6 +186,30 @@ protected:
 		}
 		bvh.addSubModel(Vs, Fs);
 		bvh.endModel();
+	}
+
+	static double binsolve(double r, double mindist)
+	{
+		double upperrange = 2 * M_PI;
+		double lowerrange = 0;
+		double sqrt3 = std::sqrt(3.0);
+		bool mid_is_valid = false;
+		while (upperrange - lowerrange > 1e-6) {
+			double prob = (upperrange + lowerrange)/2;
+			double value = std::sin(prob/2) * 6 * r + sqrt3 * prob;
+			if (value > mindist) {
+				upperrange = prob;
+				mid_is_valid = false;
+			} else if (value < mindist) {
+				lowerrange = prob;
+				mid_is_valid = true;
+			} else {
+				return prob;
+			}
+		}
+		if (mid_is_valid)
+			return (upperrange + lowerrange)/2;
+		return lowerrange;
 	}
 };
 
@@ -192,6 +243,7 @@ int main(int argc, char* argv[])
 	env.read(envfn);
 	path.readPath(pathfn);
 	robot.center << 16.973146438598633, 1.2278236150741577, 10.204807281494141; // From OMPL.app, no idea how they get this.
+	//robot.center << 17.491058349609375, 1.386110782623291, 10.115392684936523; // It changed, we also don't know why, but this one doesn't work.
 
 	double t = 0.0;
 	Path::GLMatrixd robot_transform_matrix = path.interpolate(robot, 0.0);
@@ -337,7 +389,8 @@ int main(int argc, char* argv[])
 		// Poll and swap.
 		glfwPollEvents();
 		glfwSwapBuffers(window);
-		std::cerr << "Distance " << cc.getDistance(robot_transform_matrix) << std::endl;
+		double mindist = cc.getDistance(robot_transform_matrix);
+		std::cerr << "Distance " << mindist << "\tClearance: " << cc.getClearanceCube(robot_transform_matrix, mindist).transpose() << std::endl;
 	}
 	glfwDestroyWindow(window);
 	glfwTerminate();
