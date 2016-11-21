@@ -1,0 +1,936 @@
+\documentclass[fleqn,reqno]{amsart}
+\usepackage{amssymb}
+\usepackage{color}
+\usepackage{algorithm}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage{algpseudocode}
+\usepackage[T1]{fontenc}
+%\usepackage{titlesec}
+
+\usepackage{array}
+\usepackage{booktabs}
+
+\newtheorem{thm}{Theorem}[section]
+\newtheorem{prop}[thm]{Proposition}
+\newtheorem{lem}[thm]{Lemma}
+\newtheorem{cor}[thm]{Corollary}
+
+\theoremstyle{definition}
+\newtheorem{definition}[thm]{Definition}
+\newtheorem{example}[thm]{Example}
+\newcommand{\startans}{\bigskip\textbf{\textsc{Answer}}:}
+
+\usepackage{etoolbox}
+\patchcmd{\section}{\scshape}{\bfseries}{}{}
+\makeatletter
+\renewcommand{\@secnumfont}{\bfseries}
+\makeatother
+
+%\usepackage[]{mcode}
+%\usepackage{listings}
+
+%\usepackage{geometry}
+%\geometry{margin=1in}
+
+\let \oldsection \section
+\renewcommand{\section}{\vspace{8pt plus 6pt}\oldsection}
+
+%\titlespacing*{\section} {0pt}{5.5ex plus 1ex minus .2ex}{4.3ex plus .2ex}
+%\titlespacing*{\subsection} {0pt}{5.5ex plus 1ex minus .2ex}{4.3ex plus .2ex}
+
+\newcolumntype{?}{!{\vrule width 1pt}}
+
+\begin{document}
+
+%%
+%% The title of the paper goes here.  Edit to your title.
+%%
+
+\title{Formulas}
+
+%%
+%e re some hints:Now edit the following to give your name and address:
+%% 
+
+\author{Xinya Zhang}
+%\address{UT EID: zx729}
+%\email{xinyazhang@utexas.edu}
+\maketitle
+
+\section{Notations}
+\begin{itemize}
+\item $\mathbf{W_{obs}}$, workspace space obstacle.
+\item $\mathbf{C}$, configuration space.
+\item $\mathbf{C_{obs}}$, configuration space obstacle.
+\item $\mathbf{C_{free}}$, free space in configuration space.
+\end{itemize}
+
+\section{Clearance cube calculation}
+
+\subsection{Definition}
+
+Given two vectors $x$ and $y$, their comparison operator $<_\infty$ is defined as
+$x<_\infty y$ iff $x_0 < y_0$, $x_1<y_1$, $\ldots$. $\le_\infty$,$>_\infty$
+and $\ge_\infty$ are defined in the similar way.
+
+Given a robot state $s$, we can define a \emph{state cube}
+$C=\{p\in\mathbb{C}|s-c<p<s+c\}$, in
+which $c$ is a vector in $\mathbf{C}$, and we call $c$ \emph{bounding vector} because it bounds
+the size of $C$. Hence we can define a function $\mathcal{C}(s,
+c)=\{p\in\mathbb{C}|s-c<p<s+c\}$ that
+translates a state and a bounding vector into a state cube.
+
+If a state cube $C\cap\mathbf{C_{obs}}=\varnothing$, this state cube is called
+a \emph{clearance state cube}, or \emph{clearance cube} for simplification.
+
+\subsection{Calculation}
+
+Given robot ${V,F}$, in which $V$ represents its vertices and $F$ represent
+its faces, we are trying to calculate its clearance cube for any possible
+state. This is equal to calculate a bounding vector for any given state $s$.
+
+To calculate the bounding vector, we can estimate the ranges of collision-free
+translations and rotations, and then calculate the bounding vector with these
+ranges. More formally, suppose $T$ is the translation matrix, and $R$ is the
+rotation matrix, $\forall v\in V$, $TRv\not\in\mathbf{W_{obs}}$.
+
+At the same time, we can effectively calculate the minimal distance between
+the robot (of any state) and the workspace obstacle. For any state $s$, let $\varepsilon$ be the
+minimal distance, and $S$ be the transformation matrix for this state. Thus, if
+$\forall v\in V$, $\|TRv-Sv\|_2=\|(TR-S)v\|_2<\varepsilon$, we can naturally
+guarantee $\|TRv\|\not\in\mathbf{W_{obs}}$, because $\forall
+w\in\mathbf{W_{obs}}$, $\|w-Sv\|_2\ge\varepsilon$. This indicates we can
+estimate the transformation ranges (i.e. $TR-S$) according to $\varepsilon$.
+
+Let $dT$ be a translation matrix, $dR$ be a rotation matrix, and $\forall v\in
+V$, $dTdRSv=TRv$. Hence we have the translation and rotation matrices that
+transform $Sv$ to $TRv$. Now, if $\|dTdRSv -
+Sv\|_2=\|(dTdR-I)Sv\|_2<\varepsilon$ holds for any $v\in V$, $dTdR$ can
+transform $Sv$ into a new state that is still collision free. Hence, we are
+going to examine under which condition $dT$ and $dR$ can achieve our
+objective.
+
+Support the rotation center of robot is $k$, $dR$ can be represented as a
+vector $(\alpha,\beta,\gamma)^T$ of Euler angles, and $dT$ can also be
+represented as a vector $(x,y,z)^T$ for translations. Consider we rotate the
+vertex $v$ around the center $k$ for $\theta$ w.r.t any axis, the translation
+distance is $2|\sin(\frac{\theta}{2})|\|v-k\|_2$. Recall the triangle
+inequality of Euclidean space, if we rotate $v$ around center
+$k$ for three angles $\theta_1$, $\theta_2$, $\theta_3$ w.r.t. any three axes, the total translation distance of $v$
+would be smaller than
+$2(|\sin(\frac{\theta_1}{2})|+|\sin(\frac{\theta_2}{2})|+|\sin(\frac{\theta_3}{2})|)\|v-k\|_2$.
+Similarly, the translation distance w.r.t. $dT$ would be smaller than
+$|x|+|y|+|z|$. Hence we can bound $\|dTdRSv -
+Sv\|_2\le2(|\sin(\frac{\alpha}{2})|+|\sin(\frac{\beta}{2})|+|\sin(\frac{\gamma}{2})|)\|v-k\|_2+|x|+|y|+|z|$.
+Therefore, if the right hand side is less than $\varepsilon$, the transformed
+robot is still collision free, and the maximum values of
+$(x,y,z,\alpha,\beta,\gamma)^T$ is the bounding vector w.r.t. robot state $s$.
+
+To simplify our calculate, let's calculate the maximized
+$(x,y,z,\alpha,\beta,\gamma)^T$ under constraints of $|x|=|y|=|z|$ and
+$\alpha=\beta=\gamma$, we can get the following inequality
+\[
+6|\sin(\frac{\alpha}{2})|\|v-k\|_2+\sqrt{3}|x|<\varepsilon
+\]
+Note here the constraint $|x|=|y|=|z|$ means we are trying to bound $(x,y,z)$
+with a cube. Thus the translation distance within the cube is $\sqrt{3}|x|$,
+not $3|x|$.
+
+Therefore, we can solve this formula with binary search, by adding another
+constraint that each clearance cube shall be scaled from the bounding box
+of $\mathbf{C}$, which can simplify the construction of $2^6$-tree (a 6D
+version of Octree).
+
+\end{document}
+
+% Keep them for reference.
+In answering this question, you may NOT use the Cholesky factorization
+theorem.
+
+Assume $A\in\mathbb{R}^{n\times n}$ is symmetric positive definite (SPD).
+Partition
+\[
+	A\to\left(\begin{tabular}{c|c}
+		$A_{11}$ & $A_{21}^T$ \\
+	\hline
+		$A_{21}$ & $A_{22}$
+	\end{tabular}
+\right)
+\]
+where $A_{11}$ is $b\times b$
+\begin{enumerate}
+	\item Show that $A_{11}$ is SPD.
+	\item Assume that $A_{11}=L_{11}L_{11}^T$ where $L_{11}$ is a lower
+		triangular matrix with nonzeros on the diagnoal\footnote{We
+		know this, of course, because $A_{11}$ is SPD. But I don't want
+		you to use the Cholesky factorization theorem, so we
+		are going to ASSUME it instead.}
+		\begin{enumerate}
+			\item Reason that the computation $L_{21}:=
+				A_{21}L^{-T}_{11}$ is well-defined. (This
+				shouldn't take more than a sentence or so.
+				Nothing deep.)
+			\item How would you compute $L_{21} :=
+				A_{21}L^{- T}_{11}$ in practice?
+			\item Show that $A_{22} - L_{21}L^T_{21}$ is again SPD. (Here
+				$L_{21} := A_{21}L^{-T}_{11}$ .)
+		\end{enumerate}
+\end{enumerate}
+
+\startans
+
+\subsection{Show that $A_{11}$ is SPD.}
+\begin{proof}
+	Clearly $A_{11}$ is symmetric, so we only need to proof $A_{11}$ is
+	positive definite.
+
+	Suppose $A$ is SPD but $A_{11}$ isn't, thus there exists non-zero
+	vector $v\in \mathbb{R}^{b\times 1}$ which $v^TA_{11}v\le0$. Hence we can construct
+	$v'=\left(\begin{tabular}{c}
+	$v$\\
+	\hline
+	$0$
+	\end{tabular}\right)\in\mathbb{R}^{n\times 1}$, and $v'^TAv'=v^TA_{11}v\le0$, which means $A$
+	is not SPD and contradicted to our assumption.
+
+	Thus $A_{11}$ must be SPD.
+\end{proof}
+
+\subsection{Show that $L_{21}:=A_{21}L^{-T}_{11}$ is well-defined.\\}
+
+From $A_{11}=L_{11}L_{11}^T$ we know $L_{11}$ must be $b\times $, thus
+$L_{11}^{-1}$ should also be $b\times b$. Since $A_{21}$ is $(n-b)\times b$,
+clearly $A_{21}L^{-T}_{11}$ is well-defined.
+
+\subsection{How would you compute $L_{21} := A_{21}L^{- T}_{11}$ in
+practice?\\}
+
+Run Gaussian elimination procedure on $L_{11}$ and set the right hand side to
+be $A_{21}$. Thus after the procedure done the left hand side will be
+$L_{11}L^{- T}_{11}=I$ and
+the right hand side is $L^{- T}_{11}$.
+
+\subsection{Show that $A_{22} - L_{21}L^T_{21}$ is again SPD}
+
+\begin{proof}
+	$A_{22} - L_{21}L^T_{21}
+	= A_{22} - (A_{21}L^{-T}_{11})(A_{21}L^{-T}_{11})^T
+	= A_{22} - (A_{21}L^{-T}_{11}L^{-1}_{11}A_{21}^T)
+	= A_{22} - A_{21}A_{11}^{-1}A_{21}^T$. Hence we need to show $A_{22} -
+	A_{21}A_{11}^{-1}A_{21}^T$ is SPD.
+
+	Trivially $A_{21}A_{11}^{-1}A_{21}^T$ is symmetric.
+
+	Consider
+	$\phi=\left(\begin{tabular}{c}
+	$u$\\
+	\hline
+	$v$
+	\end{tabular}\right)^T A \left(\begin{tabular}{c}
+	$u$\\
+	\hline
+	$v$
+	\end{tabular}\right)$, which is equal to
+	$u^TA_{11}u+u^TA_{21}^Tv+v^TA_{21}u+v^TA_{22}v=u^TA_{11}u+2u^TA_{21}v+v^TA_{22}v$
+	(because $u^TA_{21}^Tv$ and $v^TA_{21}u$ are both scalars).
+
+	Since $A$ is SPD, $\phi$ should always be greater than
+	zero. Thus for given $u$ and minimize $\phi$, we can get
+	\begin{align*}
+		\frac{\partial{\phi}}{\partial{v}} &=
+		2\frac{\partial{u^TA_{21}^Tv}}{\partial{v}} +
+		\frac{\partial{v^TA_{22}v}}{\partial{v}}\\
+		&= 2(u^TA_{21}^T) + v^T(A_{22}+A_{22}^T) \\
+		&= 2(u^TA_{21}^T) + 2v^TA_{22}
+	\end{align*}
+	$\phi$ is minimized when $\frac{\partial{\phi}}{\partial{v}}=0$, which
+	means $\phi$ is minimized when $A_{21}u+A_{22}v=0$ (fix $u$).
+
+	Similarly, if we fix $v$ we can get $\phi$ is minimized when
+	$A_{21}^Tv+A_{11}u=0$. Thus let $u$ be $-A_{11}^{-1}A_{21}^Tv$ we can get
+	\begin{align*}
+		\phi &=
+		(-A_{11}^{-1}A_{21}^Tv)^TA_{11}(-A_{11}^{-1}A_{21}^Tv)+2(-A_{11}^{-1}A_{21}^Tv)^TA_{21}v+v^TA_{22}v
+		\\
+		&=
+		v^TA_{21}A_{11}^{-T}A_{11}A_{11}^{-1}A_{21}^Tv-2v^TA_{21}A_{11}^{-T}A_{21}^Tv+v^TA_{22}v
+		\\
+		&=
+		v^TA_{21}A_{11}^{-T}A_{21}^Tv-2v^TA_{21}A_{11}^{-T}A_{21}^Tv+v^TA_{22}v
+		\\
+		&= -v^TA_{21}A_{11}^{-T}A_{21}^Tv+v^TA_{22}v \\
+		&= v^T(A_{22}-A_{21}A_{11}^{-1}A_{21}^T)v \\
+		& > 0 \tag{A is SPD so $\phi > 0$}
+	\end{align*}
+	However, here $v$ is chosen arbitrarily, so for any $v$ we have
+	$v^T(A_{22}-A_{21}A_{11}^{-1}A_{21}^T)v > 0$. Hence $A_{21}A_{11}^{-1}A_{21}^T$ is SPD.
+
+\end{proof}
+
+
+
+\newpage
+\section{}
+(This question was on the written exam for the CSEM program, and I was very
+disappointed with the answers then...)
+
+Let $A\in\mathbb{R}^{n\times n}$ be singular.Discuss how each of the following
+methods, when computation is \textit{exact}, can be used to detect that matrix
+
+\begin{enumerate}
+	\item Gram-Schmidt orthogonalization.
+	\item Householder QR factorization.
+	\item An appropriate choice of LU factorization.
+\end{enumerate}
+
+\startans
+
+\subsection{Gram-Schmidt}
+Since the computation is exact, the CGS and MGS is equivalent. Therefore here
+we only need to examine one method within the two.
+
+In each iteration, CGS calculates the component of the current column vector
+orthogonal to basis vectors $q_0,q_1,\ldots,q_k$ calculated before. Hence for a singular matrix,
+there exists a column vector in $span(q_0,q_1,\ldots,q_k)$, and the orthogonal
+component is zero. Thus we can detect the singularity by checking the
+orthogonal component.
+
+More specifically, for CGS algorithm described in Figure 4.3, we can check
+$a_1^{\bot}=0$ to detect the matrix is singular.
+
+\subsection{Householder QR}
+
+The Householder QR factorization relies on calculating Householder vector and
+project the current column vector to $e_0$ through the corresponding reflector
+matrix. However for singular matrix there must be an column (more precisely,
+the column vector of the lower triangular part) which turns out to be zero in
+some iterator during the execution of the Householder QR algorithm, otherwise
+the algorithm will get a non-singular factorization.
+
+For this algorithm, the singularity can be detected by checking whether the
+current input of Householder vector subroutine is zero. Specifically we shall
+check if $\left(\begin{tabular}{c}
+	$\alpha_{11}$\\
+	\hline
+	$a_21$
+	\end{tabular}
+\right)$ equals to zero in Householder QR algorithm described in Figure 6.4.
+
+\subsection{LU factorization}
+
+Here we choose LU with partial pivoting. The singularity can be detected
+in the pivoting procedure, where if the algorithm cannot find an row whose
+first element is non-zero, the matrix is singular.
+
+\newpage
+\section{}
+Implement an algorithm for reducing an $n\times n$ matrix to upperHessenberg form
+with Spark and FLAME@lab.
+
+Here are some hints:
+
+\begin{itemize}
+	\item Let's simplify the problem slightly, and ensure that the matrix
+		has real valued eigenvalues. How can we do that? Well, we know
+		that a general square matrix has a Schur decomposition. So, we
+		can create a matrix $A=QUQ^T$ where $Q$ is unitary and $U$ is
+		upper triangular. If $U\in\mathbb{R}^{n\times n}$, then the
+		eigenvalues must be real. So, you can create a test problem
+		via the steps.
+		\begin{lstlisting}
+n = 5;
+U = triu( rand( n,n ) );
+[ Q, R ] = qr( rand( n,n ));
+A = Q * U * Q';
+		\end{lstlisting}
+	\item You will write the routine \begin{lstlisting}
+[ A_out, t_out ] = upperHessRed unb( A, t );
+		\end{lstlisting}
+		where \texttt{A\_out} returns the upperHessenberg matrix, with
+		the Householder vectors stored below the first subdiagonal.
+		Vector \texttt{t\_out} returns the $\tau s$ related to the
+		Householder vectors.
+	\item Now, in theory the upperHessenberg matrix has the same
+		eigenvalues as the original matrix.
+		So, we will assume that your implementation is correct if \begin{lstlisting}
+eig(A)
+		\end{lstlisting}
+		returns the same eigenvalues as does \begin{lstlisting} 
+eig( triu( A_out, -1 ) )
+		\end{lstlisting}
+		Here \texttt{triu(A\_out,-1)} yields the upperHessenberg matrix stored
+		in \texttt{A\_out}.
+	\item Spark guesses the stopping criteria: \texttt{size( ATL ) < size( A )}.
+		This is not the correct stopping
+		criteria for reduction to upperHessenberg form...
+	\item I believe you were given a routine for computing a
+		Householder vector from a given vector x in
+		the chapter of QR factorization. You can modify it for this
+		exercise.
+	\item The algorithm in the notes has a few small typos in it...
+		You will have to fix those!
+\end{itemize}
+
+\newpage
+\section{}
+I have extracted ``Chapter 17'' on the Method of Relatively Robust
+Representations from the notes. I want you to do \emph{all} homeworks in that
+chapter. \textbf{You may not look at the answers in the notes for this
+exercise.} If you have trouble, reach out to myself of Jianyu rather
+than looking at the answers.
+
+\subsection{Modify the algorithm in Figure 17.1 so that it computes the
+$LDL^T$ factorization. (Fill in Figure 17.3.)\\}
+
+\startans
+
+\begin{align*}
+	& \alpha_{11} := \alpha_{11} \\
+	& l_{21} := a_{21}/\alpha_{11} \\
+	& A_{22} := A_{22} - l_{21}a_{21}^T \\
+	& a_{21} := l_{21}
+\end{align*}
+
+\subsection{Modify the algorithm in Figure 17.2 so that it computes the
+$LDL^T$ factorization of a tridiagonal matrix. (Fill in Figure 17.4.) What is the approximate cost, in
+floating point operations, of computing the $LDL^T$ factorization of a tridiagonal matrix? Count a divide,
+multiply, and add/subtract as a floating point operation each. Show how you came up with the algorithm,
+similar to how we derived the algorithm for the tridiagonal Cholesky
+factorization.\\}
+
+\startans
+
+\begin{align*}
+	& \alpha_{11} := \alpha_{11} \\
+	& \beta_{21} := \alpha_{21}/\alpha_{11} \\
+	& \alpha_{22} := \alpha_{22} - \beta_{21}\alpha{21} \\
+	& \alpha_{21} := \beta_{21}
+\end{align*}
+
+The approximation cost is $3n$ flops.
+This algorithm can be simplified from general $LDL^T$ algorithm, by replacing
+$a_{21}$ with $\alpha_{21}e_F$ and $A_{22}$ with $\left(\begin{tabular}{c|c}
+	$\alpha_{22}$ & $*$ \\
+	\hline
+	$\alpha_{32}e_F0$ & $A_{33}$
+	\end{tabular}
+\right)$
+
+
+\subsection{Derive an algorithm that, given an indefinite matrix $A$, computes
+$A = UDU^T$. Overwrite only the upper triangular part of $A$. (Fill in Figure
+17.5.) Show how you came up with the algorithm, similar to how we derived the
+algorithm for $LDL^T$ .\\}
+
+
+\startans
+
+Partition
+$A\to
+\left(\begin{tabular}{c|c}
+	$A_{11}$ & $a_{12}$ \\
+	\hline
+	$a_{21}^T$ & $\alpha_{22}$
+	\end{tabular}
+\right)
+$, $U\to
+\left(\begin{tabular}{c|c}
+	$U_{11}$ & $u_{12}$ \\
+	\hline
+	$0$ & $1$
+	\end{tabular}
+\right)
+$, $D\to
+\left(\begin{tabular}{c|c}
+	$D_{11}$ & $0$ \\
+	\hline
+	$0$ & $\delta_{22}$
+	\end{tabular}
+\right)
+$, we can have
+\begin{align*}
+A=
+\left(\begin{tabular}{c|c}
+	$A_{11}$ & $a_{12}$ \\
+	\hline
+	$a_{21}^T$ & $\alpha_{22}$
+	\end{tabular}
+\right)
+	&= UDU^T\\
+	&=
+\left(\begin{tabular}{c|c}
+	$U_{11}$ & $u_{12}$ \\
+	\hline
+	$0$ & $1$
+	\end{tabular}
+\right)
+\left(\begin{tabular}{c|c}
+	$D_{11}$ & $0$ \\
+	\hline
+	$0$ & $\delta_{22}$
+	\end{tabular}
+\right)
+U^T\\
+	&=
+\left(\begin{tabular}{c|c}
+	$U_{11}D_{11}$ & $u_{12}\delta_{22}$ \\
+	\hline
+	$0$ & $\delta_{22}$
+	\end{tabular}
+\right)
+\left(\begin{tabular}{c|c}
+	$U_{11}$ & $u_{12}$ \\
+	\hline
+	$0$ & $1$
+	\end{tabular}
+\right)^T\\
+	&=
+\left(\begin{tabular}{c|c}
+	$U_{11}D_{11}U_{11}^T+\delta_{22}u_{12}u_{12}^T$ & $\delta_{22}u_{12}$ \\
+	\hline
+	$*$ & $\delta_{22}$
+	\end{tabular}
+\right)
+\end{align*}
+Hence (Note different names were used in the formulas above.)
+\begin{align*}
+	& \alpha_{11} := \alpha_{11} \\
+	& l_{01} := a_{01}/\alpha_{11} \\
+	& A_{00} := A_{00} - \alpha{11}l_{01}a_{01}^T \\
+	& a_{01} := l_{01}/\alpha_{01}
+\end{align*}
+
+
+\subsection{Derive an algorithm that, given an indefinite tridiagonal matrix $A$, computes
+$A = UDU^T$. Overwrite only the upper triangular part of $A$. (Fill in Figure
+17.5.) Show how you came up with the algorithm, similar to how we derived the
+algorithm for $LDL^T$ .}
+
+For tridiagonal matrix we have
+\begin{align*}
+	a_{01} &= \alpha_{01}e_L \\
+	A_{00} &\to \left(\begin{tabular}{c|c}
+		$A_{00}'$ & $\alpha_{10}$ \\
+	\hline
+		$\alpha_{10}$ & $\alpha_{00}$
+	\end{tabular}\right)
+\end{align*}
+Hence
+\begin{align*}
+	\alpha_{11} &:= \alpha_{11} \\
+	l_{01} &:= a_{01}/\alpha_{11} = \alpha_{01}e_L/\alpha_{11}\\
+	A_{00} &:= A_{00} - \alpha{11}a_{01}a_{01}^T \\
+	&=
+	\left(\begin{tabular}{c|c}
+		$A_{00}'$ & $\alpha_{10}$ \\
+	\hline
+		$\alpha_{10}$ & $\alpha_{00}$
+	\end{tabular} \right) - \alpha{11}(\alpha_{01}e_L/\alpha_{11})(\alpha_{01}e_L)^T \\
+	&=
+	\left(\begin{tabular}{c|c}
+		$A_{00}'$ & $\alpha_{10}$ \\
+	\hline
+		$\alpha_{10}$ & $\alpha_{00}$
+	\end{tabular} \right)
+	-
+	\left(\begin{tabular}{c|c}
+		$0$ & $0$ \\
+	\hline
+		$0$ & $\alpha_{01}^2$
+	\end{tabular} \right)\\
+	&=\left(\begin{tabular}{c|c}
+		$A_{00}'$ & $\alpha_{10}$ \\
+	\hline
+		$\alpha_{10}$ & $\alpha_{00} - \alpha_{01}^2$
+	\end{tabular} \right)\\
+	a_{01} &:= l_{01}/\alpha_{01} = \alpha_{01}e_L/\alpha_{11}\\
+\end{align*}
+Therefore the algorithm can be simplified as
+\begin{align*}
+	& \alpha_{11} := \alpha_{11} \\
+	& \alpha_{MM} := \alpha_{MM} - \alpha_{01}^2 \\
+	& a_{01} := \alpha_{01}/\alpha_{11}
+\end{align*}
+
+
+\subsection{Show that, provided $\phi_1$ is chosen appropriately,}
+\begin{align*}
+\left(\begin{tabular}{c|c|c}
+	$L_{00}$ & $0$ & $0$\\
+	\hline
+	$\lambda_{10}e^T_L$ & $1$ & $\upsilon_{21}e_F^T$\\
+	\hline
+	$0$ & $0$ & $U_{22}$\\
+	\end{tabular}
+\right)
+\left(\begin{tabular}{c|c|c}
+	$D_{00}$ & $0$ & $0$\\
+	\hline
+	$0$ & $\phi_1$ & $0$\\
+	\hline
+	$0$ & $0$ & $E_{22}$\\
+	\end{tabular}
+\right)
+\left(\begin{tabular}{c|c|c}
+	$L_{00}$ & $0$ & $0$\\
+	\hline
+	$\lambda_{10}e^T_L$ & $1$ & $\upsilon_{21}e_F^T$\\
+	\hline
+	$0$ & $0$ & $U_{22}$\\
+	\end{tabular}
+\right)^T
+\\
+=\left(\begin{tabular}{c|c|c}
+	$A_{00}$ & $\alpha_{01}e_L$ & $0$\\
+	\hline
+	$\alpha_{01}e_L^T$ & $\alpha_{11}$ & $\alpha_{21}e_F^T$\\
+	\hline
+	$0$ & $\alpha_{21}e_F$ & $A_{22}$\\
+	\end{tabular}
+\right)
+\end{align*}
+(Hint: multiply out $A = LDL^T$ and $A = UEU^T$ with the partitioned matrices
+first. Then multiply out the above. Compare and match $\ldots$)
+
+How should $\phi_1$ be chosen? What is the cost of
+computing the twisted
+factorization given that you have already computed the $LDL^T$ and $UDU^T$
+factorizations? A ``Big O'' estimate is sufficient.
+Be sure to take into account what $e^T_LD_{00}e_L$ and $e_F^TE_{22}e_F$ equal
+in your cost estimate.
+
+\startans
+
+\begin{proof}
+	We know
+	\begin{align*}
+		A &= \left(\begin{tabular}{c|c|c}
+	$A_{00}$ & $\alpha_{01}e_L$ & $0$\\
+	\hline
+	$\alpha_{01}e_L^T$ & $\alpha_{11}$ & $\alpha_{21}e_F^T$\\
+	\hline
+	$0$ & $\alpha_{21}e_F$ & $A_{22}$\\
+	\end{tabular}
+\right) \\
+		&= LDL^T \\
+		&=
+\left(\begin{tabular}{c|c|c}
+	$L_{00}$ & $0$ & $0$\\
+	\hline
+	$\lambda_{10}e^T_L$ & $1$ & $0$\\
+	\hline
+	$0$ & $\lambda_{21}e_F$ & $L_{22}$\\
+	\end{tabular}
+\right)
+\left(\begin{tabular}{c|c|c}
+	$D_{00}$ & $0$ & $0$\\
+	\hline
+	$0$ & $\delta_1$ & $0$\\
+	\hline
+	$0$ & $0$ & $D_{22}$\\
+	\end{tabular}
+\right)
+\left(\begin{tabular}{c|c|c}
+	$L_{00}$ & $0$ & $0$\\
+	\hline
+	$\lambda_{10}e^T_L$ & $1$ & $0$\\
+	\hline
+	$0$ & $\lambda_{21}e_F$ & $L_{22}$\\
+	\end{tabular}
+\right)^T\\
+&=
+\left(\begin{tabular}{c|c|c}
+	$L_{00}D_{00}L_{00}^T$ & $\lambda_{10}L_{00}D_{00}e_L$ & $0$\\
+	\hline
+	$\lambda_{10}e_L^TD_{00}L_{00}^T$ &
+	$\delta_1+\lambda_{10}^2e_L^TD_{00}e_L$ & $\delta_1\lambda_{21}e_F^T$\\
+	\hline
+	$0$ & $\delta_1\lambda_{21}e_F$ &
+	$L_{22}D_{22}L_{22}^T+\delta_1\lambda_{21}^2e_Fe_F^T$\\
+	\end{tabular}
+\right)\\
+&= UEU^T \\
+&= \left(\begin{tabular}{c|c|c}
+	$U_{00}$ & $\upsilon_{01}e_L$ & $0$\\
+	\hline
+	$0$ & $1$ & $\upsilon_{21}e_F^T$\\
+	\hline
+	$0$ & $0$ & $U_{22}$\\
+	\end{tabular}
+\right)
+\left(\begin{tabular}{c|c|c}
+	$E_{00}$ & $0$ & $0$\\
+	\hline
+	$0$ & $\epsilon_1$ & $0$\\
+	\hline
+	$0$ & $0$ & $E_{22}$\\
+	\end{tabular}
+\right)
+\left(\begin{tabular}{c|c|c}
+	$U_{00}$ & $\upsilon_{01}e_L$ & $0$\\
+	\hline
+	$0$ & $1$ & $\upsilon_{21}e_F^T$\\
+	\hline
+	$0$ & $0$ & $U_{22}$\\
+	\end{tabular}
+\right)^T\\
+&=
+\left(\begin{tabular}{c|c|c}
+	$U_{00}E_{00}U_{00}^T + \epsilon_1\upsilon_{01}^2e_Le_L^T$ & $\epsilon_1\upsilon_{01}e_L$ & $0$\\
+	\hline
+	$\epsilon_1\upsilon_{01}e_L^T$ &
+	$\epsilon_1+\upsilon_{21}^2e_F^TE_{22}e_F$ &
+	$\upsilon_{21}e_F^TE_{22}U_{22}^T$\\
+	\hline
+	$0$ &
+	$\upsilon_{21}U_{22}E_{22}e_F$ &
+	$U_{22}E_{22}U_{22}^T$\\
+	\end{tabular}
+\right)\\
+	\end{align*}
+	Thus we can conclude
+	\begin{align*}
+		& A_{00} = L_{00}D_{00}L_{00}^T \\
+		& \alpha_{01}e_L = \lambda_{10}L_{00}D_{00}e_L \\
+		& \alpha_{01}e_L^T = \lambda_{10}e_L^TD_{00}L_{00}^T \\
+		& \alpha_{21}e_F^T = \upsilon_{21}e_F^TE_{22}U_{22}^T \\
+		& \alpha_{21}e_F = \upsilon_{21}U_{22}E_{22}e_F\\
+		& A_{22} = U_{22}E_{22}U_{22}^T \\
+	\end{align*}
+	Hence
+	\begin{align*}
+		&\left(\begin{tabular}{c|c|c}
+	$L_{00}$ & $0$ & $0$\\
+	\hline
+	$\lambda_{10}e^T_L$ & $1$ & $\upsilon_{21}e_F^T$\\
+	\hline
+	$0$ & $0$ & $U_{22}$\\
+	\end{tabular}
+\right)
+\left(\begin{tabular}{c|c|c}
+	$D_{00}$ & $0$ & $0$\\
+	\hline
+	$0$ & $\phi_1$ & $0$\\
+	\hline
+	$0$ & $0$ & $E_{22}$\\
+	\end{tabular}
+\right)
+\left(\begin{tabular}{c|c|c}
+	$L_{00}$ & $0$ & $0$\\
+	\hline
+	$\lambda_{10}e^T_L$ & $1$ & $\upsilon_{21}e_F^T$\\
+	\hline
+	$0$ & $0$ & $U_{22}$\\
+	\end{tabular}
+\right)^T\\
+=&
+		\left(
+		\begin{tabular}{c|c|c}
+			$L_{00} D_{00} L_{00}^T$
+			&
+			$\lambda_{10} L_{00} D_{00} e_L$
+			&
+			$0$
+			\\
+			\hline
+			$\lambda_{10} e_L^T D_{00} L_{00}^T$
+			&
+			$\lambda_{10}^2 e_L^T D_{00} e_L+\upsilon_{21}^2e_F^T E_{22} e_F+\phi_1$
+			&
+			$\upsilon_{21} e_F^T E_{22} U_{22}^T$
+			\\
+			\hline
+			$0$
+			&
+			$\upsilon_{21} U_{22} E_{22} e_F$
+			& 
+			$U_{22} E_{22} U_{22}^T$
+			\\
+		\end{tabular}
+		\right)\\
+		=&
+\left(\begin{tabular}{c|c|c}
+	$A_{00}$ &
+	$\alpha_{01}e_L$ &
+	$0$\\
+	\hline
+	$\alpha_{01}e_L^T$ &
+	$\lambda_{10}^2 e_L^T D_{00} e_L+\upsilon_{21}^2e_F^T E_{22} e_F+\phi_1$ &
+	$\alpha_{21}e_F^T$\\
+	\hline
+	$0$ &
+	$\alpha_{21}e_F$ &
+	$A_{22}$\\
+	\end{tabular}
+\right)\\
+	\end{align*}
+	Therefore $\phi_1$ should be $\alpha_{11} - \lambda_{10}^2 e_L^T D_{00}
+	e_L-\upsilon_{21}^2e_F^T E_{22} e_F$. If we already have $LDL^T$ and
+	$UEU^T$ factorization, we can calculate $\phi_1$ in $O(1)$, since 
+$e_L^T D_{00} e_L$ and $e_F^T E_{22} e_F$ basically equal to the last and
+first diagonal element in $D_{00}$ and $E_{22}$ respectively.
+
+\end{proof}
+
+
+\subsection{Compute $x_0$, $\chi_1$, and $x_2$ so that}
+\begin{align*}
+\left(\begin{tabular}{c|c|c}
+	$L_{00}$ & $0$ & $0$\\
+	\hline
+	$\lambda_{10}e^T_L$ & $1$ & $\upsilon_{21}e_F^T$\\
+	\hline
+	$0$ & $0$ & $U_{22}$\\
+	\end{tabular}
+\right)
+\left(\begin{tabular}{c|c|c}
+	$D_{00}$ & $0$ & $0$\\
+	\hline
+	$0$ & $0$ & $0$\\
+	\hline
+	$0$ & $0$ & $E_{22}$\\
+	\end{tabular}
+\right)
+\left(\begin{tabular}{c|c|c}
+	$L_{00}$ & $0$ & $0$\\
+	\hline
+	$\lambda_{10}e^T_L$ & $1$ & $\upsilon_{21}e_F^T$\\
+	\hline
+	$0$ & $0$ & $U_{22}$\\
+	\end{tabular}
+\right)^T
+\left(\begin{tabular}{c}
+	$x_0$ \\
+	\hline
+	$\chi_1$ \\
+	\hline
+	$x_2$ \\
+	\end{tabular}
+\right) \\
+=
+\left(\begin{tabular}{c}
+	$0$ \\
+	\hline
+	$0$ \\
+	\hline
+	$0$ \\
+	\end{tabular}
+\right)
+\end{align*}
+where $x=\left(\begin{tabular}{c}
+	$x_0$ \\
+	\hline
+	$\chi_1$ \\
+	\hline
+	$x_2$ \\
+	\end{tabular}
+\right)$ is not a zero vector. What is the cost of this computation, given
+that $L_{00}$ and $U_{22}$ have special structure?
+
+\startans
+
+\begin{align*}
+&\left(\begin{tabular}{c|c|c}
+	$L_{00}$ & $0$ & $0$\\
+	\hline
+	$\lambda_{10}e^T_L$ & $1$ & $\upsilon_{21}e_F^T$\\
+	\hline
+	$0$ & $0$ & $U_{22}$\\
+	\end{tabular}
+\right)
+\left(\begin{tabular}{c|c|c}
+	$D_{00}$ & $0$ & $0$\\
+	\hline
+	$0$ & $0$ & $0$\\
+	\hline
+	$0$ & $0$ & $E_{22}$\\
+	\end{tabular}
+\right)
+\left(\begin{tabular}{c|c|c}
+	$L_{00}$ & $0$ & $0$\\
+	\hline
+	$\lambda_{10}e^T_L$ & $1$ & $\upsilon_{21}e_F^T$\\
+	\hline
+	$0$ & $0$ & $U_{22}$\\
+	\end{tabular}
+\right)^T
+\left(\begin{tabular}{c}
+	$x_0$ \\
+	\hline
+	$\chi_1$ \\
+	\hline
+	$x_2$ \\
+	\end{tabular}
+\right)
+\\
+=&
+\left(\begin{tabular}{c|c|c}
+	$L_{00}D_{00}$ & $0$ & $0$\\
+	\hline
+	$\lambda_{10}e_L^TD_{00}$ & $0$ & $\upsilon_{21}e_F^TE_{22}$\\
+	\hline
+	$0$ & $0$ & $U_{22}E_{22}$\\
+	\end{tabular}
+\right)
+\left(\begin{tabular}{c}
+	$L_{00}^Tx_0+e_L\lambda_{10}\chi_1$ \\
+	\hline
+	$\chi_1$ \\
+	\hline
+	$U_{22}^Tx_2+\upsilon_{21}\chi_1e_F$ \\
+	\end{tabular}
+\right) \\
+=&
+\left(\begin{tabular}{c}
+	$L_{00} D_{00} L_{00}^Tx_0 + \lambda_{10} L_{00} D_{00} e_L\chi_1$ \\
+	\hline
+	$
+	\lambda_{10} e_L^T D_{00} L_{00}^Tx_0
+	+(\lambda_{10}^2 e_L^T D_{00} e_L+\upsilon_{21}^2e_F^T E_{22} e_F)*\chi_1
+	+\upsilon_{21} e_F^T E_{22} U_{22}^Tx_2
+	$ \\
+	\hline
+	$\upsilon_{21} U_{22} E_{22} e_F\chi_1
+	+U_{22} E_{22} U_{22}^Tx_2
+	$ \\
+	\end{tabular}
+\right)
+\end{align*}
+, and this should equal to a zero vector.
+
+Suppose $L_{00}D_{00}$ and $U_{22}E_{22}$ are non-singular, the $
+\left(\begin{tabular}{c}
+	$x_0$ \\
+	\hline
+	$\chi_1$ \\
+	\hline
+	$x_2$ \\
+	\end{tabular}
+\right) = 0$ holds only if $L_{00}^Tx_0+\lambda_{10}e_L\chi_1=0$ and
+$\upsilon_{21}e_F\chi_1+U_{22}^Tx_2=0$. At the same time, we noticed if
+$L_{00}^Tx_0+\lambda_{10}e_L\chi_1=0$ and
+$\upsilon_{21}e_F\chi_1+U_{22}^Tx_2=0$, 
+\begin{align*}
+	&\lambda_{10} e_L^T D_{00} L_{00}^Tx_0
+	+(\lambda_{10}^2 e_L^T D_{00} e_L+\upsilon_{21}^2e_F^T E_{22} e_F)*\chi_1
+	+\upsilon_{21} e_F^T E_{22} U_{22}^Tx_2 \\
+=& \lambda_{10} e_L^T D_{00} (L_{00}^Tx_0+\lambda_{10}e_L\chi_1)
+	+ \upsilon_{21}e_F^TE_{22}(\upsilon_{21}e_FU_{22}^T\chi_1+U_{22}^Tx_2)
+	\\
+=& \lambda_{10} e_L^T D_{00} * 0 + \upsilon_{21}e_F^TE_{22} * 0 \\
+=& 0
+\end{align*}
+Therefore we can pick up any non-zero $\chi_1$ and solve these two equations
+instead.
+
+Meanwhile, we also noticed the $L_{00}^T$ is bidiagonal upper triangular
+matrix, and only the last element in $\lambda_{10}e_L\chi_1$ is non-zero.
+Therefore we can start from the last row to calculate $x_0$, and propagate the
+solutions to the first row. This only takes $O(n)$ instead of $O(n^3)$.
+
+Similarly we can solve $x_2$ in $O(n)$, given an non-zero constant $\chi_1$.
+
+Therefore the overall cost of the computation is $O(n)$.
+
+
