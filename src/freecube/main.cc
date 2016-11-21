@@ -199,7 +199,7 @@ public:
 			std::cerr << "\t\t\tSanity randtr matrix: " << randtr << std::endl;
 			std::cerr << "\t\t\tSanity tr matrix: " << tr << std::endl;
 #endif
-			if (dist < 0) {
+			if (dist <= 0) {
 				nfailed(i) = 1;
 			}
 		}
@@ -217,7 +217,7 @@ public:
 		tr.setIdentity();
 		//std::cerr << "\t\t\tInitial Sanity random rotation matrix: " << tr.matrix() << std::endl;
 		tr.rotate(Eigen::AngleAxisd(neg1pos1()*dalpha, Eigen::Vector3d::UnitX()));
-		tr.rotate(Eigen::AngleAxisd(std::abs(neg1pos1())*dalpha, Eigen::Vector3d::UnitY()));
+		tr.rotate(Eigen::AngleAxisd(neg1pos1()*dalpha, Eigen::Vector3d::UnitY()));
 		tr.rotate(Eigen::AngleAxisd(neg1pos1()*dalpha, Eigen::Vector3d::UnitZ()));
 #if 1
 		Eigen::Vector3d vec;
