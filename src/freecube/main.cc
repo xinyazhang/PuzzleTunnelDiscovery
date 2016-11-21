@@ -13,6 +13,7 @@
 #include <fcl/narrowphase/detail/traversal/collision_node.h>
 #include <fcl/narrowphase/distance.h>
 #include <fcl/narrowphase/distance_result.h>
+#include <random>
 //#include <igl/barycenter.h>
 
 using std::string;
@@ -112,13 +113,15 @@ private:
 	BVHModel rob_bvh_, env_bvh_;
 	fcl::detail::SplitMethodType split_method_ = fcl::detail::SPLIT_METHOD_MEDIAN;
 public:
+	using TransformMatrix = Eigen::Matrix<double, 4, 4>;
+
 	ClearanceCalculator(const Geo& rob, Geo& env)
-		:rob_(rob), env_(env)
+		:rob_(rob), env_(env), distribution_(-1.0, 1.0)
 	{
 		buildBVHs();
 	}
 
-	double getDistance(const Eigen::Matrix<double, 4, 4>& trmat) const
+	double getDistance(const TransformMatrix& trmat) const
 	{
 		fcl::DistanceResult<Scalar> result;
 		TraversalNode node;
@@ -139,7 +142,19 @@ public:
 		return result.min_distance;
 	}
 
-	Eigen::VectorXd getClearanceCube(const Eigen::Matrix<double, 4, 4>& trmat, double distance = -1) const
+	void setC(double min, double max)
+	{
+		min_tr_ = min;
+		max_tr_ = max;
+		csize_ << max_tr_ - min_tr_, 2 * M_PI;
+	}
+
+	Eigen::Vector2d getCSize() const
+	{
+		return csize_;
+	}
+
+	Eigen::VectorXd getClearanceCube(const TransformMatrix& trmat, double distance = -1) const
 	{
 		Transform3 tf;
 		tf = trmat.block<3,4>(0,0);
@@ -149,24 +164,72 @@ public:
 			distance = getDistance(trmat);
 
 		const Eigen::MatrixXd& RV = rob_.V;
-		double dany = 2 * M_PI;
+		double dscale = 1.0;
+		auto csize = getCSize();
 		for (int i = 0; i < RV.rows(); i++) {
 			// v: relative coordinates w.r.t. robot center.
 			Eigen::Vector3d v = tf * Eigen::Vector3d(RV.row(i)) - nrcenter;
 			double r = v.norm();
-			double dalpha = binsolve(r, distance);
-			dany = std::min(dalpha, dany);
+			dscale = std::min(dscale, binsolve(csize.x(), csize.y(), r, distance));
 		}
 		Eigen::VectorXd ret;
-		ret.resize(6);
 #if 0
 		ret << 2 * M_PI, 2 * M_PI, 2 * M_PI,
 		       2 * M_PI, 2 * M_PI, 2 * M_PI;
 #endif
-		ret << dany, dany, dany, dany, dany, dany;
+		ret.resize(4);
+		ret << csize.x() * dscale, csize.y() * dscale, dscale, std::log2(1.0/dscale);
 		return ret;
 	}
 
+	int sanityCheck(const TransformMatrix& trmat, const Eigen::VectorXd& clearance)
+	{
+		double dx = clearance.x();
+		double dalpha = clearance.y();
+		constexpr int nsample = 100;
+		Eigen::VectorXd nfailed;
+		nfailed.resize(nsample);
+		nfailed.setZero();
+		for (int i = 0; i < nsample; i++) {
+			TransformMatrix randtr = randomTransform(dx, dalpha);
+			TransformMatrix tr = randtr * trmat;
+			double dist = getDistance(tr);
+#if 0
+			std::cerr << "\t\t\tSanity distance: " << dist << std::endl;
+			std::cerr << "\t\t\tSanity randtr matrix: " << randtr << std::endl;
+			std::cerr << "\t\t\tSanity tr matrix: " << tr << std::endl;
+#endif
+			if (dist < 0) {
+				nfailed(i) = 1;
+			}
+		}
+		return nfailed.array().sum();
+	}
+
+	double neg1pos1()
+	{
+		return distribution_(generator_);
+	}
+
+	TransformMatrix randomTransform(double dx, double dalpha)
+	{
+		Transform3 tr;
+		tr.setIdentity();
+		//std::cerr << "\t\t\tInitial Sanity random rotation matrix: " << tr.matrix() << std::endl;
+		tr.rotate(Eigen::AngleAxisd(neg1pos1()*dalpha, Eigen::Vector3d::UnitX()));
+		tr.rotate(Eigen::AngleAxisd(std::abs(neg1pos1())*dalpha, Eigen::Vector3d::UnitY()));
+		tr.rotate(Eigen::AngleAxisd(neg1pos1()*dalpha, Eigen::Vector3d::UnitZ()));
+#if 1
+		Eigen::Vector3d vec;
+		vec << neg1pos1() * dx, neg1pos1() * dx, neg1pos1() * dx; 
+		tr.translate(vec);
+#endif
+		TransformMatrix ret;
+		ret.setIdentity();
+		//std::cerr << "\t\t\tSanity random rotation matrix: " << tr.matrix() << std::endl;
+		ret.block<3, 4>(0, 0) = tr.matrix();
+		return ret;
+	}
 protected:
 	void buildBVHs()
 	{
@@ -188,15 +251,17 @@ protected:
 		bvh.endModel();
 	}
 
-	static double binsolve(double r, double mindist)
+	static double binsolve(double maxdx, double maxdalpha, double r, double mindist)
 	{
-		double upperrange = 2 * M_PI;
-		double lowerrange = 0;
+		double upperrange = 1.0;
+		double lowerrange = 0.0;
 		double sqrt3 = std::sqrt(3.0);
 		bool mid_is_valid = false;
 		while (upperrange - lowerrange > 1e-6) {
 			double prob = (upperrange + lowerrange)/2;
-			double value = std::sin(prob/2) * 6 * r + sqrt3 * prob;
+			double dx = maxdx * prob;
+			double dalpha = maxdalpha * prob;
+			double value = std::sin(dalpha/2) * 6 * r + sqrt3 * dx;
 			if (value > mindist) {
 				upperrange = prob;
 				mid_is_valid = false;
@@ -211,6 +276,11 @@ protected:
 			return (upperrange + lowerrange)/2;
 		return lowerrange;
 	}
+
+	double min_tr_, max_tr_;
+	Eigen::Vector2d csize_; // translation size, rotation size
+	std::mt19937 generator_;
+	std::uniform_real_distribution<double> distribution_;
 };
 
 const char* vertex_shader =
@@ -252,6 +322,7 @@ int main(int argc, char* argv[])
 	glm::vec4 light_position = glm::vec4(0.0f, 100.0f, 0.0f, 1.0f);
 	MatrixPointers mats;
 	ClearanceCalculator<fcl::OBBRSS<double>> cc(robot, env);
+	cc.setC(-100,100);
 	
 	auto matrix_binder = [](int loc, const void* data) {
 		glUniformMatrix4fv(loc, 1, GL_FALSE, (const GLfloat*)data);
@@ -390,7 +461,12 @@ int main(int argc, char* argv[])
 		glfwPollEvents();
 		glfwSwapBuffers(window);
 		double mindist = cc.getDistance(robot_transform_matrix);
-		std::cerr << "Distance " << mindist << "\tClearance: " << cc.getClearanceCube(robot_transform_matrix, mindist).transpose() << std::endl;
+		auto clearance = cc.getClearanceCube(robot_transform_matrix, mindist).transpose();
+		std::cerr << "Distance " << mindist
+		          << "\tClearance: " << clearance
+			  << std::endl;
+		auto san = cc.sanityCheck(robot_transform_matrix, clearance);
+		std::cerr << "\tSanity: " << san << std::endl;
 	}
 	glfwDestroyWindow(window);
 	glfwTerminate();
