@@ -16,6 +16,8 @@
 #include <random>
 //#include <igl/barycenter.h>
 
+#define SANITY_CHECK 0
+
 using std::string;
 
 struct Geo {
@@ -127,10 +129,11 @@ public:
 		TraversalNode node;
 		Transform3 tf;
 		tf = trmat.block<3,4>(0,0);
+		fcl::DistanceRequest<Scalar> request(true);
 		if(!fcl::detail::initialize(node,
 		                    rob_bvh_, tf,
 		                    env_bvh_, Transform3::Identity(),
-		                    fcl::DistanceRequest<Scalar>(true),
+		                    request,
 				    result)
 		  ) {
 			std::cerr << "initialize error" << std::endl;
@@ -138,7 +141,23 @@ public:
 #if 1
 		fcl::detail::distance(&node, nullptr, qsize);
 #endif
-		
+		if (result.min_distance > 0)
+			return result.min_distance;
+		return getPenetrationDepth(tf);
+	}
+
+	double getPenetrationDepth(const Transform3& tf) const
+	{
+		std::cerr << __func__ << " called" << std::endl;
+		Transform3 tf2{Transform3::Identity()};
+
+		fcl::DistanceRequest<Scalar> request;
+		request.enable_signed_distance = true;
+		request.enable_nearest_points = true;
+		request.gjk_solver_type = fcl::GST_LIBCCD;
+
+		fcl::DistanceResult<Scalar> result;
+		fcl::distance(&rob_bvh_, tf, &env_bvh_, Transform3::Identity(), request, result);
 		return result.min_distance;
 	}
 
@@ -180,6 +199,10 @@ public:
 		ret.resize(4);
 		ret << csize.x() * dscale, csize.y() * dscale, dscale, std::log2(1.0/dscale);
 		return ret;
+	}
+
+	Eigen::VectorXd getSolidCube(const TransformMatrix& trmat, double pendepth = -1) const
+	{
 	}
 
 	int sanityCheck(const TransformMatrix& trmat, const Eigen::VectorXd& clearance)
@@ -426,6 +449,7 @@ int main(int argc, char* argv[])
 			{ "fragment_color" }
 			);
 
+	std::cerr.precision(17);
 	while (!glfwWindowShouldClose(window)) {
 		// Setup some basic window stuff.
 		int window_width, window_height;
@@ -465,8 +489,10 @@ int main(int argc, char* argv[])
 		std::cerr << "Distance " << mindist
 		          << "\tClearance: " << clearance
 			  << std::endl;
+#if SANITY_CHECK
 		auto san = cc.sanityCheck(robot_transform_matrix, clearance);
 		std::cerr << "\tSanity: " << san << std::endl;
+#endif
 	}
 	glfwDestroyWindow(window);
 	glfwTerminate();
