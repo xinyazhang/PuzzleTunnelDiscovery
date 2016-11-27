@@ -1,7 +1,6 @@
-#include <GL/glew.h>
+#include "quickgl.h"
 #include "render_pass.h"
 #include <iostream>
-#include "debuggl.h"
 #include <map>
 
 /*

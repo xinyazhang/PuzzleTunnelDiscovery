@@ -1,5 +1,10 @@
-#ifndef DEBUGGL_H
-#define DEBUGGL_H
+#ifndef QUICKGL_H
+#define QUICKGL_H
+
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
+
+GLFWwindow* init_glefw(int window_width, int window_height, const char* window_title);
 
 void debugglTerminate();
 

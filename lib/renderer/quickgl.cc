@@ -1,16 +1,44 @@
 #include "quickgl.h"
-#include "debuggl.h"
 #include <stdlib.h>
 #include <iostream>
 
-int window_width = 800, window_height = 600;
-const char* window_title = "Alpha Animation";
+const char* DebugGLErrorToString(int error) {
+	switch (error) {
+		case GL_NO_ERROR:
+			return "GL_NO_ERROR";
+			break;
+		case GL_INVALID_ENUM:
+			return "GL_INVALID_ENUM";
+			break;
+		case GL_INVALID_VALUE:
+			return "GL_INVALID_VALUE";
+			break;
+		case GL_INVALID_OPERATION:
+			return "GL_INVALID_OPERATION";
+			break;
+		case GL_OUT_OF_MEMORY:
+			return "GL_OUT_OF_MEMORY";
+			break;
+		default:
+			return "Unknown Error";
+			break;
+	}
+	return "Unicorns Exist";
+}
+
+void debugglTerminate()
+{
+	glfwTerminate();
+}
+
+static int window_width = 800, window_height = 600;
+static const char* window_title = "Alpha Animation";
 
 void ErrorCallback(int error, const char* description) {
 	std::cerr << "GLFW Error: " << description << "\n";
 }
 
-GLFWwindow* init_glefw()
+GLFWwindow* init_glefw(int window_width, int window_height, const char* window_title)
 {
 	if (!glfwInit())
 		exit(EXIT_FAILURE);
