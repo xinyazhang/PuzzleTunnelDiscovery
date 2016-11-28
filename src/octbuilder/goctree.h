@@ -8,7 +8,6 @@
  * Note: check https://octomap.github.io/ for more details.
  */
 
-#include "goctree_child_policy.h"
 #include <Eigen/Core>
 #include <memory>
 #include <vector>
@@ -30,20 +29,22 @@ private:
 
 		static void initChildren(ChildType& children)
 		{
-			children.resize(ND);
+			children.resize(1 << ND);
+			for (auto& child: children)
+				child.reset();
 		}
 
-		static void assignCube(ChildType& children, unsigned long offset, std::unique_ptr<GOcTreeNode>&& node)
+		static void assignCube(ChildType& children, unsigned long offset, std::unique_ptr<GOcTreeNode>& node)
 		{
-			children[offset] = node;
+			children[offset].swap(node);
 		}
 
 		static GOcTreeNode* accessCube(ChildType& children, unsigned long offset)
 		{
-			children[offset].get();
+			return children[offset].get();
 		}
 	};
-	ChildType children_;
+	typename ChildPolicy::ChildType children_;
 
 	Coord mins_, maxs_;
 	Coord median_;
@@ -62,6 +63,8 @@ public:
 		mins = mins_;
 		maxs = maxs_;
 	}
+
+	Coord getMedian() const { return median_; }
 
 	void getCubeBV(const CubeIndex& ci, Coord& mins, Coord& maxs) const
 	{
@@ -99,7 +102,8 @@ public:
 		getCubeBV(ci, mins, maxs);
 
 		std::unique_ptr<GOcTreeNode> node(new GOcTreeNode(mins, maxs, depth_ + 1));
-		ChildPolicy::assignCube(children_, index, std::move(node));
+		//std::cerr << __func__ << ": " << node.get() << std::endl;
+		ChildPolicy::assignCube(children_, index, node);
 	}
 
 	GOcTreeNode* getCube(const CubeIndex& ci)

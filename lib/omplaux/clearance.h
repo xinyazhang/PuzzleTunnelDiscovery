@@ -10,6 +10,7 @@
 #include <string>
 #include <random>
 #include <iostream>
+#include <math.h>
 
 struct Geo {
 	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> V;
@@ -94,6 +95,7 @@ public:
 		return result.min_distance;
 	}
 
+	// Wait, what's this...
 	void setC(double min, double max)
 	{
 		min_tr_ = min;
@@ -129,19 +131,24 @@ public:
 		ret << 2 * M_PI, 2 * M_PI, 2 * M_PI,
 		       2 * M_PI, 2 * M_PI, 2 * M_PI;
 #endif
-		ret.resize(4);
-		ret << csize.x() * dscale, csize.y() * dscale, dscale, std::log2(1.0/dscale);
+		ret.resize(8);
+		ret << csize.x() * dscale, csize.x() * dscale, csize.x() * dscale,
+		       csize.y() * dscale, csize.y() * dscale, csize.y() * dscale,
+		       dscale, std::log2(1.0/dscale);
 		return ret;
 	}
 
-	Eigen::VectorXd getSolidCube(const TransformMatrix& trmat, double pendepth = -1) const
+	Eigen::VectorXd getSolidCube(const TransformMatrix& trmat, double pendepth = NAN) const
 	{
+		if (isnan(pendepth))
+			pendepth = -getDistance(trmat);
+		return getClearanceCube(trmat, pendepth); // The bounding formula is the same.
 	}
 
 	int sanityCheck(const TransformMatrix& trmat, const Eigen::VectorXd& clearance)
 	{
-		double dx = clearance.x();
-		double dalpha = clearance.y();
+		double dx = clearance(0);
+		double dalpha = clearance(3);
 		constexpr int nsample = 100;
 		Eigen::VectorXd nfailed;
 		nfailed.resize(nsample);
@@ -169,6 +176,7 @@ public:
 
 	TransformMatrix randomTransform(double dx, double dalpha)
 	{
+		// FIXME: use Path::stateToMatrix
 		Transform3 tr;
 		tr.setIdentity();
 		//std::cerr << "\t\t\tInitial Sanity random rotation matrix: " << tr.matrix() << std::endl;
@@ -186,6 +194,7 @@ public:
 		ret.block<3, 4>(0, 0) = tr.matrix();
 		return ret;
 	}
+	
 protected:
 	void buildBVHs()
 	{

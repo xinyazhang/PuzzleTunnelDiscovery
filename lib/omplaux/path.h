@@ -61,6 +61,31 @@ struct Path {
 		ret = trback * ret; // Trback * Rot * Tr2Origin
 		return ret;
 	}
+
+	template<typename FLOAT>
+	static GLMatrixd stateToMatrix(const Eigen::Matrix<FLOAT, 6, 1>& state)
+	{
+		Eigen::Transform<FLOAT, 3, Eigen::AffineCompact> tr;
+		tr.setIdentity();
+		tr.rotate(Eigen::AngleAxisd(state(3), Eigen::Vector3d::UnitX()));
+		tr.rotate(Eigen::AngleAxisd(state(4), Eigen::Vector3d::UnitY()));
+		tr.rotate(Eigen::AngleAxisd(state(5), Eigen::Vector3d::UnitZ()));
+		Eigen::Vector3d vec(state(0), state(1), state(2));
+		tr.translate(vec);
+		GLMatrixd ret;
+		ret.setIdentity();
+		ret.block<3, 4>(0, 0) = tr.matrix();
+		return ret;
+	}
+
+	// TODO: check consistency b/w stateToMatrix and matrixToState
+	static Eigen::Matrix<double, 6, 1> matrixToState(const GLMatrixd& trmat)
+	{
+		Eigen::Matrix<double, 6, 1> ret;
+		Eigen::Vector3d ea = trmat.block<3,3>(0,0).eulerAngles(0,1,2);
+		ret << trmat(0,3), trmat(1,3), trmat(2,3), ea(0), ea(1), ea(3);
+		return ret;
+	}
 };
 
 #endif
