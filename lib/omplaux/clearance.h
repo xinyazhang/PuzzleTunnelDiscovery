@@ -82,7 +82,7 @@ public:
 
 	double getPenetrationDepth(const Transform3& tf) const
 	{
-		std::cerr << __func__ << " called" << std::endl;
+		//std::cerr << __func__ << " called" << std::endl;
 		Transform3 tf2{Transform3::Identity()};
 
 		fcl::DistanceRequest<Scalar> request;

@@ -115,15 +115,15 @@ int main(int argc, char* argv[])
 	ClearanceCalculator<fcl::OBBRSS<double>> cc(robot, env);
 	cc.setC(-100,100);
 
-	auto root = buildOcTreeFromPath<6, double>(robot, env, path, cc);
-	
+	// We want template instantiation, but we don't want to run
+	// the code.
 	if (false) {
-		// We want template instantiation, but we don't want to run
-		// the code.
+		auto root = buildOcTreeFromPath<6, double>(robot, env, path, cc);
+		(void)root;
+	} else {
 		auto complete_root = buildOcTree<6, double>(robot, env, cc);
 		(void)complete_root;
 	}
-	(void)root;
 	std::cout << "Done, press enter to exit" << std::endl;
 	std::cin.ignore(std::numeric_limits<std::streamsize>::max(),'\n');
 
