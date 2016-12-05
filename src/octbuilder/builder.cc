@@ -1,15 +1,18 @@
 #include <omplaux/clearance.h>
 #include <omplaux/path.h>
 #include "goctree.h"
+#include "space.h"
 #include <string>
+#include <functional>
+#include <deque>
+#include <time.h>
 
 using std::string;
 
-template<int ND, typename FLOAT>
+template<int ND, typename FLOAT, typename Node>
 bool
-coverage(const Eigen::Matrix<FLOAT, ND, 1>& state,  const Eigen::VectorXd& clearance, GOcTreeNode<ND, FLOAT> *node)
+coverage(const Eigen::Matrix<FLOAT, ND, 1>& state,  const Eigen::VectorXd& clearance, Node *node)
 {
-	typedef GOcTreeNode<ND, FLOAT> Node;
 	// NOTE: check getClearanceCube for the exact meaning of clearance
 	// vector.
 	typename Node::Coord mins, maxs;
@@ -36,7 +39,7 @@ buildOcTreeFromPath(const Geo& robot, const Geo& env, Path& path, CC &cc)
 	Coord min, max;
 	min << -100.0, -100.0, -100.0, 0.0, 0.0, 0.0;
 	max <<  100.0,  100.0,  100.0, M_PI * 2, M_PI, M_PI * 2;
-	Node* root = new Node(min, max, 0);
+	Node* root = Node::makeRoot(min, max);
 	for( ; t < end_t ; t += 1.0/12.0) {
 		auto robot_transform_matrix = path.interpolate(robot, t);
 		double mindist = cc.getDistance(robot_transform_matrix);
@@ -59,45 +62,318 @@ buildOcTreeFromPath(const Geo& robot, const Geo& env, Path& path, CC &cc)
 	return root;
 }
 
-template<int ND, typename FLOAT, typename CC>
-void
-buildOcTreeRecursive(GOcTreeNode<ND, FLOAT>* node, CC &cc)
-{
+template<int ND, typename FLOAT>
+class OctreeBuilder {
+public:
 	typedef GOcTreeNode<ND, FLOAT> Node;
-	auto state = node->getMedian();
-	auto robot_transform_matrix = Path::stateToMatrix(state);
-	double mindist = cc.getDistance(robot_transform_matrix);
-	if (mindist > FLOAT(0)) {
-		auto clearance = cc.getClearanceCube(robot_transform_matrix, mindist);
-		if (coverage<ND, FLOAT>(state, clearance, node))
-			node->setState(Node::kCubeFree);
-	} else {
-		auto blockage = cc.getSolidCube(robot_transform_matrix, -mindist);
-		if (coverage<ND, FLOAT>(state, blockage, node))
-			node->setState(Node::kCubeFull);
-	}
-	if (node->getState() != Node::kCubeUncertain)
-		return ;
-	for (unsigned long index = 0; index < (1 << ND); index++) {
-		typename Node::CubeIndex ci(index);
-		auto subnode = node->getCube(ci);
-		buildOcTreeRecursive(subnode, cc);
-	}
-}
+	typedef typename Node::Coord Coord;
 
-template<int ND, typename FLOAT, typename CC>
-GOcTreeNode<ND, FLOAT>*
-buildOcTree(const Geo& robot, const Geo& env, CC &cc)
-{
+	OctreeBuilder(const Coord& mins, const Coord& maxs, const Coord& res)
+		:mins_(mins), maxs_(maxs), res_(res)
+	{
+	}
+
+	template<typename CC>
+	void buildOcTreeRecursive(Node* node, CC &cc, int depth)
+	{
+		auto state = node->getMedian();
+		auto robot_transform_matrix = Path::stateToMatrix(state);
+		double mindist = cc.getDistance(robot_transform_matrix);
+		if (mindist > FLOAT(0)) {
+			auto clearance = cc.getClearanceCube(robot_transform_matrix, mindist);
+			//std::cerr << "Clearance for state: " << state.transpose() << " is " << clearance.transpose() << std::endl << "\tfrom " << mindist << std::endl;
+			bool stop = coverage<ND, FLOAT>(state, res_, node) || coverage<ND, FLOAT>(state, clearance, node);
+			if (stop)
+				node->setState(Node::kCubeFree);
+			else
+				node->setState(Node::kCubeMixed);
+		} else {
+			auto blockage = cc.getSolidCube(robot_transform_matrix, -mindist);
+			bool stop = coverage<ND, FLOAT>(state, res_, node) || coverage<ND, FLOAT>(state, blockage, node);
+			if (stop)
+				node->setState(Node::kCubeFull);
+			else
+				node->setState(Node::kCubeMixed);
+		}
+		if (node->isLeaf()) {
+			fixed_volume_ += node->getVolume();
+			if (::time(NULL) > last_time_ + 10) {
+				double percent = (fixed_volume_ / total_volume_) * 100.0;
+				std::cerr << "Progress: " << percent
+				          << "\t(" << fixed_volume_
+					  << " / " << total_volume_
+					  << ")" << std::endl;
+				last_time_ = ::time(NULL);
+			}
+			return ;
+		}
+		for (unsigned long index = 0; index < (1 << ND); index++) {
+			typename Node::CubeIndex ci(index);
+			auto subnode = node->getCube(ci);
+			buildOcTreeRecursive(subnode, cc, depth + 1);
+		}
+	}
+
+	template<typename CC>
+	Node* buildOcTree(const Geo& robot, const Geo& env, CC &cc)
+	{
+		Coord min, max;
+		Node* root = Node::makeRoot(mins_, maxs_);
+		total_volume_ = root->getVolume();
+		last_time_ = ::time(NULL);
+		buildOcTreeRecursive(root, cc, 0);
+
+		return root;
+	}
+
+private:
+	Coord mins_, maxs_, res_;
+	double fixed_volume_ = 0.0;
+	double total_volume_;
+	time_t last_time_;
+};
+
+template<int ND,
+	 typename FLOAT,
+	 typename CC,
+	 typename Space = TranslationWithEulerAngleGroup<ND, FLOAT>
+	>
+class OctreePathBuilder {
+	struct FindUnionAttribute {
+		FindUnionAttribute* parent;
+		FindUnionAttribute()
+		{
+			parent = this;
+		}
+		FindUnionAttribute* getSet() const
+		{
+			FindUnionAttribute* ret = this;
+			if (parent != this)
+				ret = parent->getSet();
+			parent = ret;
+			return ret;
+		}
+		void merge(FindUnionAttribute* other)
+		{
+			other->parent = this;
+		}
+	};
+public:
+#if 1
+	typedef GOcTreeNode<ND, FLOAT, FindUnionAttribute> Node;
+#else
 	typedef GOcTreeNode<ND, FLOAT> Node;
-	typename Node::Coord min, max;
-	min << -100.0, -100.0, -100.0, 0.0, 0.0, 0.0;
-	max <<  100.0,  100.0,  100.0, M_PI * 2, M_PI, M_PI * 2;
-	Node* root = new Node(min, max, 0);
-	buildOcTreeRecursive(root, cc);
+#endif
+	typedef typename Node::Coord Coord;
 
-	return root;
-}
+	OctreePathBuilder()
+	{
+	}
+
+	void setupSpace(const Coord& mins, const Coord& maxs, const Coord& res)
+	{
+		mins_ = mins;
+		maxs_ = maxs;
+		res_ = res;
+	}
+
+	void setupInit(const Coord& initState)
+	{
+		istate_ = initState;
+	}
+
+	void setupGoal(const Coord& goalState)
+	{
+		gstate_ = goalState;
+	}
+
+	Node* determinizeCubeFromState(const Coord& state)
+	{
+		root_.reset(Node::makeRoot(mins_, maxs_));
+		auto current = root_.get();
+		auto robot_transform_matrix = Path::stateToMatrix(state);
+		double mindist = cc_->getDistance(robot_transform_matrix);
+		auto clearance = cc_->getClearanceCube(robot_transform_matrix, mindist);
+		while (current->getState() == Node::kCubeUncertain) {
+			auto ci = current->locateCube(state);
+			Node* next = current->getCube(ci);
+			if (coverage<ND, FLOAT>(state, clearance, next)) {
+				next->setState(Node::kCubeFree);
+			}
+			current = next;
+		}
+		return current;
+	}
+
+	void add_neighbors(Node* node)
+	{
+		auto op = [=](int dim, int direct, std::vector<Node*>& neighbors)
+		{
+			for (auto neighbor: neighbors) {
+				if (neighbor->getState() ==  Node::kCubeUncertain) {
+					add_to_cube_list(neighbor);
+				}
+			}
+		};
+		contactors_op(node, op);
+	}
+
+	// Note: we don't set kCubeMixed because we want to add the mixed
+	// cubes into queues.
+	// 
+	// In other words
+	//      kCubeUncertain: cubes need to be splited
+	//      kCubeUncertainPending: cubes in queue will be splited
+	//      kCubeMixed: mixed cubes have been splited
+	void check_clearance(Node* node)
+	{
+		auto state = node->getMedian();
+		auto robot_transform_matrix = Path::stateToMatrix(state);
+		double mindist = cc_->getDistance(robot_transform_matrix);
+		if (mindist > FLOAT(0)) {
+			auto clearance = cc_->getClearanceCube(robot_transform_matrix, mindist);
+			bool stop = coverage<ND, FLOAT>(state, res_, node) ||
+			            coverage<ND, FLOAT>(state, clearance, node);
+			if (stop)
+				node->setState(Node::kCubeFree);
+		} else {
+			auto blockage = cc_->getSolidCube(robot_transform_matrix, -mindist);
+			bool stop = coverage<ND, FLOAT>(state, res_, node) ||
+			            coverage<ND, FLOAT>(state, blockage, node);
+			if (stop)
+				node->setState(Node::kCubeFull);
+		}
+	}
+
+	// Use Find-Union algorithm to merge adjacent free/blocked cubes.
+	// Return true if free
+	bool connect_neighbors(Node* node)
+	{
+		auto op = [=](int dim, int direct, std::vector<Node*>& neighbors)
+		{
+			for (auto neighbor: neighbors) {
+				if (neighbor->getState() == node->getState())
+					node->merge(neighbor);
+			}
+		};
+		contactors_op(node, op);
+		
+		return node->getState() == Node::kCubeFree;
+	}
+
+	void buildOcTree(const Geo& robot, const Geo& env, CC& cc)
+	{
+		robot_ = &robot; env_ = &env; cc_ = &cc;
+		current_queue_ = 0;
+		cubes_.clear();
+		root_.reset();
+		// Pre-calculate the initial clearance cube
+		auto init_cube = determinizeCubeFromState(istate_);
+		add_neighbors(init_cube);
+		while (true) {
+			/*
+			 * 1. Find a cube, called S, in the cubes_ list.
+			 * 2. Split cube S.
+			 * 2.1 This can be done through calling getCube
+			 * 3.1 Check these newly created cubes, and connect determined
+			 *      blocks with Union operator
+			 * 3.2 Put undetermined blocks into cubes_ list
+			 * 3.2.1 Prioritize larger (smaller depth_) cubes
+			 * 3.2.2 This also includes neighbor's of S.
+			 * 4. Check if determined cubes contains gstate_
+			 * 4.1 If true, terminate
+			 * 4.2 Otherwise, start from 1.
+			 */
+			auto to_split = pop_from_cube_list();
+			auto children = split_cube(to_split);
+			bool done = false;
+			for (auto cube : children) {
+				if (!cube->isLeaf()) {
+					add_to_cube_list(cube);
+					continue;
+				}
+				if (!connect_neighbors(cube))
+					continue;
+#if 0 // Do we really need connect kCubeFull?
+				if (cube->getState() != Node::kCubeFree)
+					continue;
+#endif
+				if (cube->getState() != init_cube->getState())
+					continue;
+				if (cube->isContaining(gstate_)) {
+					done = true;
+					break;
+				}
+			}
+			if (done)
+				break;
+		}
+	}
+
+	Node* getRoot() { return root_.get(); }
+
+private:
+	std::vector<Node*> split_cube(Node* node)
+	{
+		std::vector<Node*> ret;
+		for (unsigned long index = 0; index < (1 << ND); index++) {
+			typename Node::CubeIndex ci(index);
+			ret.emplace_back(node->getCube(ci));
+			check_clearance(ret.back());
+		}
+		node->setState(Node::kCubeMixed);
+		return ret;
+	}
+
+	// FIXME: oob check for empty queue
+	Node* pop_from_cube_list()
+	{
+		int depth = current_queue_;
+		while (cubes_[depth].empty())
+			depth++;
+		auto ret = cubes_[depth].front();
+		cubes_[depth].pop_front();
+		current_queue_ = depth;
+		return ret;
+	}
+
+	void add_to_cube_list(Node* node)
+	{
+		if (node->getState() != Node::kCubeUncertain)
+			return;
+		int depth = node->getDepth();
+		if (cubes_.size() >= size_t(depth))
+			cubes_.resize(depth);
+		cubes_[depth].emplace_back(node);
+		node->setState(Node::kCubeUncertainPending);
+		current_queue_ = std::min(current_queue_, depth);
+	}
+
+	void contactors_op(Node* node,
+			   std::function<void(int dim, int direct, std::vector<Node*>&)> op)
+	{
+		for (int dim = 0; dim < ND; dim++) {
+			for (int direct = -1; direct <= 1; direct += 2) {
+				auto neighbors = Node::getContactCubes(
+						root_.get(),
+						node,
+						dim,
+						direct,
+						Space()
+						);
+				op(dim, direct, neighbors);
+			}
+		}
+	}
+
+	Coord mins_, maxs_, res_;
+	Coord istate_, gstate_;
+	const Geo *robot_, *env_;
+	CC *cc_;
+	std::unique_ptr<Node> root_;
+	int current_queue_;
+	std::vector<std::deque<Node*>> cubes_;
+};
 
 int main(int argc, char* argv[])
 {
@@ -115,14 +391,25 @@ int main(int argc, char* argv[])
 	ClearanceCalculator<fcl::OBBRSS<double>> cc(robot, env);
 	cc.setC(-100,100);
 
+	typename GOcTreeNode<6, double>::Coord min, max, res;
+	min << -100.0, -100.0, -100.0, -M_PI/2.0,      0.0,      0.0;
+	max <<  100.0,  100.0,  100.0,  M_PI/2.0, M_PI * 2, M_PI * 2;
+	res = (max - min) / 20000.0;
+
 	// We want template instantiation, but we don't want to run
 	// the code.
 	if (false) {
 		auto root = buildOcTreeFromPath<6, double>(robot, env, path, cc);
 		(void)root;
-	} else {
-		auto complete_root = buildOcTree<6, double>(robot, env, cc);
+	} else if (false) {
+		//res << 0.001, 0.001, 0.001, M_PI/64.0, M_PI/32.0, M_PI/64.0;
+		OctreeBuilder<6, double> builder(min, max, res);
+		auto complete_root = builder.buildOcTree(robot, env, cc);
 		(void)complete_root;
+	} else if (true) {
+		OctreePathBuilder<6, double, decltype(cc)> builder;
+		builder.setupSpace(min, max, res);
+		builder.buildOcTree(robot, env, cc);
 	}
 	std::cout << "Done, press enter to exit" << std::endl;
 	std::cin.ignore(std::numeric_limits<std::streamsize>::max(),'\n');
