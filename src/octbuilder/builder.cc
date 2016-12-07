@@ -195,6 +195,8 @@ public:
 		double mindist = cc_->getDistance(robot_transform_matrix);
 		auto clearance = cc_->getClearanceCube(robot_transform_matrix, mindist);
 		while (current->getState() == Node::kCubeUncertain) {
+			std::cerr << "Current depth " << current->getDepth() << std::endl;
+			split_cube(current);
 			auto ci = current->locateCube(state);
 			Node* next = current->getCube(ci);
 			if (coverage<ND, FLOAT>(state, clearance, next)) {
@@ -202,6 +204,7 @@ public:
 			}
 			current = next;
 		}
+		std::cerr << "Returning from " << __func__ << " current: " << current << std::endl;
 		return current;
 	}
 
@@ -212,6 +215,9 @@ public:
 			for (auto neighbor: neighbors) {
 				if (neighbor->getState() ==  Node::kCubeUncertain) {
 					add_to_cube_list(neighbor);
+#if VERBOSE
+					std::cerr << __func__ << " : " << neighbor << std::endl;
+#endif
 				}
 			}
 		};
@@ -234,14 +240,18 @@ public:
 			auto clearance = cc_->getClearanceCube(robot_transform_matrix, mindist);
 			bool stop = coverage<ND, FLOAT>(state, res_, node) ||
 			            coverage<ND, FLOAT>(state, clearance, node);
-			if (stop)
+			if (stop) {
 				node->setState(Node::kCubeFree);
+				fixed_volume_ += node->getVolume();
+			}
 		} else {
 			auto blockage = cc_->getSolidCube(robot_transform_matrix, -mindist);
 			bool stop = coverage<ND, FLOAT>(state, res_, node) ||
 			            coverage<ND, FLOAT>(state, blockage, node);
-			if (stop)
+			if (stop) {
 				node->setState(Node::kCubeFull);
+				fixed_volume_ += node->getVolume();
+			}
 		}
 	}
 
@@ -267,9 +277,11 @@ public:
 		current_queue_ = 0;
 		cubes_.clear();
 		root_.reset();
+		fixed_volume_ = 0.0;
 		// Pre-calculate the initial clearance cube
 		auto init_cube = determinizeCubeFromState(istate_);
 		add_neighbors(init_cube);
+		total_volume_ = root_->getVolume();
 		while (true) {
 			/*
 			 * 1. Find a cube, called S, in the cubes_ list.
@@ -307,6 +319,14 @@ public:
 			}
 			if (done)
 				break;
+			if (timer_alarming()) {
+				double percent = (fixed_volume_ / total_volume_) * 100.0;
+				std::cerr << "Progress: " << percent
+				          << "%\t(" << fixed_volume_
+					  << " / " << total_volume_
+					  << ")" << std::endl;
+				rearm_timer();
+			}
 		}
 	}
 
@@ -315,6 +335,10 @@ public:
 private:
 	std::vector<Node*> split_cube(Node* node)
 	{
+#if VERBOSE
+		std::cerr << "Splitting (" << node->getMins().transpose()
+		          << ")\t(" << node->getMaxs().transpose() << ")" << std::endl;
+#endif
 		std::vector<Node*> ret;
 		for (unsigned long index = 0; index < (1 << ND); index++) {
 			typename Node::CubeIndex ci(index);
@@ -342,8 +366,8 @@ private:
 		if (node->getState() != Node::kCubeUncertain)
 			return;
 		int depth = node->getDepth();
-		if (cubes_.size() >= size_t(depth))
-			cubes_.resize(depth);
+		if (long(cubes_.size()) <= depth)
+			cubes_.resize(depth+1);
 		cubes_[depth].emplace_back(node);
 		node->setState(Node::kCubeUncertainPending);
 		current_queue_ = std::min(current_queue_, depth);
@@ -361,9 +385,20 @@ private:
 						direct,
 						Space()
 						);
-				op(dim, direct, neighbors);
+				if (!neighbors.empty())
+					op(dim, direct, neighbors);
 			}
 		}
+	}
+
+	bool timer_alarming() const
+	{
+		return (::time(NULL) > last_time_ + 10);
+	}
+
+	void rearm_timer()
+	{
+		last_time_ = ::time(NULL);
 	}
 
 	Coord mins_, maxs_, res_;
@@ -373,20 +408,33 @@ private:
 	std::unique_ptr<Node> root_;
 	int current_queue_;
 	std::vector<std::deque<Node*>> cubes_;
+	time_t last_time_ = 0;
+	double fixed_volume_;
+	double total_volume_;
 };
 
 int main(int argc, char* argv[])
 {
+#if 0
 	string robotfn = "../res/alpha/alpha-1.2.org.obj";
 	string envfn = "../res/alpha/alpha_env-1.2.org.obj";
 	string pathfn = "../res/alpha/alpha-1.2.org.path";
+#else
+	string robotfn = "../res/simple/robot.obj";
+	string envfn = "../res/simple/env.obj";
+	string pathfn = "../res/simple/naive.path";
+#endif
 	Geo robot, env;
 	Path path;
 
 	robot.read(robotfn);
 	env.read(envfn);
 	path.readPath(pathfn);
+#if 0
 	robot.center << 16.973146438598633, 1.2278236150741577, 10.204807281494141; // From OMPL.app, no idea how they get this.
+#else
+	robot.center << 0.0, 0.0, 0.0;
+#endif
 
 	ClearanceCalculator<fcl::OBBRSS<double>> cc(robot, env);
 	cc.setC(-100,100);
@@ -409,6 +457,10 @@ int main(int argc, char* argv[])
 	} else if (true) {
 		OctreePathBuilder<6, double, decltype(cc)> builder;
 		builder.setupSpace(min, max, res);
+		double init_t = path.T.size() - 2;
+		builder.setupInit(Path::matrixToState(path.interpolate(robot, init_t)));
+		double end_t = path.T.size() - 1;
+		builder.setupGoal(Path::matrixToState(path.interpolate(robot, end_t)));
 		builder.buildOcTree(robot, env, cc);
 	}
 	std::cout << "Done, press enter to exit" << std::endl;

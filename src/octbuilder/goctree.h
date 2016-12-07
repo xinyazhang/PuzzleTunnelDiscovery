@@ -75,6 +75,9 @@ public:
 		maxs = maxs_;
 	}
 
+	Coord getMins() const { return mins_; }
+	Coord getMaxs() const { return maxs_; }
+
 	double getVolume() const
 	{
 		Coord vol = maxs_ - mins_;
@@ -168,12 +171,19 @@ public:
 		Coord neighCenter = Space::transist(center, delta);
 		auto current = root;
 		while (true) {
+#if VERBOSE
+			std::cerr << "Probing neighbor (" << current->getMins().transpose()
+				<< ")\t(" << current->getMaxs().transpose() << ")" << std::endl;
+#endif
 			auto ci = current->locateCube(neighCenter);
 			auto next = current->tryCube(ci);
 			if (!next || next->getDepth() > from->getDepth())
 				break;
 			current = next;
 		}
+#if VERBOSE
+		std::cerr << __func__ << " returns " << current << std::endl;
+#endif
 		return current;
 	}
 
@@ -187,12 +197,12 @@ public:
 			)
 	{
 		auto neighbor = getNeighbor<Space>(root, from, dimension, direction);
-		if (neighbor->isLeaf())
+		if (neighbor->isLeaf() || neighbor->getState() == kCubeUncertain)
 			return {neighbor};
-		return getBoundaryDescendant(neighbor, dimension, direction);
+		return getBoundaryDescendant(neighbor, dimension, -direction);
 	}
 
-	// Note: this only returns expanded cubes.
+	// TODO: Fill the skeleton.
 	static std::vector<GOcTreeNode*>
 	getBoundaryDescendant(GOcTreeNode* from, int dimension, int direction)
 	{
