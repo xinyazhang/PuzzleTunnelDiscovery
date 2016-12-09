@@ -196,13 +196,18 @@ public:
 		auto clearance = cc_->getClearanceCube(robot_transform_matrix, mindist);
 		while (current->getState() == Node::kCubeUncertain) {
 			std::cerr << "Current depth " << current->getDepth() << std::endl;
-			split_cube(current);
+			auto children = split_cube(current);
 			auto ci = current->locateCube(state);
 			Node* next = current->getCube(ci);
 			if (coverage<ND, FLOAT>(state, clearance, next)) {
 				next->setState(Node::kCubeFree);
 			}
 			current = next;
+			// Add the remaining to the list.
+			for (auto cube : children) {
+				if (!cube->isLeaf() && cube != current)
+					add_to_cube_list(cube);
+			}
 		}
 		std::cerr << "Returning from " << __func__ << " current: " << current << std::endl;
 		return current;
@@ -259,14 +264,20 @@ public:
 	// Return true if free
 	bool connect_neighbors(Node* node)
 	{
-		auto op = [=](int dim, int direct, std::vector<Node*>& neighbors)
+		size_t ttlneigh = 0;
+		auto op = [=,&ttlneigh](int dim, int direct, std::vector<Node*>& neighbors)
 		{
 			for (auto neighbor: neighbors) {
 				if (neighbor->getState() == node->getState())
 					node->merge(neighbor);
+				ttlneigh++;
 			}
 		};
 		contactors_op(node, op);
+#if VERBOSE
+		std::cerr << "Connected " << ttlneigh << " neighbors from Node (" << node->getMedian().transpose()
+			  << ")\t depth: " << node->getDepth() << std::endl;
+#endif
 		
 		return node->getState() == Node::kCubeFree;
 	}
@@ -279,6 +290,8 @@ public:
 		root_.reset();
 		fixed_volume_ = 0.0;
 		// Pre-calculate the initial clearance cube
+		std::cerr << "Init: " << istate_.transpose() << std::endl;
+		std::cerr << "Goal: " << gstate_.transpose() << std::endl;
 		auto init_cube = determinizeCubeFromState(istate_);
 		add_neighbors(init_cube);
 		total_volume_ = root_->getVolume();
@@ -338,6 +351,8 @@ private:
 #if VERBOSE
 		std::cerr << "Splitting (" << node->getMins().transpose()
 		          << ")\t(" << node->getMaxs().transpose() << ")" << std::endl;
+		std::cerr << "Splitting (" << node->getMedian().transpose()
+		          << ")\t depth: " << node->getDepth() << std::endl;
 #endif
 		std::vector<Node*> ret;
 		for (unsigned long index = 0; index < (1 << ND); index++) {
@@ -346,6 +361,7 @@ private:
 			check_clearance(ret.back());
 		}
 		node->setState(Node::kCubeMixed);
+		//std::cerr << "\tResult: " << ret.size() << " child cubes" << std::endl;
 		return ret;
 	}
 
@@ -413,6 +429,12 @@ private:
 	double total_volume_;
 };
 
+void press_enter()
+{
+	std::cout << "Done, press enter to exit" << std::endl;
+	std::cin.ignore(std::numeric_limits<std::streamsize>::max(),'\n');
+}
+
 int main(int argc, char* argv[])
 {
 #if 0
@@ -449,11 +471,13 @@ int main(int argc, char* argv[])
 	if (false) {
 		auto root = buildOcTreeFromPath<6, double>(robot, env, path, cc);
 		(void)root;
+		press_enter();
 	} else if (false) {
 		//res << 0.001, 0.001, 0.001, M_PI/64.0, M_PI/32.0, M_PI/64.0;
 		OctreeBuilder<6, double> builder(min, max, res);
 		auto complete_root = builder.buildOcTree(robot, env, cc);
 		(void)complete_root;
+		press_enter();
 	} else if (true) {
 		OctreePathBuilder<6, double, decltype(cc)> builder;
 		builder.setupSpace(min, max, res);
@@ -462,9 +486,8 @@ int main(int argc, char* argv[])
 		double end_t = path.T.size() - 1;
 		builder.setupGoal(Path::matrixToState(path.interpolate(robot, end_t)));
 		builder.buildOcTree(robot, env, cc);
+		press_enter();
 	}
-	std::cout << "Done, press enter to exit" << std::endl;
-	std::cin.ignore(std::numeric_limits<std::streamsize>::max(),'\n');
 
 	return 0;
 }
