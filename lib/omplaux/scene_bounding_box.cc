@@ -34,12 +34,26 @@ void calculateSceneBoundingBox(const Geo& robot,
 {
 	Eigen::VectorXd robot_bs_center, env_bs_center;
 	double robot_bs_radius, env_bs_radius;
+	// TODO: fix robot.center for bs_center and calculate radius
+	// accordingly.
 	getBoundingSphere(robot.V, robot_bs_center, robot_bs_radius);
+	robot_bs_center -= robot.center;
+	std::cerr << "Robot bounding sphere: " << robot_bs_center.transpose()
+	          << "\traidus: " << robot_bs_radius << std::endl;
 	getBoundingSphere(env.V, env_bs_center, env_bs_radius);
+	std::cerr << "Env bounding sphere: " << env_bs_center.transpose()
+	          << "\traidus: " << env_bs_radius << std::endl;
 
-	BoundingSphereMerger bsm(path.T.front(), robot_bs_radius);;
-	bsm.merge(env_bs_center, env_bs_radius);
-	bsm.merge(path.T.back(), robot_bs_radius);
+	std::cerr << "Init trans: " << (path.T.front() - robot.center).transpose() << std::endl;
+	BoundingSphereMerger bsm(path.T.front() - robot.center, robot_bs_radius);
+	std::cerr << "Basic BSM sphere: " << bsm.getCenter().transpose()
+	          << "\traidus: " << bsm.getRadius() << std::endl;
+	bsm.merge(env_bs_center, env_bs_radius + robot_bs_radius);
+	std::cerr << "With Env BSM sphere: " << bsm.getCenter().transpose()
+	          << "\traidus: " << bsm.getRadius() << std::endl;
+	bsm.merge(path.T.back() - robot.center, robot_bs_radius);
+	std::cerr << "Final BSM sphere: " << bsm.getCenter().transpose()
+	          << "\traidus: " << bsm.getRadius() << std::endl;
 	bbmin = bsm.getCenter().minCoeff() - bsm.getRadius();
 	bbmax = bsm.getCenter().maxCoeff() + bsm.getRadius();
 }

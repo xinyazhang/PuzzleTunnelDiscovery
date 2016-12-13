@@ -141,14 +141,16 @@ template<int ND,
 	>
 class OctreePathBuilder {
 	struct FindUnionAttribute {
-		FindUnionAttribute* parent;
+		mutable const FindUnionAttribute* parent;
+		mutable double volume = 0.0;
+
 		FindUnionAttribute()
 		{
 			parent = this;
 		}
-		FindUnionAttribute* getSet() const
+		const FindUnionAttribute* getSet() const
 		{
-			FindUnionAttribute* ret = this;
+			const FindUnionAttribute* ret = this;
 			if (parent != this)
 				ret = parent->getSet();
 			parent = ret;
@@ -156,7 +158,11 @@ class OctreePathBuilder {
 		}
 		void merge(FindUnionAttribute* other)
 		{
-			other->parent = this;
+			if (getSet() == other->getSet())
+				return ;
+			getSet()->volume += other->getSet()->volume;
+			//other->getSet()->volume = 0.0;
+			other->getSet()->parent = getSet();
 		}
 	};
 public:
@@ -252,6 +258,8 @@ public:
 						<< ")\t depth: " << node->getDepth() << std::endl;
 				}
 				node->setState(Node::kCubeFree);
+
+				node->volume = node->getVolume();
 				fixed_volume_ += node->getVolume();
 			}
 		} else {
@@ -260,6 +268,8 @@ public:
 			            coverage<ND, FLOAT>(state, blockage, node);
 			if (stop) {
 				node->setState(Node::kCubeFull);
+
+				node->volume = node->getVolume();
 				fixed_volume_ += node->getVolume();
 			}
 		}
@@ -273,8 +283,24 @@ public:
 		auto op = [=,&ttlneigh](int dim, int direct, std::vector<Node*>& neighbors)
 		{
 			for (auto neighbor: neighbors) {
-				if (neighbor->getState() == node->getState())
-					node->merge(neighbor);
+				if (neighbor->isLeaf()) {
+					if (neighbor->getState() == node->getState()) {
+#if 0
+						std::cerr << "Merging: " << neighbor
+							<< " to " << node
+							<< std::endl;
+						std::cerr << "\tBefore Volume: " << neighbor->getSet()->volume
+							<< " and " << node->getSet()->volume
+							<< std::endl;
+#endif
+						node->merge(neighbor);
+#if 0
+						std::cerr << "\tAfter Volume: " << neighbor->getSet()->volume
+							<< " and " << node->getSet()->volume
+							<< std::endl;
+#endif
+					}
+				}
 				ttlneigh++;
 			}
 		};
@@ -298,8 +324,12 @@ public:
 		std::cerr << "Init: " << istate_.transpose() << std::endl;
 		std::cerr << "Goal: " << gstate_.transpose() << std::endl;
 		auto init_cube = determinizeCubeFromState(istate_);
+		decltype(init_cube) goal_cube = nullptr;
 		add_neighbors(init_cube);
 		total_volume_ = root_->getVolume();
+		double max_cleared_distance = 0.0;
+		Eigen::VectorXd max_cleared_median;
+		// TODO: use DFS instead of BFS
 		while (true) {
 			/*
 			 * 1. Find a cube, called S, in the cubes_ list.
@@ -316,7 +346,6 @@ public:
 			 */
 			auto to_split = pop_from_cube_list();
 			auto children = split_cube(to_split);
-			bool done = false;
 			for (auto cube : children) {
 				if (!cube->isLeaf()) {
 					add_to_cube_list(cube);
@@ -328,21 +357,39 @@ public:
 				if (cube->getState() != Node::kCubeFree)
 					continue;
 #endif
-				if (cube->getState() != init_cube->getState())
+				if (cube->getState() != Node::kCubeFree)
 					continue;
-				if (cube->isContaining(gstate_)) {
-					done = true;
-					break;
+				if (!goal_cube && cube->isContaining(gstate_)) {
+					goal_cube = cube;
+				}
+
+				// Track the furthest reachable cube.
+				if (cube->getSet() == init_cube->getSet()) {
+					Eigen::VectorXd dis = cube->getMedian() - init_cube->getMedian();
+					double disn = dis.block<3,1>(0,0).norm();
+					if (disn > max_cleared_distance) {
+						max_cleared_distance = disn;
+						max_cleared_median = dis;
+					}
 				}
 			}
-			if (done)
+			if (goal_cube && goal_cube->getSet() == init_cube->getSet())
 				break;
 			if (timer_alarming()) {
 				double percent = (fixed_volume_ / total_volume_) * 100.0;
 				std::cerr << "Progress: " << percent
 				          << "%\t(" << fixed_volume_
 					  << " / " << total_volume_
-					  << ")" << std::endl;
+					  << ")\tMax cleared distance: " << max_cleared_distance
+					  << "\tcube median: " << max_cleared_median.transpose()
+					  << std::endl;
+				std::cerr << "\tInit Set: " << init_cube->getSet()
+					  << "\tInit Volume: " << init_cube->getSet()->volume
+					  << std::endl;
+				if (goal_cube)
+					std::cerr << "\tGoal Set: " << goal_cube->getSet()
+						  << "\tGoal Volume: " << goal_cube->getSet()->volume
+						  << std::endl;
 				rearm_timer();
 			}
 		}
@@ -414,7 +461,7 @@ private:
 
 	bool timer_alarming() const
 	{
-		return (::time(NULL) > last_time_ + 10);
+		return (::time(NULL) > last_time_); // Time interval
 	}
 
 	void rearm_timer()
@@ -422,8 +469,7 @@ private:
 		last_time_ = ::time(NULL);
 	}
 
-	Coord mins_, maxs_, res_;
-	Coord istate_, gstate_;
+	Coord mins_, maxs_, res_; Coord istate_, gstate_;
 	const Geo *robot_, *env_;
 	CC *cc_;
 	std::unique_ptr<Node> root_;
@@ -474,6 +520,12 @@ int main(int argc, char* argv[])
 	min << -10.0, -10.0, -10.0, -M_PI/2.0,      0.0,      0.0;
 	max <<  10.0,  10.0,  10.0,  M_PI/2.0, M_PI * 2, M_PI * 2;
 	cc.setC(-10, 10);
+#elif 0
+	double tmin = -30;
+	double tmax = 30;
+	min << tmin, tmin, tmin, -M_PI/2.0,      0.0,      0.0;
+	max << tmax, tmax, tmax,  M_PI/2.0, M_PI * 2, M_PI * 2;
+	cc.setC(tmin, tmax);
 #else
 	double bbmin, bbmax;
 	omplaux::calculateSceneBoundingBox(robot, env, path, bbmin, bbmax);
@@ -484,7 +536,7 @@ int main(int argc, char* argv[])
 		  << "\tmax: " << max.transpose() << std::endl;
 	cc.setC(bbmin, bbmax);
 #endif
-	res = (max - min) / 20000.0;
+	res = (max - min) / 20000.0; // FIXME: how to calculate a resolution?
 
 	// We want template instantiation, but we don't want to run
 	// the code.
@@ -501,6 +553,7 @@ int main(int argc, char* argv[])
 	} else if (true) {
 		OctreePathBuilder<6, double, decltype(cc)> builder;
 		builder.setupSpace(min, max, res);
+		//double init_t = 0.0;
 		double init_t = path.T.size() - 2;
 		builder.setupInit(Path::matrixToState(path.interpolate(robot, init_t)));
 		double end_t = path.T.size() - 1;
