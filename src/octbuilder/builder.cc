@@ -1,5 +1,6 @@
 #include <omplaux/clearance.h>
 #include <omplaux/path.h>
+#include <omplaux/scene_bounding_box.h>
 #include "goctree.h"
 #include "space.h"
 #include <string>
@@ -246,6 +247,10 @@ public:
 			bool stop = coverage<ND, FLOAT>(state, res_, node) ||
 			            coverage<ND, FLOAT>(state, clearance, node);
 			if (stop) {
+				if (node->isContaining(gstate_)) {
+					std::cerr << "Goal Cube Cleared (" << node->getMedian().transpose()
+						<< ")\t depth: " << node->getDepth() << std::endl;
+				}
 				node->setState(Node::kCubeFree);
 				fixed_volume_ += node->getVolume();
 			}
@@ -459,11 +464,26 @@ int main(int argc, char* argv[])
 #endif
 
 	ClearanceCalculator<fcl::OBBRSS<double>> cc(robot, env);
-	cc.setC(-100,100);
 
 	typename GOcTreeNode<6, double>::Coord min, max, res;
+#if 0
 	min << -100.0, -100.0, -100.0, -M_PI/2.0,      0.0,      0.0;
 	max <<  100.0,  100.0,  100.0,  M_PI/2.0, M_PI * 2, M_PI * 2;
+	cc.setC(-100,100);
+#elif 0
+	min << -10.0, -10.0, -10.0, -M_PI/2.0,      0.0,      0.0;
+	max <<  10.0,  10.0,  10.0,  M_PI/2.0, M_PI * 2, M_PI * 2;
+	cc.setC(-10, 10);
+#else
+	double bbmin, bbmax;
+	omplaux::calculateSceneBoundingBox(robot, env, path, bbmin, bbmax);
+	min << bbmin, bbmin, bbmin, -M_PI/2.0,      0.0,      0.0;
+	max << bbmax, bbmax, bbmax,  M_PI/2.0, M_PI * 2, M_PI * 2;
+	std::cerr << "Bounding box\n"
+	          << "\tmin: " << min.transpose() << "\n"
+		  << "\tmax: " << max.transpose() << std::endl;
+	cc.setC(bbmin, bbmax);
+#endif
 	res = (max - min) / 20000.0;
 
 	// We want template instantiation, but we don't want to run

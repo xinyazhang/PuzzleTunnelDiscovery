@@ -4,6 +4,9 @@
 #include <string>
 #include <iostream>
 #include <fstream>
+#include <vector>
+#include <Eigen/Core>
+#include <Eigen/Geometry>
 
 struct Path {
 	typedef Eigen::Matrix<float, 4, 4, Eigen::ColMajor> GLMatrix;

@@ -2,8 +2,6 @@
 #define OMPLAUX_CLEARANCE_H
 
 #include <fcl/fcl.h> // This incldued eigen as well.
-#include <igl/readOBJ.h>
-#include <igl/per_vertex_normals.h>
 #include <fcl/narrowphase/detail/traversal/collision_node.h>
 #include <fcl/narrowphase/distance.h>
 #include <fcl/narrowphase/distance_result.h>
@@ -11,31 +9,11 @@
 #include <random>
 #include <iostream>
 #include <math.h>
+#include "geo.h"
 
-struct Geo {
-	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> V;
-	Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> GPUV;
-	Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> F;
-	Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> N;
-
-	Eigen::Vector3d center;
-
-	void read(const std::string& fn)
-	{
-		igl::readOBJ(fn, V, F);
-		//center << 0.0, 0.0, 0.0; // Origin
-		center = V.colwise().mean().cast<double>();
-		//center << 16.973146438598633, 1.2278236150741577, 10.204807281494141;
-		// From OMPL.app, no idea how they get this.
-		GPUV = V.cast<float>();
-		igl::per_vertex_normals(GPUV, F, N);
-		std::cerr << "center: " << center << std::endl;
-#if 0
-		std::cerr << N << std::endl;;
-#endif
-	}
-};
-
+/*
+ * BV: bounding volume, like fcl::OBBRSS<double>
+ */
 template<typename BV>
 class ClearanceCalculator {
 private:
@@ -95,7 +73,6 @@ public:
 		return result.min_distance;
 	}
 
-	// Wait, what's this...
 	void setC(double min, double max)
 	{
 		min_tr_ = min;
