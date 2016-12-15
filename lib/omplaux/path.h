@@ -86,7 +86,7 @@ struct Path {
 	{
 		Eigen::Matrix<double, 6, 1> ret;
 		Eigen::Vector3d ea = trmat.block<3,3>(0,0).eulerAngles(0,1,2);
-		ret << trmat(0,3), trmat(1,3), trmat(2,3), ea(0), ea(1), ea(3);
+		ret << trmat(0,3), trmat(1,3), trmat(2,3), ea(0), ea(1), ea(2);
 		return ret;
 	}
 };
