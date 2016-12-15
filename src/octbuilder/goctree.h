@@ -11,6 +11,7 @@
 #include <Eigen/Core>
 #include <memory>
 #include <vector>
+#include <set>
 
 struct GOcTreeNodeNoAttribute {
 };
@@ -202,7 +203,6 @@ public:
 		return getBoundaryDescendant(neighbor, dimension, -direction);
 	}
 
-	// TODO: Fill the skeleton.
 	static std::vector<GOcTreeNode*>
 	getBoundaryDescendant(GOcTreeNode* from, int dimension, int direction)
 	{
@@ -223,6 +223,18 @@ public:
 		}
 		return ret;
 	}
+
+	static void setAdjacency(GOcTreeNode *lhs, GOcTreeNode *rhs)
+	{
+		if (lhs == rhs)
+			return ;
+		lhs->adj_.insert(rhs);
+		rhs->adj_.insert(lhs);
+	}
+
+	const std::set<GOcTreeNode*>& getAdjacency() const { return adj_; }
+private:
+	std::set<GOcTreeNode*> adj_;
 };
 
 #endif

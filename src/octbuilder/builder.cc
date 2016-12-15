@@ -6,7 +6,9 @@
 #include <string>
 #include <functional>
 #include <deque>
+#include <queue>
 #include <time.h>
+#include <climits>
 
 using std::string;
 
@@ -140,7 +142,12 @@ template<int ND,
 	 typename Space = TranslationWithEulerAngleGroup<ND, FLOAT>
 	>
 class OctreePathBuilder {
-	struct FindUnionAttribute {
+	struct PathBuilderAttribute {
+		static constexpr auto kUnviewedDistance = ULONG_MAX;
+		unsigned long distance = kUnviewedDistance;
+		const PathBuilderAttribute* prev = nullptr;
+	};
+	struct FindUnionAttribute : public PathBuilderAttribute {
 		mutable const FindUnionAttribute* parent;
 		mutable double volume = 0.0;
 
@@ -148,6 +155,7 @@ class OctreePathBuilder {
 		{
 			parent = this;
 		}
+
 		const FindUnionAttribute* getSet() const
 		{
 			const FindUnionAttribute* ret = this;
@@ -156,6 +164,7 @@ class OctreePathBuilder {
 			parent = ret;
 			return ret;
 		}
+
 		void merge(FindUnionAttribute* other)
 		{
 			if (getSet() == other->getSet())
@@ -294,6 +303,7 @@ public:
 							<< std::endl;
 #endif
 						node->merge(neighbor);
+						Node::setAdjacency(node, neighbor);
 #if 0
 						std::cerr << "\tAfter Volume: " << neighbor->getSet()->volume
 							<< " and " << node->getSet()->volume
@@ -324,8 +334,13 @@ public:
 		std::cerr << "Init: " << istate_.transpose() << std::endl;
 		std::cerr << "Goal: " << gstate_.transpose() << std::endl;
 		auto init_cube = determinizeCubeFromState(istate_);
-		decltype(init_cube) goal_cube = nullptr;
 		add_neighbors(init_cube);
+#if 0
+		auto goal_cube = determinizeCubeFromState(gstate_);
+		add_neighbors(goal_cube);
+#else
+		decltype(init_cube) goal_cube = nullptr;
+#endif
 		total_volume_ = root_->getVolume();
 		double max_cleared_distance = 0.0;
 		Eigen::VectorXd max_cleared_median;
@@ -393,9 +408,47 @@ public:
 				rearm_timer();
 			}
 		}
+		init_cube_ = init_cube;
+		goal_cube_ = goal_cube;
 	}
 
 	Node* getRoot() { return root_.get(); }
+
+	std::vector<Eigen::VectorXd> buildPath()
+	{
+		init_cube_->distance = 0;
+		init_cube_->prev = init_cube_; // Only circular one
+		auto cmp = [](Node* lhs, Node* rhs) -> bool { return lhs->distance < rhs->distance; };
+		// priority_queue:
+		//      cmp(top, other) always returns false.
+		std::priority_queue<Node*, std::deque<Node*>, decltype(cmp)> Q(cmp);
+		Q.push(init_cube_);
+		bool goal_reached = false;
+		while (!Q.empty() && !goal_reached) {
+			auto tip = Q.top();
+			Q.pop();
+			for (auto adj : tip->getAdjacency()) {
+				if (adj->prev) // No re-insert
+					continue;
+				adj->prev = tip;
+				adj->distance = tip->distance + 1;
+				Q.push(adj);
+				if (adj == goal_cube_) {
+					goal_reached = true;
+					break;
+				}
+			}
+		}
+		std::vector<Eigen::VectorXd> ret;
+		const Node* node = goal_cube_;
+		while (node->prev != node) {
+			ret.emplace_back(Path::stateToPath<double>(node->getMedian()));
+			node = static_cast<const Node*>(node->prev);
+		}
+		ret.emplace_back(node->getMedian());
+		std::reverse(ret.begin(), ret.end());
+		return ret;
+	}
 
 private:
 	std::vector<Node*> split_cube(Node* node)
@@ -478,12 +531,23 @@ private:
 	time_t last_time_ = 0;
 	double fixed_volume_;
 	double total_volume_;
+	Node *init_cube_ = nullptr;
+	Node *goal_cube_ = nullptr;
 };
 
 void press_enter()
 {
-	std::cout << "Done, press enter to exit" << std::endl;
+	std::cerr << "Done, press enter to exit" << std::endl;
 	std::cin.ignore(std::numeric_limits<std::streamsize>::max(),'\n');
+}
+
+// FIXME: put this into some lib
+std::ostream& operator<<(std::ostream& fout, const std::vector<Eigen::VectorXd>& milestones)
+{
+	for(const auto& m : milestones) {
+		fout << m.transpose() << std::endl;
+	}
+	return fout;
 }
 
 int main(int argc, char* argv[])
@@ -559,6 +623,7 @@ int main(int argc, char* argv[])
 		double end_t = path.T.size() - 1;
 		builder.setupGoal(Path::matrixToState(path.interpolate(robot, end_t)));
 		builder.buildOcTree(robot, env, cc);
+		std::cout << builder.buildPath();
 		press_enter();
 	}
 

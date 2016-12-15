@@ -81,6 +81,23 @@ struct Path {
 		return ret;
 	}
 
+	template<typename FLOAT>
+	static Eigen::Matrix<FLOAT, 7, 1> stateToPath(const Eigen::Matrix<FLOAT, 6, 1>& state)
+	{
+		Eigen::Matrix<FLOAT, 7, 1>  ret;
+		Eigen::Quaternion<FLOAT> Q;
+		using Vector3F = Eigen::Matrix<FLOAT, 3, 1>;
+
+		Eigen::AngleAxis<FLOAT> r(state(3), Vector3F::UnitX());
+		Eigen::AngleAxis<FLOAT> p(state(4), Vector3F::UnitY());
+		Eigen::AngleAxis<FLOAT> y(state(5), Vector3F::UnitZ());
+		Q = r * p * y;
+
+		ret << state(0), state(1), state(2),
+		       Q.x(), Q.y(), Q.z(), Q.w();
+		return ret;
+	}
+
 	// TODO: check consistency b/w stateToMatrix and matrixToState
 	static Eigen::Matrix<double, 6, 1> matrixToState(const GLMatrixd& trmat)
 	{
