@@ -143,8 +143,8 @@ template<int ND,
 	>
 class OctreePathBuilder {
 	struct PathBuilderAttribute {
-		static constexpr auto kUnviewedDistance = ULONG_MAX;
-		unsigned long distance = kUnviewedDistance;
+		//static constexpr auto kUnviewedDistance = ULONG_MAX;
+		double distance; // = kUnviewedDistance;
 		const PathBuilderAttribute* prev = nullptr;
 	};
 	struct FindUnionAttribute : public PathBuilderAttribute {
@@ -431,7 +431,7 @@ public:
 				if (adj->prev) // No re-insert
 					continue;
 				adj->prev = tip;
-				adj->distance = tip->distance + 1;
+				adj->distance = tip->distance + 1.0/pow(2.0, tip->getDepth());
 				Q.push(adj);
 				if (adj == goal_cube_) {
 					goal_reached = true;
@@ -441,11 +441,13 @@ public:
 		}
 		std::vector<Eigen::VectorXd> ret;
 		const Node* node = goal_cube_;
+		ret.emplace_back(Path::stateToPath<double>(gstate_));
 		while (node->prev != node) {
 			ret.emplace_back(Path::stateToPath<double>(node->getMedian()));
 			node = static_cast<const Node*>(node->prev);
 		}
-		ret.emplace_back(node->getMedian());
+		ret.emplace_back(Path::stateToPath<double>(node->getMedian()));
+		ret.emplace_back(Path::stateToPath<double>(istate_));
 		std::reverse(ret.begin(), ret.end());
 		return ret;
 	}
