@@ -32,15 +32,25 @@ int main(int argc, char* argv[])
 	GLFWwindow *window = init_glefw(800, 600, "Alpha animation");
 	GUI gui(window);
 
+#if 0
 	string robotfn = "../res/alpha/alpha-1.2.org.obj";
 	string envfn = "../res/alpha/alpha_env-1.2.org.obj";
 	string pathfn = "../res/alpha/alpha-1.2.org.path";
+#else
+	string robotfn = "../res/simple/robot.obj";
+	string envfn = "../res/simple/env.obj";
+	string pathfn = "1.path";
+#endif
 	Geo robot, env;
 	Path path;
 	robot.read(robotfn);
 	env.read(envfn);
 	path.readPath(pathfn);
+#if 0
 	robot.center << 16.973146438598633, 1.2278236150741577, 10.204807281494141; // From OMPL.app, no idea how they get this.
+#else
+	robot.center << 0.0, 0.0, 0.0;
+#endif
 	//robot.center << 17.491058349609375, 1.386110782623291, 10.115392684936523; // It changed, we also don't know why, but this one doesn't work.
 
 	double t = 0.0;
@@ -110,6 +120,7 @@ int main(int argc, char* argv[])
 	ShaderUniform yellow_diffuse = { "diffuse", vector_binder, yellow_color_data };
 	ShaderUniform robot_model = { "model", matrix_binder, robot_model_data };
 
+	std::cerr << robot.GPUV << std::endl;
 	RenderDataInput robot_pass_input;
 	robot_pass_input.assign(0, "vertex_position", robot.GPUV.data(), robot.GPUV.rows(), 3, GL_FLOAT);
 	robot_pass_input.assign(1, "normal", robot.N.data(), robot.N.rows(), 3, GL_FLOAT);
@@ -173,9 +184,11 @@ int main(int argc, char* argv[])
 		gui.updateMatrices();
 		mats = gui.getMatrixPointers();
 
-		t += 1.0/12.0;
+		t += 1.0/60.0;
 		robot_transform_matrix = path.interpolate(robot, t);
+		//robot_transform_matrix(0, 3) = t;
 		alpha_model_matrix = robot_transform_matrix.cast<float>();
+		std::cerr << "Transform matrix:\n " << robot_transform_matrix << std::endl;
 
 		robot_pass.setup();
 		CHECK_GL_ERROR(glDrawElements(GL_TRIANGLES, robot.F.rows() * 3,
@@ -190,7 +203,7 @@ int main(int argc, char* argv[])
 		glfwPollEvents();
 		glfwSwapBuffers(window);
 		double mindist = cc.getDistance(robot_transform_matrix);
-		auto clearance = cc.getClearanceCube(robot_transform_matrix, mindist).transpose();
+		auto clearance = cc.getClearanceCube(robot_transform_matrix, mindist);
 		std::cerr << "Distance " << mindist
 		          << "\tClearance: " << clearance
 			  << std::endl;
