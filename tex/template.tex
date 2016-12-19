@@ -188,16 +188,20 @@ Let the cell's dimensions be $2w_x \times 2w_y \times 2w_z \times 2w_{\phi} \tim
 %&\leq \sqrt{w_x^2 + w_y^2+w_z^2} + \|\bp\|\|R_c - R_s\| \\
 \end{align*}
 
-To bound the second term, we need to decompose $R_c$ and $R_s$.
+To bound the second term, we need to decompose $R_c^{-1}R_s$.
 Let $R_X(\phi)$, $R_Y(\theta)$, $R_Z(\psi)$ be rotation matrices w.r.t x, y and z axes.
 Thus we can decompose $R_c$ into $R_Z(\psi_c)R_Y(\theta_c)R_X(\phi_c)$, where $psi_c$, $theta_c$, $\phi_c$ are the Euler angles of $R_c$.
 Similarly we have $R_s=R_Z(\psi_s)R_Y(\theta_s)R_X(\phi_s)$.
-Hence 
+Hence,
+\emph{FIXME!!: EULER ANGLES ARE NOT VECTORS, THEY DO NOT COMMUTE}
 \begin{align*}
 	R_c^{-1}R_s &= (R_Z(\psi_c)R_Y(\theta_c)R_X(\phi_c))^{-1}(R_Z(\psi_s)R_Y(\theta_s)R_X(\phi_s)) \\
 	&= R_X(-\phi_c)(R_Y(-\theta_c)(R_Z(-\psi_c)R_Z(\psi_s))R_Y(\theta_s))R_X(\phi_s) \\
+	&= R_X(-\phi_c)(R_Y(-\theta_c)R_Z(\psi_s-\psi_c)R_Y(\theta_s))R_X(\phi_s) \\
 	&= R_Z(\psi_s-\psi_c)R_Y(\theta_s-\theta_c)R_X(\phi_s-\phi_c) \\
+	&= R_Z(\bar{\psi})R_Y(\bar{\theta})R_X(\bar{\phi}) \\
 \end{align*}
+\emph{FIXME!!: WE ONLY NEED TO BOUND THOSE BAR ANGLES}
 Therefore
 \begin{align*}
 	 & \| \bp - R_c^{-1}R_s \bp\| \\
