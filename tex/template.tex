@@ -117,7 +117,8 @@ $$\Cobs = \left\{\bq \in Q \ \vert \ \cm(\bq) \cap \co \neq \emptyset\right\},$$
 and $\Cfree = Q \setminus \Cobs$ the complementary, feasible space. 
 
 For the purposes of computation, we will restrict our attention to a bounded region $R$ of configuration space, and parameterize the rotational degrees of freedom by Euler angles: $R$ is then a rectangular box in six-dimensional Euclidean space
-$$R = [a_x, b_x] \times [a_y, b_y] \times [a_z, b_z] \times [-\pi,\pi] \times [0,\pi] \times [-\pi,\pi]$$
+$$R = [a_x, b_x] \times [a_y, b_y] \times [a_z, b_z] \times [0,2\pi] \times [-\pi,\pi] \times [0, 2\pi]$$
+% Note: here we use the Tait-Bryan convention
 with the $\phi$ and $\psi$ dimensions periodic. The full configuration space $Q$ extends past $R$ in the $x,y,z$ directions, but we assume that the box is large enough that the entirety of $\Cobs$ lies inside the box. Let $B$ denote the six hyperfaces of $R$ where $x,y$ or $z$ attain their extreme values; given an initial configuration $\bq_0$, the untangling problem can then be formalized as: \textbf{does there exist a path $\gamma$ from $\bq_0$ to $B$, with $\gamma \in \Cfree$?} Here a path is curve in $R$ that is continuous, except for jump discontinuities wherever $\gamma$ ``wraps around'' in the $\phi$ or $\psi$ directions.
 \section{Goals}
 If it were feasible to explicitly construct a mesh representing $\Cfree$ (or its five-dimensional boundary) the untangling problem would be trivial: a path exists if the connected component (taking into account the periodicity of $R$) of $\Cfree$ containing $\bq_0$ abuts any part of $B$. If a path exists, it can then be reconstructed using e.g. a breadth-first search.
@@ -182,9 +183,46 @@ Let the cell's dimensions be $2w_x \times 2w_y \times 2w_z \times 2w_{\phi} \tim
 &= \|\bt_c - \bt_s\| + \|R_c \bp - R_c R_c^{-1}R_s \bp\|\\
 &= \|\bt_c - \bt_s\| + \| \bp - R_c^{-1}R_s \bp\|\\
 &\leq \sqrt{w_x^2 + w_y^2+w_z^2} + \| \bp - R_c^{-1}R_s \bp\|\\
+%&\leq \sqrt{w_x^2 + w_y^2+w_z^2} + \|\bp\|\| I - R_c^{-1}R_s\|\\
+%&\leq \sqrt{w_x^2 + w_y^2+w_z^2} + \|(R_c - R_s)\bp\| \\
+%&\leq \sqrt{w_x^2 + w_y^2+w_z^2} + \|\bp\|\|R_c - R_s\| \\
 \end{align*}
 
-XXX Todo: bound on the angular part?
+To bound the second term, we need to decompose $R_c$ and $R_s$.
+Let $R_X(\phi)$, $R_Y(\theta)$, $R_Z(\psi)$ be rotation matrices w.r.t x, y and z axes.
+Thus we can decompose $R_c$ into $R_Z(\psi_c)R_Y(\theta_c)R_X(\phi_c)$, where $psi_c$, $theta_c$, $\phi_c$ are the Euler angles of $R_c$.
+Similarly we have $R_s=R_Z(\psi_s)R_Y(\theta_s)R_X(\phi_s)$.
+Hence 
+\begin{align*}
+	R_c^{-1}R_s &= (R_Z(\psi_c)R_Y(\theta_c)R_X(\phi_c))^{-1}(R_Z(\psi_s)R_Y(\theta_s)R_X(\phi_s)) \\
+	&= R_X(-\phi_c)(R_Y(-\theta_c)(R_Z(-\psi_c)R_Z(\psi_s))R_Y(\theta_s))R_X(\phi_s) \\
+	&= R_Z(\psi_s-\psi_c)R_Y(\theta_s-\theta_c)R_X(\phi_s-\phi_c) \\
+\end{align*}
+Therefore
+\begin{align*}
+	 & \| \bp - R_c^{-1}R_s \bp\| \\
+	=& \| \bp - R_Z(\psi_s-\psi_c)R_Y(\theta_s-\theta_c)R_X(\phi_s-\phi_c)\bp\| \\
+	\le& \| \bp - R_X(\phi_s-\phi_c)\bp \| \\
+	 &+ \| R_X(\phi_s-\phi_c)\bp - R_Y(\theta_s-\theta_c)R_X(\phi_s-\phi_c)\bp \| \\
+	 &+ \|R_Y(\theta_s-\theta_c)R_X(\phi_s-\phi_c)\bp \\
+	 &  - R_Z(\psi_s-\psi_c)R_Y(\theta_s-\theta_c)R_X(\phi_s-\phi_c)\bp\| \\
+	=& \| (I - R_X(\phi_s-\phi_c))\bp \| \\
+	 &+ \| (I - R_Y(\theta_s-\theta_c))R_X(\phi_s-\phi_c)\bp \| \\
+	 &+ \| (I - R_Z(\psi_s-\psi_c))R_Y(\theta_s-\theta_c)R_X(\phi_s-\phi_c)\bp\| \\
+	=& \| 2\sin(\frac{\phi_s-\phi_c}{2})\bp \| \\
+	 &+ \| 2\sin(\frac{\theta_s-\theta_c}{2})R_X(\phi_s-\phi_c)\bp \| \\
+	 &+ \| 2\sin(\frac{\psi_s-\psi_c}{2})R_Y(\theta_s-\theta_c)R_X(\phi_s-\phi_c)\bp\| \\
+	\le& \| 2\sin(w_\phi)\bp \| \\
+	 &+ \| 2\sin(w_\theta)R_X(\phi_s-\phi_c)\bp \| \\
+	 &+ \| 2\sin(w_\psi)R_Y(\theta_s-\theta_c)R_X(\phi_s-\phi_c)\bp\| \\
+	=& 2\|\bp\|(|\sin(w_\phi)|+|\sin(w_\theta)|+|\sin(w_\psi)|)
+\end{align*}
+Thus, the upper bound of $\|\bt_c + R_c\bp - \bt_s - R_s\bp\|$ is
+\[
+\sqrt{w_x^2 + w_y^2+w_z^2} + 2\|\bp\|(|\sin(w_\phi)|+|\sin(w_\theta)|+|\sin(w_\psi)|)
+\]
+
+% TODO: We need a figure here
 
 Now that we have $D$, we can use it to classify the cell. Suppose that $\bc \in \Cfree$, so that the cell is either a free cell, or an unknown cell. We compute the \emph{closest distance} $D_c$ between $\co$ and $\cm(\bc)$:
 $$D_c = \min_{\bx \in \co} \min_{\by \in \cm(\bc)} \|\bx-\by\|.$$
@@ -198,3 +236,5 @@ If $D < D_p$, the cell is guaranteed to be an obstacle cell. Otherwise, its stat
 \bibliographystyle{acmsiggraph}
 \bibliography{template}
 \end{document}
+
+% vim: tw=0
