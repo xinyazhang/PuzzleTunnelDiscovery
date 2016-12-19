@@ -589,14 +589,14 @@ int main(int argc, char* argv[])
 #elif 0
 	double tmin = -30;
 	double tmax = 30;
-	min << tmin, tmin, tmin, -M_PI/2.0,      0.0,      0.0;
-	max << tmax, tmax, tmax,  M_PI/2.0, M_PI * 2, M_PI * 2;
+	min << tmin, tmin, tmin, M_PI*0.0, -M_PI/2.0, M_PI*0.0;
+	max << tmax, tmax, tmax, M_PI*2.0,  M_PI/2.0, M_PI*2.0;
 	cc.setC(tmin, tmax);
 #else
 	double bbmin, bbmax;
 	omplaux::calculateSceneBoundingBox(robot, env, path, bbmin, bbmax);
-	min << bbmin, bbmin, bbmin, -M_PI/2.0,      0.0,      0.0;
-	max << bbmax, bbmax, bbmax,  M_PI/2.0, M_PI * 2, M_PI * 2;
+	min << bbmin, bbmin, bbmin, M_PI*0.0, -M_PI/2.0, M_PI*0.0;
+	max << bbmax, bbmax, bbmax, M_PI*2.0,  M_PI/2.0, M_PI*2.0;
 	std::cerr << "Bounding box\n"
 	          << "\tmin: " << min.transpose() << "\n"
 		  << "\tmax: " << max.transpose() << std::endl;
