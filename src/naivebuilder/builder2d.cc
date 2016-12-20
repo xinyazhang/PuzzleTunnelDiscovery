@@ -464,12 +464,10 @@ std::ostream& operator<<(std::ostream& fout, const std::vector<Eigen::VectorXd>&
 
 int worker(NaiveRenderer* renderer)
 {
-	string envfn = "../res/2d/env.obj";
-	string pathfn = "../res/2d/naive.path";
-
+	string envfn = "../res/simple/Torus.obj";
 	Geo env;
-
 	env.read(envfn);
+	env.V.block(0, 2, env.V.rows(), 1) *= 0.0001;
 
 	renderer->setEnv(&env);
 	NaiveClearance cc(env);

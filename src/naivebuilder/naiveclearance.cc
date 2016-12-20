@@ -14,7 +14,7 @@ struct NaiveClearance::NaiveClearancePrivate {
 
 	const Geo& env;
 	BVHModel env_bvh;
-	fcl::Sphere<Scalar> rob{0.0001};
+	fcl::Sphere<Scalar> rob{0.001};
 
 	NaiveClearancePrivate(const Geo* _env)
 		:env(*_env)
@@ -54,6 +54,10 @@ NaiveClearance::~NaiveClearance()
 {
 }
 
+namespace {
+	constexpr double sqrt2 = 1.41421356237;
+};
+
 Eigen::VectorXd NaiveClearance::getCertainCube(const Eigen::Vector2d& state, bool &isfree)
 {
 	using Scalar = double;
@@ -72,6 +76,9 @@ Eigen::VectorXd NaiveClearance::getCertainCube(const Eigen::Vector2d& state, boo
 	auto d = result.min_distance;
 	isfree = d > 0;
 
-	return Eigen::Vector2d(fabs(d), fabs(d));
+	std::cerr << "\tState: " << state.transpose() << "\tDistance: " << d << std::endl;
+	double cd = fabs(d) / sqrt2;
+
+	return Eigen::Vector2d(cd, cd);
 }
 
