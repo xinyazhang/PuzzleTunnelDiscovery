@@ -136,6 +136,7 @@ public:
 
 	unsigned getVAO() const { return unsigned(vao_); }
 	void updateVBO(int position, const void* data, size_t nelement);
+	void updateIndex(const void* data, size_t nelement);
 	void setup();
 	/*
  	 * Note: here we don't have an unified render() function, because the
@@ -150,6 +151,8 @@ public:
 	 * corresponding uniforms for Phong shading.
 	 */
 	bool renderWithMaterial(int i); // return false if material id is invalid
+
+	RenderDataInput& getInput() { return input_; }
 private:
 	void initMaterialUniform();
 	void createMaterialTexture();

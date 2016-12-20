@@ -184,4 +184,7 @@ TARGET_LINK_LIBRARIES(freecube fcl renderer omplaux ${CMAKE_THREAD_LIBS_INIT} ${
 
 EASYADD(octbuilder)
 TARGET_LINK_LIBRARIES(octbuilder fcl omplaux ${CMAKE_THREAD_LIBS_INIT})
+
+EASYADD(naivebuilder)
+TARGET_LINK_LIBRARIES(naivebuilder fcl renderer omplaux ${CMAKE_THREAD_LIBS_INIT} ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY})
 # vim: tw=0

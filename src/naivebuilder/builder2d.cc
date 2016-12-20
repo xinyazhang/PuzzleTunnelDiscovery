@@ -1,5 +1,6 @@
 #include "naiveclearance.h"
 #include "naivespace.h"
+#include "naiverenderer.h"
 #include "goctree.h"
 #include <string>
 #include <functional>
@@ -73,9 +74,9 @@ public:
 #endif
 	typedef typename Node::Coord Coord;
 
-	OctreePathBuilder()
+	OctreePathBuilder(NaiveRenderer* renderer)
+		:renderer_(renderer)
 	{
-		renderer_.reset(new NaiveRenderer);
 	}
 
 	void setupSpace(const Coord& mins, const Coord& maxs, const Coord& res)
@@ -113,7 +114,7 @@ public:
 					next->setState(Node::kCubeFree);
 				else
 					next->setState(Node::kCubeFull);
-				drawCertain(node);
+				drawCertain(next);
 			}
 			current = next;
 			// Add the remaining to the list.
@@ -304,6 +305,7 @@ public:
 
 	Node* getRoot() { return root_.get(); }
 
+#if 0
 	std::vector<Eigen::VectorXd> buildPath()
 	{
 		init_cube_->distance = 0;
@@ -341,6 +343,7 @@ public:
 		std::reverse(ret.begin(), ret.end());
 		return ret;
 	}
+#endif
 
 	void drawSplit(Node* node)
 	{
@@ -349,7 +352,7 @@ public:
 
 	void drawCertain(Node* node)
 	{
-		renderer_->addCertain(node->getMedian(), node->getMins(), node->getMaxs());
+		renderer_->addCertain(node->getMedian(), node->getMins(), node->getMaxs(), node->getState() == Node::kCubeFree);
 	}
 
 	void setupRenderer(NaiveRenderer* renderer)
@@ -366,7 +369,7 @@ private:
 		std::cerr << "Splitting (" << node->getMedian().transpose()
 		          << ")\t depth: " << node->getDepth() << std::endl;
 #endif
-		drawSplit(node->getMedian(), node->getMins(), node->getMaxs());
+		drawSplit(node);
 
 		std::vector<Node*> ret;
 		for (unsigned long index = 0; index < (1 << ND); index++) {
@@ -465,9 +468,7 @@ int worker(NaiveRenderer* renderer)
 	string pathfn = "../res/2d/naive.path";
 
 	Geo env;
-	Path path;
 
-	robot.read(robotfn);
 	env.read(envfn);
 
 	renderer->setEnv(&env);
@@ -487,7 +488,7 @@ int worker(NaiveRenderer* renderer)
 
 	// We want template instantiation, but we don't want to run
 	// the code.
-	Builder builder;
+	Builder builder(renderer);
 	builder.setupSpace(min, max, res);
 	builder.setupRenderer(renderer);
 	Coord init_p, goal_p;
@@ -500,7 +501,7 @@ int worker(NaiveRenderer* renderer)
 	renderer->workerReady();
 
 	builder.buildOcTree(cc);
-	std::cout << builder.buildPath();
+	// std::cout << builder.buildPath();
 	press_enter();
 
 	return 0;

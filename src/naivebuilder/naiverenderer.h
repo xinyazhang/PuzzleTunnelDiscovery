@@ -2,6 +2,7 @@
 #define NAIVE_RENDERER_H
 
 #include <Eigen/Core>
+#include <memory>
 
 struct Geo;
 
@@ -12,7 +13,8 @@ public:
 			      const Eigen::VectorXd& maxs) {}
 	virtual void addCertain(const Eigen::VectorXd& center, 
 				const Eigen::VectorXd& mins,
-				const Eigen::VectorXd& maxs) {}
+				const Eigen::VectorXd& maxs,
+				bool isfree) {}
 	virtual void setEnv(const Geo*) {};
 	virtual void workerReady() {};
 };
@@ -27,7 +29,8 @@ public:
 			      const Eigen::VectorXd& maxs);
 	virtual void addCertain(const Eigen::VectorXd& center, 
 				const Eigen::VectorXd& mins,
-				const Eigen::VectorXd& maxs);
+				const Eigen::VectorXd& maxs,
+				bool isfree);
 
 	void init();
 	void launch_worker(std::function<int(NaiveRenderer*)>);

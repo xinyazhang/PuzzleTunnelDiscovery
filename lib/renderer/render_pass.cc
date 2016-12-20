@@ -252,6 +252,20 @@ void RenderPass::updateVBO(int position, const void* data, size_t size)
 				data, GL_STATIC_DRAW));
 }
 
+void RenderPass::updateIndex(const void* data, size_t nelement)
+{
+	if (!input_.hasIndex())
+		throw __func__+std::string(": error, render input does not have index buffer.");
+	auto meta = input_.getIndexMeta();
+	// The last one must be index buffer
+	CHECK_GL_ERROR(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,
+				glbuffers_.back()
+				));
+	CHECK_GL_ERROR(glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+				meta.getElementSize() * nelement,
+				data, GL_STATIC_DRAW));
+}
+
 void RenderPass::setup()
 {
 	// Switch to our object VAO.

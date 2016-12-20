@@ -11,6 +11,7 @@
 #include <Eigen/Core>
 #include <memory>
 #include <vector>
+#include <bitset>
 #include <set>
 
 struct GOcTreeNodeNoAttribute {

@@ -45,8 +45,8 @@ struct NaiveClearance::NaiveClearancePrivate {
 
 };
 
-NaiveClearance::NaiveClearance(Geo* env)
-	:p_(new NaiveClearancePrivate(env))
+NaiveClearance::NaiveClearance(Geo& env)
+	:p_(new NaiveClearancePrivate(&env))
 {
 }
 
@@ -56,6 +56,9 @@ NaiveClearance::~NaiveClearance()
 
 Eigen::VectorXd NaiveClearance::getCertainCube(const Eigen::Vector2d& state, bool &isfree)
 {
+	using Scalar = double;
+	using Transform3 = fcl::Transform3<Scalar>;
+
 	Transform3 tf{Transform3::Identity()};
 	tf.translation() = fcl::Vector3<Scalar>(state.x(), state.y(), 0.0);
 	
@@ -65,7 +68,7 @@ Eigen::VectorXd NaiveClearance::getCertainCube(const Eigen::Vector2d& state, boo
 	request.gjk_solver_type = fcl::GST_LIBCCD;
 	fcl::DistanceResult<Scalar> result;
 
-	fcl::distance(&p_->rob, tf, &p_->env, Transform3::Identity(), request, result);
+	fcl::distance(&p_->rob, tf, &p_->env_bvh, Transform3::Identity(), request, result);
 	auto d = result.min_distance;
 	isfree = d > 0;
 
