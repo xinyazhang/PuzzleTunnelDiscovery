@@ -14,8 +14,6 @@ template<int ND, typename FLOAT, typename Node>
 bool
 coverage(const Eigen::Matrix<FLOAT, ND, 1>& state,  const Eigen::VectorXd& clearance, Node *node)
 {
-	// NOTE: check getClearanceCube for the exact meaning of clearance
-	// vector.
 	typename Node::Coord mins, maxs;
 	node->getBV(mins, maxs);
 	//std::cerr << "mins: " << mins.transpose() << " should > " << (state - clearance.segment<ND>(0)).transpose() << std::endl;
@@ -472,6 +470,7 @@ int worker(NaiveRenderer* renderer)
 	robot.read(robotfn);
 	env.read(envfn);
 
+	renderer->setEnv(&env);
 	NaiveClearance cc(env);
 
 	using Builder = OctreePathBuilder<2, double, decltype(cc)>;
@@ -497,6 +496,9 @@ int worker(NaiveRenderer* renderer)
 
 	builder.setupInit(init_p);
 	builder.setupGoal(goal_p);
+
+	renderer->workerReady();
+
 	builder.buildOcTree(cc);
 	std::cout << builder.buildPath();
 	press_enter();

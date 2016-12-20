@@ -1,26 +1,17 @@
 #ifndef OMPLAUX_CLEARANCE_H
 #define OMPLAUX_CLEARANCE_H
 
-#include <string>
-#include <random>
+#include <Eigen/Core>
 #include <iostream>
-#include <math.h>
+#include <memory>
 #include "geo.h"
 
 class NaiveClearance {
-private:
-	const Geo &env_;
-	using Scalar = typename BV::S;
 public:
-	NaiveClearance(Geo& env)
-		:env_(env)
-	{
-	}
+	NaiveClearance(Geo& env);
+	~NaiveClearance();
 
-	Eigen::VectorXd getCertainCube(const Eigen::Vector2d& state, bool &isfree)
-	{
-		// TODO
-	}
+	Eigen::VectorXd getCertainCube(const Eigen::Vector2d& state, bool &isfree);
 
 	void setC(double min, double max)
 	{
@@ -37,5 +28,8 @@ public:
 protected:
 	double min_tr_, max_tr_;
 	Eigen::Vector2d csize_; // translation size, rotation size
+
+	struct NaiveClearancePrivate;
+	std::unique_ptr<NaiveClearancePrivate> p_;
 };
 #endif
