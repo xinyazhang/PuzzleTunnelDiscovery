@@ -10,7 +10,7 @@
 struct Naive2DRenderer::Private {
 	GLFWwindow *window;
 	std::unique_ptr<GUI> gui;
-	const Geo* env;
+	Geo env;
 	std::unique_ptr<std::thread> worker;
 	std::mutex mutex;
 
@@ -19,8 +19,14 @@ struct Naive2DRenderer::Private {
 		mutex.lock();
 	}
 
+	~Private()
+	{
+		if (worker)
+			worker->join();
+	}
+
 	struct VF {
-		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> V;
+		Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> V;
 		Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> F;
 	};
 
@@ -61,13 +67,13 @@ struct Naive2DRenderer::Private {
 
 	template <typename Scalar>
 	static void append_matrix(
-		Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& src,
+		const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& src,
 		Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& tgt,
 		Scalar base
 		)
 	{
 		int newblkrow = tgt.rows();
-		tgt.conservativeResize(tgt.rows() + src.rows(), tgt.cols());
+		tgt.conservativeResize(tgt.rows() + src.rows(), src.cols());
 		tgt.block(newblkrow, 0, src.rows(), tgt.cols()) = src.array() + base;
 	}
 
@@ -75,8 +81,14 @@ struct Naive2DRenderer::Private {
 			Eigen::MatrixXi& F,
 			VF& vf)
 	{
-		append_matrix<double>(V, vf.V, 0.0);
-		append_matrix<int>(F, vf.F, vf.F.rows());
+		//std::cerr << "Incoming VF\n" << V <<"\n" << F << std::endl;
+		append_matrix<int>(F, vf.F, vf.V.rows());
+		append_matrix<float>(V.cast<float>(), vf.V, 0.0f);
+#if 0
+		std::cerr << "Appended VF\n" << vf.V <<"\n" << vf.F << std::endl;
+		std::cerr << "Test V(0,0)\n" << vf.V(0,0) << std::endl;
+		std::cerr << "Appended VF sizes\n" << vf.V.rows() <<"\n" << vf.F.rows() << std::endl;
+#endif
 	}
 
 	bool wireframe_dirty = false;
@@ -136,7 +148,7 @@ void Naive2DRenderer::launch_worker(std::function<int(NaiveRenderer*)> fn)
 
 void Naive2DRenderer::setEnv(const Geo* env)
 {
-	p_->env = env;
+	p_->env = *env;
 }
 
 void Naive2DRenderer::workerReady()
@@ -208,6 +220,14 @@ int Naive2DRenderer::run()
 		static float color[4] = { 1.0f, 1.0f, 0.0f, 1.0f};
 		return color;
 	};
+	auto blue_color_data = []() -> const void* {
+		static float color[4] = { 0.0f, 0.0f, 1.0f, 1.0f};
+		return color;
+	};
+	auto white_color_data = []() -> const void* {
+		static float color[4] = { 1.0f, 1.0f, 1.0f, 1.0f};
+		return color;
+	};
 
 	ShaderUniform std_model = { "model", matrix_binder, std_model_data };
 	ShaderUniform std_view = { "view", matrix_binder, std_view_data };
@@ -217,12 +237,14 @@ int Naive2DRenderer::run()
 	ShaderUniform object_alpha = { "alpha", float_binder, alpha_data };
 	ShaderUniform red_diffuse = { "diffuse", vector_binder, red_color_data };
 	ShaderUniform yellow_diffuse = { "diffuse", vector_binder, yellow_color_data };
+	ShaderUniform blue_diffuse = { "diffuse", vector_binder, blue_color_data };
+	ShaderUniform white_diffuse = { "diffuse", vector_binder, white_color_data };
 
-	const Geo& env = *p_->env;
+	const Geo& env = p_->env;
 
 	RenderDataInput env_pass_input;
 	env_pass_input.assign(0, "vertex_position", env.GPUV.data(), env.GPUV.rows(), 3, GL_FLOAT);
-	env_pass_input.assign(1, "normal", env.N.data(), env.N.rows(), 3, GL_FLOAT);
+	//env_pass_input.assign(1, "normal", env.N.data(), env.N.rows(), 3, GL_FLOAT);
 	env_pass_input.assign_index(env.F.data(), env.F.rows(), 3);
 	RenderPass env_pass(-1,
 			env_pass_input,
@@ -237,11 +259,10 @@ int Naive2DRenderer::run()
 			  std_light,
 			  std_camera,
 			  object_alpha,
-			  yellow_diffuse
+			  blue_diffuse
 			  },
 			{ "fragment_color" }
 			);
-	// TODO: Tree Pass
 	RenderDataInput wireframe_pass_input;
 	wireframe_pass_input.assign(0, "vertex_position", nullptr, 0, 3, GL_FLOAT);
 	wireframe_pass_input.assign_index(nullptr, 0, 3);
@@ -279,7 +300,7 @@ int Naive2DRenderer::run()
 			  std_light,
 			  std_camera,
 			  object_alpha,
-			  yellow_diffuse
+			  white_diffuse
 			  },
 			{ "fragment_color" }
 			);
@@ -299,16 +320,17 @@ int Naive2DRenderer::run()
 			  std_light,
 			  std_camera,
 			  object_alpha,
-			  yellow_diffuse
+			  red_diffuse
 			  },
 			{ "fragment_color" }
 			);
 
+	std::cerr << "ENV Faces\n " << env.F << "\nVertices\n" << env.GPUV << std::endl;
 	while (!glfwWindowShouldClose(p_->window)) {
 		int window_width, window_height;
 		glfwGetFramebufferSize(p_->window, &window_width, &window_height);
 		glViewport(0, 0, window_width, window_height);
-		glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+		glClearColor(0.1f, 0.1f, 0.1f, 0.0f);
 		glEnable(GL_DEPTH_TEST);
 		glEnable(GL_MULTISAMPLE);
 		glEnable(GL_BLEND);
@@ -324,48 +346,62 @@ int Naive2DRenderer::run()
 		CHECK_GL_ERROR(glDrawElements(GL_TRIANGLES, env.F.rows() * 3,
 					GL_UNSIGNED_INT,
 					0));
+#if 1
 		p_->mutex.lock();
 
+		wireframe_pass.setup();
 		if (p_->wireframe_dirty) {
 			wireframe_pass.updateVBO(0, p_->wireframe.V.data(), p_->wireframe.V.rows());
 			wireframe_pass.updateIndex(p_->wireframe.F.data(), p_->wireframe.F.rows());
 			p_->wireframe_dirty = false;
 		}
-		wireframe_pass.setup();
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		CHECK_GL_ERROR(glDrawElements(GL_TRIANGLES, p_->wireframe.F.rows() * 3,
 					GL_UNSIGNED_INT,
 					0));
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
+		clear_pass.setup();
 		if (p_->clear_cubes_dirty) {
 			clear_pass.updateVBO(0, p_->clear_cubes.V.data(), p_->clear_cubes.V.rows());
 			clear_pass.updateIndex(p_->clear_cubes.F.data(), p_->clear_cubes.F.rows());
 			p_->clear_cubes_dirty = false;
 		}
-		clear_pass.setup();
 		CHECK_GL_ERROR(glDrawElements(GL_TRIANGLES, p_->clear_cubes.F.rows() * 3,
 					GL_UNSIGNED_INT,
 					0));
 
+		solid_pass.setup();
 		if (p_->solid_cubes_dirty) {
 			solid_pass.updateVBO(0, p_->solid_cubes.V.data(), p_->solid_cubes.V.rows());
 			solid_pass.updateIndex(p_->solid_cubes.F.data(), p_->solid_cubes.F.rows());
 			p_->solid_cubes_dirty = false;
 		}
-		solid_pass.setup();
 		CHECK_GL_ERROR(glDrawElements(GL_TRIANGLES, p_->solid_cubes.F.rows() * 3,
 					GL_UNSIGNED_INT,
 					0));
 
+#if 0
+		std::cerr << "ENV Faces\n " << env.F << "\nVertices\n" << env.V << std::endl;
+		//std::cerr << "ENV Faces\n " << env.F.rows() << "\nVertices\n" << env.V.rows() << std::endl;
+		std::cerr << " Faces " << p_->wireframe.F.rows()
+			  << "\t" << p_->clear_cubes.F.rows()
+			  << "\t" << p_->solid_cubes.F.rows()
+			  << std::endl;
+#endif
 		p_->mutex.unlock();
+#endif
+		env_pass.setup();
+		CHECK_GL_ERROR(glDrawElements(GL_TRIANGLES, env.F.rows() * 3,
+					GL_UNSIGNED_INT,
+					0));
 
 		glfwPollEvents();
 		glfwSwapBuffers(p_->window);
 	}
 	glfwDestroyWindow(p_->window);
 	p_->window = nullptr;
-	glfwTerminate();
+	//glfwTerminate();
 
 	return 0;
 }

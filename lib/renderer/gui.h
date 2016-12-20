@@ -55,7 +55,7 @@ private:
 	float zoom_speed_ = 2.0f;
 	float aspect_;
 
-	glm::vec3 eye_ = glm::vec3(0.0f, 15.0f, camera_distance_);
+	glm::vec3 eye_ = glm::vec3(0.0f, 0.0f, camera_distance_);
 	glm::vec3 up_ = glm::vec3(0.0f, 1.0f, 0.0f);
 	glm::vec3 look_ = glm::vec3(0.0f, 0.0f, -1.0f);
 	glm::vec3 tangent_ = glm::cross(look_, up_);

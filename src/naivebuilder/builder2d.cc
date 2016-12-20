@@ -11,14 +11,16 @@
 
 using std::string;
 
+void press_enter();
+
 template<int ND, typename FLOAT, typename Node>
 bool
 coverage(const Eigen::Matrix<FLOAT, ND, 1>& state,  const Eigen::VectorXd& clearance, Node *node)
 {
 	typename Node::Coord mins, maxs;
 	node->getBV(mins, maxs);
-	//std::cerr << "mins: " << mins.transpose() << " should > " << (state - clearance.segment<ND>(0)).transpose() << std::endl;
-	//std::cerr << "maxs: " << maxs.transpose() << " should < " << (state + clearance.segment<ND>(0)).transpose() << std::endl;
+	std::cerr << "mins: " << mins.transpose() << " should > " << (state - clearance.segment<ND>(0)).transpose() << std::endl;
+	std::cerr << "maxs: " << maxs.transpose() << " should < " << (state + clearance.segment<ND>(0)).transpose() << std::endl;
 	for (int i = 0; i < ND; i++) {
 		if (mins(i) < state(i) - clearance(i))
 			return false;
@@ -282,25 +284,30 @@ public:
 			if (goal_cube && goal_cube->getSet() == init_cube->getSet())
 				break;
 			if (timer_alarming()) {
-				double percent = (fixed_volume_ / total_volume_) * 100.0;
-				std::cerr << "Progress: " << percent
-				          << "%\t(" << fixed_volume_
-					  << " / " << total_volume_
-					  << ")\tMax cleared distance: " << max_cleared_distance
-					  << "\tcube median: " << max_cleared_median.transpose()
-					  << std::endl;
-				std::cerr << "\tInit Set: " << init_cube->getSet()
-					  << "\tInit Volume: " << init_cube->getSet()->volume
-					  << std::endl;
-				if (goal_cube)
-					std::cerr << "\tGoal Set: " << goal_cube->getSet()
-						  << "\tGoal Volume: " << goal_cube->getSet()->volume
-						  << std::endl;
+				verbose(init_cube, goal_cube, max_cleared_distance, max_cleared_median);
 				rearm_timer();
 			}
 		}
 		init_cube_ = init_cube;
 		goal_cube_ = goal_cube;
+	}
+
+	void verbose(Node* init_cube, Node* goal_cube, double max_cleared_distance, const Eigen::VectorXd& max_cleared_median)
+	{
+		double percent = (fixed_volume_ / total_volume_) * 100.0;
+		std::cerr << "Progress: " << percent
+			<< "%\t(" << fixed_volume_
+			<< " / " << total_volume_
+			<< ")\tMax cleared distance: " << max_cleared_distance
+			<< "\tcube median: " << max_cleared_median.transpose()
+			<< std::endl;
+		std::cerr << "\tInit Set: " << init_cube->getSet()
+			<< "\tInit Volume: " << init_cube->getSet()->volume
+			<< std::endl;
+		if (goal_cube)
+			std::cerr << "\tGoal Set: " << goal_cube->getSet()
+				<< "\tGoal Volume: " << goal_cube->getSet()->volume
+				<< std::endl;
 	}
 
 	Node* getRoot() { return root_.get(); }
@@ -347,12 +354,16 @@ public:
 
 	void drawSplit(Node* node)
 	{
+		//std::cerr << "Adding split: " << node->getMins() << " - " << node->getMaxs() << std::endl;
 		renderer_->addSplit(node->getMedian(), node->getMins(), node->getMaxs());
+		press_enter();
 	}
 
 	void drawCertain(Node* node)
 	{
+		std::cerr << "Adding certain: " << node->getMins().transpose() << " - " << node->getMaxs().transpose() << "\tCenter: " << node->getMedian().transpose() << std::endl;
 		renderer_->addCertain(node->getMedian(), node->getMins(), node->getMaxs(), node->getState() == Node::kCubeFree);
+		press_enter();
 	}
 
 	void setupRenderer(NaiveRenderer* renderer)
@@ -449,7 +460,7 @@ private:
 
 void press_enter()
 {
-	std::cerr << "Done, press enter to exit" << std::endl;
+	std::cerr << "Press enter to continue" << std::endl;
 	std::cin.ignore(std::numeric_limits<std::streamsize>::max(),'\n');
 }
 
@@ -490,7 +501,7 @@ int worker(NaiveRenderer* renderer)
 	builder.setupSpace(min, max, res);
 	builder.setupRenderer(renderer);
 	Coord init_p, goal_p;
-	init_p << 0.0, 0.0;
+	init_p << -1.0, -1.0;
 	goal_p << 10.0, 0.0;
 
 	builder.setupInit(init_p);
@@ -500,6 +511,7 @@ int worker(NaiveRenderer* renderer)
 
 	builder.buildOcTree(cc);
 	// std::cout << builder.buildPath();
+	std::cerr << "Done\n";
 	press_enter();
 
 	return 0;
