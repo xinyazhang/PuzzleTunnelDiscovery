@@ -1,8 +1,24 @@
 cmake_minimum_required(VERSION 3.0)
 
-project(mkobs3d)
+project(mkobs3d CXX)
 set (mkobs3d_VERSION_MAJOR 0)
 set (mkobj3d_VERSION_MINOR 2)
+
+message(STATUS, "CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
+
+if (APPLE)
+  link_directories(
+    "/usr/local/lib"
+    "/opt/local/lib"
+  )
+endif()
+
+include_directories(
+  "/usr/local/include"
+  "/opt/local/include"
+  "/usr/local/Cellar/glew/2.0.0/include/"
+  "/Users/randallsmith/Documents/sdks/git/libigl/include"
+  "/lusr/include")
 
 FIND_PACKAGE(OpenMP)
 
@@ -15,6 +31,14 @@ INCLUDE(${CMAKE_SOURCE_DIR}/cmake/FindSUITESPARSE.cmake)
 INCLUDE_DIRECTORIES(${SUITESPARSE_INCLUDE_DIRS})
 INCLUDE_DIRECTORIES(lib/)
 
+find_package(OpenGL REQUIRED)
+include_directories(${OpenGL_INCLUDE_DIRS})
+link_directories(${OpenGL_LIBRARY_DIRS})
+
+find_package(GLEW REQUIRED)
+include_directories(${GLEW_INCLUDE_DIRS})
+link_libraries(${GLEW_LIBRARIES})
+
 # GLFW
 FIND_PACKAGE(PkgConfig REQUIRED)
 pkg_search_module(GLFW3 REQUIRED glfw3)
@@ -22,9 +46,13 @@ INCLUDE_DIRECTORIES(${GLFW3_INCLUDE_DIRS})
 SET(GLFW3_LIBRARY ${GLFW3_LIBRARIES})
 MESSAGE(STATUS "GLFW: ${GLFW3_LIBRARIES}")
 
+if (APPLE)
+	  find_library(COCOA_LIBRARY Cocoa REQUIRED)
+endif(APPLE)
+
 # C++11 and Debug
 # Note: we focus on gcc/clang right now, so we uses compiler specific solutions.
-set(CMAKE_CXX_FLAGS "--std=c++14 -g -O2 -march=haswell -ggdb3 -Wno-ignored-attributes -Wno-deprecated-declarations -Wno-deprecated ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "--std=c++14  ${CMAKE_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS "${OpenMP_CXX_FLAGS} ${CMAKE_CXX_FLAGS}")
 set(CMAKE_EXE_LINKER_FLAGS "-g")
 
@@ -111,6 +139,7 @@ EASYLIB(renderer)
 EASYLIB(omplaux)
 
 TARGET_LINK_LIBRARIES(mazeinfo vertcolorply)
+TARGET_LINK_LIBRARIES(renderer  ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY})
 
 EASYADD(meshgen)
 TARGET_LINK_LIBRARIES(meshgen mazeinfo)
@@ -155,8 +184,6 @@ TARGET_LINK_LIBRARIES(heat ${SUITESPARSE_LIBRARIES} vecio)
 EASYADD(mass)
 TARGET_LINK_LIBRARIES(mass tetio vecio)
 
-find_package(GLEW REQUIRED)
-find_package(OpenGL REQUIRED)
 EASYADD(visheat)
 TARGET_LINK_LIBRARIES(visheat vertcolorply ${CMAKE_THREAD_LIBS_INIT} ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY} tetio heatio)
 

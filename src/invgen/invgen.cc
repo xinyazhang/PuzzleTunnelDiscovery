@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <iostream>
 #include <algorithm>
+#include <unistd.h>
 
 using std::endl;
 
