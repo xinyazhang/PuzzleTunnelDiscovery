@@ -9,6 +9,8 @@
 #include <time.h>
 #include <climits>
 
+#define SHOW_ADJACENCY 0
+
 using std::string;
 
 void press_enter();
@@ -71,6 +73,7 @@ class OctreePathBuilder {
 		}
 	};
 public:
+	static constexpr int Dimension = ND;
 #if 1
 	typedef GOcTreeNode<ND, FLOAT, FindUnionAttribute> Node;
 #else
@@ -211,6 +214,18 @@ public:
 #endif
 						node->merge(neighbor);
 						Node::setAdjacency(node, neighbor);
+#if SHOW_ADJACENCY
+						if (node->getState() == Node::kCubeFree) {
+							Eigen::MatrixXd adj;
+							adj.resize(2, ND + 1);
+							adj.row(0) = node->getMedian();
+							adj.row(1) = neighbor->getMedian();
+							// Note: 2D only
+							adj(0, ND) = 2.0;
+							adj(1, ND) = 2.0;
+							renderer_->addLine(adj);
+						}
+#endif
 #if 0
 						std::cerr << "\tAfter Volume: " << neighbor->getSet()->volume
 							<< " and " << node->getSet()->volume
@@ -353,7 +368,7 @@ public:
 				if (adj->prev) // No re-insert
 					continue;
 				adj->prev = tip;
-				adj->distance = tip->distance + 1.0/pow(2.0, tip->getDepth());
+				adj->distance = tip->distance + (tip->getMedian() - adj->getMedian()).norm();
 				Q.push(adj);
 				if (adj == goal_cube_) {
 					goal_reached = true;
@@ -379,14 +394,14 @@ public:
 	{
 		//std::cerr << "Adding split: " << node->getMins() << " - " << node->getMaxs() << std::endl;
 		renderer_->addSplit(node->getMedian(), node->getMins(), node->getMaxs());
-		press_enter();
+		// press_enter();
 	}
 
 	void drawCertain(Node* node)
 	{
 		std::cerr << "Adding certain: " << node->getMins().transpose() << " - " << node->getMaxs().transpose() << "\tCenter: " << node->getMedian().transpose() << std::endl;
 		renderer_->addCertain(node->getMedian(), node->getMins(), node->getMaxs(), node->getState() == Node::kCubeFree);
-		press_enter();
+		// press_enter();
 	}
 
 	void setupRenderer(NaiveRenderer* renderer)
@@ -574,10 +589,10 @@ int worker(NaiveRenderer* renderer)
 	auto path = builder.buildPath();
 	std::cerr << path << std::endl;
 	Eigen::MatrixXd np;
-	np.resize(path.size(), path.front().size() + 1);
+	np.resize(path.size(), path.front().size() + 1); // Note: 2D only
 	for (size_t i = 0; i < path.size(); i++) {
 		np.row(i) = path[i];
-		np(i, 2) = 2.0;
+		np(i, Builder::Dimension) = 2.0; // Note: 2D only
 	}
 	renderer->addLine(np);
 	std::cerr << "Done\n";

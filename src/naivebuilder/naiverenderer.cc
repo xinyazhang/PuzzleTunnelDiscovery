@@ -17,11 +17,6 @@ struct Naive2DRenderer::Private {
 	Private()
 	{
 		mutex.lock();
-#if 0
-		lines.V.resize(2, 3);
-		lines.V << 5,5,5
-			<< 0,0,0;
-#endif
 	}
 
 	~Private()
@@ -36,7 +31,42 @@ struct Naive2DRenderer::Private {
 	};
 
 	VF wireframe, clear_cubes, solid_cubes;
-	VF lines;
+	std::vector<VF> lines;
+
+	bool wireframe_dirty = false;
+	bool clear_cubes_dirty = false;
+	bool solid_cubes_dirty = false;
+	bool line_dirty = false;
+	size_t last_line = 0;
+	size_t line_nelements = 0;
+
+	void update_to_render_pass(RenderPass& pass)
+	{
+		line_dirty = false;
+		size_t new_nelem = line_nelements;
+		for (size_t i = last_line; i < lines.size(); i++) {
+			size_t nelem = lines[i].V.rows();
+			new_nelem += nelem;
+		}
+		pass.updateVBO(0, nullptr, new_nelem); // Allocate the buffer
+		line_nelements = 0;
+		for (size_t i = 0; i < lines.size(); i++) {
+			const auto& V = lines[i].V;
+			size_t nelem = lines[i].V.rows();
+			pass.overwriteVBO(0, V.data(), nelem, line_nelements);
+			line_nelements += nelem;
+		}
+		last_line = lines.size();
+	}
+
+	static void render_lines(const std::vector<VF>& lines)
+	{
+		int first = 0;
+		for (const auto& line: lines) {
+			CHECK_GL_ERROR(glDrawArrays(GL_LINE_STRIP, first, line.V.rows()));
+			first += line.V.rows();
+		}
+	}
 
 	void create_cube(const Eigen::VectorXd& , // Well, it turns out we don't even use center
 			const Eigen::VectorXd& mins,
@@ -96,11 +126,6 @@ struct Naive2DRenderer::Private {
 		std::cerr << "Appended VF sizes\n" << vf.V.rows() <<"\n" << vf.F.rows() << std::endl;
 #endif
 	}
-
-	bool wireframe_dirty = false;
-	bool clear_cubes_dirty = false;
-	bool solid_cubes_dirty = false;
-	bool line_dirty = false;
 };
 
 Naive2DRenderer::Naive2DRenderer()
@@ -145,7 +170,8 @@ void Naive2DRenderer::addCertain(const Eigen::VectorXd& center,
 void Naive2DRenderer::addLine(const Eigen::MatrixXd& LV)
 {
 	std::lock_guard<std::mutex> guard(p_->mutex);
-	p_->append_matrix<float>(LV.cast<float>(), p_->lines.V, 0.0f);
+	p_->lines.emplace_back();
+	p_->append_matrix<float>(LV.cast<float>(), p_->lines.back().V, 0.0f);
 	p_->line_dirty = true;
 }
 
@@ -348,7 +374,7 @@ int Naive2DRenderer::run()
 			);
 
 	RenderDataInput path_pass_input;
-	path_pass_input.assign(0, "vertex_position", p_->lines.V.data(), 2, 3, GL_FLOAT);
+	path_pass_input.assign(0, "vertex_position", nullptr, 0, 3, GL_FLOAT);
 	RenderPass path_pass(-1,
 			path_pass_input,
 			{
@@ -423,11 +449,9 @@ int Naive2DRenderer::run()
 
 		path_pass.setup();
 		if (p_->line_dirty) {
-			path_pass.updateVBO(0, p_->lines.V.data(), p_->lines.V.rows());
-			// std::cerr << p_->lines.V << std::endl;
-			p_->line_dirty = false;
+			p_->update_to_render_pass(path_pass);
 		}
-		CHECK_GL_ERROR(glDrawArrays(GL_LINE_STRIP, 0, p_->lines.V.rows()));
+		p_->render_lines(p_->lines);
 #if 0
 		std::cerr << "ENV Faces\n " << env.F << "\nVertices\n" << env.V << std::endl;
 		//std::cerr << "ENV Faces\n " << env.F.rows() << "\nVertices\n" << env.V.rows() << std::endl;

@@ -136,6 +136,8 @@ public:
 
 	unsigned getVAO() const { return unsigned(vao_); }
 	void updateVBO(int position, const void* data, size_t nelement);
+	// CAVEAT: MUST call updateVBO before calling overwriteVBO
+	void overwriteVBO(int position, const void* data, size_t nelement, size_t start_element);
 	void updateIndex(const void* data, size_t nelement);
 	void setup();
 	/*

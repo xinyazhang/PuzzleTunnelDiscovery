@@ -252,6 +252,29 @@ void RenderPass::updateVBO(int position, const void* data, size_t size)
 				data, GL_STATIC_DRAW));
 }
 
+void RenderPass::overwriteVBO(int position, const void* data, size_t nelement, size_t start_element)
+{
+	int bufferid = -1;
+	for (int i = 0; i < input_.getNBuffers(); i++) {
+		auto meta = input_.getBufferMeta(i);
+		if (meta.position == position) {
+			bufferid = i;
+			break;
+		}
+	}
+	if (bufferid < 0)
+		throw __func__+std::string(": error, can't find buffer with position ")+std::to_string(position);
+	auto meta = input_.getBufferMeta(bufferid);
+	CHECK_GL_ERROR(glBufferSubData(GL_ARRAY_BUFFER,
+				start_element * meta.getElementSize(),
+				nelement * meta.getElementSize(),
+				data));
+	std::cerr << "glBufferSubData: "
+		<< start_element * meta.getElementSize()
+		<< "\t" << nelement * meta.getElementSize() << std::endl;
+}
+
+
 void RenderPass::updateIndex(const void* data, size_t nelement)
 {
 	if (!input_.hasIndex())
