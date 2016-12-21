@@ -335,7 +335,7 @@ public:
 
 	Node* getRoot() { return root_.get(); }
 
-#if 0
+#if 1
 	std::vector<Eigen::VectorXd> buildPath()
 	{
 		init_cube_->distance = 0;
@@ -363,13 +363,13 @@ public:
 		}
 		std::vector<Eigen::VectorXd> ret;
 		const Node* node = goal_cube_;
-		ret.emplace_back(Path::stateToPath<double>(gstate_));
+		ret.emplace_back(gstate_);
 		while (node->prev != node) {
-			ret.emplace_back(Path::stateToPath<double>(node->getMedian()));
+			ret.emplace_back(node->getMedian());
 			node = static_cast<const Node*>(node->prev);
 		}
-		ret.emplace_back(Path::stateToPath<double>(node->getMedian()));
-		ret.emplace_back(Path::stateToPath<double>(istate_));
+		ret.emplace_back(node->getMedian());
+		ret.emplace_back(istate_);
 		std::reverse(ret.begin(), ret.end());
 		return ret;
 	}
@@ -571,7 +571,15 @@ int worker(NaiveRenderer* renderer)
 	renderer->workerReady();
 
 	builder.buildOcTree(cc);
-	// std::cout << builder.buildPath();
+	auto path = builder.buildPath();
+	std::cerr << path << std::endl;
+	Eigen::MatrixXd np;
+	np.resize(path.size(), path.front().size() + 1);
+	for (size_t i = 0; i < path.size(); i++) {
+		np.row(i) = path[i];
+		np(i, 2) = 2.0;
+	}
+	renderer->addLine(np);
 	std::cerr << "Done\n";
 	press_enter();
 

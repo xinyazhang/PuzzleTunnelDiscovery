@@ -17,6 +17,11 @@ struct Naive2DRenderer::Private {
 	Private()
 	{
 		mutex.lock();
+#if 0
+		lines.V.resize(2, 3);
+		lines.V << 5,5,5
+			<< 0,0,0;
+#endif
 	}
 
 	~Private()
@@ -31,6 +36,7 @@ struct Naive2DRenderer::Private {
 	};
 
 	VF wireframe, clear_cubes, solid_cubes;
+	VF lines;
 
 	void create_cube(const Eigen::VectorXd& , // Well, it turns out we don't even use center
 			const Eigen::VectorXd& mins,
@@ -94,6 +100,7 @@ struct Naive2DRenderer::Private {
 	bool wireframe_dirty = false;
 	bool clear_cubes_dirty = false;
 	bool solid_cubes_dirty = false;
+	bool line_dirty = false;
 };
 
 Naive2DRenderer::Naive2DRenderer()
@@ -135,6 +142,13 @@ void Naive2DRenderer::addCertain(const Eigen::VectorXd& center,
 	}
 }
 
+void Naive2DRenderer::addLine(const Eigen::MatrixXd& LV)
+{
+	std::lock_guard<std::mutex> guard(p_->mutex);
+	p_->append_matrix<float>(LV.cast<float>(), p_->lines.V, 0.0f);
+	p_->line_dirty = true;
+}
+
 void Naive2DRenderer::init()
 {
 	p_->window = init_glefw(800, 600, "Naive Renderer");
@@ -166,6 +180,14 @@ const char* geometry_shader =
 
 const char* fragment_shader =
 #include "shaders/default.frag"
+;
+
+const char* line_vs =
+#include "shaders/line.vert"
+;
+
+const char* line_fs =
+#include "shaders/line.frag"
 ;
 
 int Naive2DRenderer::run()
@@ -325,6 +347,24 @@ int Naive2DRenderer::run()
 			{ "fragment_color" }
 			);
 
+	RenderDataInput path_pass_input;
+	path_pass_input.assign(0, "vertex_position", p_->lines.V.data(), 2, 3, GL_FLOAT);
+	RenderPass path_pass(-1,
+			path_pass_input,
+			{
+			  line_vs,
+			  nullptr,
+			  line_fs
+			},
+			{ std_model,
+			  std_view,
+			  std_proj,
+			  object_alpha,
+			  red_diffuse
+			  },
+			{ "fragment_color" }
+			);
+
 	//std::cerr << "ENV Faces\n " << env.F << "\nVertices\n" << env.GPUV << std::endl;
 	while (!glfwWindowShouldClose(p_->window)) {
 		int window_width, window_height;
@@ -381,6 +421,13 @@ int Naive2DRenderer::run()
 					GL_UNSIGNED_INT,
 					0));
 
+		path_pass.setup();
+		if (p_->line_dirty) {
+			path_pass.updateVBO(0, p_->lines.V.data(), p_->lines.V.rows());
+			// std::cerr << p_->lines.V << std::endl;
+			p_->line_dirty = false;
+		}
+		CHECK_GL_ERROR(glDrawArrays(GL_LINE_STRIP, 0, p_->lines.V.rows()));
 #if 0
 		std::cerr << "ENV Faces\n " << env.F << "\nVertices\n" << env.V << std::endl;
 		//std::cerr << "ENV Faces\n " << env.F.rows() << "\nVertices\n" << env.V.rows() << std::endl;

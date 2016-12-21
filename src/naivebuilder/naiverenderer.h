@@ -15,6 +15,7 @@ public:
 				const Eigen::VectorXd& mins,
 				const Eigen::VectorXd& maxs,
 				bool isfree) {}
+	virtual void addLine(const Eigen::MatrixXd& LS) {}
 	virtual void setEnv(const Geo*) {};
 	virtual void workerReady() {};
 };
@@ -26,11 +27,12 @@ public:
 
 	virtual void addSplit(const Eigen::VectorXd& center, 
 			      const Eigen::VectorXd& mins,
-			      const Eigen::VectorXd& maxs);
+			      const Eigen::VectorXd& maxs) override;
 	virtual void addCertain(const Eigen::VectorXd& center, 
 				const Eigen::VectorXd& mins,
 				const Eigen::VectorXd& maxs,
-				bool isfree);
+				bool isfree) override;
+	virtual void addLine(const Eigen::MatrixXd& LS) override;
 
 	void init();
 	void launch_worker(std::function<int(NaiveRenderer*)>);
