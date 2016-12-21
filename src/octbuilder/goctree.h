@@ -13,6 +13,7 @@
 #include <vector>
 #include <bitset>
 #include <set>
+#include <ostream>
 
 struct GOcTreeNodeNoAttribute {
 };
@@ -32,23 +33,32 @@ public:
 
 private:
 	struct ChildPolicy {
-		typedef std::unique_ptr<GOcTreeNode> ChildType[1<<ND];
+		typedef std::vector<std::unique_ptr<GOcTreeNode>> ChildType;
 
 		static void initChildren(ChildType& children)
 		{
 			//children.resize(1 << ND);
-			for (auto& child: children)
-				child.reset();
+			//for (auto& child: children)
+			//	child.reset();
 		}
 
 		static void assignCube(ChildType& children, unsigned long offset, std::unique_ptr<GOcTreeNode>& node)
 		{
+			if (children.empty())
+				children.resize(1 << ND);
 			children[offset].swap(node);
 		}
 
 		static GOcTreeNode* accessCube(ChildType& children, unsigned long offset)
 		{
+			if (children.empty())
+				return nullptr;
 			return children[offset].get();
+		}
+
+		static bool isEmpty(const ChildType& children)
+		{
+			return children.empty();
 		}
 	};
 	typename ChildPolicy::ChildType children_;
@@ -126,7 +136,7 @@ public:
 	
 	void setState(CubeState s) { state_ = s; }
 	CubeState getState() const { return state_; }
-	bool isLeaf() const { return state_ == kCubeFree || state_ == kCubeFull; }
+	bool isLeaf() const { return ChildPolicy::isEmpty(children_); }
 	unsigned getDepth() const { return unsigned(depth_); }
 
 	void expandCube(const CubeIndex& ci)
@@ -168,14 +178,14 @@ public:
 	getNeighbor(GOcTreeNode* root, GOcTreeNode* from, int dimension, int direction)
 	{
 		Coord center = from->getMedian();
-		Coord delta;
+		Coord delta { Coord::Zero() };
 		delta(dimension) = FLOAT(direction) * (from->maxs_(dimension) - from->mins_(dimension));
 		Coord neighCenter = Space::transist(center, delta);
+		std::cerr << "getNeighbor at " << neighCenter.transpose() << " from " << center.transpose() << " and delta " << delta.transpose() << std::endl;
 		auto current = root;
 		while (true) {
-#if VERBOSE
-			std::cerr << "Probing neighbor (" << current->getMins().transpose()
-				<< ")\t(" << current->getMaxs().transpose() << ")" << std::endl;
+#if 1 // VERBOSE
+			std::cerr << "\tProbing " << *current << std::endl;
 #endif
 			auto ci = current->locateCube(neighCenter);
 			auto next = current->tryCube(ci);
@@ -208,9 +218,18 @@ public:
 	getBoundaryDescendant(GOcTreeNode* from, int dimension, int direction)
 	{
 		if (from->isLeaf())
-			return {};
+			return {from};
 		bool expbit = direction < 0 ? 0 : 1;
 		std::vector<GOcTreeNode*> ret;
+		bool debug = false;
+		if (fabs(from->getMedian()(0) - (-2.5)) < 1e-3)
+			if (fabs(from->getMedian()(1) - (-2.5)) < 1e-3)
+				debug = true;
+		if (debug) {
+			std::cerr << "= Trying to get descendant from " << *from
+				  << "\tdim: " << dimension << "\tdirection: " << direction
+				  << std::endl;
+		}
 		// FIXME: better efficiency in iterating children
 		for (unsigned long index = 0; index < (1 << ND); index++) {
 			CubeIndex ci(index);
@@ -220,6 +239,12 @@ public:
 			if (!descendant)
 				continue;
 			auto accum = getBoundaryDescendant(descendant, dimension, direction);
+			if (debug) {
+				std::cerr << "\t\t" << __func__ << " ci: " << ci
+					  << "\t\t" << *descendant
+					  << "\t\taccum size: " << accum.size()
+					  << std::endl;
+			}
 			ret.insert(std::end(ret), std::begin(accum), std::end(accum));
 		}
 		return ret;
@@ -237,5 +262,16 @@ public:
 private:
 	std::set<GOcTreeNode*> adj_;
 };
+
+template<int ND, typename FLOAT = double, typename UserDefinedAtrribute>
+std::ostream& operator<<(std::ostream& fout, const GOcTreeNode<ND, FLOAT, UserDefinedAtrribute>& node)
+{
+	fout << "\tcenter: " << node.getMedian().transpose()
+	     << "\tmins: " << node.getMins().transpose()
+	     << "\tmaxs: " << node.getMaxs().transpose()
+	     << "\tdepth: " << node.getDepth()
+	     << "\tstate: " << node.getState();
+	return fout;
+}
 
 #endif

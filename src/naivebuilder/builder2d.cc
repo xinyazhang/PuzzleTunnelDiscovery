@@ -19,8 +19,10 @@ coverage(const Eigen::Matrix<FLOAT, ND, 1>& state,  const Eigen::VectorXd& clear
 {
 	typename Node::Coord mins, maxs;
 	node->getBV(mins, maxs);
+#if 0
 	std::cerr << "mins: " << mins.transpose() << " should > " << (state - clearance.segment<ND>(0)).transpose() << std::endl;
 	std::cerr << "maxs: " << maxs.transpose() << " should < " << (state + clearance.segment<ND>(0)).transpose() << std::endl;
+#endif
 	for (int i = 0; i < ND; i++) {
 		if (mins(i) < state(i) - clearance(i))
 			return false;
@@ -119,11 +121,13 @@ public:
 				drawCertain(next);
 			}
 			current = next;
+#if 0 // Not necessary in DFS
 			// Add the remaining to the list.
 			for (auto cube : children) {
 				if (!cube->isLeaf() && cube != current)
 					add_to_cube_list(cube);
 			}
+#endif
 		}
 		std::cerr << "Returning from " << __func__ << " current: " << current << std::endl;
 		return current;
@@ -131,11 +135,13 @@ public:
 
 	void add_neighbors(Node* node)
 	{
+		std::cerr << "BEGIN " << __func__ << std::endl;
 		auto op = [=](int dim, int direct, std::vector<Node*>& neighbors) -> bool
 		{
 			for (auto neighbor: neighbors) {
+				std::cerr << "checking neighbor: " << *neighbor << std::endl;
 				if (neighbor->getState() ==  Node::kCubeUncertain) {
-					add_to_cube_list(neighbor);
+					add_to_cube_list(neighbor, false);
 #if 1 // VERBOSE
 					std::cerr << __func__ << " : " << neighbor << std::endl;
 #endif
@@ -144,6 +150,7 @@ public:
 			return false;
 		};
 		contactors_op(node, op);
+		std::cerr << "TERMINATE " << __func__ << std::endl;
 	}
 
 	// Note: we don't set kCubeMixed because we want to add the mixed
@@ -229,6 +236,7 @@ public:
 		std::cerr << "Init: " << istate_.transpose() << std::endl;
 		std::cerr << "Goal: " << gstate_.transpose() << std::endl;
 		auto init_cube = determinizeCubeFromState(istate_);
+		init_cube_ = init_cube;
 		add_neighbors(init_cube);
 		std::cerr << "add_neighbors DONE\n";
 #if 0
@@ -258,7 +266,10 @@ public:
 			auto to_split = pop_from_cube_list();
 			auto children = split_cube(to_split);
 			for (auto cube : children) {
-				if (!cube->isLeaf()) {
+				if (cube->getState() == Node::kCubeUncertain) {
+					std::cerr << "\t= Try to add child to list "
+						  << *cube
+						  << std::endl;
 					add_to_cube_list(cube);
 					continue;
 				}
@@ -270,12 +281,15 @@ public:
 #endif
 				if (cube->getState() != Node::kCubeFree)
 					continue;
+				// From now we assume cube.state == free.
 				if (!goal_cube && cube->isContaining(gstate_)) {
 					goal_cube = cube;
+					goal_cube_ = goal_cube;
 				}
-
-				// Track the furthest reachable cube.
 				if (cube->getSet() == init_cube->getSet()) {
+					add_neighbors(cube);
+
+					// Track the furthest reachable cube.
 					Eigen::VectorXd dis = cube->getMedian() - init_cube->getMedian();
 					double disn = dis.block<3,1>(0,0).norm();
 					if (disn > max_cleared_distance) {
@@ -291,8 +305,6 @@ public:
 				rearm_timer();
 			}
 		}
-		init_cube_ = init_cube;
-		goal_cube_ = goal_cube;
 	}
 
 	void verbose(Node* init_cube, Node* goal_cube, double max_cleared_distance, const Eigen::VectorXd& max_cleared_median)
@@ -411,12 +423,16 @@ private:
 	bool contacting_free(Node* node)
 	{
 		bool ret = false;
-		auto op = [&ret](int dim, int direct, std::vector<Node*>& neighbors) -> bool
+		std::cerr << "Checking contacting_free: " << *node  << std::endl;
+		auto op = [&ret, this](int dim, int direct, std::vector<Node*>& neighbors) -> bool
 		{
 			std::cerr << "dim: " << dim << "\tdirect: " << direct << "\t# neighbors: " << neighbors.size() << std::endl;
 			for (auto neighbor: neighbors) {
+				std::cerr << "\tNeighbor: " << *neighbor << std::endl;
 				std::cerr << "\tLeaf? " << neighbor->isLeaf() << "\tState? " << neighbor->getState() << std::endl;
-				if (neighbor->isLeaf() && neighbor->getState() == Node::kCubeFree) {
+				if (neighbor->isLeaf() &&
+				    neighbor->getState() == Node::kCubeFree &&
+				    neighbor->getSet() == init_cube_->getSet()) {
 					ret = true;
 					return true;
 				}
@@ -428,11 +444,11 @@ private:
 		return ret;
 	}
 
-	void add_to_cube_list(Node* node)
+	void add_to_cube_list(Node* node, bool do_check = true)
 	{
 		if (node->getState() != Node::kCubeUncertain)
 			return;
-		if (!contacting_free(node))
+		if (do_check && !contacting_free(node))
 			return;
 		int depth = node->getDepth();
 		if (long(cubes_.size()) <= depth)

@@ -325,7 +325,7 @@ int Naive2DRenderer::run()
 			{ "fragment_color" }
 			);
 
-	std::cerr << "ENV Faces\n " << env.F << "\nVertices\n" << env.GPUV << std::endl;
+	//std::cerr << "ENV Faces\n " << env.F << "\nVertices\n" << env.GPUV << std::endl;
 	while (!glfwWindowShouldClose(p_->window)) {
 		int window_width, window_height;
 		glfwGetFramebufferSize(p_->window, &window_width, &window_height);
