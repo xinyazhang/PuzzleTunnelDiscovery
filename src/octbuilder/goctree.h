@@ -181,10 +181,12 @@ public:
 		Coord delta { Coord::Zero() };
 		delta(dimension) = FLOAT(direction) * (from->maxs_(dimension) - from->mins_(dimension));
 		Coord neighCenter = Space::transist(center, delta);
+#if VERBOSE
 		std::cerr << "getNeighbor at " << neighCenter.transpose() << " from " << center.transpose() << " and delta " << delta.transpose() << std::endl;
+#endif
 		auto current = root;
 		while (true) {
-#if 1 // VERBOSE
+#if VERBOSE
 			std::cerr << "\tProbing " << *current << std::endl;
 #endif
 			auto ci = current->locateCube(neighCenter);
@@ -221,6 +223,7 @@ public:
 			return {from};
 		bool expbit = direction < 0 ? 0 : 1;
 		std::vector<GOcTreeNode*> ret;
+#if VERBOSE
 		bool debug = false;
 		if (fabs(from->getMedian()(0) - (-2.5)) < 1e-3)
 			if (fabs(from->getMedian()(1) - (-2.5)) < 1e-3)
@@ -230,6 +233,7 @@ public:
 				  << "\tdim: " << dimension << "\tdirection: " << direction
 				  << std::endl;
 		}
+#endif
 		// FIXME: better efficiency in iterating children
 		for (unsigned long index = 0; index < (1 << ND); index++) {
 			CubeIndex ci(index);
@@ -239,12 +243,14 @@ public:
 			if (!descendant)
 				continue;
 			auto accum = getBoundaryDescendant(descendant, dimension, direction);
+#if VERBOSE
 			if (debug) {
 				std::cerr << "\t\t" << __func__ << " ci: " << ci
 					  << "\t\t" << *descendant
 					  << "\t\taccum size: " << accum.size()
 					  << std::endl;
 			}
+#endif
 			ret.insert(std::end(ret), std::begin(accum), std::end(accum));
 		}
 		return ret;

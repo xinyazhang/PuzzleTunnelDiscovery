@@ -135,14 +135,18 @@ public:
 
 	void add_neighbors(Node* node)
 	{
+#if VERBOSE
 		std::cerr << "BEGIN " << __func__ << std::endl;
+#endif
 		auto op = [=](int dim, int direct, std::vector<Node*>& neighbors) -> bool
 		{
 			for (auto neighbor: neighbors) {
+#if VERBOSE
 				std::cerr << "checking neighbor: " << *neighbor << std::endl;
+#endif
 				if (neighbor->getState() ==  Node::kCubeUncertain) {
 					add_to_cube_list(neighbor, false);
-#if 1 // VERBOSE
+#if VERBOSE
 					std::cerr << __func__ << " : " << neighbor << std::endl;
 #endif
 				}
@@ -150,7 +154,9 @@ public:
 			return false;
 		};
 		contactors_op(node, op);
+#if VERBOSE
 		std::cerr << "TERMINATE " << __func__ << std::endl;
+#endif
 	}
 
 	// Note: we don't set kCubeMixed because we want to add the mixed
@@ -267,9 +273,11 @@ public:
 			auto children = split_cube(to_split);
 			for (auto cube : children) {
 				if (cube->getState() == Node::kCubeUncertain) {
+#if VERBOSE
 					std::cerr << "\t= Try to add child to list "
 						  << *cube
 						  << std::endl;
+#endif
 					add_to_cube_list(cube);
 					continue;
 				}
@@ -423,13 +431,19 @@ private:
 	bool contacting_free(Node* node)
 	{
 		bool ret = false;
+#if VERBOSE
 		std::cerr << "Checking contacting_free: " << *node  << std::endl;
+#endif
 		auto op = [&ret, this](int dim, int direct, std::vector<Node*>& neighbors) -> bool
 		{
+#if VERBOSE
 			std::cerr << "dim: " << dim << "\tdirect: " << direct << "\t# neighbors: " << neighbors.size() << std::endl;
+#endif
 			for (auto neighbor: neighbors) {
+#if VERBOSE
 				std::cerr << "\tNeighbor: " << *neighbor << std::endl;
 				std::cerr << "\tLeaf? " << neighbor->isLeaf() << "\tState? " << neighbor->getState() << std::endl;
+#endif
 				if (neighbor->isLeaf() &&
 				    neighbor->getState() == Node::kCubeFree &&
 				    neighbor->getSet() == init_cube_->getSet()) {
@@ -454,7 +468,9 @@ private:
 		if (long(cubes_.size()) <= depth)
 			cubes_.resize(depth+1);
 		cubes_[depth].emplace_back(node);
+#if VERBOSE
 		std::cerr << "-----Add one into list\n";
+#endif
 		node->setState(Node::kCubeUncertainPending);
 		current_queue_ = std::min(current_queue_, depth);
 	}
@@ -547,7 +563,7 @@ int worker(NaiveRenderer* renderer)
 	builder.setupRenderer(renderer);
 	Coord init_p, goal_p;
 	init_p << -1.0, -1.0;
-	goal_p << 10.0, 0.0;
+	goal_p << -9.0, 0.0;
 
 	builder.setupInit(init_p);
 	builder.setupGoal(goal_p);

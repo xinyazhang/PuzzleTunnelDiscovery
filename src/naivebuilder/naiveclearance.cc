@@ -76,7 +76,9 @@ Eigen::VectorXd NaiveClearance::getCertainCube(const Eigen::Vector2d& state, boo
 	auto d = result.min_distance;
 	isfree = d > 0;
 
+#if 0
 	std::cerr << "\tState: " << state.transpose() << "\tDistance: " << d << std::endl;
+#endif
 	double cd = fabs(d) / sqrt2;
 
 	return Eigen::Vector2d(cd, cd);
