@@ -131,16 +131,17 @@ public:
 
 	void add_neighbors(Node* node)
 	{
-		auto op = [=](int dim, int direct, std::vector<Node*>& neighbors)
+		auto op = [=](int dim, int direct, std::vector<Node*>& neighbors) -> bool
 		{
 			for (auto neighbor: neighbors) {
 				if (neighbor->getState() ==  Node::kCubeUncertain) {
 					add_to_cube_list(neighbor);
-#if VERBOSE
+#if 1 // VERBOSE
 					std::cerr << __func__ << " : " << neighbor << std::endl;
 #endif
 				}
 			}
+			return false;
 		};
 		contactors_op(node, op);
 	}
@@ -182,7 +183,7 @@ public:
 	bool connect_neighbors(Node* node)
 	{
 		size_t ttlneigh = 0;
-		auto op = [=,&ttlneigh](int dim, int direct, std::vector<Node*>& neighbors)
+		auto op = [=,&ttlneigh](int dim, int direct, std::vector<Node*>& neighbors) -> bool
 		{
 			for (auto neighbor: neighbors) {
 				if (neighbor->isLeaf()) {
@@ -206,6 +207,7 @@ public:
 				}
 				ttlneigh++;
 			}
+			return false;
 		};
 		contactors_op(node, op);
 #if VERBOSE
@@ -228,6 +230,7 @@ public:
 		std::cerr << "Goal: " << gstate_.transpose() << std::endl;
 		auto init_cube = determinizeCubeFromState(istate_);
 		add_neighbors(init_cube);
+		std::cerr << "add_neighbors DONE\n";
 #if 0
 		auto goal_cube = determinizeCubeFromState(gstate_);
 		add_neighbors(goal_cube);
@@ -405,20 +408,43 @@ private:
 		return ret;
 	}
 
+	bool contacting_free(Node* node)
+	{
+		bool ret = false;
+		auto op = [&ret](int dim, int direct, std::vector<Node*>& neighbors) -> bool
+		{
+			std::cerr << "dim: " << dim << "\tdirect: " << direct << "\t# neighbors: " << neighbors.size() << std::endl;
+			for (auto neighbor: neighbors) {
+				std::cerr << "\tLeaf? " << neighbor->isLeaf() << "\tState? " << neighbor->getState() << std::endl;
+				if (neighbor->isLeaf() && neighbor->getState() == Node::kCubeFree) {
+					ret = true;
+					return true;
+				}
+			}
+			return false;
+		};
+		contactors_op(node, op);
+
+		return ret;
+	}
+
 	void add_to_cube_list(Node* node)
 	{
 		if (node->getState() != Node::kCubeUncertain)
+			return;
+		if (!contacting_free(node))
 			return;
 		int depth = node->getDepth();
 		if (long(cubes_.size()) <= depth)
 			cubes_.resize(depth+1);
 		cubes_[depth].emplace_back(node);
+		std::cerr << "-----Add one into list\n";
 		node->setState(Node::kCubeUncertainPending);
 		current_queue_ = std::min(current_queue_, depth);
 	}
 
 	void contactors_op(Node* node,
-			   std::function<void(int dim, int direct, std::vector<Node*>&)> op)
+			   std::function<bool(int dim, int direct, std::vector<Node*>&)> op)
 	{
 		for (int dim = 0; dim < ND; dim++) {
 			for (int direct = -1; direct <= 1; direct += 2) {
@@ -429,8 +455,11 @@ private:
 						direct,
 						Space()
 						);
-				if (!neighbors.empty())
-					op(dim, direct, neighbors);
+				if (!neighbors.empty()) {
+					bool terminate = op(dim, direct, neighbors);
+					if (terminate)
+						return;
+				}
 			}
 		}
 	}
