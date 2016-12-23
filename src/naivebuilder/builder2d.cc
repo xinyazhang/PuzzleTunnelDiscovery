@@ -10,6 +10,7 @@
 #include <climits>
 
 #define SHOW_ADJACENCY 0
+#define ENABLE_DFS 1
 
 using std::string;
 
@@ -124,13 +125,11 @@ public:
 				drawCertain(next);
 			}
 			current = next;
-#if 0 // Not necessary in DFS
 			// Add the remaining to the list.
 			for (auto cube : children) {
 				if (!cube->isLeaf() && cube != current)
 					add_to_cube_list(cube);
 			}
-#endif
 		}
 		std::cerr << "Returning from " << __func__ << " current: " << current << std::endl;
 		return current;
@@ -269,7 +268,6 @@ public:
 		total_volume_ = root_->getVolume();
 		double max_cleared_distance = 0.0;
 		Eigen::VectorXd max_cleared_median;
-		// TODO: use DFS instead of BFS
 		while (true) {
 			/*
 			 * 1. Find a cube, called S, in the cubes_ list.
@@ -399,7 +397,7 @@ public:
 
 	void drawCertain(Node* node)
 	{
-		std::cerr << "Adding certain: " << node->getMins().transpose() << " - " << node->getMaxs().transpose() << "\tCenter: " << node->getMedian().transpose() << std::endl;
+		std::cerr << "Adding certain: " << *node << std::endl;
 		renderer_->addCertain(node->getMedian(), node->getMins(), node->getMaxs(), node->getState() == Node::kCubeFree);
 		// press_enter();
 	}
@@ -440,6 +438,9 @@ private:
 		auto ret = cubes_[depth].front();
 		cubes_[depth].pop_front();
 		current_queue_ = depth;
+#if 1 // VERBOSE
+		std::cerr << "-----Pop one from list\n";
+#endif
 		return ret;
 	}
 
@@ -477,13 +478,13 @@ private:
 	{
 		if (node->getState() != Node::kCubeUncertain)
 			return;
-		if (do_check && !contacting_free(node))
+		if (ENABLE_DFS && do_check && !contacting_free(node))
 			return;
 		int depth = node->getDepth();
 		if (long(cubes_.size()) <= depth)
 			cubes_.resize(depth+1);
 		cubes_[depth].emplace_back(node);
-#if VERBOSE
+#if 1 // VERBOSE
 		std::cerr << "-----Add one into list\n";
 #endif
 		node->setState(Node::kCubeUncertainPending);
