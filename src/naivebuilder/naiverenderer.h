@@ -16,6 +16,10 @@ public:
 				const Eigen::VectorXd& maxs,
 				bool isfree) {}
 	virtual void addLine(const Eigen::MatrixXd& LS) {}
+	// Returns a token for deletion in the future.
+	virtual int addDynamicLine(const Eigen::MatrixXd& LS) { return -1; }
+	// Note: undefined behavior for invalid token.
+	virtual void removeDynamicLine(int token) { }
 	virtual void setEnv(const Geo*) {};
 	virtual void workerReady() {};
 };
@@ -33,6 +37,8 @@ public:
 				const Eigen::VectorXd& maxs,
 				bool isfree) override;
 	virtual void addLine(const Eigen::MatrixXd& LS) override;
+	virtual int addDynamicLine(const Eigen::MatrixXd& LS) override;
+	virtual void removeDynamicLine(int token) override;
 
 	void init();
 	void launch_worker(std::function<int(NaiveRenderer*)>);

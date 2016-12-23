@@ -136,6 +136,7 @@ public:
 	
 	void setState(CubeState s) { state_ = s; }
 	CubeState getState() const { return state_; }
+	bool atState(CubeState state) const { return getState() == state; }
 	bool isLeaf() const { return ChildPolicy::isEmpty(children_); }
 	unsigned getDepth() const { return unsigned(depth_); }
 
@@ -263,10 +264,47 @@ public:
 		lhs->adj_.insert(rhs);
 		rhs->adj_.insert(lhs);
 	}
-
 	const std::set<GOcTreeNode*>& getAdjacency() const { return adj_; }
+
+	bool isAggressiveFree() const
+	{
+		return atState(kCubeFree) ||
+			atState(kCubeUncertain) ||
+			atState(kCubeUncertainPending);
+	}
+	static bool hasAggressiveAdjacency(GOcTreeNode *lhs, GOcTreeNode *rhs)
+	{
+		if (lhs->isAggressiveFree() && rhs->isAggressiveFree())
+			return true;
+		return false;
+	}
+
+	static void setAggressiveAdjacency(GOcTreeNode *lhs, GOcTreeNode *rhs)
+	{
+		if (lhs == rhs)
+			return ;
+		lhs->aggadj_.insert(rhs);
+		rhs->aggadj_.insert(lhs);
+	}
+
+	static void breakAggressiveAdjacency(GOcTreeNode *lhs, GOcTreeNode *rhs)
+	{
+		if (lhs == rhs)
+			return ;
+		lhs->aggadj_.erase(rhs);
+		rhs->aggadj_.erase(lhs);
+	}
+
+	void cancelAggressiveAdjacency()
+	{
+		for (auto adj: aggadj_) {
+			adj->aggadj_.erase(this);
+		}
+		aggadj_.clear();
+	}
+	const std::set<GOcTreeNode*>& getAggressiveAdjacency() const { return aggadj_; }
 private:
-	std::set<GOcTreeNode*> adj_;
+	std::set<GOcTreeNode*> adj_, aggadj_;
 };
 
 template<int ND, typename FLOAT = double, typename UserDefinedAtrribute>

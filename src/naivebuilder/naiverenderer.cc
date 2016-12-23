@@ -6,6 +6,8 @@
 #include <omplaux/geo.h>
 #include <mutex>
 #include <thread>
+#include <list>
+#include <map>
 
 struct Naive2DRenderer::Private {
 	GLFWwindow *window;
@@ -32,34 +34,37 @@ struct Naive2DRenderer::Private {
 
 	VF wireframe, clear_cubes, solid_cubes;
 	std::vector<VF> lines;
+	std::list<VF> dynlines;
+	int next_token = 0;
+	std::map<int, decltype(dynlines)::iterator> token_to_iter;
 
 	bool wireframe_dirty = false;
 	bool clear_cubes_dirty = false;
 	bool solid_cubes_dirty = false;
 	bool line_dirty = false;
-	size_t last_line = 0;
+	bool dynline_dirty = false;
 	size_t line_nelements = 0;
 
-	void update_to_render_pass(RenderPass& pass)
+	template<typename Container>
+	void update_to_render_pass(const Container& line_container, RenderPass& pass)
 	{
-		line_dirty = false;
 		size_t new_nelem = line_nelements;
-		for (size_t i = last_line; i < lines.size(); i++) {
-			size_t nelem = lines[i].V.rows();
+		for (const auto& line : line_container) {
+			size_t nelem = line.V.rows();
 			new_nelem += nelem;
 		}
 		pass.updateVBO(0, nullptr, new_nelem); // Allocate the buffer
 		line_nelements = 0;
-		for (size_t i = 0; i < lines.size(); i++) {
-			const auto& V = lines[i].V;
-			size_t nelem = lines[i].V.rows();
+		for (const auto& line : line_container) {
+			const auto& V = line.V;
+			size_t nelem = V.rows();
 			pass.overwriteVBO(0, V.data(), nelem, line_nelements);
 			line_nelements += nelem;
 		}
-		last_line = lines.size();
 	}
 
-	static void render_lines(const std::vector<VF>& lines)
+	template<typename Container>
+	static void render_lines(const Container& lines)
 	{
 		int first = 0;
 		for (const auto& line: lines) {
@@ -175,6 +180,25 @@ void Naive2DRenderer::addLine(const Eigen::MatrixXd& LV)
 	p_->line_dirty = true;
 }
 
+int Naive2DRenderer::addDynamicLine(const Eigen::MatrixXd& LV)
+{
+	std::lock_guard<std::mutex> guard(p_->mutex);
+	auto iter = p_->dynlines.emplace(p_->dynlines.end());
+	p_->append_matrix<float>(LV.cast<float>(), p_->dynlines.back().V, 0.0f);
+	int token= p_->next_token++;
+	p_->token_to_iter[token] = iter;
+	p_->dynline_dirty = true;
+	return token;
+}
+
+void Naive2DRenderer::removeDynamicLine(int token)
+{
+	std::lock_guard<std::mutex> guard(p_->mutex);
+	p_->dynlines.erase(p_->token_to_iter[token]);
+	p_->token_to_iter.erase(token);
+	p_->dynline_dirty = true;
+}
+
 void Naive2DRenderer::init()
 {
 	p_->window = init_glefw(800, 600, "Naive Renderer");
@@ -276,6 +300,10 @@ int Naive2DRenderer::run()
 		static float color[4] = { 1.0f, 1.0f, 1.0f, 1.0f};
 		return color;
 	};
+	auto green_color_data = []() -> const void* {
+		static float color[4] = { 0.0f, 1.0f, 0.0f, 1.0f};
+		return color;
+	};
 
 	ShaderUniform std_model = { "model", matrix_binder, std_model_data };
 	ShaderUniform std_view = { "view", matrix_binder, std_view_data };
@@ -287,6 +315,7 @@ int Naive2DRenderer::run()
 	ShaderUniform yellow_diffuse = { "diffuse", vector_binder, yellow_color_data };
 	ShaderUniform blue_diffuse = { "diffuse", vector_binder, blue_color_data };
 	ShaderUniform white_diffuse = { "diffuse", vector_binder, white_color_data };
+	ShaderUniform green_diffuse = { "diffuse", vector_binder, green_color_data };
 
 	const Geo& env = p_->env;
 
@@ -391,6 +420,24 @@ int Naive2DRenderer::run()
 			{ "fragment_color" }
 			);
 
+	RenderDataInput dynline_pass_input;
+	dynline_pass_input.assign(0, "vertex_position", nullptr, 0, 3, GL_FLOAT);
+	RenderPass dynline_pass(-1,
+			dynline_pass_input,
+			{
+			  line_vs,
+			  nullptr,
+			  line_fs
+			},
+			{ std_model,
+			  std_view,
+			  std_proj,
+			  object_alpha,
+			  green_diffuse
+			  },
+			{ "fragment_color" }
+			);
+
 	//std::cerr << "ENV Faces\n " << env.F << "\nVertices\n" << env.GPUV << std::endl;
 	while (!glfwWindowShouldClose(p_->window)) {
 		int window_width, window_height;
@@ -451,9 +498,17 @@ int Naive2DRenderer::run()
 
 		path_pass.setup();
 		if (p_->line_dirty) {
-			p_->update_to_render_pass(path_pass);
+			p_->update_to_render_pass(p_->lines, path_pass);
+			p_->line_dirty = false;
 		}
 		p_->render_lines(p_->lines);
+
+		dynline_pass.setup();
+		if (p_->dynline_dirty) {
+			p_->update_to_render_pass(p_->dynlines, dynline_pass);
+			p_->dynline_dirty = false;
+		}
+		p_->render_lines(p_->dynlines);
 #if 0
 		std::cerr << "ENV Faces\n " << env.F << "\nVertices\n" << env.V << std::endl;
 		//std::cerr << "ENV Faces\n " << env.F.rows() << "\nVertices\n" << env.V.rows() << std::endl;

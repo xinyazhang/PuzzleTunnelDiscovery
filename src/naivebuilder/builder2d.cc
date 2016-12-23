@@ -6,10 +6,12 @@
 #include <functional>
 #include <deque>
 #include <queue>
+#include <set>
 #include <time.h>
 #include <climits>
 
 #define SHOW_ADJACENCY 0
+#define SHOW_AGGADJACENCY 1
 #define ENABLE_DFS 1
 
 using std::string;
@@ -72,6 +74,9 @@ class OctreePathBuilder {
 			//other->getSet()->volume = 0.0;
 			other->getSet()->parent = getSet();
 		}
+#if SHOW_AGGADJACENCY
+		std::set<int> agg_line_tokens_;
+#endif
 	};
 public:
 	static constexpr int Dimension = ND;
@@ -231,6 +236,21 @@ public:
 							<< std::endl;
 #endif
 					}
+					if (Node::hasAggressiveAdjacency(node, neighbor)) {
+						Node::setAggressiveAdjacency(node, neighbor);
+#if SHOW_AGGADJACENCY
+						Eigen::MatrixXd adj;
+						adj.resize(2, ND + 1);
+						adj.row(0) = node->getMedian();
+						adj.row(1) = neighbor->getMedian();
+						// Note: 2D only
+						adj(0, ND) = 2.0;
+						adj(1, ND) = 2.0;
+						int token = renderer_->addDynamicLine(adj);
+						node->agg_line_tokens_.insert(token);
+						neighbor->agg_line_tokens_.insert(token);
+#endif
+					}
 				}
 				ttlneigh++;
 			}
@@ -348,7 +368,6 @@ public:
 
 	Node* getRoot() { return root_.get(); }
 
-#if 1
 	std::vector<Eigen::VectorXd> buildPath()
 	{
 		init_cube_->distance = 0;
@@ -374,6 +393,8 @@ public:
 				}
 			}
 		}
+		if (!goal_reached)
+			return {};
 		std::vector<Eigen::VectorXd> ret;
 		const Node* node = goal_cube_;
 		ret.emplace_back(gstate_);
@@ -386,7 +407,6 @@ public:
 		std::reverse(ret.begin(), ret.end());
 		return ret;
 	}
-#endif
 
 	void drawSplit(Node* node)
 	{
@@ -425,6 +445,14 @@ private:
 			check_clearance(ret.back());
 		}
 		node->setState(Node::kCubeMixed);
+#if SHOW_AGGADJACENCY
+		for (auto token : node->agg_line_tokens_) {
+			for (auto adj: node->getAggressiveAdjacency())
+				adj->agg_line_tokens_.erase(token);
+			renderer_->removeDynamicLine(token);
+		}
+#endif
+		node->cancelAggressiveAdjacency();
 		//std::cerr << "\tResult: " << ret.size() << " child cubes" << std::endl;
 		return ret;
 	}

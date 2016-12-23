@@ -269,9 +269,11 @@ void RenderPass::overwriteVBO(int position, const void* data, size_t nelement, s
 				start_element * meta.getElementSize(),
 				nelement * meta.getElementSize(),
 				data));
+#if 0
 	std::cerr << "glBufferSubData: "
 		<< start_element * meta.getElementSize()
 		<< "\t" << nelement * meta.getElementSize() << std::endl;
+#endif
 }
 
 
