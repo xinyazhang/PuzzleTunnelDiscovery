@@ -53,15 +53,31 @@ struct NaiveClearance::NaiveClearancePrivate {
 		Eigen::MatrixXi E;
 		igl::edges(smash_env.F, E);
 		igl::is_boundary_edge(E, smash_env.F, smash_env_B);
-		Geo tmp = smash_env;
-		tmp.V.conservativeResize(tmp.V.rows(), 2); // Trim the Z
-		for (int i = 0; i < tmp.F.rows(); i++) {
-			if (smash_env_B(i))
+
+		Eigen::MatrixXd tmpV;
+		tmpV.resize(smash_env.V.rows(), 2); // Trim the Z
+		tmpV.block(0, 0, smash_env.V.rows(), 2) = smash_env.V.block(0, 0,
+				smash_env.V.rows(), 2);
+
+		std::vector<bool> keep(E.rows());
+		for (int i = 0; i < E.rows(); i++) {
+			if (smash_env_B(i)) {
 				continue;
-			tmp.F.row(i) << -1, -1;
+			}
+			E.row(i) << -1, -1;
 		}
 		Eigen::VectorXi I;
-		igl::remove_unreferenced(tmp.V, tmp.F, silhouette.V, silhouette.F, I);
+		Eigen::MatrixXi renumberedE;
+		igl::remove_unreferenced(tmpV, E, silhouette.V, renumberedE, I);
+		silhouette.F.resize(smash_env_B.count(), 2);
+		for (int i = 0, fi = 0; i < renumberedE.rows(); i++) {
+			if (smash_env_B(i) == 0)
+				continue;
+			silhouette.F.row(fi) = renumberedE.row(i);
+			fi++;
+		}
+
+		// std::cerr << silhouette.V << "\n" << silhouette.F << "\n";
 	}
 
 	static void initBVH(fcl::BVHModel<BV> &bvh,
@@ -103,8 +119,9 @@ struct NaiveClearance::NaiveClearancePrivate {
 			double d = distance2d(center,
 				silhouette.V.row(silhouette.F(i,0)),
 				silhouette.V.row(silhouette.F(i,1)));
-			ret = std::max(d, ret);
+			ret = std::min(d, ret);
 		}
+		// std::cerr << "PDt from " << center.transpose() << " = " << ret << std::endl;
 		return ret;
 	}
 };
