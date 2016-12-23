@@ -555,6 +555,7 @@ int worker(NaiveRenderer* renderer)
 	Geo env;
 	env.read(envfn);
 	env.V.block(0, 2, env.V.rows(), 1) *= 0.0001;
+	env.GPUV.block(0, 2, env.V.rows(), 1) *= 0.001f;
 
 	renderer->setEnv(&env);
 	NaiveClearance cc(env);

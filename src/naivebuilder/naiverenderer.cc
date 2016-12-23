@@ -408,12 +408,24 @@ int Naive2DRenderer::run()
 
 		gui->updateMatrices();
 		mats = gui->getMatrixPointers();
+#if 0
 		env_pass.setup();
 		CHECK_GL_ERROR(glDrawElements(GL_TRIANGLES, env.F.rows() * 3,
 					GL_UNSIGNED_INT,
 					0));
+#endif
 #if 1
 		p_->mutex.lock();
+
+		solid_pass.setup();
+		if (p_->solid_cubes_dirty) {
+			solid_pass.updateVBO(0, p_->solid_cubes.V.data(), p_->solid_cubes.V.rows());
+			solid_pass.updateIndex(p_->solid_cubes.F.data(), p_->solid_cubes.F.rows());
+			p_->solid_cubes_dirty = false;
+		}
+		CHECK_GL_ERROR(glDrawElements(GL_TRIANGLES, p_->solid_cubes.F.rows() * 3,
+					GL_UNSIGNED_INT,
+					0));
 
 		wireframe_pass.setup();
 		if (p_->wireframe_dirty) {
@@ -434,16 +446,6 @@ int Naive2DRenderer::run()
 			p_->clear_cubes_dirty = false;
 		}
 		CHECK_GL_ERROR(glDrawElements(GL_TRIANGLES, p_->clear_cubes.F.rows() * 3,
-					GL_UNSIGNED_INT,
-					0));
-
-		solid_pass.setup();
-		if (p_->solid_cubes_dirty) {
-			solid_pass.updateVBO(0, p_->solid_cubes.V.data(), p_->solid_cubes.V.rows());
-			solid_pass.updateIndex(p_->solid_cubes.F.data(), p_->solid_cubes.F.rows());
-			p_->solid_cubes_dirty = false;
-		}
-		CHECK_GL_ERROR(glDrawElements(GL_TRIANGLES, p_->solid_cubes.F.rows() * 3,
 					GL_UNSIGNED_INT,
 					0));
 
