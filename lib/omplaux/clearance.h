@@ -157,6 +157,8 @@ public:
 		Transform3 tr;
 		tr.setIdentity();
 		//std::cerr << "\t\t\tInitial Sanity random rotation matrix: " << tr.matrix() << std::endl;
+		// Note: Yaw, pitch, and roll should be performed in X,Y,Z
+		// order.
 		tr.rotate(Eigen::AngleAxisd(neg1pos1()*dalpha, Eigen::Vector3d::UnitX()));
 		tr.rotate(Eigen::AngleAxisd(neg1pos1()*dalpha, Eigen::Vector3d::UnitY()));
 		tr.rotate(Eigen::AngleAxisd(neg1pos1()*dalpha, Eigen::Vector3d::UnitZ()));
