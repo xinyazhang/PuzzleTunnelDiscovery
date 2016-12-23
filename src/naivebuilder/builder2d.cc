@@ -10,9 +10,9 @@
 #include <time.h>
 #include <climits>
 
-#define SHOW_ADJACENCY 0
+#define SHOW_ADJACENCY 1
 #define SHOW_AGGADJACENCY 1
-#define ENABLE_DFS 1
+#define ENABLE_DFS 0
 
 using std::string;
 
@@ -118,7 +118,7 @@ public:
 		auto certain = cc_->getCertainCube(state, isfree);
 
 		while (current->getState() == Node::kCubeUncertain) {
-			std::cerr << "Current depth " << current->getDepth() << std::endl;
+			// std::cerr << "Current depth " << current->getDepth() << std::endl;
 			auto children = split_cube(current);
 			auto ci = current->locateCube(state);
 			Node* next = current->getCube(ci);
@@ -132,9 +132,11 @@ public:
 			current = next;
 			// Add the remaining to the list.
 			for (auto cube : children) {
-				if (!cube->isLeaf() && cube != current)
+				if (cube->atState(Node::kCubeUncertain) && cube != current)
 					add_to_cube_list(cube);
+				connect_neighbors(cube);
 			}
+			// press_enter();
 		}
 		std::cerr << "Returning from " << __func__ << " current: " << current << std::endl;
 		return current;
@@ -206,6 +208,10 @@ public:
 		auto op = [=,&ttlneigh](int dim, int direct, std::vector<Node*>& neighbors) -> bool
 		{
 			for (auto neighbor: neighbors) {
+				// TODO: WHY neighbors include itself?! CHECK
+				// getContactCubes.
+				if (node == neighbor)
+					continue;
 				if (neighbor->isLeaf()) {
 					if (neighbor->getState() == node->getState()) {
 #if 0
@@ -236,9 +242,13 @@ public:
 							<< std::endl;
 #endif
 					}
-					if (Node::hasAggressiveAdjacency(node, neighbor)) {
-						Node::setAggressiveAdjacency(node, neighbor);
+				}
+				if (Node::hasAggressiveAdjacency(node, neighbor)) {
+					bool inserted;
+					inserted = Node::setAggressiveAdjacency(node, neighbor);
+					(void)inserted;
 #if SHOW_AGGADJACENCY
+					if (inserted) {
 						Eigen::MatrixXd adj;
 						adj.resize(2, ND + 1);
 						adj.row(0) = node->getMedian();
@@ -249,8 +259,12 @@ public:
 						int token = renderer_->addDynamicLine(adj);
 						node->agg_line_tokens_.insert(token);
 						neighbor->agg_line_tokens_.insert(token);
-#endif
+						std::cerr << "Adding Aggressive Adj\n"
+							<< "\tnode: " << *node
+							<< "\n\tneigh: " << *neighbor
+							<< std::endl;
 					}
+#endif
 				}
 				ttlneigh++;
 			}
@@ -312,10 +326,11 @@ public:
 						  << std::endl;
 #endif
 					add_to_cube_list(cube);
-					continue;
+					// continue; Don't do that,
+					// We need kCubeUncertain for
+					// Aggressive Adjacency
 				}
-				if (!connect_neighbors(cube))
-					continue;
+				connect_neighbors(cube);
 #if 0 // Do we really need connect kCubeFull?
 				if (cube->getState() != Node::kCubeFree)
 					continue;
@@ -339,6 +354,7 @@ public:
 					}
 				}
 			}
+			// press_enter();
 			if (goal_cube && goal_cube->getSet() == init_cube->getSet())
 				break;
 			if (timer_alarming()) {
@@ -410,16 +426,22 @@ public:
 
 	void drawSplit(Node* node)
 	{
-		//std::cerr << "Adding split: " << node->getMins() << " - " << node->getMaxs() << std::endl;
+		std::cerr << "Adding split: " << *node << std::endl;
 		renderer_->addSplit(node->getMedian(), node->getMins(), node->getMaxs());
 		// press_enter();
 	}
 
 	void drawCertain(Node* node)
 	{
+#if VERBOSE
 		std::cerr << "Adding certain: " << *node << std::endl;
+#endif
 		renderer_->addCertain(node->getMedian(), node->getMins(), node->getMaxs(), node->getState() == Node::kCubeFree);
 		// press_enter();
+		if (node->atState(Node::kCubeFull)) {
+			std::cerr << "Added full node: " << *node << std::endl;
+			// press_enter();
+		}
 	}
 
 	void setupRenderer(NaiveRenderer* renderer)
@@ -446,18 +468,24 @@ private:
 		}
 		node->setState(Node::kCubeMixed);
 #if SHOW_AGGADJACENCY
+		bool need_pause = !node->agg_line_tokens_.empty();
 		for (auto token : node->agg_line_tokens_) {
 			for (auto adj: node->getAggressiveAdjacency())
 				adj->agg_line_tokens_.erase(token);
 			renderer_->removeDynamicLine(token);
 		}
+#if 0
+		if (need_pause)
+			press_enter();
+#endif
+		
 #endif
 		node->cancelAggressiveAdjacency();
 		//std::cerr << "\tResult: " << ret.size() << " child cubes" << std::endl;
 		return ret;
 	}
 
-	// FIXME: oob check for empty queue
+	// TODO: oob check for empty queue
 	Node* pop_from_cube_list()
 	{
 		int depth = current_queue_;
@@ -466,7 +494,7 @@ private:
 		auto ret = cubes_[depth].front();
 		cubes_[depth].pop_front();
 		current_queue_ = depth;
-#if 1 // VERBOSE
+#if VERBOSE
 		std::cerr << "-----Pop one from list\n";
 #endif
 		return ret;
@@ -512,7 +540,7 @@ private:
 		if (long(cubes_.size()) <= depth)
 			cubes_.resize(depth+1);
 		cubes_[depth].emplace_back(node);
-#if 1 // VERBOSE
+#if VERBOSE
 		std::cerr << "-----Add one into list\n";
 #endif
 		node->setState(Node::kCubeUncertainPending);
@@ -580,7 +608,8 @@ std::ostream& operator<<(std::ostream& fout, const std::vector<Eigen::VectorXd>&
 
 int worker(NaiveRenderer* renderer)
 {
-	string envfn = "../res/simple/Torus.obj";
+	// string envfn = "../res/simple/Torus.obj";
+	string envfn = "../res/simple/FullTorus.obj";
 	Geo env;
 	env.read(envfn);
 	env.V.block(0, 2, env.V.rows(), 1) *= 0.0001;

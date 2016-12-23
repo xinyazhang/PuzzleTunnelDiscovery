@@ -272,19 +272,23 @@ public:
 			atState(kCubeUncertain) ||
 			atState(kCubeUncertainPending);
 	}
+
 	static bool hasAggressiveAdjacency(GOcTreeNode *lhs, GOcTreeNode *rhs)
 	{
+		if (lhs->atState(kCubeFree) && rhs->atState(kCubeFree))
+			return false;
 		if (lhs->isAggressiveFree() && rhs->isAggressiveFree())
 			return true;
 		return false;
 	}
 
-	static void setAggressiveAdjacency(GOcTreeNode *lhs, GOcTreeNode *rhs)
+	static bool setAggressiveAdjacency(GOcTreeNode *lhs, GOcTreeNode *rhs)
 	{
 		if (lhs == rhs)
-			return ;
-		lhs->aggadj_.insert(rhs);
+			return false;
+		auto inserted = lhs->aggadj_.insert(rhs);
 		rhs->aggadj_.insert(lhs);
+		return inserted.second;
 	}
 
 	static void breakAggressiveAdjacency(GOcTreeNode *lhs, GOcTreeNode *rhs)

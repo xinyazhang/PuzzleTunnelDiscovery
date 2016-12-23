@@ -201,7 +201,7 @@ void Naive2DRenderer::removeDynamicLine(int token)
 
 void Naive2DRenderer::init()
 {
-	p_->window = init_glefw(800, 600, "Naive Renderer");
+	p_->window = init_glefw(1440, 900, "Naive Renderer");
 	p_->gui.reset(new GUI(p_->window));
 }
 
