@@ -25,6 +25,7 @@ public:
 	void mouseButtonCallback(int button, int action, int mods);
 	void updateMatrices();
 	MatrixPointers getMatrixPointers() const;
+	void setOrthogonalProjection(bool orth) { orth_proj_ = orth; }
 
 	static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
 	static void MousePosCallback(GLFWwindow* window, double mouse_x, double mouse_y);
@@ -69,6 +70,7 @@ private:
 
 	bool captureWASDUPDOWN(int key, int action);
 
+	bool orth_proj_ = false;
 };
 
 #endif

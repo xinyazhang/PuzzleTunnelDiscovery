@@ -4,6 +4,7 @@
 #include <glm/gtc/matrix_access.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/transform.hpp>
+#include <glm/gtx/io.hpp>
 
 GUI::GUI(GLFWwindow* window)
 	:window_(window)
@@ -15,7 +16,13 @@ GUI::GUI(GLFWwindow* window)
 
 	glfwGetWindowSize(window_, &window_width_, &window_height_);
 	float aspect_ = static_cast<float>(window_width_) / window_height_;
-	projection_matrix_ = glm::perspective((float)(kFov * (M_PI / 180.0f)), aspect_, kNear, kFar);
+	if (orth_proj_) {
+		projection_matrix_ = 
+		glm::ortho(-100.0f, 100.0f, -100.0f, -100.0f);
+	} else {
+		projection_matrix_ =
+			glm::perspective((float)(kFov * (M_PI / 180.0f)), aspect_, kNear, kFar);
+	}
 }
 
 GUI::~GUI()
@@ -97,8 +104,13 @@ void GUI::updateMatrices()
 	light_position_ = glm::vec4(eye_, 1.0f);
 
 	aspect_ = static_cast<float>(window_width_) / window_height_;
-	projection_matrix_ =
+	if (orth_proj_) {
+		projection_matrix_ = 
+		glm::ortho(aspect_ * -10.0f, aspect_ * 10.0f, -10.0f, 10.0f, 0.0f, 1000.0f);
+	} else {
+		projection_matrix_ =
 		glm::perspective((float)(kFov * (M_PI / 180.0f)), aspect_, kNear, kFar);
+	}
 	model_matrix_ = glm::mat4(1.0f);
 }
 
@@ -118,6 +130,10 @@ bool GUI::captureWASDUPDOWN(int key, int action)
 			eye_ += zoom_speed_ * look_;
 		else
 			camera_distance_ -= zoom_speed_;
+#if 0
+		std::cerr << "Camera: " << eye_ << std::endl;
+		std::cerr << "Proj: " << projection_matrix_ << std::endl;
+#endif
 		return true;
 	} else if (key == GLFW_KEY_S) {
 		if (fps_mode_)
