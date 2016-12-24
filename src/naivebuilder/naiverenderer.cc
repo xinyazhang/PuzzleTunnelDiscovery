@@ -466,7 +466,7 @@ int Naive2DRenderer::run()
 #if 1
 		p_->mutex.lock();
 
-#if 0
+#if 1
 		solid_pass.setup();
 		if (p_->solid_cubes_dirty) {
 			solid_pass.updateVBO(0, p_->solid_cubes.V.data(), p_->solid_cubes.V.rows());
@@ -500,12 +500,14 @@ int Naive2DRenderer::run()
 					0));
 #endif
 
+#if 0 
 		path_pass.setup();
 		if (p_->line_dirty) {
 			p_->update_to_render_pass(p_->lines, path_pass);
 			p_->line_dirty = false;
 		}
 		p_->render_lines(p_->lines);
+#endif
 
 		dynline_pass.setup();
 		if (p_->dynline_dirty) {
@@ -523,10 +525,12 @@ int Naive2DRenderer::run()
 #endif
 		p_->mutex.unlock();
 #endif
+#if 1
 		env_pass.setup();
 		CHECK_GL_ERROR(glDrawElements(GL_TRIANGLES, env.F.rows() * 3,
 					GL_UNSIGNED_INT,
 					0));
+#endif
 
 		glfwPollEvents();
 		glfwSwapBuffers(p_->window);

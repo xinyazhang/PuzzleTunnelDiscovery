@@ -259,10 +259,12 @@ public:
 						int token = renderer_->addDynamicLine(adj);
 						node->agg_line_tokens_.insert(token);
 						neighbor->agg_line_tokens_.insert(token);
+#if VERBOSE
 						std::cerr << "Adding Aggressive Adj\n"
 							<< "\tnode: " << *node
 							<< "\n\tneigh: " << *neighbor
 							<< std::endl;
+#endif
 					}
 #endif
 				}
@@ -427,7 +429,7 @@ public:
 
 	void drawSplit(Node* node)
 	{
-		std::cerr << "Adding split: " << *node << std::endl;
+		// std::cerr << "Adding split: " << *node << std::endl;
 		renderer_->addSplit(node->getMedian(), node->getMins(), node->getMaxs());
 		// press_enter();
 	}
@@ -439,10 +441,12 @@ public:
 #endif
 		renderer_->addCertain(node->getMedian(), node->getMins(), node->getMaxs(), node->getState() == Node::kCubeFree);
 		// press_enter();
+#if VERBOSE
 		if (node->atState(Node::kCubeFull)) {
 			std::cerr << "Added full node: " << *node << std::endl;
 			// press_enter();
 		}
+#endif
 	}
 
 	void setupRenderer(NaiveRenderer* renderer)

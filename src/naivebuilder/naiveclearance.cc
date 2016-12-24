@@ -18,7 +18,7 @@ struct NaiveClearance::NaiveClearancePrivate {
 
 	const Geo& env;
 	BVHModel env_bvh;
-	fcl::Sphere<Scalar> rob{0.001};
+	fcl::Sphere<Scalar> rob{0.01};
 
 	Geo smash_env;
 	Eigen::VectorXi smash_env_B;
@@ -121,7 +121,8 @@ struct NaiveClearance::NaiveClearancePrivate {
 				silhouette.V.row(silhouette.F(i,1)));
 			ret = std::min(d, ret);
 		}
-		// std::cerr << "PDt from " << center.transpose() << " = " << ret << std::endl;
+		if (std::abs(center(0)) < 0.1)
+			std::cerr << "PDt from " << center.transpose() << " = " << ret << std::endl;
 		return ret;
 	}
 };
@@ -148,14 +149,16 @@ Eigen::VectorXd NaiveClearance::getCertainCube(const Eigen::Vector2d& state, boo
 	tf.translation() = fcl::Vector3<Scalar>(state.x(), state.y(), 0.0);
 	
 	fcl::DistanceRequest<Scalar> request(true);
+#if 0
 	request.enable_signed_distance = true;
 	request.enable_nearest_points = true;
+#endif
 	request.gjk_solver_type = fcl::GST_LIBCCD;
 	fcl::DistanceResult<Scalar> result;
 
 	fcl::distance(&p_->rob, tf, &p_->env_bvh, Transform3::Identity(), request, result);
 	auto d = result.min_distance;
-	isfree = d > 0;
+	isfree = d > 1e-6;
 	if (!isfree) {
 		d = p_->getPDt(state);
 	}
@@ -163,6 +166,8 @@ Eigen::VectorXd NaiveClearance::getCertainCube(const Eigen::Vector2d& state, boo
 #if 0
 	std::cerr << "\tState: " << state.transpose() << "\tDistance: " << d << std::endl;
 #endif
+	if (std::abs(state(0)) < 0.1)
+		std::cerr << "distance from " << state.transpose() << " = " << d << " free: " << isfree << std::endl;
 	double cd = fabs(d) / sqrt2;
 
 	return Eigen::Vector2d(cd, cd);
