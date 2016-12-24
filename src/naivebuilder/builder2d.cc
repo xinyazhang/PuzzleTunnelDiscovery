@@ -360,6 +360,7 @@ public:
 			if (timer_alarming()) {
 				verbose(init_cube, goal_cube, max_cleared_distance, max_cleared_median);
 				rearm_timer();
+				press_enter();
 			}
 		}
 	}

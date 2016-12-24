@@ -267,6 +267,7 @@ int Naive2DRenderer::run()
 		return mats.view;
 	};
 	GUI* gui = p_->gui.get();
+	p_->gui->setOrthogonalProjection(true);
 	auto std_camera_data  = [gui]() -> const void* {
 		return &gui->getCamera()[0];
 	};
@@ -450,6 +451,7 @@ int Naive2DRenderer::run()
 		glEnable(GL_CULL_FACE);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glDepthFunc(GL_LESS);
+		// glDepthRangef(-1.0, 1.0);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glCullFace(GL_BACK);
 
@@ -464,6 +466,7 @@ int Naive2DRenderer::run()
 #if 1
 		p_->mutex.lock();
 
+#if 0
 		solid_pass.setup();
 		if (p_->solid_cubes_dirty) {
 			solid_pass.updateVBO(0, p_->solid_cubes.V.data(), p_->solid_cubes.V.rows());
@@ -495,6 +498,7 @@ int Naive2DRenderer::run()
 		CHECK_GL_ERROR(glDrawElements(GL_TRIANGLES, p_->clear_cubes.F.rows() * 3,
 					GL_UNSIGNED_INT,
 					0));
+#endif
 
 		path_pass.setup();
 		if (p_->line_dirty) {
