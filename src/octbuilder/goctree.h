@@ -138,6 +138,7 @@ public:
 	CubeState getState() const { return state_; }
 	bool atState(CubeState state) const { return getState() == state; }
 	bool isLeaf() const { return ChildPolicy::isEmpty(children_); }
+	bool isDetermined() const { return atState(kCubeFree) || atState(kCubeFull); }
 	unsigned getDepth() const { return unsigned(depth_); }
 
 	void expandCube(const CubeIndex& ci)

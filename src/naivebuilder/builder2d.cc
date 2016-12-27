@@ -212,7 +212,7 @@ public:
 				// getContactCubes.
 				if (node == neighbor)
 					continue;
-				if (neighbor->isLeaf()) {
+				if (neighbor->isDetermined()) {
 					if (neighbor->getState() == node->getState()) {
 #if 0
 						std::cerr << "Merging: " << neighbor
