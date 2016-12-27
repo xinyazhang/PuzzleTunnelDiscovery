@@ -13,7 +13,7 @@
 #define SHOW_ADJACENCY 1
 #define SHOW_AGGADJACENCY 1
 #define SHOW_AGGPATH 1
-#define ENABLE_DFS 0
+#define ENABLE_DFS 1
 
 using std::string;
 
@@ -124,6 +124,7 @@ public:
 			auto children = split_cube(current);
 			auto ci = current->locateCube(state);
 			Node* next = current->getCube(ci);
+			// FIXME: do we really need this?
 			if (coverage<ND, FLOAT>(state, certain, next)) {
 				if (isfree)
 					next->setState(Node::kCubeFree);
@@ -132,10 +133,15 @@ public:
 				drawCertain(next);
 			}
 			current = next;
-			// Add the remaining to the list.
 			for (auto cube : children) {
+#if !ENABLE_DFS
+				// Add the remaining to the list.
+				// Note: add_to_cube_list requires init_cube_ for DFS
+				//       but init_cube_ is initialized by this
+				//       function.
 				if (cube->atState(Node::kCubeUncertain) && cube != current)
 					add_to_cube_list(cube);
+#endif
 				connect_neighbors(cube);
 			}
 			// press_enter();
@@ -144,19 +150,21 @@ public:
 		return current;
 	}
 
-	void add_neighbors(Node* node)
+	std::vector<Node*> add_neighbors_to_list(Node* node)
 	{
 #if VERBOSE
 		std::cerr << "BEGIN " << __func__ << std::endl;
 #endif
-		auto op = [=](int dim, int direct, std::vector<Node*>& neighbors) -> bool
+		std::vector<Node*> ret;
+		auto op = [=,&ret](int dim, int direct, std::vector<Node*>& neighbors) -> bool
 		{
 			for (auto neighbor: neighbors) {
 #if VERBOSE
 				std::cerr << "checking neighbor: " << *neighbor << std::endl;
 #endif
 				if (neighbor->getState() ==  Node::kCubeUncertain) {
-					add_to_cube_list(neighbor, false);
+					if (add_to_cube_list(neighbor, false))
+						ret.emplace_back(neighbor);
 #if VERBOSE
 					std::cerr << __func__ << " : " << neighbor << std::endl;
 #endif
@@ -168,6 +176,7 @@ public:
 #if VERBOSE
 		std::cerr << "TERMINATE " << __func__ << std::endl;
 #endif
+		return ret;
 	}
 
 	// Note: we don't set kCubeMixed because we want to add the mixed
@@ -255,7 +264,6 @@ public:
 				if (Node::hasAggressiveAdjacency(node, neighbor)) {
 					bool inserted;
 					inserted = Node::setAggressiveAdjacency(node, neighbor);
-					(void)inserted;
 #if SHOW_AGGADJACENCY
 					if (inserted) {
 						Eigen::MatrixXd adj;
@@ -302,7 +310,7 @@ public:
 		std::cerr << "Goal: " << gstate_.transpose() << std::endl;
 		goal_cube_ = nullptr;
 		init_cube_ = determinizeCubeFromState(istate_);
-		add_neighbors(init_cube_);
+		add_neighbors_to_list(init_cube_);
 		std::cerr << "add_neighbors DONE\n";
 #if 0
 		auto goal_cube = determinizeCubeFromState(gstate_);
@@ -351,7 +359,14 @@ public:
 					continue;
 				// From now we assume cube.state == free.
 				if (cube->getSet() == init_cube_->getSet()) {
-					add_neighbors(cube);
+#if ENABLE_DFS
+					// Add second order neighbors.
+					auto firstorder = add_neighbors_to_list(cube);
+					for (auto neighbor : firstorder)
+						add_neighbors_to_list(neighbor);
+#else
+					add_neighbors_to_list(cube);
+#endif
 
 					// Track the furthest reachable cube.
 					Eigen::VectorXd dis = cube->getMedian() - init_cube_->getMedian();
@@ -586,7 +601,7 @@ private:
 				std::cerr << "\tLeaf? " << neighbor->isLeaf() << "\tState? " << neighbor->getState() << std::endl;
 #endif
 				if (neighbor->isLeaf() &&
-				    neighbor->getState() == Node::kCubeFree &&
+				    neighbor->isAggressiveFree() &&
 				    neighbor->getSet() == init_cube_->getSet()) {
 					ret = true;
 					return true;
@@ -599,12 +614,12 @@ private:
 		return ret;
 	}
 
-	void add_to_cube_list(Node* node, bool do_check = true)
+	bool add_to_cube_list(Node* node, bool do_check = true)
 	{
 		if (node->getState() != Node::kCubeUncertain)
-			return;
+			return false;
 		if (ENABLE_DFS && do_check && !contacting_free(node))
-			return;
+			return false;
 		int depth = node->getDepth();
 		if (long(cubes_.size()) <= depth)
 			cubes_.resize(depth+1);
@@ -614,6 +629,7 @@ private:
 #endif
 		node->setState(Node::kCubeUncertainPending);
 		current_queue_ = std::min(current_queue_, depth);
+		return true;
 	}
 
 	void contactors_op(Node* node,

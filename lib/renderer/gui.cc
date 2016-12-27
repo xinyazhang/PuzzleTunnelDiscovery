@@ -105,8 +105,9 @@ void GUI::updateMatrices()
 
 	aspect_ = static_cast<float>(window_width_) / window_height_;
 	if (orth_proj_) {
+		constexpr float ws = 10.0f;
 		projection_matrix_ = 
-		glm::ortho(aspect_ * -10.0f, aspect_ * 10.0f, -10.0f, 10.0f, 0.0f, 1000.0f);
+		glm::ortho(aspect_ * -ws, aspect_ * ws, -ws, ws, 0.0f, 1000.0f);
 	} else {
 		projection_matrix_ =
 		glm::perspective((float)(kFov * (M_PI / 180.0f)), aspect_, kNear, kFar);
