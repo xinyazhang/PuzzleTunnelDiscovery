@@ -12,6 +12,7 @@
 
 #define SHOW_ADJACENCY 1
 #define SHOW_AGGADJACENCY 1
+#define SHOW_AGGPATH 1
 #define ENABLE_DFS 0
 
 using std::string;
@@ -47,6 +48,7 @@ class OctreePathBuilder {
 		//static constexpr auto kUnviewedDistance = ULONG_MAX;
 		double distance; // = kUnviewedDistance;
 		const PathBuilderAttribute* prev = nullptr;
+		int epoch = -1;
 	};
 	struct FindUnionAttribute : public PathBuilderAttribute {
 		mutable const FindUnionAttribute* parent;
@@ -187,12 +189,19 @@ public:
 		node->volume = node->getVolume();
 		fixed_volume_ += node->getVolume();
 		if (stop) {
+#if 0
 			if (node->isContaining(gstate_)) {
 				std::cerr << "Goal Cube Cleared (" << node->getMedian().transpose()
 					<< ")\t depth: " << node->getDepth() << std::endl;
 			}
+#endif
 			if (isfree) {
 				node->setState(Node::kCubeFree);
+				if (goal_cube_ == nullptr && node->isContaining(gstate_)) {
+					goal_cube_ = node;
+					std::cerr << "!! Set goal cube as " << goal_cube_
+						<< std::endl;
+				}
 			} else {
 				node->setState(Node::kCubeFull);
 			}
@@ -291,19 +300,20 @@ public:
 		// Pre-calculate the initial clearance cube
 		std::cerr << "Init: " << istate_.transpose() << std::endl;
 		std::cerr << "Goal: " << gstate_.transpose() << std::endl;
-		auto init_cube = determinizeCubeFromState(istate_);
-		init_cube_ = init_cube;
-		add_neighbors(init_cube);
+		goal_cube_ = nullptr;
+		init_cube_ = determinizeCubeFromState(istate_);
+		add_neighbors(init_cube_);
 		std::cerr << "add_neighbors DONE\n";
 #if 0
 		auto goal_cube = determinizeCubeFromState(gstate_);
 		add_neighbors(goal_cube);
-#else
-		decltype(init_cube) goal_cube = nullptr;
 #endif
 		total_volume_ = root_->getVolume();
 		double max_cleared_distance = 0.0;
 		Eigen::VectorXd max_cleared_median;
+#if SHOW_AGGPATH
+		int aggpath_token = -1;
+#endif
 		while (true) {
 			/*
 			 * 1. Find a cube, called S, in the cubes_ list.
@@ -340,15 +350,11 @@ public:
 				if (cube->getState() != Node::kCubeFree)
 					continue;
 				// From now we assume cube.state == free.
-				if (!goal_cube && cube->isContaining(gstate_)) {
-					goal_cube = cube;
-					goal_cube_ = goal_cube;
-				}
-				if (cube->getSet() == init_cube->getSet()) {
+				if (cube->getSet() == init_cube_->getSet()) {
 					add_neighbors(cube);
 
 					// Track the furthest reachable cube.
-					Eigen::VectorXd dis = cube->getMedian() - init_cube->getMedian();
+					Eigen::VectorXd dis = cube->getMedian() - init_cube_->getMedian();
 					double disn = dis.block<3,1>(0,0).norm();
 					if (disn > max_cleared_distance) {
 						max_cleared_distance = disn;
@@ -357,11 +363,33 @@ public:
 				}
 			}
 			// press_enter();
-			if (goal_cube && goal_cube->getSet() == init_cube->getSet())
+			if (goal_cube_ && goal_cube_->getSet() == init_cube_->getSet())
 				break;
 			if (timer_alarming()) {
-				verbose(init_cube, goal_cube, max_cleared_distance, max_cleared_median);
+				verbose(init_cube_,
+					goal_cube_,
+					max_cleared_distance,
+					max_cleared_median);
 				rearm_timer();
+				auto aggpath = buildPath(true);
+				std::cerr << "Aggressive path: " << aggpath << std::endl;
+#if SHOW_AGGPATH
+				if (aggpath_token > 0) {
+					renderer_->removeDynamicLine(aggpath_token);
+				}
+				Eigen::MatrixXd adj;
+				adj.resize(aggpath.size(), ND + 1);
+				for (size_t i = 0 ; i < aggpath.size(); i++) {
+					adj.row(i) = aggpath[i];
+					adj(i, Dimension) = 2.0; // Note: 2D only
+				}
+				aggpath_token = renderer_->addDynamicLine(adj);
+
+#endif
+				if (aggpath.empty()) {
+					std::cerr << "CANNOT FIND A PATH, EXITING\n";
+					break;
+				}
 				press_enter();
 			}
 		}
@@ -387,30 +415,65 @@ public:
 
 	Node* getRoot() { return root_.get(); }
 
-	std::vector<Eigen::VectorXd> buildPath()
+	std::vector<Eigen::VectorXd> buildPath(bool aggressive = false)
 	{
+		epoch_++;
+		int epoch = epoch_;
+		auto goal_cube = goal_cube_;
+
 		init_cube_->distance = 0;
 		init_cube_->prev = init_cube_; // Only circular one
+		init_cube_->epoch = epoch;
+
 		auto cmp = [](Node* lhs, Node* rhs) -> bool { return lhs->distance < rhs->distance; };
 		// priority_queue:
 		//      cmp(top, other) always returns false.
 		std::priority_queue<Node*, std::deque<Node*>, decltype(cmp)> Q(cmp);
 		Q.push(init_cube_);
 		bool goal_reached = false;
+		auto loopf = [&Q, &goal_reached, epoch, goal_cube]
+			(Node* adj, Node* tip) -> bool {
+				if (adj->prev && adj->epoch == epoch) // No re-insert
+					return false;
+				adj->prev = tip;
+				adj->distance = tip->distance +
+					(tip->getMedian() - adj->getMedian()).norm();
+				adj->epoch = epoch;
+#if 0
+				std::cerr << "\tInserting " << *adj << std::endl;
+				std::cerr << "\t\tPointer " << adj
+					<< " Goal? " << (adj == goal_cube)
+					<< "(" << goal_cube << ")" << std::endl;
+#endif
+				Q.push(adj);
+				if (adj->atState(Node::kCubeMixed)) {
+					std::cerr << "!@#$%^&^&*((*$%^&#%&^#$" << std::endl;
+					std::cerr << "\tAdj: " << *adj << std::endl;
+					std::cerr << "\tTip: " << *tip << std::endl;
+				}
+				if (adj == goal_cube) {
+#if 0
+					std::cerr << "\t!This is goal cube" << std::endl;
+#endif
+					goal_reached = true;
+					return true;
+				}
+				return false;
+			};
 		while (!Q.empty() && !goal_reached) {
 			auto tip = Q.top();
 			Q.pop();
-			for (auto adj : tip->getAdjacency()) {
-				if (adj->prev) // No re-insert
-					continue;
-				adj->prev = tip;
-				adj->distance = tip->distance + (tip->getMedian() - adj->getMedian()).norm();
-				Q.push(adj);
-				if (adj == goal_cube_) {
-					goal_reached = true;
+#if 0
+			std::cerr << "Checking " << *tip << std::endl
+				<< "\tPointer: " << tip << std::endl;
+#endif
+			for (auto adj : tip->getAdjacency())
+				if (loopf(adj, tip))
 					break;
-				}
-			}
+			if (!goal_reached && aggressive)
+				for (auto adj : tip->getAggressiveAdjacency())
+					if (loopf(adj, tip))
+						break;
 		}
 		if (!goal_reached)
 			return {};
@@ -474,6 +537,7 @@ private:
 		node->setState(Node::kCubeMixed);
 #if SHOW_AGGADJACENCY
 		bool need_pause = !node->agg_line_tokens_.empty();
+		(void)need_pause;
 		for (auto token : node->agg_line_tokens_) {
 			for (auto adj: node->getAggressiveAdjacency())
 				adj->agg_line_tokens_.erase(token);
@@ -594,6 +658,7 @@ private:
 	double total_volume_;
 	Node *init_cube_ = nullptr;
 	Node *goal_cube_ = nullptr;
+	int epoch_ = 0;
 };
 
 void press_enter()
@@ -651,15 +716,17 @@ int worker(NaiveRenderer* renderer)
 
 	builder.buildOcTree(cc);
 	auto path = builder.buildPath();
-	std::cerr << path << std::endl;
-	Eigen::MatrixXd np;
-	np.resize(path.size(), path.front().size() + 1); // Note: 2D only
-	for (size_t i = 0; i < path.size(); i++) {
-		np.row(i) = path[i];
-		np(i, Builder::Dimension) = 2.0; // Note: 2D only
+	if (!path.empty()) {
+		std::cerr << path << std::endl;
+		Eigen::MatrixXd np;
+		np.resize(path.size(), path.front().size() + 1); // Note: 2D only
+		for (size_t i = 0; i < path.size(); i++) {
+			np.row(i) = path[i];
+			np(i, Builder::Dimension) = 2.0; // Note: 2D only
+		}
+		renderer->addLine(np);
+		std::cerr << "Done\n";
 	}
-	renderer->addLine(np);
-	std::cerr << "Done\n";
 	press_enter();
 
 	return 0;

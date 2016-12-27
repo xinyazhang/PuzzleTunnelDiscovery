@@ -466,7 +466,7 @@ int Naive2DRenderer::run()
 #if 1
 		p_->mutex.lock();
 
-#if 1
+#if 0
 		solid_pass.setup();
 		if (p_->solid_cubes_dirty) {
 			solid_pass.updateVBO(0, p_->solid_cubes.V.data(), p_->solid_cubes.V.rows());
@@ -476,7 +476,9 @@ int Naive2DRenderer::run()
 		CHECK_GL_ERROR(glDrawElements(GL_TRIANGLES, p_->solid_cubes.F.rows() * 3,
 					GL_UNSIGNED_INT,
 					0));
+#endif
 
+#if 1
 		wireframe_pass.setup();
 		if (p_->wireframe_dirty) {
 			wireframe_pass.updateVBO(0, p_->wireframe.V.data(), p_->wireframe.V.rows());
@@ -488,7 +490,9 @@ int Naive2DRenderer::run()
 					GL_UNSIGNED_INT,
 					0));
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+#endif
 
+#if 0
 		clear_pass.setup();
 		if (p_->clear_cubes_dirty) {
 			clear_pass.updateVBO(0, p_->clear_cubes.V.data(), p_->clear_cubes.V.rows());
@@ -500,7 +504,7 @@ int Naive2DRenderer::run()
 					0));
 #endif
 
-#if 0 
+#if 1 
 		path_pass.setup();
 		if (p_->line_dirty) {
 			p_->update_to_render_pass(p_->lines, path_pass);
