@@ -8,6 +8,7 @@
 #include <igl/remove_unreferenced.h>
 #include <igl/edges.h>
 #include <igl/is_boundary_edge.h>
+#include <igl/barycentric_coordinates.h>
 
 struct NaiveClearance::NaiveClearancePrivate {
 	using BV = fcl::OBBRSS<double>;
@@ -21,6 +22,7 @@ struct NaiveClearance::NaiveClearancePrivate {
 	fcl::Sphere<Scalar> rob{0.01};
 
 	Geo smash_env;
+	Eigen::MatrixXd smashABC[3];
 	Eigen::VectorXi smash_env_B;
 	Geo silhouette;
 
@@ -43,12 +45,33 @@ struct NaiveClearance::NaiveClearancePrivate {
 			Eigen::MatrixXd N;
 			igl::per_face_normals(env.V, env.F, N);
 			Eigen::MatrixXi oldF = env.F;
+			Eigen::VectorXi keepV;
+			keepV.resize(oldF.rows());
 			for (int i = 0; i < oldF.rows(); i++) {
-				if (N.row(i).dot(posZ) >= 0)
+				if (N.row(i).dot(posZ) >= 0) {
 					oldF.row(i) << -1, -1, -1;
+					keepV(i) = 0;
+				} else
+					keepV(i) = 1;
 			}
 			Eigen::VectorXi I;
-			igl::remove_unreferenced(env.V, oldF, smash_env.V, smash_env.F, I);
+			Eigen::MatrixXi newF;
+			igl::remove_unreferenced(env.V, oldF, smash_env.V, newF, I);
+			smash_env.F.resize(keepV.count(), oldF.cols());
+			for (int i = 0, fi = 0; i < newF.rows(); i++) {
+				if (keepV(i)) {
+					smash_env.F.row(fi) = newF.row(i);
+					fi++;
+				}
+			}
+#if 0
+			for (int i = 0; i < 3; i++) {
+				smashABC[i].resize(newF.rows(), 2);
+				for (int f = 0; f < smash_env.F.rows(); f++) {
+					smashABC[i].row(f) = smash_env.V.row(smash_env.F(f, i));
+				}
+			}
+#endif
 		}
 		Eigen::MatrixXi E;
 		igl::edges(smash_env.F, E);
@@ -121,8 +144,10 @@ struct NaiveClearance::NaiveClearancePrivate {
 				silhouette.V.row(silhouette.F(i,1)));
 			ret = std::min(d, ret);
 		}
+#if VERBOSE
 		if (std::abs(center(0)) < 0.1)
 			std::cerr << "PDt from " << center.transpose() << " = " << ret << std::endl;
+#endif
 		return ret;
 	}
 };
@@ -140,8 +165,11 @@ namespace {
 	constexpr double sqrt2 = 1.41421356237;
 };
 
+#define USE_FCL_FOR_2D 0
+
 Eigen::VectorXd NaiveClearance::getCertainCube(const Eigen::Vector2d& state, bool &isfree)
 {
+#if USE_FCL_FOR_2D
 	using Scalar = double;
 	using Transform3 = fcl::Transform3<Scalar>;
 
@@ -162,12 +190,41 @@ Eigen::VectorXd NaiveClearance::getCertainCube(const Eigen::Vector2d& state, boo
 	if (!isfree) {
 		d = p_->getPDt(state);
 	}
+#else
+	isfree = true;
+	Eigen::MatrixXd cstate(1, 2);
+	cstate << state(0), state(1);
+	for (int i = 0; i < p_->smash_env.F.rows(); i++) {
+		Eigen::MatrixXd bc;
+		Eigen::Vector3i F = p_->smash_env.F.row(i);
+		igl::barycentric_coordinates(
+				cstate,
+				p_->smash_env.V.block<1,2>(F(0), 0),
+				p_->smash_env.V.block<1,2>(F(1), 0),
+				p_->smash_env.V.block<1,2>(F(2), 0),
+				bc);
+		if (bc(0) >= 0 && bc(1) >= 0 && bc(2) >= 0) {
+			isfree = false;
+#if 0
+			std::cerr << state.transpose() << "\thas barycenter coordinates "
+				<< bc.transpose()
+				<< " from triangle:"
+				<< "\n\t" << p_->smash_env.V.row(F(0))
+				<< "\n\t" << p_->smash_env.V.row(F(1))
+				<< "\n\t" << p_->smash_env.V.row(F(2))
+				<< std::endl;
+#endif
+			break;
+		}
+	}
+	double d = p_->getPDt(state);
+#endif
 
 #if 0
 	std::cerr << "\tState: " << state.transpose() << "\tDistance: " << d << std::endl;
-#endif
 	if (std::abs(state(0)) < 0.1)
 		std::cerr << "distance from " << state.transpose() << " = " << d << " free: " << isfree << std::endl;
+#endif
 	double cd = fabs(d) / sqrt2;
 
 	return Eigen::Vector2d(cd, cd);
