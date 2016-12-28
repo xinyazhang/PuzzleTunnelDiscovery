@@ -10,6 +10,7 @@
 #include <iostream>
 #include <math.h>
 #include "geo.h"
+#include "path.h"
 
 /*
  * BV: bounding volume, like fcl::OBBRSS<double>
@@ -28,6 +29,7 @@ private:
 	fcl::detail::SplitMethodType split_method_ = fcl::detail::SPLIT_METHOD_MEDIAN;
 public:
 	using TransformMatrix = Eigen::Matrix<double, 4, 4>;
+	using State = Eigen::Matrix<double, 6, 1>;
 
 	ClearanceCalculator(const Geo& rob, Geo& env)
 		:rob_(rob), env_(env), distribution_(-1.0, 1.0)
@@ -35,12 +37,10 @@ public:
 		buildBVHs();
 	}
 
-	double getDistance(const TransformMatrix& trmat) const
+	double getDistance(const Transform3& tf) const
 	{
-		fcl::DistanceResult<Scalar> result;
 		TraversalNode node;
-		Transform3 tf;
-		tf = trmat.block<3,4>(0,0);
+		fcl::DistanceResult<Scalar> result;
 		fcl::DistanceRequest<Scalar> request(true);
 		if(!fcl::detail::initialize(node,
 		                    rob_bvh_, tf,
@@ -50,18 +50,30 @@ public:
 		  ) {
 			std::cerr << "initialize error" << std::endl;
 		}
-#if 1
 		fcl::detail::distance(&node, nullptr, qsize);
-#endif
-		if (result.min_distance > 0)
-			return result.min_distance;
+		return result.min_distance;
+	}
+
+	double getDistance(const TransformMatrix& trmat) const
+	{
+		Transform3 tf;
+		tf = trmat.block<3,4>(0,0);
+		return getDistance(tf);
+	}
+
+	double getSignedDistance(const TransformMatrix& trmat) const
+	{
+		Transform3 tf;
+		tf = trmat.block<3,4>(0,0);
+		double d = getDistance(tf);
+		if (d > 0)
+			return d;
 		return getPenetrationDepth(tf);
 	}
 
 	double getPenetrationDepth(const Transform3& tf) const
 	{
 		//std::cerr << __func__ << " called" << std::endl;
-		Transform3 tf2{Transform3::Identity()};
 
 		fcl::DistanceRequest<Scalar> request;
 		request.enable_signed_distance = true;
@@ -85,7 +97,36 @@ public:
 		return csize_;
 	}
 
-	Eigen::VectorXd getClearanceCube(const TransformMatrix& trmat, double distance = -1) const
+	State getCertainCube(const State& state, bool& isfree) const
+	{
+		auto trmat = Path::stateToMatrix(state);
+		Transform3 tf;
+		tf = trmat.block<3,4>(0,0);
+		Eigen::Vector3d nrcenter = tf * rob_.center;
+		double distance = getSignedDistance(trmat);
+		if (distance > 0) {
+			isfree = true;
+		} else {
+			isfree = false;
+			distance = -distance;
+		}
+
+		const Eigen::MatrixXd& RV = rob_.V;
+		double dscale = 1.0;
+		auto csize = getCSize();
+		for (int i = 0; i < RV.rows(); i++) {
+			// v: relative coordinates w.r.t. robot center.
+			Eigen::Vector3d v = tf * Eigen::Vector3d(RV.row(i)) - nrcenter;
+			double r = v.norm();
+			dscale = std::min(dscale, binsolve(csize.x(), csize.y(), r, distance));
+		}
+		State ret;
+		ret << csize.x() * dscale, csize.x() * dscale, csize.x() * dscale,
+		       csize.y() * dscale, csize.y() * dscale, csize.y() * dscale;
+		return ret;
+	}
+
+	State getClearanceCube(const TransformMatrix& trmat, double distance = -1) const
 	{
 		Transform3 tf;
 		tf = trmat.block<3,4>(0,0);
@@ -103,26 +144,29 @@ public:
 			double r = v.norm();
 			dscale = std::min(dscale, binsolve(csize.x(), csize.y(), r, distance));
 		}
-		Eigen::VectorXd ret;
+		State ret;
 #if 0
 		ret << 2 * M_PI, 2 * M_PI, 2 * M_PI,
 		       2 * M_PI, 2 * M_PI, 2 * M_PI;
 #endif
-		ret.resize(8);
+#if 0
 		ret << csize.x() * dscale, csize.x() * dscale, csize.x() * dscale,
 		       csize.y() * dscale, csize.y() * dscale, csize.y() * dscale,
 		       dscale, std::log2(1.0/dscale);
+#endif
+		ret << csize.x() * dscale, csize.x() * dscale, csize.x() * dscale,
+		       csize.y() * dscale, csize.y() * dscale, csize.y() * dscale;
 		return ret;
 	}
 
-	Eigen::VectorXd getSolidCube(const TransformMatrix& trmat, double pendepth = NAN) const
+	State getSolidCube(const TransformMatrix& trmat, double pendepth = NAN) const
 	{
 		if (isnan(pendepth))
 			pendepth = -getDistance(trmat);
 		return getClearanceCube(trmat, pendepth); // The bounding formula is the same.
 	}
 
-	int sanityCheck(const TransformMatrix& trmat, const Eigen::VectorXd& clearance)
+	int sanityCheck(const TransformMatrix& trmat, const State& clearance)
 	{
 		double dx = clearance(0);
 		double dalpha = clearance(3);

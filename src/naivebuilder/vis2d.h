@@ -3,6 +3,7 @@
 
 #include "nullvisualizer.h"
 #include "naiverenderer.h"
+#include <vecio/arrayvecio.h>
 #include <iostream>
 #include <set>
 
@@ -10,8 +11,6 @@
 #define SHOW_ADJACENCY 1
 #define SHOW_AGGADJACENCY 1
 #define SHOW_AGGPATH 1
-
-std::ostream& operator<<(std::ostream& fout, const std::vector<Eigen::VectorXd>& milestones);
 
 /* 2D Visualizer */
 class NaiveVisualizer : public NullVisualizer {

@@ -8,12 +8,13 @@
 #include <functional>
 #include <queue>
 #include <iostream>
+#include <stdexcept>
 
 /*
  * DFS: prioritize larger cubes connected to the initial cube
  * BFS: prioritize larger cubes globally.
  */
-#define ENABLE_DFS 1
+#define ENABLE_DFS 0
 
 template<int ND,
 	 typename FLOAT,
@@ -245,6 +246,8 @@ protected:
 					if (inserted) {
 						VIS::visAggAdj(node, neighbor);
 					}
+#else
+					(void)inserted;
 #endif
 				}
 				ttlneigh++;
@@ -333,8 +336,10 @@ protected:
 	Node* pop_from_cube_list()
 	{
 		int depth = current_queue_;
-		while (cubes_[depth].empty())
+		while (cubes_[depth].empty() && depth < int(cubes_.size()))
 			depth++;
+		if (depth >= int(cubes_.size()))
+			throw std::runtime_error("CUBE LIST BECOMES EMPTY, TERMINATE");
 		auto ret = cubes_[depth].front();
 		cubes_[depth].pop_front();
 		current_queue_ = depth;
