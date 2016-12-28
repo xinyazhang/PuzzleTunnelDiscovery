@@ -466,7 +466,7 @@ int Naive2DRenderer::run()
 #if 1
 		p_->mutex.lock();
 
-#if 0
+#if 1
 		solid_pass.setup();
 		if (p_->solid_cubes_dirty) {
 			solid_pass.updateVBO(0, p_->solid_cubes.V.data(), p_->solid_cubes.V.rows());
@@ -492,7 +492,7 @@ int Naive2DRenderer::run()
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 #endif
 
-#if 0
+#if 1
 		clear_pass.setup();
 		if (p_->clear_cubes_dirty) {
 			clear_pass.updateVBO(0, p_->clear_cubes.V.data(), p_->clear_cubes.V.rows());

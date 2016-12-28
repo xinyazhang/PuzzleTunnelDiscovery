@@ -116,14 +116,12 @@ public:
 		root_.reset(Node::makeRoot(mins_, maxs_));
 		auto current = root_.get();
 
-		bool isfree;
-		auto certain = cc_->getCertainCube(state, isfree);
-
 		while (current->getState() == Node::kCubeUncertain) {
 			// std::cerr << "Current depth " << current->getDepth() << std::endl;
 			auto children = split_cube(current);
 			auto ci = current->locateCube(state);
 			Node* next = current->getCube(ci);
+#if 0
 			// FIXME: do we really need this?
 			if (coverage<ND, FLOAT>(state, certain, next)) {
 				if (isfree)
@@ -132,6 +130,7 @@ public:
 					next->setState(Node::kCubeFull);
 				drawCertain(next);
 			}
+#endif
 			current = next;
 			for (auto cube : children) {
 #if !ENABLE_DFS
