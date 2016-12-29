@@ -133,7 +133,6 @@ public:
 						break;
 					}
 				}
-				VIS::pause();
 			}
 		}
 	}
