@@ -5,9 +5,10 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/transform.hpp>
 #include <glm/gtx/io.hpp>
+#include "camera.h"
 
 GUI::GUI(GLFWwindow* window)
-	:window_(window)
+	:window_(window), camera_(new Camera)
 {
 	glfwSetWindowUserPointer(window_, this);
 	glfwSetKeyCallback(window_, KeyCallback);
@@ -31,25 +32,11 @@ GUI::~GUI()
 
 void GUI::keyCallback(int key, int scancode, int action, int mods)
 {
+	if (camera_->key_pressed(key))
+		return;
 	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
 		glfwSetWindowShouldClose(window_, GL_TRUE);
 		return ;
-	}
-	if (key == GLFW_KEY_J && action == GLFW_RELEASE) {
-		//FIXME save out a screenshot using SaveJPEG
-	}
-
-	if (captureWASDUPDOWN(key, action))
-		return ;
-	if (key == GLFW_KEY_LEFT || key == GLFW_KEY_RIGHT) {
-		float roll_speed;
-		if (key == GLFW_KEY_RIGHT)
-			roll_speed = -roll_speed_;
-		else
-			roll_speed = roll_speed_;
-		// FIXME: actually roll the bone here
-	} else if (key == GLFW_KEY_C && action != GLFW_RELEASE) {
-		fps_mode_ = !fps_mode_;
 	} else if (key == GLFW_KEY_T && action != GLFW_RELEASE) {
 		transparent_ = !transparent_;
 	}
@@ -61,29 +48,18 @@ void GUI::mousePosCallback(double mouse_x, double mouse_y)
 	last_y_ = current_y_;
 	current_x_ = mouse_x;
 	current_y_ = window_height_ - mouse_y;
-	float delta_x = current_x_ - last_x_;
-	float delta_y = current_y_ - last_y_;
+	double delta_x = current_x_ - last_x_;
+	double delta_y = current_y_ - last_y_;
 	if (sqrt(delta_x * delta_x + delta_y * delta_y) < 1e-15)
 		return;
-	glm::vec3 mouse_direction = glm::normalize(glm::vec3(delta_x, delta_y, 0.0f));
-	glm::vec2 mouse_start = glm::vec2(last_x_, last_y_);
-	glm::vec2 mouse_end = glm::vec2(current_x_, current_y_);
-	glm::uvec4 viewport = glm::uvec4(0, 0, window_width_, window_height_);
-
-	bool drag_camera = drag_state_ && current_button_ == GLFW_MOUSE_BUTTON_RIGHT;
-	bool drag_bone = drag_state_ && current_button_ == GLFW_MOUSE_BUTTON_LEFT;
-
-	if (drag_camera) {
-		glm::vec3 axis = glm::normalize(
-				orientation_ *
-				glm::vec3(mouse_direction.y, -mouse_direction.x, 0.0f)
-				);
-		orientation_ =
-			glm::mat3(glm::rotate(rotation_speed_, axis) * glm::mat4(orientation_));
-		tangent_ = glm::column(orientation_, 0);
-		up_ = glm::column(orientation_, 1);
-		look_ = glm::column(orientation_, 2);
-	}
+	if (!drag_state_)
+		return ;
+	if (current_button_ == GLFW_MOUSE_BUTTON_LEFT)
+		camera_->left_drag(delta_x, delta_y);
+	else if (current_button_ == GLFW_MOUSE_BUTTON_RIGHT)
+		camera_->right_drag(delta_x, delta_y);
+	else if (current_button_ == GLFW_MOUSE_BUTTON_MIDDLE)
+		camera_->middle_drag(delta_x, delta_y);
 }
 
 void GUI::mouseButtonCallback(int button, int action, int mods)
@@ -94,15 +70,7 @@ void GUI::mouseButtonCallback(int button, int action, int mods)
 
 void GUI::updateMatrices()
 {
-	// Compute our view, and projection matrices.
-	if (fps_mode_)
-		center_ = eye_ + camera_distance_ * look_;
-	else
-		eye_ = center_ - camera_distance_ * look_;
-
-	view_matrix_ = glm::lookAt(eye_, center_, up_);
-	light_position_ = glm::vec4(eye_, 1.0f);
-
+	light_position_ = glm::vec4(camera_->getCenter(), 1.0f);
 	aspect_ = static_cast<float>(window_width_) / window_height_;
 	if (orth_proj_) {
 		constexpr float ws = 10.0f;
@@ -120,56 +88,19 @@ MatrixPointers GUI::getMatrixPointers() const
 	MatrixPointers ret;
 	ret.projection = &projection_matrix_[0][0];
 	ret.model= &model_matrix_[0][0];
-	ret.view = &view_matrix_[0][0];
+	ret.view = &(camera_->get_view_matrix()[0][0]);
 	return ret;
 }
 
-bool GUI::captureWASDUPDOWN(int key, int action)
+glm::vec3 GUI::getCenter() const
 {
-	if (key == GLFW_KEY_W) {
-		if (fps_mode_)
-			eye_ += zoom_speed_ * look_;
-		else
-			camera_distance_ -= zoom_speed_;
-#if 0
-		std::cerr << "Camera: " << eye_ << std::endl;
-		std::cerr << "Proj: " << projection_matrix_ << std::endl;
-#endif
-		return true;
-	} else if (key == GLFW_KEY_S) {
-		if (fps_mode_)
-			eye_ -= zoom_speed_ * look_;
-		else
-			camera_distance_ += zoom_speed_;
-		return true;
-	} else if (key == GLFW_KEY_A) {
-		if (fps_mode_)
-			eye_ -= pan_speed_ * tangent_;
-		else
-			center_ -= pan_speed_ * tangent_;
-		return true;
-	} else if (key == GLFW_KEY_D) {
-		if (fps_mode_)
-			eye_ += pan_speed_ * tangent_;
-		else
-			center_ += pan_speed_ * tangent_;
-		return true;
-	} else if (key == GLFW_KEY_DOWN) {
-		if (fps_mode_)
-			eye_ -= pan_speed_ * up_;
-		else
-			center_ -= pan_speed_ * up_;
-		return true;
-	} else if (key == GLFW_KEY_UP) {
-		if (fps_mode_)
-			eye_ += pan_speed_ * up_;
-		else
-			center_ += pan_speed_ * up_;
-		return true;
-	}
-	return false;
+	return camera_->getCenter();
 }
 
+const glm::vec3& GUI::getCamera() const
+{
+	return camera_->getCamera();
+}
 
 // Delegrate to the actual GUI object.
 void GUI::KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
