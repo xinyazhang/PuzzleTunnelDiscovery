@@ -440,7 +440,7 @@ int Naive3DRenderer::run()
 			{ "fragment_color" }
 			);
 
-	//std::cerr << "ENV Faces\n " << env.F << "\nVertices\n" << env.GPUV << std::endl;
+	// std::cerr << "ENV Faces\n " << env.F << "\nVertices\n" << env.GPUV << std::endl;
 	while (!glfwWindowShouldClose(p_->window)) {
 		int window_width, window_height;
 		glfwGetFramebufferSize(p_->window, &window_width, &window_height);
@@ -458,7 +458,7 @@ int Naive3DRenderer::run()
 
 		gui->updateMatrices();
 		mats = gui->getMatrixPointers();
-#if 0
+#if 1
 		env_pass.setup();
 		CHECK_GL_ERROR(glDrawElements(GL_TRIANGLES, env.F.rows() * 3,
 					GL_UNSIGNED_INT,
@@ -493,7 +493,7 @@ int Naive3DRenderer::run()
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 #endif
 
-#if 1
+#if 0
 		clear_pass.setup();
 		if (p_->clear_cubes_dirty) {
 			clear_pass.updateVBO(0, p_->clear_cubes.V.data(), p_->clear_cubes.V.rows());
@@ -514,12 +514,14 @@ int Naive3DRenderer::run()
 		p_->render_lines(p_->lines);
 #endif
 
+#if 1
 		dynline_pass.setup();
 		if (p_->dynline_dirty) {
 			p_->update_to_render_pass(p_->dynlines, dynline_pass);
 			p_->dynline_dirty = false;
 		}
 		p_->render_lines(p_->dynlines);
+#endif
 #if 0
 		std::cerr << "ENV Faces\n " << env.F << "\nVertices\n" << env.V << std::endl;
 		//std::cerr << "ENV Faces\n " << env.F.rows() << "\nVertices\n" << env.V.rows() << std::endl;
@@ -530,7 +532,7 @@ int Naive3DRenderer::run()
 #endif
 		p_->mutex.unlock();
 #endif
-#if 1
+#if 0
 		env_pass.setup();
 		CHECK_GL_ERROR(glDrawElements(GL_TRIANGLES, env.F.rows() * 3,
 					GL_UNSIGNED_INT,

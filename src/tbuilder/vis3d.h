@@ -8,8 +8,8 @@
 #include <set>
 
 // FIXME: find a way to avoid using macros
-#define SHOW_ADJACENCY 1
-#define SHOW_AGGADJACENCY 1
+#define SHOW_ADJACENCY 0
+#define SHOW_AGGADJACENCY 0
 #define SHOW_AGGPATH 1
 
 /*
@@ -36,6 +36,12 @@ public:
 		renderer_->addLine(adj);
 	}
 #endif
+	template<typename Node>
+	static void visPathSegment(Node* node, Node* neighbor)
+	{
+		auto adj = build_line(node, neighbor);
+		renderer_->addLine(adj);
+	}
 
 #if SHOW_AGGPATH
 	static void visAggPath(const std::vector<Eigen::VectorXd>& aggpath)
@@ -55,7 +61,7 @@ public:
 
 	static void pause()
 	{
-#if 0
+#if 1
 		std::cerr << "Press enter to continue" << std::endl;
 		std::cin.ignore(std::numeric_limits<std::streamsize>::max(),'\n');
 #endif
@@ -90,6 +96,7 @@ public:
 	static void visSplit(Node* node)
 	{
 		renderer_->addSplit(node->getMedian(), node->getMins(), node->getMaxs());
+		// pause();
 	}
 
 	template<typename Node>
@@ -99,6 +106,10 @@ public:
 				node->getMins(),
 				node->getMaxs(),
 				node->getState() == Node::kCubeFree);
+#if 0
+		if (node->atState(Node::kCubeFull))
+			pause();
+#endif
 	}
 
 	static void setRenderer(NaiveRenderer* renderer) { renderer_ = renderer; }

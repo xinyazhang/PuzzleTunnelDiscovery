@@ -14,7 +14,7 @@ using std::string;
 int worker(NaiveRenderer* renderer)
 {
 	string robotfn = "../res/simple/robot.obj";
-	string envfn = "../res/simple/env2.obj";
+	string envfn = "../res/simple/FullTorus.obj";
 	string pathfn = "../res/simple/naive2.path";
 
 	Geo robot, env;
@@ -24,6 +24,7 @@ int worker(NaiveRenderer* renderer)
 	env.read(envfn);
 	path.readPath(pathfn);
 	robot.center << 0.0, 0.0, 0.0;
+	renderer->setEnv(&env);
 
 	TranslationOnlyClearance<fcl::OBBRSS<double>> cc(robot, env);
 
@@ -76,7 +77,19 @@ int worker(NaiveRenderer* renderer)
 	renderer->workerReady();
 
 	builder.buildOcTree(cc);
-	std::cout << builder.buildPath();
+	{
+		auto path = builder.buildPath();
+		if (!path.empty()) {
+			std::cerr << "PATH FOUND:\n" << path << std::endl;
+			Eigen::MatrixXd np;
+			np.resize(path.size(), path.front().size());
+			for (size_t i = 0; i < path.size(); i++) {
+				np.row(i) = path[i];
+			}
+			renderer->addLine(np);
+			std::cerr << "Done\n";
+		}
+	}
 	Builder::VIS::pause();
 	std::cerr << "Worker thread exited\n";
 

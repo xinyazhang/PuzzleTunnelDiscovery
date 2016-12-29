@@ -13,6 +13,8 @@ public:
 	static void initialize() { last_time_ = ::time(NULL); }
 	template<typename Node>
 	static void visAdj(Node*, Node* ) {}
+	template<typename Node>
+	static void visPathSegment(Node*, Node* ) {}
 
 	template<typename Node>
 	static void visAggAdj(Node*, Node* ) {}
