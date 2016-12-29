@@ -207,12 +207,19 @@ TARGET_LINK_LIBRARIES(evadiff tetio heatio)
 #EASYADD(minkview2)
 #TARGET_LINK_LIBRARIES(minkview2 ${CGAL_LIBRARIES} ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY})
 
-EASYADD(freecube)
-TARGET_LINK_LIBRARIES(freecube fcl renderer omplaux ${CMAKE_THREAD_LIBS_INIT} ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY})
+SET(viscommon renderer ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY})
 
+EASYADD(freecube)
+TARGET_LINK_LIBRARIES(freecube fcl omplaux ${CMAKE_THREAD_LIBS_INIT} ${viscommon})
+
+SET(octbuildercommon goct vecio fcl omplaux ${CMAKE_THREAD_LIBS_INIT})
+	
 EASYADD(octbuilder)
-TARGET_LINK_LIBRARIES(octbuilder goct vecio fcl omplaux ${CMAKE_THREAD_LIBS_INIT})
+TARGET_LINK_LIBRARIES(octbuilder ${octbuildercommon})
 
 EASYADD(naivebuilder)
-TARGET_LINK_LIBRARIES(naivebuilder goct vecio fcl renderer omplaux ${CMAKE_THREAD_LIBS_INIT} ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY})
+TARGET_LINK_LIBRARIES(naivebuilder ${octbuildercommon} ${viscommon})
+
+EASYADD(tbuilder)
+TARGET_LINK_LIBRARIES(tbuilder ${octbuildercommon} ${viscommon})
 # vim: tw=0
