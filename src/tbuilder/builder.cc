@@ -13,20 +13,36 @@ using std::string;
 
 int worker(NaiveRenderer* renderer)
 {
+#if 0
 	string robotfn = "../res/simple/robot.obj";
 	string envfn = "../res/simple/FullTorus.obj";
 	string pathfn = "../res/simple/naive2.path";
+#else
+	string robotfn = "../res/simple/robot.obj";
+	string envfn = "../res/simple/mFixedElkMeetsCube.obj";
+	string pathfn = "../res/simple/naiveelk.path";
+#endif
 
 	Geo robot, env;
 	Path path;
 
+	std::cerr << "Robot Reading\n";
 	robot.read(robotfn);
+	std::cerr << "Robot Read\n";
+	std::cerr << "ENV Reading\n";
 	env.read(envfn);
+	std::cerr << "ENV Read\n";
+	std::cerr << "Path Reading\n";
 	path.readPath(pathfn);
+	std::cerr << "Path Read\n";
 	robot.center << 0.0, 0.0, 0.0;
+	std::cerr << "Renderer reading Env\n";
 	renderer->setEnv(&env);
+	std::cerr << "Renderer read Env\n";
 
+	std::cerr << "CC constructing\n";
 	TranslationOnlyClearance<fcl::OBBRSS<double>> cc(robot, env);
+	std::cerr << "CC constructed\n";
 
 	typename GOcTreeNode<3, double>::Coord min, max, res;
 #if 0
@@ -45,6 +61,7 @@ int worker(NaiveRenderer* renderer)
 	cc.setC(tmin, tmax);
 #else
 	double bbmin, bbmax;
+	std::cerr << "Calclating BB\n";
 	omplaux::calculateSceneBoundingBox(robot, env, path, bbmin, bbmax);
 	min << bbmin, bbmin, bbmin, -M_PI, -M_PI/2.0, -M_PI;
 	max << bbmax, bbmax, bbmax,  M_PI,  M_PI/2.0,  M_PI;
@@ -75,6 +92,7 @@ int worker(NaiveRenderer* renderer)
 	builder.setupGoal(goal_state.block<3,1>(0,0));
 
 	renderer->workerReady();
+	std::cerr << "Worker ready\n";
 
 	builder.buildOcTree(cc);
 	{

@@ -56,6 +56,7 @@ public:
 			adj.row(i) = aggpath[i];
 		}
 		aggpath_token = renderer_->addDynamicLine(adj);
+		// pause();
 	}
 #endif
 
