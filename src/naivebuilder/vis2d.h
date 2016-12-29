@@ -1,7 +1,7 @@
 #ifndef VIS2D_H
 #define VIS2D_H
 
-#include "nullvisualizer.h"
+#include <goct/nullvisualizer.h>
 #include "naiverenderer.h"
 #include <vecio/arrayvecio.h>
 #include <iostream>

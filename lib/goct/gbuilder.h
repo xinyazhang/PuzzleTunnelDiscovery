@@ -1,8 +1,8 @@
 #ifndef GBUILDER_H
 #define GBUILDER_H
 
-#include <goct/nullvisualizer.h>
-#include <goct/goctree.h>
+#include "nullvisualizer.h"
+#include "goctree.h"
 #include <deque>
 #include <algorithm>
 #include <functional>

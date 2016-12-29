@@ -137,6 +137,7 @@ EASYLIB(geopick)
 EASYLIB(mazeinfo)
 EASYLIB(renderer)
 EASYLIB(omplaux)
+EASYLIB(goct)
 
 TARGET_LINK_LIBRARIES(mazeinfo vertcolorply)
 TARGET_LINK_LIBRARIES(renderer  ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY})
@@ -210,8 +211,8 @@ EASYADD(freecube)
 TARGET_LINK_LIBRARIES(freecube fcl renderer omplaux ${CMAKE_THREAD_LIBS_INIT} ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY})
 
 EASYADD(octbuilder)
-TARGET_LINK_LIBRARIES(octbuilder vecio fcl omplaux ${CMAKE_THREAD_LIBS_INIT})
+TARGET_LINK_LIBRARIES(octbuilder goct vecio fcl omplaux ${CMAKE_THREAD_LIBS_INIT})
 
 EASYADD(naivebuilder)
-TARGET_LINK_LIBRARIES(naivebuilder vecio fcl renderer omplaux ${CMAKE_THREAD_LIBS_INIT} ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY})
+TARGET_LINK_LIBRARIES(naivebuilder goct vecio fcl renderer omplaux ${CMAKE_THREAD_LIBS_INIT} ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY})
 # vim: tw=0

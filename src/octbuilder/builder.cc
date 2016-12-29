@@ -2,8 +2,8 @@
 #include <omplaux/path.h>
 #include <omplaux/scene_bounding_box.h>
 #include <vecio/arrayvecio.h>
-#include "goctree.h"
-#include "gbuilder.h"
+#include <goct/goctree.h>
+#include <goct/gbuilder.h>
 #include "space.h"
 #include "textvisualizer.h"
 

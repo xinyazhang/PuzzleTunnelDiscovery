@@ -2,8 +2,8 @@
 #include "naiveclearance.h"
 #include "naivespace.h"
 #include "vis2d.h"
-#include "goctree.h"
-#include "gbuilder.h"
+#include <goct/goctree.h>
+#include <goct/gbuilder.h>
 #include <string>
 
 using std::string;

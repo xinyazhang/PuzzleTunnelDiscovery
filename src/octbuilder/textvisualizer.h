@@ -1,7 +1,7 @@
 #ifndef TEXT_VISUALIZER_H
 #define TEXT_VISUALIZER_H
 
-#include "nullvisualizer.h"
+#include <goct/nullvisualizer.h>
 #include <iostream>
 
 class TextVisualizer : public NullVisualizer {
