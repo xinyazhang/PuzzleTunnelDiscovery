@@ -23,6 +23,10 @@ public:
 	static void visSplit(Node*) {}
 	template<typename Node>
 	static void visCertain(Node*) {}
+	template<typename Node>
+	static void visPending(Node*) {}
+	template<typename Node>
+	static void visPop(Node*) {}
 
 	static void visAggPath(const std::vector<Eigen::VectorXd>&) {}
 

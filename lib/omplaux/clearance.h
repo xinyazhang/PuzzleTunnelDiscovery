@@ -104,6 +104,7 @@ public:
 		tf = trmat.block<3,4>(0,0);
 		Eigen::Vector3d nrcenter = tf * rob_.center;
 		double distance = getSignedDistance(trmat);
+		// std::cerr << "\tDistance = " << distance << " for state " << state.transpose() << '\n';
 		if (distance > 0) {
 			isfree = true;
 		} else {

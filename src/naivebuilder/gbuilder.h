@@ -14,7 +14,7 @@
  * DFS: prioritize larger cubes connected to the initial cube
  * BFS: prioritize larger cubes globally.
  */
-#define ENABLE_DFS 0
+#define ENABLE_DFS 1
 
 template<int ND,
 	 typename FLOAT,
@@ -122,13 +122,16 @@ public:
 				break;
 			if (VIS::timerAlarming()) {
 				VIS::periodicalReport();
+				std::cerr << "Fixed volume: " << fixed_volume_ << std::endl;
 				VIS::rearmTimer();
 
-				auto aggpath = buildPath(true);
-				VIS::visAggPath(aggpath);
-				if (aggpath.empty()) {
-					std::cerr << "CANNOT FIND A PATH, EXITING\n";
-					break;
+				if (goal_cube_) {
+					auto aggpath = buildPath(true);
+					VIS::visAggPath(aggpath);
+					if (aggpath.empty()) {
+						std::cerr << "CANNOT FIND A PATH, EXITING\n";
+						break;
+					}
 				}
 				VIS::pause();
 			}
@@ -233,22 +236,16 @@ protected:
 				    neighbor->getState() == node->getState()) {
 					node->merge(neighbor);
 					Node::setAdjacency(node, neighbor);
-#if SHOW_ADJACENCY
 					if (node->getState() == Node::kCubeFree) {
 						VIS::visAdj(node, neighbor);
 					}
-#endif
 				}
 				if (Node::hasAggressiveAdjacency(node, neighbor)) {
 					bool inserted;
 					inserted = Node::setAggressiveAdjacency(node, neighbor);
-#if SHOW_AGGADJACENCY
 					if (inserted) {
 						VIS::visAggAdj(node, neighbor);
 					}
-#else
-					(void)inserted;
-#endif
 				}
 				ttlneigh++;
 			}
@@ -292,6 +289,7 @@ protected:
 				node->setState(Node::kCubeFree);
 				if (goal_cube_ == nullptr && node->isContaining(gstate_)) {
 					goal_cube_ = node;
+					std::cerr << "Goal cube cleared: " << *node << std::endl;
 				}
 			} else {
 				node->setState(Node::kCubeFull);
@@ -313,6 +311,7 @@ protected:
 
 		goal_cube_ = nullptr;
 		init_cube_ = determinize_cube(istate_);
+		std::cerr << "Init Cube: " << *init_cube_ << std::endl;
 		add_neighbors_to_list(init_cube_);
 	}
 
@@ -343,6 +342,7 @@ protected:
 		auto ret = cubes_[depth].front();
 		cubes_[depth].pop_front();
 		current_queue_ = depth;
+		VIS::visPop(ret);
 		return ret;
 	}
 
@@ -360,6 +360,7 @@ protected:
 		cubes_[depth].emplace_back(node);
 		node->setState(Node::kCubeUncertainPending);
 		current_queue_ = std::min(current_queue_, depth);
+		VIS::visPending(node);
 		return true;
 	}
 

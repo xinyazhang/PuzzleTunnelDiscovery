@@ -52,8 +52,8 @@ int main(int argc, char* argv[])
 #else
 	double bbmin, bbmax;
 	omplaux::calculateSceneBoundingBox(robot, env, path, bbmin, bbmax);
-	min << bbmin, bbmin, bbmin, M_PI*0.0, -M_PI/2.0, M_PI*0.0;
-	max << bbmax, bbmax, bbmax, M_PI*2.0,  M_PI/2.0, M_PI*2.0;
+	min << bbmin, bbmin, bbmin, -M_PI, -M_PI/2.0, -M_PI;
+	max << bbmax, bbmax, bbmax,  M_PI,  M_PI/2.0,  M_PI;
 	std::cerr << "Bounding box\n"
 	          << "\tmin: " << min.transpose() << "\n"
 		  << "\tmax: " << max.transpose() << std::endl;
@@ -73,7 +73,8 @@ int main(int argc, char* argv[])
 	double init_t = 0.0;
 	//double init_t = path.T.size() - 2;
 	builder.setupInit(Path::matrixToState(path.interpolate(robot, init_t)));
-	double end_t = path.T.size() - 1;
+	//double end_t = path.T.size() - 1;
+	double end_t = 1.0;
 	builder.setupGoal(Path::matrixToState(path.interpolate(robot, end_t)));
 	builder.buildOcTree(cc);
 	std::cout << builder.buildPath();
