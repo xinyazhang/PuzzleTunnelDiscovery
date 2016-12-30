@@ -458,7 +458,7 @@ int Naive3DRenderer::run()
 
 		gui->updateMatrices();
 		mats = gui->getMatrixPointers();
-#if 1
+#if 0
 		env_pass.setup();
 		CHECK_GL_ERROR(glDrawElements(GL_TRIANGLES, env.F.rows() * 3,
 					GL_UNSIGNED_INT,

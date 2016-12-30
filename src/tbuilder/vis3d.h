@@ -46,7 +46,7 @@ public:
 #if SHOW_AGGPATH
 	static void visAggPath(const std::vector<Eigen::VectorXd>& aggpath)
 	{
-		std::cerr << "Aggressive path: " << aggpath << std::endl;
+		// std::cerr << "Aggressive path: " << aggpath << std::endl;
 		if (aggpath_token > 0) {
 			renderer_->removeDynamicLine(aggpath_token);
 		}
@@ -93,16 +93,22 @@ public:
 	};
 #endif
 
+#if 0
 	template<typename Node>
 	static void visSplit(Node* node)
 	{
 		renderer_->addSplit(node->getMedian(), node->getMins(), node->getMaxs());
 		// pause();
 	}
+#endif
 
 	template<typename Node>
 	static void visCertain(Node* node)
 	{
+#if 1 // Only visualize Full
+		if (!node->atState(Node::kCubeFull))
+			return ;
+#endif
 		renderer_->addCertain(node->getMedian(),
 				node->getMins(),
 				node->getMaxs(),
