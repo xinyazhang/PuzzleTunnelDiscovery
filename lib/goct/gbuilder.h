@@ -14,7 +14,9 @@
  * DFS: prioritize larger cubes connected to the initial cube
  * BFS: prioritize larger cubes globally.
  */
+#ifndef ENABLE_DFS
 #define ENABLE_DFS 1
+#endif
 
 template<int ND,
 	 typename FLOAT,
@@ -133,7 +135,6 @@ public:
 						break;
 					}
 				}
-				VIS::pause();
 			}
 		}
 	}

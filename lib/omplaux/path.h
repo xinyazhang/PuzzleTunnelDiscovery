@@ -5,6 +5,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <stdexcept>
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 
@@ -23,6 +24,8 @@ struct Path {
 			fin >> x >> y >> z;
 			if (fin.eof())
 				break;
+			else if (fin.fail())
+				throw std::runtime_error("Failure occurs during reading " + fn);
 			T.emplace_back(x, y, z);
 			double qx, qy, qz, qw;
 			// If no rotation is represented with (0,0,0,1)

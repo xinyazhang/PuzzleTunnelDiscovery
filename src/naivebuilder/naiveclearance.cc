@@ -162,7 +162,7 @@ NaiveClearance::~NaiveClearance()
 }
 
 namespace {
-	constexpr double sqrt2 = 1.41421356237;
+	constexpr double sqrt2 = 1.41421356237309504880;
 };
 
 #define USE_FCL_FOR_2D 0
