@@ -1,0 +1,167 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath, amssymb}
+\newcommand{\cm}{\mathcal{M}}
+\newcommand{\by}{\mathbf{y}}
+\newcommand{\bx}{\mathbf{x}}
+\newcommand{\bt}{\mathbf{t}}
+\newcommand{\bc}{\mathbf{c}}
+\newcommand{\bs}{\mathbf{s}}
+\newcommand{\bp}{\mathbf{p}}
+\newcommand{\bq}{\mathbf{q}}
+\newcommand{\Cfree}{\mathcal{C}_{\mathrm{free}}}
+\newcommand{\Cobs}{\mathcal{C}_{\mathrm{obs}}}
+\newcommand{\co}{\mathcal{O}}
+
+\begin{document}
+
+\textbf{Bound for $\|R_c p - R_s p\|$}\\
+
+
+Let $R_c = R_Z(\psi) R_Y(\phi)R_X(\theta)$ and $R_s = R_Z(\psi + \delta \psi) R_Y(\phi + \delta \phi)R_X(\theta + \delta \theta)$\\
+
+The distance $\|R_c p - R_s p\|$ can be computed as 
+\begin{align*}
+\|R_c p - R_s p\| &= \|R_c^T R_c p - R_c^T R_s p\| \\
+                          &=  \|p - R_c^T R_s p\| 
+\end{align*}         
+Let $R =    R_c^T R_s$.  This problem reduces to computing the distance $\|p - R p\|$ of a point $p$ given a rotation $R$. 
+Let $v$, $\alpha$, be the axis and angle of the rotation $R$, respectively. Let $q$ be the closest point on the line $l(t) = tv$ to $p$ and let $d \geq 0$
+be the distance $\|p - q\|$.  Let this distance be called the \textit{orthogonal distance} from $p$ to $v$.\\
+
+As $p$ is rotated, its orthogonal distance from $v$ never changes.  Thus, the distance $s = \|p - R p\|$ is given by the law of cosines
+\begin{align}
+s^2 &= d^2 + d^2 - 2d \times d \cos \alpha\\
+       &= 2 d^2 - 2d^2 \cos \alpha
+\end{align}
+Let $\beta$ be the angle that $p$ makes with $v$.  Geometrically, the distance $d$ is such that $\sin \beta = d / \|p\|$ and this gives 
+\begin{align}
+d = \|p\| \sin \beta.
+\end{align}
+Putting this all together
+\begin{align}
+s &= \sqrt{2 d^2 - 2d^2 \cos \alpha}\\
+   &= \sqrt{2}d \sqrt{1   - \cos \alpha}\\
+   &= \sqrt{2}\|p\| \sin \beta \sqrt{1   - \cos \alpha}
+\end{align} 
+The eigenvalues of $R$ are $1$, $\cos \alpha + i \sin \alpha$, $\cos \alpha - i \sin \alpha$.  The trace of $R$ is
+the sum of its eigenvalues, 
+\begin{align}
+\text{tr}(R) &= 1 + \cos \alpha - i \sin \alpha + \cos \alpha + i \sin \alpha\\
+                   &= 1 + 2 \cos \alpha
+\end{align}  
+So, $s$ can be written as
+\begin{align}
+s &=   \sqrt{2}\|p\| \sin \beta \sqrt{1   -  (\text{tr}(R) - 1) / 2}\\
+   &=   \sqrt{2}\|p\| \sin \beta \sqrt{3/2   -  \text{tr}(R)/2}\\
+   &=   \|p\| \sin \beta \sqrt{3   -  \text{tr}(R)}
+\end{align} 
+Since $\sin \beta \leq 1$, the quantity $s$ can bound with
+\begin{align}
+s \leq \|p\|  \sqrt{3   -  \text{tr}(R)}\\
+    =  \sqrt{3   -  \text{tr}(R_c^TR_s)}.
+\end{align}
+Since $R_c$ and $R_s$ are orthogonal, the trace is the pairwise sum of the dot products of the columns of $R_c$ and $R_s$ and so it is less than or equal to 3.  So,
+it will not be the case that $ \sqrt{3   -  \text{tr}(R)}$ is imaginary.  Furthermore,
+\begin{align*}
+ \text{tr}(R_c^TR_s) &= \text{tr}(R_X(\theta)^T R_Y(\phi)^T R_Z(\psi)^TR_Z(\psi + \delta \psi) R_Y(\phi + \delta \phi)R_X(\theta + \delta \theta))\\
+ &=  \text{tr}(R_X(\theta)^T R_Y(\phi)^T R_Z(\delta \psi) R_Y(\phi + \delta \phi)R_X(\theta + \delta \theta))\\
+&=  \text{tr}( R_Y(\phi)^T R_Z(\delta \psi) R_Y(\phi + \delta \phi)R_X(\theta + \delta \theta)R_X(\theta)^T)\\
+&= \text{tr}( R_Y(\phi)^T R_Z(\delta \psi) R_Y(\phi + \delta \phi)R_X( \delta \theta))\\
+\end{align*}
+which demonstrates that $F_\phi(\delta \theta, \delta \phi, \delta \psi)  = 3   -  \text{tr}(R_c^TR_s)$ is a polynomial in terms of $A = \cos \phi$, $B = \sin \phi$.\\
+
+Explicitly, 
+\begin{align}
+F_\phi(\delta \theta, \delta \phi, \delta \psi) &= c_1 A^2 + c_2 AB + c_3 B^2 + c_4 A + c_5 B + c6\\
+      &= 3   -  \text{tr}(R_c^TR_s)
+\end{align}
+and bounding this requires finding the constants $c_i$ since $|A|, |B| \leq 1$.\\
+
+What follows was computed using Mathematica and simplified by hand,
+\begin{align*}
+c_1 &= \frac{1}{2} \frac{d^2F_\phi}{dA^2}\\
+       &= \frac{1}{4} \cos \delta \phi  (\cos \delta \theta  (2 \cos \delta \psi -2)-2 \cos \delta \psi +2)\\
+       &= \frac{1}{4} \cos \delta \phi  (-4 \cos \delta \theta \sin^2  \frac{\delta \psi}{2}+4 \sin^2 \frac{\delta \psi}{2})\\
+       &=  \cos \delta \phi  \sin^2  \frac{\delta \psi}{2} (-\cos \delta \theta+ 1)\\
+       &=  2\cos \delta \phi  \sin^2  \frac{\delta \psi}{2} \sin^2 \frac{\delta \theta}{2}\\
+       &\leq  2  \sin^2  \frac{\delta \psi}{2} \sin^2 \frac{\delta \theta}{2}\\ 
+       & \leq  \frac{1}{8} \delta \psi^2 \delta \theta^2
+\end{align*}
+which gives a bound for $c_1$.\\
+
+For $c_2$,
+\begin{align*}
+c_2 &=  \frac{d^2F_\phi}{dBdA}\\
+       &=-\cos \delta \theta  (\cos \delta \psi -1) \sin \delta \phi -(1-\cos \delta \psi) \sin \delta \phi\\
+       &=2\cos \delta \theta\sin^2 \frac{\delta \psi}{2} \sin \delta \phi -2\sin^2 \frac{\delta \psi}{2} \sin \delta \phi\\
+       &= 2\sin^2 \frac{\delta \psi}{2} \sin \delta \phi( \cos \delta \theta -1)\\
+       &= -4\sin^2 \frac{\delta \psi}{2} \sin \delta \phi \sin^2 \frac{\delta \theta}{2}\\
+       &\leq  4\sin^2 \frac{\delta \psi}{2} |\sin \delta \phi| \sin^2 \frac{\delta \theta}{2}\\
+       & \leq \frac{1}{4}\delta \psi^2  |\delta \phi| \delta \theta^2
+\end{align*}\\
+
+For $c_3$,
+\begin{align*}
+c_3 &=   \frac{1}{2} \frac{d^2F_\phi}{dB^2}\\
+       &=\frac{1}{4} \cos \delta \phi  (\cos \delta \theta  (2-2 \cos \delta \psi )+2 \cos \delta \psi -2)\\
+       &=\frac{1}{4} \cos \delta \phi  (4\cos \delta \theta  \sin^2 \frac{\delta \psi}{2} -4 \sin^2 \frac{\delta \psi}{2})\\
+       &= \cos \delta \phi \sin^2 \frac{\delta \psi}{2}( \cos\delta \theta - 1)\\
+       &= -2\cos \delta \phi \sin^2 \frac{\delta \psi}{2}\sin^2\frac{\delta \theta}{2}\\
+       &\leq  2 \sin^2 \frac{\delta \psi}{2}\sin^2\frac{\delta \theta}{2}\\
+       &\leq  \frac{1}{8} \delta \psi ^2\delta \theta^2
+ \end{align*}\\
+ 
+ For $c_4$,
+\begin{align*}
+c_4 &=   \frac{dF_\phi}{dA}\bigg|_{A=0, B=0}\\
+      &= - \sin\delta \theta \sin \delta \phi \sin \delta \psi\\
+      &\leq |\delta \theta||\delta \phi||\delta \psi|
+ \end{align*}\\
+ 
+  For $c_5$,
+\begin{align*}
+c_5 &=   \frac{dF_\phi}{dB}\bigg|_{A=0, B=0}\\
+      &= \frac{1}{2} (-2 \sin \delta \theta  \sin \delta \psi -2 \sin \delta \theta  \sin\delta \psi  \cos \delta \phi)\\
+      &= -2 \sin \delta \theta  \sin \delta \psi (1+\cos \delta \phi)\\
+      &= -4 \sin \delta \theta  \sin \delta \psi \cos^2 \frac{\delta \phi}{2}\\
+      &\leq 4  |\delta \theta|  |\delta \psi|
+\end{align*}\\
+
+ For $c_6$,
+\begin{align*}
+c_6 &=   F_{\phi}|_{A=0, B=0}\\
+&=\frac{1}{2} (-2 \cos \delta \theta  \cos \delta \psi +\cos \delta \phi  (\cos \delta \theta  (-\cos \delta \psi -1)-\cos \delta \psi -1)+6).
+\end{align*}
+Making the substitution $\cos x = 1 - 2 \sin^2 \frac{x}{2}$ for $\phi$, $\theta$, and $\delta$ and expanding using Mathematica gives.
+\begin{align*}
+c6 &=4\sin ^2\frac{\delta \theta }{2}+4 \sin ^2\frac{\delta \psi}{2}+4 \sin ^2\frac{\delta \phi }{2}\\
+   &-6 \sin ^2\frac{\delta \theta }{2} \sin ^2\frac{\delta \psi}{2}-4 \sin^2\frac{\delta \theta }{2} \sin ^2\frac{\delta \phi}{2}-4 \sin ^2\frac{\delta \psi }{2} \sin ^2\frac{\delta \phi }{2}\\
+   &+4 \sin ^2\frac{\delta \theta }{2} \sin ^2\frac{\delta \psi }{2} \sin ^2\frac{\delta \phi }{2}\\
+   &= 4\sin ^2\frac{\delta \theta }{2}\cos^2\frac{\delta \phi}{2}+4 \sin ^2\frac{\delta \psi}{2}\cos^2\frac{\delta \phi}{2}+4 \sin ^2\frac{\delta \phi }{2}\\
+   &-6 \sin ^2\frac{\delta \theta }{2} \sin ^2\frac{\delta \psi}{2}\\
+   &+4 \sin ^2\frac{\delta \theta }{2} \sin ^2\frac{\delta \psi }{2} \sin ^2\frac{\delta \phi }{2}\\ 
+  &= 4\sin ^2\frac{\delta \theta }{2}\cos^2\frac{\delta \phi}{2}+4 \sin ^2\frac{\delta \psi}{2}\cos^2\frac{\delta \phi}{2}+4 \sin ^2\frac{\delta \phi }{2}\\
+   &-2 \sin ^2\frac{\delta \theta }{2} \sin ^2\frac{\delta \psi}{2}\\
+   &-4 \sin ^2\frac{\delta \theta }{2} \sin ^2\frac{\delta \psi }{2} \cos ^2\frac{\delta \phi }{2}\\ 
+   &\leq  4\sin ^2\frac{\delta \theta }{2}\cos^2\frac{\delta \phi}{2}+4 \sin ^2\frac{\delta \psi}{2}\cos^2\frac{\delta \phi}{2}+4 \sin ^2\frac{\delta \phi }{2}\\
+   &\leq 4( \sin ^2\frac{\delta \theta }{2}+ \sin ^2\frac{\delta \psi}{2}+ \sin ^2\frac{\delta \phi }{2})\\
+   &\leq \delta \theta^2 + \delta\psi^2 + \delta\phi^2
+\end{align*}
+Putting these constants all together gives
+\begin{flalign}
+F_\phi(\delta \theta, \delta \phi, \delta \psi) &\leq |c_1| + |c_2| + |c_3| + |c_4| + |c_5| + |c_6|\\
+   &\leq  \frac{1}{8} \delta \psi^2 \delta \theta^2 +  \frac{1}{4}\delta \psi^2  |\delta \phi| \delta \theta^2 +
+    \frac{1}{8} \delta \psi ^2\delta \theta^2 +  |\delta \theta||\delta \phi||\delta \psi| +  4  |\delta \theta|  |\delta \psi| +  \delta \theta^2 + \delta\psi^2 + \delta\phi^2\\
+    &=  \frac{1}{4} \delta \psi^2 \delta \theta^2 +  \frac{1}{4}\delta \psi^2  |\delta \phi| \delta \theta^2 +
+     |\delta \theta||\delta \phi||\delta \psi| +  4  |\delta \theta|  |\delta \psi| +  \delta \theta^2 + \delta\psi^2 + \delta\phi^2
+\end{flalign}
+Note that, if $\delta \theta, \delta \phi, \delta \psi \leq \epsilon  \leq 1$, where $\epsilon \geq  0$, then equation 18 gives
+\begin{flalign*}
+F_\phi(\delta \theta, \delta \phi, \delta \psi) \leq 9 \epsilon^2
+\end{flalign*}
+This implies
+\begin{flalign*}
+  s \leq 3\|p\| \max\{|\delta \theta |, |\delta \phi |, |\delta \psi |\}
+\end{flalign*}
+as a bound which may be useful if the $\delta$'s are sufficiently small and $\|p\|$ is not too large.
+\end{document}
