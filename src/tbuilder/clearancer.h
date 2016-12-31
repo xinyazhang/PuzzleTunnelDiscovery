@@ -6,6 +6,7 @@
 #include <fcl/narrowphase/detail/traversal/collision_node.h>
 #include <fcl/narrowphase/distance.h>
 #include <fcl/narrowphase/distance_result.h>
+#include <fcl/narrowphase/collision.h>
 
 template<typename BV>
 class TranslationOnlyClearance {
@@ -47,13 +48,26 @@ public:
 		tf.translate(state);
 
 		fcl::DistanceRequest<Scalar> request;
-		request.enable_signed_distance = true;
 		request.gjk_solver_type = fcl::GST_LIBCCD;
 
 		fcl::DistanceResult<Scalar> result;
 		fcl::distance(&rob_bvh_, tf, &env_bvh_, Transform3::Identity(), request, result);
 		double distance = result.min_distance;
-		double d = fabs(distance);
+		double d = distance;
+		if (distance <= 0) {
+			fcl::CollisionRequest<Scalar> request;
+			fcl::CollisionResult<Scalar> result;
+			request.enable_contact = true;
+			request.gjk_solver_type = fcl::GST_LIBCCD;
+			fcl::collide(&rob_bvh_, tf, &env_bvh_, Transform3::Identity(), request, result);
+			if (!result.isCollision())
+				std::cerr << "WIERD, distance = 0 but not collide\n";
+			auto nContact = result.numContacts();
+			double pend = result.getContact(0).penetration_depth;
+			for (decltype(nContact) i = 1; i < nContact; i++)
+				pend = std::max(pend, result.getContact(i).penetration_depth);
+			d = pend;
+		}
 
 		State ret;
 		ret << d*invsqrt3, d*invsqrt3, d*invsqrt3;
