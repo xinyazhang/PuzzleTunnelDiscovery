@@ -31,6 +31,8 @@ public:
 	static void visPop(Node*) {}
 
 	static void visAggPath(const std::vector<Eigen::VectorXd>&) {}
+	template<typename Node>
+	static void visAggPath(const std::vector<const Node*>&) {}
 
 	template<typename Node>
 	static void trackFurestCube(Node* cube, Node* init_cube) {}

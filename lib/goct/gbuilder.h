@@ -128,8 +128,13 @@ public:
 				VIS::rearmTimer();
 
 				if (goal_cube_) {
-					auto aggpath = buildPath(true);
-					VIS::visAggPath(aggpath);
+					auto aggpath = buildNodePath(true);
+					for (auto node : aggpath) {
+						if (node->isDetermined())
+							continue;
+						add_to_oob_list(const_cast<Node*>(node));
+					}
+					VIS::visAggPath(convertNodePath(aggpath));
 					if (aggpath.empty()) {
 						std::cerr << "CANNOT FIND A PATH, EXITING\n";
 						break;
@@ -140,6 +145,23 @@ public:
 	}
 
 	std::vector<Eigen::VectorXd> buildPath(bool aggressive = false)
+	{
+		return convertNodePath(buildNodePath(aggressive));
+	}
+
+	std::vector<Eigen::VectorXd> convertNodePath(const std::vector<const Node*>& nodes)
+	{
+		std::vector<Eigen::VectorXd> ret;
+		ret.reserve(nodes.size() + 2);
+		ret.emplace_back(init_cube_->getMedian());
+		for (const Node *node : nodes) {
+			ret.emplace_back(node->getMedian());
+		}
+		ret.emplace_back(goal_cube_->getMedian());
+		return ret;
+	}
+
+	std::vector<const Node*> buildNodePath(bool aggressive = false)
 	{
 		epoch_++;
 		int epoch = epoch_;
@@ -185,15 +207,12 @@ public:
 		}
 		if (!goal_reached)
 			return {};
-		std::vector<Eigen::VectorXd> ret;
+		std::vector<const Node*> ret;
 		const Node* node = goal_cube_;
-		ret.emplace_back(gstate_);
 		while (node->prev != node) {
-			ret.emplace_back(node->getMedian());
+			ret.emplace_back(node);
 			node = static_cast<const Node*>(node->prev);
 		}
-		ret.emplace_back(node->getMedian());
-		ret.emplace_back(istate_);
 		std::reverse(ret.begin(), ret.end());
 		return ret;
 	}
@@ -362,6 +381,12 @@ protected:
 		node->setState(Node::kCubeUncertainPending);
 		current_queue_ = std::min(current_queue_, depth);
 		VIS::visPending(node);
+		return true;
+	}
+
+	bool add_to_oob_list(Node* node)
+	{
+		cubes_[0].emplace_back(node);
 		return true;
 	}
 
