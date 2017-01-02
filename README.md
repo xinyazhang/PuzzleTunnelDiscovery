@@ -1,4 +1,4 @@
-# FAST STARTUP
+# FAST STARTUP FOR C-OBS GENERATION AND HEAT SOLVER
 
 (Here we assume in every part our CWD is the root of git source.)
 
@@ -39,3 +39,13 @@ See targets in samples/Makefile.build.
 - mc.bheat: simulate the heat flow
 - vis: visualize the simulation
 - follow: find the path out given the initial position.
+
+# FAST STARTUP FOR CONVEX DECOMPOSITION
+
+```
+./convexpp --input ../res/simple/mFixedElkMeetsCube.obj --output ../res/simple/cvx/ElkMeetsCube \
+	--convexhullApproximation 0 --concavity 0.0 \
+	--resolution 2000000
+```
+
+Note: The ``--resolution`` option is critical for the approximation quality.

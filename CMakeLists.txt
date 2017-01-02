@@ -222,4 +222,9 @@ TARGET_LINK_LIBRARIES(naivebuilder ${octbuildercommon} ${viscommon})
 
 EASYADD(tbuilder)
 TARGET_LINK_LIBRARIES(tbuilder ${octbuildercommon} ${viscommon})
+
+FIND_PACKAGE(vhacd REQUIRED)
+EASYADD(convexpp)
+TARGET_LINK_LIBRARIES(convexpp vhacd ${CGAL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${GMP_LIBRARIES} ${MPFR_LIBRARIES})
+
 # vim: tw=0
