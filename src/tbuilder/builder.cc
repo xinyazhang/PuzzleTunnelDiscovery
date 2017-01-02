@@ -23,6 +23,7 @@ int worker(NaiveRenderer* renderer)
 	string robotfn = "../res/simple/LongStick.obj";
 	string envfn = "../res/simple/mFixedElkMeetsCube.obj";
 	string pathfn = "../res/simple/naiveelk.path";
+	string envcvxpn = "../res/simple/cvx/ElkMeetsCube";
 #endif
 
 	Geo robot, env;
@@ -33,6 +34,7 @@ int worker(NaiveRenderer* renderer)
 	std::cerr << "Robot Read\n";
 	std::cerr << "ENV Reading\n";
 	env.read(envfn);
+	env.readcvx(envcvxpn);
 	std::cerr << "ENV Read\n";
 	std::cerr << "Path Reading\n";
 	path.readPath(pathfn);

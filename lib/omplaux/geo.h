@@ -2,6 +2,7 @@
 #define OMPLAUX_GEO_H
 
 #include <Eigen/Core>
+#include <vector>
 
 struct Geo {
 	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> V;
@@ -12,6 +13,11 @@ struct Geo {
 	Eigen::Vector3d center;
 
 	void read(const std::string& fn);
+
+	std::vector<Eigen::MatrixXd> cvxV;
+	std::vector<Eigen::MatrixXi> cvxF;
+
+	void readcvx(const std::string& prefix);
 };
 
 #endif
