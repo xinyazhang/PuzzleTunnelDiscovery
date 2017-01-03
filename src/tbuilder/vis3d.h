@@ -12,19 +12,26 @@
 #define SHOW_AGGADJACENCY 0
 #define SHOW_AGGPATH 1
 
+#define COUNT_NODES 1
+
+#if COUNT_NODES
+typedef NodeCounterVisualizer NaiveVisualizer3DBase;
+#else
+typedef NullVisualizer NaiveVisualizer3DBase;
+#endif
+
 /*
  * FIXME: lots of dup code with 2D Visualizer
  *        Lines related to ND were changed
  */
-class NaiveVisualizer3D : public NullVisualizer {
+class NaiveVisualizer3D : NaiveVisualizer3DBase {
 private:
 	static constexpr int ND = 3;
 public:
 	static void initialize()
 	{
-#if SHOW_AGGPATH
+		NaiveVisualizer3DBase::initialize();
 		aggpath_token = -1;
-#endif
 		rearmTimer();
 	}
 
@@ -93,14 +100,17 @@ public:
 	};
 #endif
 
-#if 0
 	template<typename Node>
 	static void visSplit(Node* node)
 	{
+#if 0
 		renderer_->addSplit(node->getMedian(), node->getMins(), node->getMaxs());
 		// pause();
-	}
 #endif
+#if COUNT_NODES
+		NaiveVisualizer3DBase::visSplit(node);
+#endif
+	}
 
 	template<typename Node>
 	static void visCertain(Node* node)

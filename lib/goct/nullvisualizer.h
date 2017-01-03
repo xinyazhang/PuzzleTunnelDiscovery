@@ -4,6 +4,7 @@
 #include <time.h>
 #include <vector>
 #include <Eigen/Core>
+#include <vector>
 
 /*
  * NullVisualizer: concept of Visualizer used by GOctreePathBuilder
@@ -50,5 +51,29 @@ protected:
 	static time_t last_time_;
 };
 
+class NodeCounterVisualizer : public NullVisualizer {
+protected:
+	static unsigned long nsplit_nodes;
+	static std::vector<unsigned long> nsplit_histgram;
+
+public:
+	static void initialize()
+	{
+		nsplit_nodes = 0;
+	}
+
+	template<typename Node>
+	static void visSplit(Node* node)
+	{
+		++nsplit_nodes;
+		auto depth = node->getDepth();
+		if (depth >= nsplit_histgram.size())
+			nsplit_histgram.resize(depth + 1);
+		++nsplit_histgram[depth];
+	}
+
+	static void periodicalReport();
+	static void showHistogram();
+};
 
 #endif

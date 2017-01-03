@@ -149,7 +149,7 @@ public:
 				break;
 			if (VIS::timerAlarming()) {
 				VIS::periodicalReport();
-				std::cerr << "Fixed volume: " << fixed_volume_ << std::endl;
+				std::cerr << "Fixed volume: " << fixed_volume_ << "\tDeepest level: " << getDeepestLevel() << std::endl;
 				VIS::rearmTimer();
 
 				check_path = true;
@@ -204,7 +204,7 @@ public:
 		//      cmp(top, other) always returns false.
 		auto cmp = [](Node* lhs, Node* rhs) -> bool
 			{ return lhs->distance > rhs->distance; };
-		std::priority_queue<Node*, std::deque<Node*>, decltype(cmp)> Q(cmp);
+		std::priority_queue<Node*, std::vector<Node*>, decltype(cmp)> Q(cmp);
 		Q.push(init_cube_);
 
 		bool goal_reached = false;
@@ -257,6 +257,14 @@ public:
 		return ret;
 	}
 
+	unsigned getDeepestLevel()
+	{
+#if !PRIORITIZE_SHORTEST_PATH
+		return cubes_.size();
+#else
+		return max_depth_;
+#endif
+	}
 protected:
 	Node* determinize_cube(const Coord& state)
 	{
@@ -383,10 +391,17 @@ protected:
 		add_neighbors_to_list(init_cube_);
 	}
 
+	/*
+	 * Note: split_cube is designed can be called multiple times on the
+	 *       same cube
+	 */
 	std::vector<Node*> split_cube(Node* node)
 	{
+		bool repeated = node->atState(Node::kCubeMixed);
 		node->setState(Node::kCubeMixed);
-		VIS::visSplit(node);
+
+		if (!repeated)
+			VIS::visSplit(node);
 
 		std::vector<Node*> ret;
 		for (unsigned long index = 0; index < (1 << ND); index++) {
@@ -396,7 +411,9 @@ protected:
 		}
 		VIS::withdrawAggAdj(node);
 		node->cancelAggressiveAdjacency();
-		
+#if PRIORITIZE_SHORTEST_PATH
+		max_depth_ = std::max(node->getDepth() + 1, max_depth_);
+#endif
 		return ret;
 	}
 
@@ -504,6 +521,9 @@ protected:
 	Node *goal_cube_ = nullptr;
 	int epoch_ = 0;
 	double fixed_volume_;
+#if PRIORITIZE_SHORTEST_PATH
+	unsigned max_depth_ = 0;
+#endif
 };
 
 #endif

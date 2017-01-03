@@ -10,6 +10,7 @@
 #include "vis3d.h"
 #include "naiverenderer.h"
 #include "clearancer.h"
+#include <chrono>
 
 using std::string;
 
@@ -20,8 +21,8 @@ int worker(NaiveRenderer* renderer)
 	string envfn = "../res/simple/FullTorus.obj";
 	string pathfn = "../res/simple/naive2.path";
 #else
-	string robotfn = "../res/simple/robot.obj";
-	//string robotfn = "../res/simple/LongStick.obj";
+	// string robotfn = "../res/simple/robot.obj";
+	string robotfn = "../res/simple/LongStick.obj";
 	string envfn = "../res/simple/mFixedElkMeetsCube.obj";
 	string pathfn = "../res/simple/naiveelk.path";
 	string envcvxpn = "../res/simple/cvx/ElkMeetsCube";
@@ -75,13 +76,14 @@ int worker(NaiveRenderer* renderer)
 		  << "\tmax: " << max.transpose() << std::endl;
 	cc.setC(bbmin, bbmax);
 #endif
-	res = (max - min) / 20000.0; // FIXME: how to calculate a resolution?
+	res = (max - min) / 320000.0; // FIXME: how to calculate a resolution?
 
 	using Builder = GOctreePathBuilder<3,
 	      double,
 	      decltype(cc),
 	      TranslationOnlySpace<3, double>,
-	      NullVisualizer
+	      // NullVisualizer
+	      NodeCounterVisualizer
 	      // NaiveVisualizer3D
 	      >;
 	Builder::VIS::setRenderer(renderer);
@@ -99,7 +101,11 @@ int worker(NaiveRenderer* renderer)
 	renderer->workerReady();
 	std::cerr << "Worker ready\n";
 
+	using Clock = std::chrono::high_resolution_clock;
+	auto t1 = Clock::now();
 	builder.buildOcTree(cc);
+	auto t2 = Clock::now();
+	std::chrono::duration<double, std::milli> dur = t2 - t1;
 	{
 		auto path = builder.buildPath();
 		if (!path.empty()) {
@@ -114,6 +120,14 @@ int worker(NaiveRenderer* renderer)
 		}
 	}
 	Builder::VIS::pause();
+	std::cerr << "Configuration: ENABLE_DFS = " << ENABLE_DFS
+	          << "\tPRIORITIZE_SHORTEST_PATH = " << PRIORITIZE_SHORTEST_PATH
+	          << std::endl;
+	std::cerr << "Planning takes " << dur.count() << " ms to complete\n";
+	std::cerr << "Maximum cube depth " << builder.getDeepestLevel() << "\n";
+#if COUNT_NODES
+	Builder::VIS::showHistogram();
+#endif
 	std::cerr << "Worker thread exited\n";
 
 	return 0;
