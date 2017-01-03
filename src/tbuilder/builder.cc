@@ -4,6 +4,7 @@
 #include <vecio/arrayvecio.h>
 #include <goct/goctree.h>
 #define ENABLE_DFS 0
+#define PRIORITIZE_SHORTEST_PATH 1
 #include <goct/gbuilder.h>
 #include "naivespace.h"
 #include "vis3d.h"
@@ -19,8 +20,8 @@ int worker(NaiveRenderer* renderer)
 	string envfn = "../res/simple/FullTorus.obj";
 	string pathfn = "../res/simple/naive2.path";
 #else
-	//string robotfn = "../res/simple/robot.obj";
-	string robotfn = "../res/simple/LongStick.obj";
+	string robotfn = "../res/simple/robot.obj";
+	//string robotfn = "../res/simple/LongStick.obj";
 	string envfn = "../res/simple/mFixedElkMeetsCube.obj";
 	string pathfn = "../res/simple/naiveelk.path";
 	string envcvxpn = "../res/simple/cvx/ElkMeetsCube";
@@ -80,8 +81,8 @@ int worker(NaiveRenderer* renderer)
 	      double,
 	      decltype(cc),
 	      TranslationOnlySpace<3, double>,
-	      //NullVisualizer
-	      NaiveVisualizer3D
+	      NullVisualizer
+	      // NaiveVisualizer3D
 	      >;
 	Builder::VIS::setRenderer(renderer);
 	Builder builder;

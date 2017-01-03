@@ -9,6 +9,7 @@
 #include <queue>
 #include <iostream>
 #include <stdexcept>
+#include <boost/heap/priority_queue.hpp>
 
 /*
  * DFS: prioritize larger cubes connected to the initial cube
@@ -16,6 +17,10 @@
  */
 #ifndef ENABLE_DFS
 #define ENABLE_DFS 1
+#endif
+
+#ifndef PRIORITIZE_SHORTEST_PATH
+#define PRIORITIZE_SHORTEST_PATH 0
 #endif
 
 template<int ND,
@@ -97,13 +102,33 @@ public:
 		init_builder(cc);
 		VIS::initialize();
 		VIS::rearmTimer();
+		bool check_path = false;
 		while (true) {
+#if PRIORITIZE_SHORTEST_PATH
+			check_path = isCubeListEmpty();
+#endif
+			if (check_path && goal_cube_) {
+				auto aggpath = buildNodePath(true);
+				for (auto node : aggpath) {
+					if (node->isDetermined())
+						continue;
+					add_to_cube_list(const_cast<Node*>(node));
+				}
+				VIS::visAggPath(convertNodePath(aggpath));
+				if (aggpath.empty()) {
+					std::cerr << "CANNOT FIND A PATH, EXITING\n";
+					break;
+				}
+			}
+
 			auto to_split = pop_from_cube_list();
 			auto children = split_cube(to_split);
 			for (auto cube : children) {
+#if !PRIORITIZE_SHORTEST_PATH
 				if (cube->getState() == Node::kCubeUncertain) {
 					add_to_cube_list(cube);
 				}
+#endif
 				connect_neighbors(cube);
 
 				if (!cube->atState(Node::kCubeFree))
@@ -127,19 +152,7 @@ public:
 				std::cerr << "Fixed volume: " << fixed_volume_ << std::endl;
 				VIS::rearmTimer();
 
-				if (goal_cube_) {
-					auto aggpath = buildNodePath(true);
-					for (auto node : aggpath) {
-						if (node->isDetermined())
-							continue;
-						add_to_oob_list(const_cast<Node*>(node));
-					}
-					VIS::visAggPath(convertNodePath(aggpath));
-					if (aggpath.empty()) {
-						std::cerr << "CANNOT FIND A PATH, EXITING\n";
-						break;
-					}
-				}
+				check_path = true;
 			}
 		}
 	}
@@ -152,51 +165,78 @@ public:
 	std::vector<Eigen::VectorXd> convertNodePath(const std::vector<const Node*>& nodes)
 	{
 		std::vector<Eigen::VectorXd> ret;
-		ret.reserve(nodes.size() + 2);
-		ret.emplace_back(init_cube_->getMedian());
+		ret.reserve(nodes.size());
+		// ret.emplace_back(istate_);
 		for (const Node *node : nodes) {
 			ret.emplace_back(node->getMedian());
 		}
-		ret.emplace_back(goal_cube_->getMedian());
+		// ret.emplace_back(gstate_);
 		return ret;
 	}
 
+	/*
+	 * Dijkstra with immutable priority queue.
+	 * 
+	 * epoch is used to denote the status of the node:
+	 *      fresh epoch: 
+	 *              Node::distance and Node::prev is valid
+	 *      fin epoch:
+	 *              Node::distance and Node::prev is final
+	 *      others:
+	 *              Both of them are uninitialized or the legacy from
+	 *              previous epoch.
+	 *
+	 * Each node may have multiple copies in Q, since std::priority_queue
+	 * is immutable.
+	 */
 	std::vector<const Node*> buildNodePath(bool aggressive = false)
 	{
 		epoch_++;
-		int epoch = epoch_;
+		int freshepoch = epoch_;
+		epoch_++;
+		int finepoch = epoch_;
 		auto goal_cube = goal_cube_;
 
 		init_cube_->distance = 0;
 		init_cube_->prev = init_cube_; // Only circular one
-		init_cube_->epoch = epoch;
 
 		// priority_queue:
 		//      cmp(top, other) always returns false.
 		auto cmp = [](Node* lhs, Node* rhs) -> bool
-			{ return lhs->distance < rhs->distance; };
+			{ return lhs->distance > rhs->distance; };
 		std::priority_queue<Node*, std::deque<Node*>, decltype(cmp)> Q(cmp);
 		Q.push(init_cube_);
 
 		bool goal_reached = false;
-		auto loopf = [&Q, &goal_reached, epoch, goal_cube]
+		auto loopf = [&Q, &goal_reached, freshepoch, finepoch, goal_cube]
 			(Node* adj, Node* tip) -> bool {
-				if (adj->prev && adj->epoch == epoch) // No re-insert
-					return false;
-				adj->prev = tip;
-				adj->distance = tip->distance +
-					(tip->getMedian() - adj->getMedian()).norm();
-				adj->epoch = epoch;
-				Q.push(adj);
-				if (adj == goal_cube) {
-					goal_reached = true;
-					return true;
+				bool fresh = (adj->epoch != freshepoch && adj->epoch != finepoch);
+				bool do_update = false;
+				// double w = (tip->getMedian() - adj->getMedian()).norm();
+				double w = 1.0; // prefer larger cube.
+				double dist = tip->distance + w;
+				do_update = fresh ? true : (adj->distance > dist);
+
+				if (do_update) {
+					adj->prev = tip;
+					adj->distance = dist;
 				}
+				if (fresh)
+					adj->epoch = freshepoch;
+				Q.push(adj);
 				return false;
 			};
+
 		while (!Q.empty() && !goal_reached) {
 			auto tip = Q.top();
 			Q.pop();
+			if (tip->epoch == finepoch) // We may have duplicated nodes in Q.
+				continue;
+			tip->epoch = finepoch;
+			if (tip == goal_cube) {
+				goal_reached = true;
+				break;
+			}
 			for (auto adj : tip->getAdjacency())
 				if (loopf(adj, tip))
 					break;
@@ -228,7 +268,7 @@ protected:
 			Node* next = current->getCube(ci);
 			current = next;
 			for (auto cube : children) {
-#if !ENABLE_DFS
+#if !ENABLE_DFS && !PRIORITIZE_SHORTEST_PATH
 				// Add the remaining to the list.
 				// Note: add_to_cube_list requires init_cube_ for DFS
 				//       but init_cube_ is initialized by this
@@ -278,6 +318,9 @@ protected:
 
 	std::vector<Node*> add_neighbors_to_list(Node* node)
 	{
+#if PRIORITIZE_SHORTEST_PATH
+		return {};
+#else
 		std::vector<Node*> ret;
 		auto op = [=,&ret](int dim, int direct, std::vector<Node*>& neighbors) -> bool
 		{
@@ -291,6 +334,7 @@ protected:
 		};
 		contactors_op(node, op);
 		return ret;
+#endif
 	}
 
 	void check_clearance(Node* node)
@@ -331,6 +375,10 @@ protected:
 
 		goal_cube_ = nullptr;
 		init_cube_ = determinize_cube(istate_);
+#if PRIORITIZE_SHORTEST_PATH
+		goal_cube_ = determinize_cube(gstate_);
+		cubes_.resize(1);
+#endif
 		std::cerr << "Init Cube: " << *init_cube_ << std::endl;
 		add_neighbors_to_list(init_cube_);
 	}
@@ -366,6 +414,14 @@ protected:
 		return ret;
 	}
 
+	bool isCubeListEmpty()
+	{
+		for (const auto& list: cubes_)
+			if (!list.empty())
+				return false;
+		return true;
+	}
+
 	bool add_to_cube_list(Node* node, bool check_contacting_free = true)
 	{
 		if (node->getState() != Node::kCubeUncertain)
@@ -384,11 +440,17 @@ protected:
 		return true;
 	}
 
+#if 0
 	bool add_to_oob_list(Node* node)
 	{
+		if (node->getState() != Node::kCubeUncertain)
+			return false;
 		cubes_[0].emplace_back(node);
+		node->setState(Node::kCubeUncertainPending);
+		VIS::visPending(node);
 		return true;
 	}
+#endif
 
 	bool is_contacting_free(Node* node)
 	{

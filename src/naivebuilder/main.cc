@@ -10,8 +10,8 @@ using std::string;
 
 int worker(NaiveRenderer* renderer)
 {
-	// string envfn = "../res/simple/Torus.obj";
-	string envfn = "../res/simple/FullTorus.obj";
+	string envfn = "../res/simple/Torus.obj";
+	// string envfn = "../res/simple/FullTorus.obj";
 	Geo env;
 	env.read(envfn);
 	env.V.block(0, 2, env.V.rows(), 1) *= 0.0001;

@@ -8,6 +8,8 @@
 /*
  * NullVisualizer: concept of Visualizer used by GOctreePathBuilder
  */
+
+class NaiveRenderer;
 class NullVisualizer {
 public:
 	static void initialize() { last_time_ = ::time(NULL); }
@@ -31,8 +33,6 @@ public:
 	static void visPop(Node*) {}
 
 	static void visAggPath(const std::vector<Eigen::VectorXd>&) {}
-	template<typename Node>
-	static void visAggPath(const std::vector<const Node*>&) {}
 
 	template<typename Node>
 	static void trackFurestCube(Node* cube, Node* init_cube) {}
@@ -44,6 +44,8 @@ public:
 
 	struct Attribute {
 	};
+
+	static void setRenderer(NaiveRenderer*) {}
 protected:
 	static time_t last_time_;
 };
