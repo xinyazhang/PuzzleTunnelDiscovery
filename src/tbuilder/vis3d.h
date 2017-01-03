@@ -5,7 +5,7 @@
 #include "naiverenderer.h"
 #include <vecio/arrayvecio.h>
 #include <iostream>
-#include <set>
+#include <unordered_set>
 
 // FIXME: find a way to avoid using macros
 #define SHOW_ADJACENCY 0
@@ -89,7 +89,7 @@ public:
 	}
 
 	struct Attribute {
-		std::set<int> agg_line_tokens_;
+		std::unordered_set<int> agg_line_tokens_;
 	};
 #endif
 
