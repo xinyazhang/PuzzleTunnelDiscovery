@@ -36,15 +36,26 @@ int main(int argc, char* argv[])
 	string robotfn = "../res/alpha/alpha-1.2.org.obj";
 	string envfn = "../res/alpha/alpha_env-1.2.org.obj";
 	string pathfn = "../res/alpha/alpha-1.2.org.path";
-#else
+	string envcvxpn;
+	gui.setCameraDistance(150.0f);
+#elif 1
 	string robotfn = "../res/simple/robot.obj";
-	string envfn = "../res/simple/env.obj";
+	string envfn = "../res/simple/FullTorus.obj";
+	string envcvxpn = "../res/simple/cvx/FullTorus";
 	string pathfn = "1.path";
+#else
+	string robotfn = "../res/alpha/rob-1.2.obj";
+	string envfn = "../res/alpha/env-1.2.obj";
+	string envcvxpn = "../res/alpha/cvx/env-1.2";
+	string pathfn = "1.path";
+	gui.setCameraDistance(150.0f);
 #endif
 	Geo robot, env;
 	Path path;
 	robot.read(robotfn);
 	env.read(envfn);
+	if (!envcvxpn.empty())
+		env.readcvx(envcvxpn);
 	path.readPath(pathfn);
 #if 0
 	robot.center << 16.973146438598633, 1.2278236150741577, 10.204807281494141; // From OMPL.app, no idea how they get this.
@@ -188,7 +199,7 @@ int main(int argc, char* argv[])
 		robot_transform_matrix = path.interpolate(robot, t);
 		//robot_transform_matrix(0, 3) = t;
 		alpha_model_matrix = robot_transform_matrix.cast<float>();
-		std::cerr << "Transform matrix:\n " << robot_transform_matrix << std::endl;
+		// std::cerr << "Transform matrix:\n " << robot_transform_matrix << std::endl;
 
 		robot_pass.setup();
 		CHECK_GL_ERROR(glDrawElements(GL_TRIANGLES, robot.F.rows() * 3,

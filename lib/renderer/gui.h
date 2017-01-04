@@ -35,6 +35,7 @@ public:
 
 	glm::vec3 getCenter() const;
 	const glm::vec3& getCamera() const;
+	void setCameraDistance(float d);
 	bool isPoseDirty() const { return pose_changed_; }
 	void clearPose() { pose_changed_ = false; }
 	const float* getLightPositionPtr() const { return &light_position_[0]; }
