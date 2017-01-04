@@ -3,6 +3,8 @@
 #include <omplaux/scene_bounding_box.h>
 #include <vecio/arrayvecio.h>
 #include <goct/goctree.h>
+#define ENABLE_DFS 0
+#define PRIORITIZE_SHORTEST_PATH 1
 #include <goct/gbuilder.h>
 #include "space.h"
 #include "textvisualizer.h"
@@ -15,11 +17,16 @@ int main(int argc, char* argv[])
 	string robotfn = "../res/alpha/alpha-1.2.org.obj";
 	string envfn = "../res/alpha/alpha_env-1.2.org.obj";
 	string pathfn = "../res/alpha/alpha-1.2.org.path";
-#else
+#elif 1
 	string robotfn = "../res/simple/robot.obj";
 	string envfn = "../res/simple/FullTorus.obj";
 	string pathfn = "../res/simple/naive2.path";
 	string envcvxpn = "../res/simple/cvx/FullTorus";
+#else
+	string robotfn = "../res/alpha/rob-1.2.obj";
+	string envfn = "../res/alpha/env-1.2.obj";
+	string pathfn = "../res/alpha/ver1.2.path";
+	string envcvxpn = "../res/alpha/cvx/env-1.2";
 #endif
 	Geo robot, env;
 	Path path;
@@ -72,14 +79,18 @@ int main(int argc, char* argv[])
 	      >;
 	Builder builder;
 	builder.setupSpace(min, max, res);
-	double init_t = 0.0;
-	//double init_t = path.T.size() - 2;
-	builder.setupInit(Path::matrixToState(path.interpolate(robot, init_t)));
+	// double init_t = 0.0;
+	// double init_t = path.T.size() - 2;
+	// builder.setupInit(Path::matrixToState(path.interpolate(robot, init_t)));
+	builder.setupInit(path.pathToState(0));
 	//double end_t = path.T.size() - 1;
-	double end_t = 1.0;
-	builder.setupGoal(Path::matrixToState(path.interpolate(robot, end_t)));
+	// double end_t = 1.0;
+	// builder.setupGoal(Path::matrixToState(path.interpolate(robot, end_t)));
+	builder.setupGoal(path.pathToState(1));
 	builder.buildOcTree(cc);
-	std::cout << builder.buildPath();
+	auto slnpath = builder.buildPath();
+	for (const auto& state: slnpath)
+		std::cout << Path::stateToPath<double>(state.block<6, 1>(0,0)).transpose() << std::endl;
 	Builder::VIS::pause();
 
 	return 0;
