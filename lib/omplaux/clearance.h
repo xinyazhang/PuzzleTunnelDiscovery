@@ -85,7 +85,7 @@ public:
 
 	State getCertainCube(const State& state, bool& isfree) const
 	{
-		auto trmat = Path::stateToMatrix(state);
+		auto trmat = Path::stateToMatrix(state, rob_.center);
 		Transform3 tf;
 		tf = trmat.block<3,4>(0,0);
 
@@ -101,6 +101,13 @@ public:
 
 		State ret = bound(d, tf);
 		isfree = distance > 0;
+
+#if 0
+		std::cerr << "state: " << state.transpose()
+		          << "\tdistance: " << d
+		          << "\tfree: " << isfree
+		          << std::endl;
+#endif
 
 		return ret;
 	}

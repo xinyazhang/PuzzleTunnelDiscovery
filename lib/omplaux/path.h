@@ -51,9 +51,9 @@ struct Path {
 
 		GLMatrixd ret;
 		ret.setIdentity();
-		// Translate to origin
+		// Translate robot's center to origin
 		ret.block<3,1>(0, 3) = -robot.center;
-
+		// Rotation w.r.t. the translated origin, i.e. robot's center
 		Eigen::Quaternion<double> Qfrom = Q[from];
 		Eigen::Quaternion<double> Qinterp = Qfrom.slerp(c, Q[to]);
 		auto rotmat = Qinterp.toRotationMatrix();
@@ -69,13 +69,18 @@ struct Path {
 	}
 
 	template<typename FLOAT>
-	static GLMatrixd stateToMatrix(const Eigen::Matrix<FLOAT, 6, 1>& state)
+	static GLMatrixd stateToMatrix(const Eigen::Matrix<FLOAT, 6, 1>& state,
+			Eigen::Vector3d center = Eigen::Vector3d::Zero()
+			)
 	{
 		Eigen::Transform<FLOAT, 3, Eigen::AffineCompact> tr;
 		tr.setIdentity();
+		tr.translate(-center);
 		tr.rotate(Eigen::AngleAxisd(state(3), Eigen::Vector3d::UnitX()));
 		tr.rotate(Eigen::AngleAxisd(state(4), Eigen::Vector3d::UnitY()));
 		tr.rotate(Eigen::AngleAxisd(state(5), Eigen::Vector3d::UnitZ()));
+		// Note, the transliation component in state represents the
+		// translation w.r.t the original geometry.
 		Eigen::Vector3d vec(state(0), state(1), state(2));
 		tr.translate(vec);
 		GLMatrixd ret;
@@ -84,6 +89,8 @@ struct Path {
 		return ret;
 	}
 
+	// stateToPath only needs to convert Euler angles to quaternion
+	// Path::interpolate is responsible for calculating the correct tranform from the path data.
 	template<typename FLOAT>
 	static Eigen::Matrix<FLOAT, 7, 1> stateToPath(const Eigen::Matrix<FLOAT, 6, 1>& state)
 	{
@@ -101,7 +108,39 @@ struct Path {
 		return ret;
 	}
 
+	template<typename FLOAT = double>
+	Eigen::Matrix<FLOAT, 6, 1> pathToState(size_t idx)
+	{
+		Eigen::Matrix<FLOAT, 6, 1> state;
+
+		const auto& q = Q[idx];
+		// The following converting code is copied from Wikipedia
+		double ysqr = q.y() * q.y();
+
+		// roll (x-axis rotation)
+		double t0 = +2.0f * (q.w() * q.x() + q.y() * q.z());
+		double t1 = +1.0f - 2.0f * (q.x() * q.x() + ysqr);
+		double roll = std::atan2(t0, t1);
+
+		// pitch (y-axis rotation)
+		double t2 = +2.0f * (q.w() * q.y() - q.z() * q.x());
+		t2 = t2 > 1.0f ? 1.0f : t2;
+		t2 = t2 < -1.0f ? -1.0f : t2;
+		double pitch = std::asin(t2); // asin returns [-pi/2, pi/2]
+
+		// yaw (z-axis rotation)
+		double t3 = +2.0f * (q.w() * q.z() + q.x() *q.y());
+		double t4 = +1.0f - 2.0f * (ysqr + q.z() * q.z());  
+		double yaw = std::atan2(t3, t4);
+
+		state << T[idx](0), T[idx](1), T[idx](2), roll, pitch, yaw;
+
+		return state;
+	}
+
 	// TODO: check consistency b/w stateToMatrix and matrixToState
+	// Note: this also needn't robot center because it takes
+	// the output of Path::interpolate.
 	static Eigen::Matrix<double, 6, 1> matrixToState(const GLMatrixd& trmat)
 	{
 		Eigen::Matrix<double, 6, 1> ret;
