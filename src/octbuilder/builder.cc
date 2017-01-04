@@ -17,14 +17,16 @@ int main(int argc, char* argv[])
 	string pathfn = "../res/alpha/alpha-1.2.org.path";
 #else
 	string robotfn = "../res/simple/robot.obj";
-	string envfn = "../res/simple/env2.obj";
+	string envfn = "../res/simple/FullTorus.obj";
 	string pathfn = "../res/simple/naive2.path";
+	string envcvxpn = "../res/simple/cvx/FullTorus";
 #endif
 	Geo robot, env;
 	Path path;
 
 	robot.read(robotfn);
 	env.read(envfn);
+	env.readcvx(envcvxpn);
 	path.readPath(pathfn);
 #if 0
 	robot.center << 16.973146438598633, 1.2278236150741577, 10.204807281494141; // From OMPL.app, no idea how they get this.

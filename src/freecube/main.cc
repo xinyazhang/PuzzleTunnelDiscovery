@@ -202,11 +202,13 @@ int main(int argc, char* argv[])
 		// Poll and swap.
 		glfwPollEvents();
 		glfwSwapBuffers(window);
+#if 0
 		double mindist = cc.getDistance(robot_transform_matrix);
 		auto clearance = cc.getClearanceCube(robot_transform_matrix, mindist);
 		std::cerr << "Distance " << mindist
 		          << "\tClearance: " << clearance
 			  << std::endl;
+#endif
 #if SANITY_CHECK
 		auto san = cc.sanityCheck(robot_transform_matrix, clearance);
 		std::cerr << "\tSanity: " << san << std::endl;
