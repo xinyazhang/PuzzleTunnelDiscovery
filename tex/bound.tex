@@ -164,4 +164,21 @@ This implies
   s \leq 3\|p\| \max\{|\delta \theta |, |\delta \phi |, |\delta \psi |\}
 \end{flalign*}
 as a bound which may be useful if the $\delta$'s are sufficiently small and $\|p\|$ is not too large.
+
+However, consider the state space of Euler angles, each cube in the OcTree
+would follow $\delta \theta = \delta \psi = 2 \delta \phi$, because the range
+of $\phi$ is $-\frac{\pi}{2}$ to $\frac{\pi}{2}$, rather than $-\pi$ to $\pi$.
+
+Suppose $\delta \theta, 2\delta \phi, \delta \psi \leq \epsilon$. we can get
+the following bound
+\[
+F_\phi(\delta \theta, \delta \phi, \delta \psi) \leq \frac{25}{4} \epsilon^2
+\]
+
+Consequently, we can conclude
+\[
+  s \leq \frac{5}{2}\|p\||\epsilon| 
+\]
+in which $\epsilon$ represents the bound of $\delta \theta$ and $\delta \psi$.
+Meanwhile $\frac{\epsilon}{2}$ bounds $\delta \phi$.
 \end{document}
