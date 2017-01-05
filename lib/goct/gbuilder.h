@@ -383,11 +383,12 @@ protected:
 
 		goal_cube_ = nullptr;
 		init_cube_ = determinize_cube(istate_);
+		std::cerr << "Init Cube: " << *init_cube_ << std::endl;
 #if PRIORITIZE_SHORTEST_PATH
 		goal_cube_ = determinize_cube(gstate_);
 		cubes_.resize(1);
+		std::cerr << "Goal Cube: " << *goal_cube_ << std::endl;
 #endif
-		std::cerr << "Init Cube: " << *init_cube_ << std::endl;
 		add_neighbors_to_list(init_cube_);
 	}
 

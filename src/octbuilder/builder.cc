@@ -13,20 +13,28 @@ using std::string;
 
 int main(int argc, char* argv[])
 {
+	Eigen::Vector3d robotcenter { Eigen::Vector3d::Zero() };
 #if 0
 	string robotfn = "../res/alpha/alpha-1.2.org.obj";
 	string envfn = "../res/alpha/alpha_env-1.2.org.obj";
 	string pathfn = "../res/alpha/alpha-1.2.org.path";
-#elif 1
+#elif 0
 	string robotfn = "../res/simple/robot.obj";
 	string envfn = "../res/simple/FullTorus.obj";
 	string pathfn = "../res/simple/naive2.path";
 	string envcvxpn = "../res/simple/cvx/FullTorus";
+#elif 1
+	string robotfn = "../res/simple/robot.obj";
+	// string robotfn = "../res/simple/LongStick.obj";
+	string envfn = "../res/simple/mFixedElkMeetsCube.obj";
+	string pathfn = "../res/simple/naiveelk.path";
+	string envcvxpn = "../res/simple/cvx/ElkMeetsCube";
 #else
 	string robotfn = "../res/alpha/rob-1.2.obj";
 	string envfn = "../res/alpha/env-1.2.obj";
 	string pathfn = "../res/alpha/ver1.2.path";
 	string envcvxpn = "../res/alpha/cvx/env-1.2";
+	robotcenter = 16.973146438598633, 1.2278236150741577, 10.204807281494141;
 #endif
 	Geo robot, env;
 	Path path;
@@ -35,10 +43,13 @@ int main(int argc, char* argv[])
 	env.read(envfn);
 	env.readcvx(envcvxpn);
 	path.readPath(pathfn);
+	robot.center = robotcenter;
 #if 0
+#if 1
 	robot.center << 16.973146438598633, 1.2278236150741577, 10.204807281494141; // From OMPL.app, no idea how they get this.
 #else
 	robot.center << 0.0, 0.0, 0.0;
+#endif
 #endif
 
 	ClearanceCalculator<fcl::OBBRSS<double>> cc(robot, env);
