@@ -24,7 +24,7 @@ typedef NullVisualizer NaiveVisualizer3DBase;
  * FIXME: lots of dup code with 2D Visualizer
  *        Lines related to ND were changed
  */
-class NaiveVisualizer3D : NaiveVisualizer3DBase {
+class NaiveVisualizer3D : public NaiveVisualizer3DBase {
 private:
 	static constexpr int ND = 3;
 public:

@@ -40,6 +40,7 @@ public:
 
 	static bool timerAlarming() { return ::time(NULL) > last_time_; }
 	static void periodicalReport() {}
+	static void showHistogram() {}
 	static void rearmTimer() { last_time_ = ::time(NULL); }
 	static void pause() {}
 

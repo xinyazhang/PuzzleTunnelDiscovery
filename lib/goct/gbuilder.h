@@ -23,6 +23,10 @@
 #define PRIORITIZE_SHORTEST_PATH 0
 #endif
 
+#ifndef ENABLE_DIJKSTRA
+#define ENABLE_DIJKSTRA 0
+#endif
+
 template<int ND,
 	 typename FLOAT,
 	 typename CC,
@@ -31,8 +35,11 @@ template<int ND,
 	>
 class GOctreePathBuilder {
 	struct PathBuilderAttribute : public Visualizer::Attribute {
-		//static constexpr auto kUnviewedDistance = ULONG_MAX;
-		double distance; // = kUnviewedDistance;
+#ifdef ENABLE_DIJKSTRA
+		double distance;
+#else
+		int distance;
+#endif
 		const PathBuilderAttribute* prev = nullptr;
 		int epoch = -1;
 	};
@@ -189,6 +196,7 @@ public:
 	 * Each node may have multiple copies in Q, since std::priority_queue
 	 * is immutable.
 	 */
+#if ENABLE_DIJKSTRA
 	std::vector<const Node*> buildNodePath(bool aggressive = false)
 	{
 		epoch_++;
@@ -256,6 +264,59 @@ public:
 		std::reverse(ret.begin(), ret.end());
 		return ret;
 	}
+#else
+	std::vector<const Node*> buildNodePath(bool aggressive = false)
+	{
+		epoch_++;
+		int finepoch = epoch_;
+		auto goal_cube = goal_cube_;
+		bool goal_reached = false;
+
+		init_cube_->distance = 0;
+		init_cube_->prev = init_cube_; // Only circular one
+		init_cube_->epoch = finepoch;
+
+		std::queue<Node*> Q;
+		Q.push(init_cube_);
+
+		auto loopf = [&Q, &goal_reached, finepoch, goal_cube]
+			(Node* adj, Node* tip) -> bool {
+				if (adj->epoch == finepoch)
+					return false;
+				adj->epoch = finepoch;
+				adj->distance = tip->distance + 1;
+				adj->prev = tip;
+				Q.push(adj);
+				if (goal_cube == adj) {
+					goal_reached = true;
+					return true;
+				}
+				return false;
+			};
+
+		while (!Q.empty() && !goal_reached) {
+			auto tip = Q.front();
+			Q.pop();
+			for (auto adj : tip->getAdjacency())
+				if (loopf(adj, tip))
+					break;
+			if (!goal_reached && aggressive)
+				for (auto adj : tip->getAggressiveAdjacency())
+					if (loopf(adj, tip))
+						break;
+		}
+		if (!goal_reached)
+			return {};
+		std::vector<const Node*> ret;
+		const Node* node = goal_cube_;
+		while (node->prev != node) {
+			ret.emplace_back(node);
+			node = static_cast<const Node*>(node->prev);
+		}
+		std::reverse(ret.begin(), ret.end());
+		return ret;
+	}
+#endif
 
 	unsigned getDeepestLevel()
 	{
@@ -306,6 +367,7 @@ protected:
 					Node::setAdjacency(node, neighbor);
 					if (node->getState() == Node::kCubeFree) {
 						VIS::visAdj(node, neighbor);
+						dsl_add_edge(node, neighbor);
 					}
 				}
 				if (Node::hasAggressiveAdjacency(node, neighbor)) {
@@ -313,6 +375,7 @@ protected:
 					inserted = Node::setAggressiveAdjacency(node, neighbor);
 					if (inserted) {
 						VIS::visAggAdj(node, neighbor);
+						dsl_add_edge(node, neighbor);
 					}
 				}
 				ttlneigh++;
@@ -361,6 +424,8 @@ protected:
 				node->setState(Node::kCubeFree);
 				if (goal_cube_ == nullptr && node->isContaining(gstate_)) {
 					goal_cube_ = node;
+					dsl_init();
+					dsl_sssp();
 					std::cerr << "Goal cube cleared: " << *node << std::endl;
 				}
 			} else {
@@ -411,6 +476,8 @@ protected:
 			check_clearance(ret.back());
 		}
 		VIS::withdrawAggAdj(node);
+		for (const auto& neighbor : node->getAggressiveAdjacency())
+			dsl_block_edge(node, neighbor);
 		node->cancelAggressiveAdjacency();
 #if PRIORITIZE_SHORTEST_PATH
 		max_depth_ = std::max(node->getDepth() + 1, max_depth_);
@@ -511,6 +578,32 @@ protected:
 			}
 		}
 	}
+
+	struct DSLEdge {
+		Node *n0;
+		Node *n1;
+		DSLEdge(Node* a, Node* b) : n0(a), n1(b) {}
+	};
+
+	// TODO: D* Lite algorithm?
+	void dsl_init()
+	{
+	}
+
+	std::vector<Node*> dsl_sssp()
+	{
+		return {};
+	}
+
+	void dsl_add_edge(Node* node, Node* neighbor)
+	{
+	}
+
+	void dsl_block_edge(Node* node, Node* neighbor)
+	{
+	}
+
+	std::vector<DSLEdge> one_edges_, inf_edge_;
 
 	Coord mins_, maxs_, res_;
 	Coord istate_, gstate_;
