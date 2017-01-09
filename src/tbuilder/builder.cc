@@ -21,8 +21,8 @@ int worker(NaiveRenderer* renderer)
 	string envfn = "../res/simple/FullTorus.obj";
 	string pathfn = "../res/simple/naive2.path";
 #else
-	// string robotfn = "../res/simple/robot.obj";
-	string robotfn = "../res/simple/LongStick.obj";
+	string robotfn = "../res/simple/robot.obj";
+	// string robotfn = "../res/simple/LongStick.obj";
 	string envfn = "../res/simple/mFixedElkMeetsCube.obj";
 	string pathfn = "../res/simple/naiveelk.path";
 	string envcvxpn = "../res/simple/cvx/ElkMeetsCube";
@@ -128,6 +128,10 @@ int worker(NaiveRenderer* renderer)
 #if COUNT_NODES
 	Builder::VIS::showHistogram();
 #endif
+	auto profiler = cc.getProfiler();
+	std::cerr << "FCL statistics\n\t Distance: " << profiler.getAverageClockMs(decltype(profiler)::DISTANCE)
+		  << "\n\t Collision: " <<  profiler.getAverageClockMs(decltype(profiler)::COLLISION)
+		  << std::endl;
 	std::cerr << "Worker thread exited\n";
 
 	return 0;
