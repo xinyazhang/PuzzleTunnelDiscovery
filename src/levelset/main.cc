@@ -1,4 +1,4 @@
-#include "levelset.h"
+#include "sancheck.h"
 #include <igl/readOBJ.h>
 #include <igl/writeOBJ.h>
 #include <unistd.h>
@@ -22,7 +22,8 @@ int main(int argc, char* argv[])
 	double fatten = 1.0;
 	double scale = fat::default_scale_factor;
 	bool trianglize = true;
-	while ((opt = getopt(argc, argv, "i:o:w:s:q")) != -1) {
+	bool do_sancheck = false;
+	while ((opt = getopt(argc, argv, "i:o:w:s:qc")) != -1) {
 		switch (opt) {
 			case 'i': 
 				ifn = optarg;
@@ -38,6 +39,9 @@ int main(int argc, char* argv[])
 				break;
 			case 'q':
 				trianglize = false;
+				break;
+			case 'c':
+				do_sancheck = true;
 				break;
 			default:
 				usage();
@@ -59,5 +63,9 @@ int main(int argc, char* argv[])
 	}
 	fat::mkfatter(IV, IF, fatten, OV, OF, trianglize, scale);
 	igl::writeOBJ(ofn, OV, OF);
+	if (do_sancheck) {
+		std::cerr << "SAN Check...";
+		san_check(IV, IF, OV, OF, fatten);
+	}
 	return 0;
 }
