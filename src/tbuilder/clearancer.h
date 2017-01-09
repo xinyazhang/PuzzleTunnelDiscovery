@@ -8,6 +8,14 @@
 #include <fcl/narrowphase/distance_result.h>
 #include <fcl/narrowphase/collision.h>
 
+#ifndef ENABLE_FCL_PROFILING
+#define ENABLE_FCL_PROFILING 1
+#endif
+
+#if ENABLE_FCL_PROFILING
+#include <chrono>
+#endif
+
 template<typename BV>
 class TranslationOnlyClearance {
 private:
@@ -23,7 +31,45 @@ private:
 	BVHModel rob_bvh_, env_bvh_;
 	std::vector<BVHModel> rob_cvxbvhs_, env_cvxbvhs_;
 	fcl::detail::SplitMethodType split_method_ = fcl::detail::SPLIT_METHOD_MEDIAN;
+
 public:
+#if ENABLE_FCL_PROFILING
+	struct Profiler {
+		enum {
+			DISTANCE,
+			COLLISION,
+			TOTAL_NUMBER
+		};
+		void start()
+		{
+			tstart = std::chrono::high_resolution_clock::now();
+		}
+
+		void stop(int timer)
+		{
+			tend = std::chrono::high_resolution_clock::now();
+			sum[timer] += std::chrono::duration_cast<std::chrono::microseconds>(tend - tstart).count();
+			++count[timer];
+		}
+
+		double getAverageClockMs(int timer) const { return sum[timer]/count[timer]; }
+	private:
+		std::chrono::time_point<std::chrono::high_resolution_clock> tstart, tend;
+		double sum[TOTAL_NUMBER] = {0.0};
+		int count[TOTAL_NUMBER] = {0};
+	};
+#else
+	struct Profiler {
+		enum {
+			DISTANCE,
+			COLLISION
+		};
+		void start() {}
+		void stop(int) {}
+		double getAverageClockMs(int) const { return -1.0;}
+	};
+#endif
+
 	using TransformMatrix = Eigen::Matrix<double, 4, 4>;
 	using State = Eigen::Matrix<double, 3, 1>;
 
@@ -82,11 +128,16 @@ public:
 		request.gjk_solver_type = fcl::GST_LIBCCD;
 
 		fcl::DistanceResult<Scalar> result;
+		profiler_.start();
 		fcl::distance(&rob_bvh_, tf, &env_bvh_, Transform3::Identity(), request, result);
+		profiler_.stop(Profiler::DISTANCE);
 		double distance = result.min_distance;
 		double d = distance;
-		if (distance <= 0)
+		if (distance <= 0) {
+			profiler_.start();
 			d = getPenDepth(tf);
+			profiler_.stop(Profiler::COLLISION);
+		}
 
 		State ret;
 		ret << d*invsqrt3, d*invsqrt3, d*invsqrt3;
@@ -94,6 +145,8 @@ public:
 
 		return ret;
 	}
+
+	const Profiler& getProfiler() const { return profiler_; }
 protected:
 	void buildBVHs()
 	{
@@ -137,6 +190,8 @@ protected:
 		bvh.addSubModel(Vs, Fs);
 		bvh.endModel();
 	}
+
+	mutable Profiler profiler_;
 };
 
 #endif
