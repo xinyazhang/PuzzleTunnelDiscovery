@@ -74,6 +74,12 @@ FUNCTION(EASYADD place)
 	FINALIZE(${place})
 ENDFUNCTION()
 
+FUNCTION(SANCHECK place)
+	AUX_SOURCE_DIRECTORY(sancheck/${place}/ SAN_CHECK_SRC)
+	ADD_EXECUTABLE(sancheck_${place} ${SAN_CHECK_SRC})
+	FINALIZE(sancheck_${place})
+ENDFUNCTION()
+
 FUNCTION(EASYLIB place)
 	AUX_SOURCE_DIRECTORY(lib/${place}/ EASY_LOCAL_SRC)
 	ADD_LIBRARY(${place} SHARED ${EASY_LOCAL_SRC})
@@ -164,8 +170,8 @@ TARGET_LINK_LIBRARIES(Bcond tetio)
 EASYADD(NBcond)
 TARGET_LINK_LIBRARIES(NBcond tetio vecio)
 
-EASYADD(sancheck)
-TARGET_LINK_LIBRARIES(sancheck tetio)
+SANCHECK(laplacian)
+TARGET_LINK_LIBRARIES(sancheck_laplacian tetio)
 
 EASYADD(ring1picker)
 TARGET_LINK_LIBRARIES(ring1picker tetio)
