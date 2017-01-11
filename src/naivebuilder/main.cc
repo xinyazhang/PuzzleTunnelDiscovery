@@ -2,6 +2,7 @@
 #include "naiveclearance.h"
 #include "naivespace.h"
 #include "vis2d.h"
+#define ENABLE_DFS 0
 #include <goct/goctree.h>
 #include <goct/gbuilder.h>
 #include <string>

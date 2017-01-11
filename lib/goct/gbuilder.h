@@ -27,6 +27,10 @@
 #define ENABLE_DIJKSTRA 0
 #endif
 
+#if !PRIORITIZE_SHORTEST_PATH
+#define PRIORITIZE_CLEARER_CUBE 1
+#endif
+
 template<int ND,
 	 typename FLOAT,
 	 typename CC,
@@ -70,8 +74,16 @@ class GOctreePathBuilder {
 			other->getSet()->parent = getSet();
 		}
 	};
+#if !PRIORITIZE_CLEARER_CUBE
+	using NodeAttribute = FindUnionAttribute;
+#else
+	struct NodeDistanceAttribute : public FindUnionAttribute {
+		double certain_ratio;
+	};
+	using NodeAttribute = NodeDistanceAttribute;
+#endif
 public:
-	typedef GOcTreeNode<ND, FLOAT, FindUnionAttribute> Node;
+	typedef GOcTreeNode<ND, FLOAT, NodeAttribute> Node;
 	typedef typename Node::Coord Coord;
 	typedef Visualizer VIS;
 
@@ -221,7 +233,11 @@ public:
 				bool fresh = (adj->epoch != freshepoch && adj->epoch != finepoch);
 				bool do_update = false;
 				// double w = (tip->getMedian() - adj->getMedian()).norm();
+#if PRIORITIZE_CLEARER_CUBE
+				double w = 1.0/adj->certain_ratio; // Perfer cubes further from obs
+#else
 				double w = 1.0; // prefer larger cube.
+#endif
 				double dist = tip->distance + w;
 				do_update = fresh ? true : (adj->distance > dist);
 
@@ -418,6 +434,9 @@ protected:
 		bool stop = coverage(state, res_, node) ||
 			    coverage(state, certain, node);
 		node->volume = node->getVolume();
+#if PRIORITIZE_CLEARER_CUBE
+		node->certain_ratio = certain(0) / res_(0);
+#endif
 		fixed_volume_ += node->getVolume();
 		if (stop) {
 			if (isfree) {
@@ -492,8 +511,13 @@ protected:
 			depth++;
 		if (depth >= int(cubes_.size()))
 			throw std::runtime_error("CUBE LIST BECOMES EMPTY, TERMINATE");
+#if !PRIORITIZE_CLEARER_CUBE
 		auto ret = cubes_[depth].front();
 		cubes_[depth].pop_front();
+#else
+		auto ret = cubes_[depth].top();
+		cubes_[depth].pop();
+#endif
 		current_queue_ = depth;
 		VIS::visPop(ret);
 		return ret;
@@ -518,7 +542,11 @@ protected:
 		int depth = node->getDepth();
 		if (long(cubes_.size()) <= depth)
 			cubes_.resize(depth+1);
+#if !PRIORITIZE_CLEARER_CUBE
 		cubes_[depth].emplace_back(node);
+#else
+		cubes_[depth].push(node);
+#endif
 		node->setState(Node::kCubeUncertainPending);
 		current_queue_ = std::min(current_queue_, depth);
 		VIS::visPending(node);
@@ -604,13 +632,23 @@ protected:
 	}
 
 	std::vector<DSLEdge> one_edges_, inf_edge_;
+#if !PRIORITIZE_CLEARER_CUBE
+	using PerDepthQ = std::deque<Node*>;
+#else
+	struct ClearerNode {
+		bool operator() (Node* lhs, Node* rhs) {
+			return lhs->certain_ratio > rhs->certain_ratio;
+		}
+	};
+	using PerDepthQ = std::priority_queue<Node*, std::vector<Node*>, ClearerNode>;
+#endif
 
 	Coord mins_, maxs_, res_;
 	Coord istate_, gstate_;
 	CC *cc_;
 	std::unique_ptr<Node> root_;
 	int current_queue_;
-	std::vector<std::deque<Node*>> cubes_;
+	std::vector<PerDepthQ> cubes_;
 	Node *init_cube_ = nullptr;
 	Node *goal_cube_ = nullptr;
 	int epoch_ = 0;

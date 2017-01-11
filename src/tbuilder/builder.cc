@@ -5,6 +5,8 @@
 #include <goct/goctree.h>
 #define ENABLE_DFS 0
 #define PRIORITIZE_SHORTEST_PATH 1
+#define PRIORITIZE_CLEARER_CUBE 1
+#define ENABLE_DIJKSTRA 1
 #include <goct/gbuilder.h>
 #include "naivespace.h"
 #include "vis3d.h"
@@ -21,15 +23,13 @@ int worker(NaiveRenderer* renderer)
 	string envfn = "../res/simple/FullTorus.obj";
 	string pathfn = "../res/simple/naive2.path";
 #else
-	string robotfn = "../res/simple/robot.obj";
-	// string robotfn = "../res/simple/LongStick.obj";
+	// string robotfn = "../res/simple/robot.obj";
+	string robotfn = "../res/simple/LongStick.obj";
 	string envfn = "../res/simple/mFixedElkMeetsCube.obj";
 	string pathfn = "../res/simple/naiveelk.path";
 	string envcvxpn = "../res/simple/cvx/ElkMeetsCube";
 #endif
-
-	Geo robot, env;
-	Path path;
+Geo robot, env; Path path;
 
 	std::cerr << "Robot Reading\n";
 	robot.read(robotfn);
@@ -76,7 +76,7 @@ int worker(NaiveRenderer* renderer)
 		  << "\tmax: " << max.transpose() << std::endl;
 	cc.setC(bbmin, bbmax);
 #endif
-	res = (max - min) / 320000.0; // FIXME: how to calculate a resolution?
+	res = (max - min) / 1280000.0; // FIXME: how to calculate a resolution?
 
 	using Builder = GOctreePathBuilder<3,
 	      double,

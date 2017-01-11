@@ -3,8 +3,12 @@
 #include <omplaux/scene_bounding_box.h>
 #include <vecio/arrayvecio.h>
 #include <goct/goctree.h>
+// #define ENABLE_DFS 1
+// #define PRIORITIZE_SHORTEST_PATH 0
 #define ENABLE_DFS 0
 #define PRIORITIZE_SHORTEST_PATH 1
+#define PRIORITIZE_CLEARER_CUBE 1
+#define ENABLE_DIJKSTRA 1
 #include <goct/gbuilder.h>
 #include "space.h"
 #include "textvisualizer.h"
@@ -98,11 +102,22 @@ int main(int argc, char* argv[])
 	// double end_t = 1.0;
 	// builder.setupGoal(Path::matrixToState(path.interpolate(robot, end_t)));
 	builder.setupGoal(path.pathToState(1));
+
+	using Clock = std::chrono::high_resolution_clock;
+	auto t1 = Clock::now();
 	builder.buildOcTree(cc);
+	auto t2 = Clock::now();
+	std::chrono::duration<double, std::milli> dur = t2 - t1;
+
 	auto slnpath = builder.buildPath();
 	for (const auto& state: slnpath)
 		std::cout << Path::stateToPath<double>(state.block<6, 1>(0,0)).transpose() << std::endl;
 	Builder::VIS::pause();
+	std::cerr << "Configuration: ENABLE_DFS = " << ENABLE_DFS
+	          << "\tPRIORITIZE_SHORTEST_PATH = " << PRIORITIZE_SHORTEST_PATH
+	          << std::endl;
+	std::cerr << "Planning takes " << dur.count() << " ms to complete\n";
+	std::cerr << "Maximum cube depth " << builder.getDeepestLevel() << "\n";
 
 	return 0;
 }
