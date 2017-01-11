@@ -83,6 +83,9 @@ class GOctreePathBuilder {
 	using NodeAttribute = NodeDistanceAttribute;
 #endif
 public:
+	/*
+	 * Helper functions
+	 */
 	typedef GOcTreeNode<ND, FLOAT, NodeAttribute> Node;
 	typedef typename Node::Coord Coord;
 	typedef Visualizer VIS;
@@ -116,6 +119,9 @@ public:
 	void setupInit(const Coord& initState) { istate_ = initState; }
 	void setupGoal(const Coord& goalState) { gstate_ = goalState; }
 
+	/*
+	 * Tree building
+	 */
 	void buildOcTree(CC& cc)
 	{
 		init_builder(cc);
@@ -174,6 +180,7 @@ public:
 				check_path = true;
 			}
 		}
+		stop_builder();
 	}
 
 	std::vector<Eigen::VectorXd> buildPath(bool aggressive = false)
@@ -193,6 +200,7 @@ public:
 		return ret;
 	}
 
+#if ENABLE_DIJKSTRA
 	/*
 	 * Dijkstra with immutable priority queue.
 	 * 
@@ -208,7 +216,6 @@ public:
 	 * Each node may have multiple copies in Q, since std::priority_queue
 	 * is immutable.
 	 */
-#if ENABLE_DIJKSTRA
 	std::vector<const Node*> buildNodePath(bool aggressive = false)
 	{
 		epoch_++;
@@ -281,6 +288,9 @@ public:
 		return ret;
 	}
 #else
+	/*
+	 * Simple BFS path builder
+	 */
 	std::vector<const Node*> buildNodePath(bool aggressive = false)
 	{
 		epoch_++;
@@ -383,7 +393,6 @@ protected:
 					Node::setAdjacency(node, neighbor);
 					if (node->getState() == Node::kCubeFree) {
 						VIS::visAdj(node, neighbor);
-						dsl_add_edge(node, neighbor);
 					}
 				}
 				if (Node::hasAggressiveAdjacency(node, neighbor)) {
@@ -391,7 +400,6 @@ protected:
 					inserted = Node::setAggressiveAdjacency(node, neighbor);
 					if (inserted) {
 						VIS::visAggAdj(node, neighbor);
-						dsl_add_edge(node, neighbor);
 					}
 				}
 				ttlneigh++;
@@ -443,8 +451,6 @@ protected:
 				node->setState(Node::kCubeFree);
 				if (goal_cube_ == nullptr && node->isContaining(gstate_)) {
 					goal_cube_ = node;
-					dsl_init();
-					dsl_sssp();
 					std::cerr << "Goal cube cleared: " << *node << std::endl;
 				}
 			} else {
@@ -474,6 +480,13 @@ protected:
 		std::cerr << "Goal Cube: " << *goal_cube_ << std::endl;
 #endif
 		add_neighbors_to_list(init_cube_);
+
+		launch_wall_finder();
+	}
+
+	void stop_builder()
+	{
+		stop_wall_finder();
 	}
 
 	/*
@@ -495,8 +508,6 @@ protected:
 			check_clearance(ret.back());
 		}
 		VIS::withdrawAggAdj(node);
-		for (const auto& neighbor : node->getAggressiveAdjacency())
-			dsl_block_edge(node, neighbor);
 		node->cancelAggressiveAdjacency();
 #if PRIORITIZE_SHORTEST_PATH
 		max_depth_ = std::max(node->getDepth() + 1, max_depth_);
@@ -553,18 +564,6 @@ protected:
 		return true;
 	}
 
-#if 0
-	bool add_to_oob_list(Node* node)
-	{
-		if (node->getState() != Node::kCubeUncertain)
-			return false;
-		cubes_[0].emplace_back(node);
-		node->setState(Node::kCubeUncertainPending);
-		VIS::visPending(node);
-		return true;
-	}
-#endif
-
 	bool is_contacting_free(Node* node)
 	{
 		bool ret = false;
@@ -607,31 +606,6 @@ protected:
 		}
 	}
 
-	struct DSLEdge {
-		Node *n0;
-		Node *n1;
-		DSLEdge(Node* a, Node* b) : n0(a), n1(b) {}
-	};
-
-	// TODO: D* Lite algorithm?
-	void dsl_init()
-	{
-	}
-
-	std::vector<Node*> dsl_sssp()
-	{
-		return {};
-	}
-
-	void dsl_add_edge(Node* node, Node* neighbor)
-	{
-	}
-
-	void dsl_block_edge(Node* node, Node* neighbor)
-	{
-	}
-
-	std::vector<DSLEdge> one_edges_, inf_edge_;
 #if !PRIORITIZE_CLEARER_CUBE
 	using PerDepthQ = std::deque<Node*>;
 #else
@@ -656,6 +630,14 @@ protected:
 #if PRIORITIZE_SHORTEST_PATH
 	unsigned max_depth_ = 0;
 #endif
+
+	void launch_wall_finder()
+	{
+	}
+
+	void stop_wall_finder()
+	{
+	}
 };
 
 #endif
