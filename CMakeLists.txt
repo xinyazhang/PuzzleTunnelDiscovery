@@ -239,4 +239,6 @@ TARGET_LINK_LIBRARIES(fat openvdb tbb Half)
 EASYADD(levelset)
 TARGET_LINK_LIBRARIES(levelset fat)
 
+SANCHECK(fatten)
+
 # vim: tw=0
