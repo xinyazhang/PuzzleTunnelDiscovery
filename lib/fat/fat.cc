@@ -30,6 +30,17 @@ namespace {
 	}
 
 	template <typename In, typename EigenMatrix>
+	void convert_back3(const std::vector<In>& in, EigenMatrix& m)
+	{
+		m.resize(in.size(), 3);
+		for (size_t i = 0; i < in.size(); i++) {
+			m(i, 0) = in[i].x();
+			m(i, 1) = in[i].y();
+			m(i, 2) = in[i].z();
+		}
+	}
+
+	template <typename In, typename EigenMatrix>
 	void convert_back3(const std::vector<In>& in, EigenMatrix& m, double scale_factor)
 	{
 		m.resize(in.size(), 3);
@@ -37,6 +48,19 @@ namespace {
 			m(i, 0) = in[i].x() * scale_factor;
 			m(i, 1) = in[i].y() * scale_factor;
 			m(i, 2) = in[i].z() * scale_factor;
+		}
+	}
+
+	template <typename In, typename EigenMatrix>
+	void concat(const std::vector<In>& in, EigenMatrix& m)
+	{
+		int base = m.rows();
+		m.conservativeResize(m.rows() + in.size(), 3);
+		
+		for (size_t i = 0; i < in.size(); i++) {
+			m(base + i, 0) = in[i].x();
+			m(base + i, 1) = in[i].y();
+			m(base + i, 2) = in[i].z();
 		}
 	}
 
@@ -90,20 +114,23 @@ void fat::mkfatter(
 	using openvdb::tools::meshToLevelSet;
 	using openvdb::tools::volumeToMesh;
 
-	auto V = convert3<Vec3s>(inV, scale_factor);
+	auto V = convert3<Vec3s>(inV);
 	auto F = convert3<Vec3I>(inF);
 	
-	auto tf = Transform::createLinearTransform();
+	auto tf = Transform::createLinearTransform(1.0/scale_factor);
 	auto grid = meshToLevelSet<openvdb::FloatGrid>(*tf, V, F, width * scale_factor);
 	std::vector<Vec3s> OV;
 	std::vector<Vec3I> OF;
 	std::vector<Vec4I> OQ;
 
-	volumeToMesh(*grid, OV, OF, OQ, width * scale_factor);
+	// volumeToMesh(*grid, OV, OF, OQ, width * scale_factor);
+	volumeToMesh(*grid, OV, OF, OQ, width, 1.0);
 
-	convert_back3(OV, outV, 1.0/scale_factor);
+	// convert_back3(OV, outV, 1.0/scale_factor);
+	convert_back3(OV, outV);
 	if (trianglize)
 		convert_quads(OQ, outF);
 	else
 		convert_back4(OQ, outF);
+	concat(OF, outF);
 }
