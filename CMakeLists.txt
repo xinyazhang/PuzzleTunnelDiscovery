@@ -221,7 +221,7 @@ TARGET_LINK_LIBRARIES(freecube fcl omplaux ${CMAKE_THREAD_LIBS_INIT} ${viscommon
 SET(octbuildercommon goct vecio fcl omplaux ${CMAKE_THREAD_LIBS_INIT})
 	
 EASYADD(octbuilder)
-TARGET_LINK_LIBRARIES(octbuilder ${octbuildercommon})
+TARGET_LINK_LIBRARIES(octbuilder ${octbuildercommon} ${viscommon})
 
 EASYADD(naivebuilder)
 TARGET_LINK_LIBRARIES(naivebuilder ${octbuildercommon} ${viscommon})
