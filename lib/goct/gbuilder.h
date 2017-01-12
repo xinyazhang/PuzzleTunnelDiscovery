@@ -4,6 +4,7 @@
 #include "nullvisualizer.h"
 #include "goctree.h"
 #include <deque>
+#include <thread>
 #include <algorithm>
 #include <functional>
 #include <queue>
@@ -128,16 +129,19 @@ public:
 		VIS::initialize();
 		VIS::rearmTimer();
 		bool check_path = false;
+		std::unordered_set<Node*> path_nodes;
 		while (true) {
 #if PRIORITIZE_SHORTEST_PATH
 			check_path = isCubeListEmpty();
 #endif
 			if (check_path && goal_cube_) {
+				path_nodes.clear();
 				auto aggpath = buildNodePath(true);
 				for (auto node : aggpath) {
 					if (node->isDetermined())
 						continue;
 					add_to_cube_list(const_cast<Node*>(node));
+					path_nodes.emplace(node);
 				}
 				VIS::visAggPath(convertNodePath(aggpath));
 				if (aggpath.empty()) {
@@ -148,6 +152,7 @@ public:
 
 			auto to_split = pop_from_cube_list();
 			auto children = split_cube(to_split);
+			bool direct_node = (path_nodes.find(to_split) != path_nodes.end());
 			for (auto cube : children) {
 #if !PRIORITIZE_SHORTEST_PATH
 				if (cube->getState() == Node::kCubeUncertain) {
@@ -156,8 +161,13 @@ public:
 #endif
 				connect_neighbors(cube);
 
-				if (!cube->atState(Node::kCubeFree))
+				if (direct_node && cube->atState(Node::kCubeFull))
+					add_neighbors_to_list(cube, true);
+
+				if (!cube->atState(Node::kCubeFree)) {
+					// Full cube may have full neighbors.
 					continue;
+				}
 #if ENABLE_DFS
 				// From now we assume cube.state == free.
 				if (cube->getSet() == init_cube_->getSet()) {
@@ -188,7 +198,7 @@ public:
 		return convertNodePath(buildNodePath(aggressive));
 	}
 
-	std::vector<Eigen::VectorXd> convertNodePath(const std::vector<const Node*>& nodes)
+	std::vector<Eigen::VectorXd> convertNodePath(const std::vector<Node*>& nodes)
 	{
 		std::vector<Eigen::VectorXd> ret;
 		ret.reserve(nodes.size());
@@ -216,7 +226,7 @@ public:
 	 * Each node may have multiple copies in Q, since std::priority_queue
 	 * is immutable.
 	 */
-	std::vector<const Node*> buildNodePath(bool aggressive = false)
+	std::vector<Node*> buildNodePath(bool aggressive = false)
 	{
 		epoch_++;
 		int freshepoch = epoch_;
@@ -278,11 +288,11 @@ public:
 		}
 		if (!goal_reached)
 			return {};
-		std::vector<const Node*> ret;
-		const Node* node = goal_cube_;
+		std::vector<Node*> ret;
+		Node* node = goal_cube_;
 		while (node->prev != node) {
 			ret.emplace_back(node);
-			node = static_cast<const Node*>(node->prev);
+			node = const_cast<Node*>(static_cast<const Node*>(node->prev));
 		}
 		std::reverse(ret.begin(), ret.end());
 		return ret;
@@ -291,7 +301,7 @@ public:
 	/*
 	 * Simple BFS path builder
 	 */
-	std::vector<const Node*> buildNodePath(bool aggressive = false)
+	std::vector<Node*> buildNodePath(bool aggressive = false)
 	{
 		epoch_++;
 		int finepoch = epoch_;
@@ -333,11 +343,11 @@ public:
 		}
 		if (!goal_reached)
 			return {};
-		std::vector<const Node*> ret;
-		const Node* node = goal_cube_;
+		std::vector<Node*> ret;
+		Node* node = goal_cube_;
 		while (node->prev != node) {
 			ret.emplace_back(node);
-			node = static_cast<const Node*>(node->prev);
+			node = const_cast<Node*>(static_cast<const Node*>(node->prev));
 		}
 		std::reverse(ret.begin(), ret.end());
 		return ret;
@@ -411,25 +421,32 @@ protected:
 		return node->getState() == Node::kCubeFree;
 	}
 
-	std::vector<Node*> add_neighbors_to_list(Node* node)
+	std::vector<Node*> add_neighbors_to_list(Node* node,
+			bool enforce = false)
 	{
+		// Default policy of PRIORITIZE_SHORTEST_PATH
+		//   Only add cubes on the shortest path
+		// 
+		// Set enforce to true to override this behavior.
 #if PRIORITIZE_SHORTEST_PATH
-		return {};
-#else
+		if (!enforce)
+			return {};
+#endif
 		std::vector<Node*> ret;
 		auto op = [=,&ret](int dim, int direct, std::vector<Node*>& neighbors) -> bool
 		{
 			for (auto neighbor: neighbors) {
-				if (neighbor->getState() ==  Node::kCubeUncertain) {
-					if (add_to_cube_list(neighbor, false))
-						ret.emplace_back(neighbor);
-				}
+				if (neighbor->getState() !=  Node::kCubeUncertain)
+					continue;
+				if (enforce && neighbor->getDepth() > node->getDepth())
+					continue;
+				if (add_to_cube_list(neighbor, false))
+					ret.emplace_back(neighbor);
 			}
 			return false;
 		};
 		contactors_op(node, op);
 		return ret;
-#endif
 	}
 
 	void check_clearance(Node* node)
@@ -630,12 +647,26 @@ protected:
 #if PRIORITIZE_SHORTEST_PATH
 	unsigned max_depth_ = 0;
 #endif
+	std::unique_ptr<std::thread> wall_finder_thread_;
+	bool wall_finder_exiting_;
 
 	void launch_wall_finder()
 	{
+		wall_finder_exiting_ = false;
+		if (!wall_finder_thread_)
+			wall_finder_thread_.reset(new std::thread([this](){this->wall_finder();}));
 	}
 
 	void stop_wall_finder()
+	{
+		wall_finder_exiting_ = true;
+		if (wall_finder_thread_)
+			wall_finder_thread_->join();
+		wall_finder_thread_.reset();
+	}
+
+	// Another thread to detect walls?
+	void wall_finder()
 	{
 	}
 };
