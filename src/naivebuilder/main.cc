@@ -3,6 +3,9 @@
 #include "naivespace.h"
 #include "vis2d.h"
 #define ENABLE_DFS 0
+#define PRIORITIZE_SHORTEST_PATH 1
+#define PRIORITIZE_CLEARER_CUBE 1
+#define ENABLE_DIJKSTRA 1
 #include <goct/goctree.h>
 #include <goct/gbuilder.h>
 #include <string>

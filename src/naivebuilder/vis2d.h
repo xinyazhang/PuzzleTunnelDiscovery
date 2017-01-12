@@ -10,7 +10,9 @@
 // FIXME: find a way to avoid using macros
 #define SHOW_ADJACENCY 0
 #define SHOW_AGGADJACENCY 0
-#define SHOW_AGGPATH 0
+#define SHOW_AGGPATH 1
+
+#define PAUSE_EVERYWHERE 1
 
 /* 2D Visualizer */
 class NaiveVisualizer : public NullVisualizer {
@@ -86,6 +88,9 @@ public:
 	static void visSplit(Node* node)
 	{
 		renderer_->addSplit(node->getMedian(), node->getMins(), node->getMaxs());
+#if PAUSE_EVERYWHERE
+		pause();
+#endif
 	}
 
 	template<typename Node>
@@ -95,6 +100,9 @@ public:
 				node->getMins(),
 				node->getMaxs(),
 				node->getState() == Node::kCubeFree);
+#if PAUSE_EVERYWHERE
+		pause();
+#endif
 	}
 
 	static void setRenderer(NaiveRenderer* renderer) { renderer_ = renderer; }

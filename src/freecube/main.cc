@@ -38,11 +38,16 @@ int main(int argc, char* argv[])
 	string pathfn = "../res/alpha/alpha-1.2.org.path";
 	string envcvxpn;
 	gui.setCameraDistance(150.0f);
-#elif 1
+#elif 0
 	string robotfn = "../res/simple/robot.obj";
 	string envfn = "../res/simple/FullTorus.obj";
 	string envcvxpn = "../res/simple/cvx/FullTorus";
 	string pathfn = "1.path";
+#elif 1
+	string robotfn = "../res/simple/mediumstick.obj";
+	string envfn = "../res/simple/boxwithhole2.obj";
+	string pathfn = "../res/simple/boxreference.path";
+	string envcvxpn = "../res/simple/cvx/boxwithhole";
 #else
 	string robotfn = "../res/alpha/rob-1.2.obj";
 	string envfn = "../res/alpha/env-1.2.obj";

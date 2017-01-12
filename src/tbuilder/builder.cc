@@ -29,7 +29,7 @@ int worker(NaiveRenderer* renderer)
 	string pathfn = "../res/simple/naiveelk.path";
 	string envcvxpn = "../res/simple/cvx/ElkMeetsCube";
 #endif
-Geo robot, env; Path path;
+	Geo robot, env; Path path;
 
 	std::cerr << "Robot Reading\n";
 	robot.read(robotfn);
