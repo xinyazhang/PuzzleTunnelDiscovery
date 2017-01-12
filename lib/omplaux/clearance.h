@@ -48,6 +48,11 @@ public:
 		dtr_ = (max - min)/2.0;
 	}
 
+	void setDAlpha(double dalpha)
+	{
+		dalpha_ = dalpha;
+	}
+
 	Eigen::Vector2d getCSize() const
 	{
 		return {};
@@ -123,11 +128,11 @@ public:
 			// v: relative coordinates w.r.t. robot center.
 			Eigen::Vector3d v = tf * Eigen::Vector3d(RV.row(i)) - nrcenter;
 			double r = v.norm();
-			scale_ratio = std::min(scale_ratio, binsolve(dtr_, M_PI, r, d));
+			scale_ratio = std::min(scale_ratio, binsolve(dtr_, dalpha_, r, d));
 		}
 		State ret;
 		ret << dtr_ * scale_ratio, dtr_ * scale_ratio, dtr_ * scale_ratio,
-		       M_PI * scale_ratio, M_PI/2.0 * scale_ratio, M_PI * scale_ratio;
+		       dalpha_ * scale_ratio, dalpha_/2.0 * scale_ratio, dalpha_ * scale_ratio;
 		return ret;
 	}
 protected:
@@ -203,6 +208,7 @@ protected:
 
 	double mintr_, maxtr_;
 	double dtr_;
+	double dalpha_ = M_PI;
 
 };
 #endif
