@@ -3,6 +3,7 @@
 #include <openvdb/tools/MeshToVolume.h>
 #include <openvdb/util/Util.h>
 #include <openvdb/tools/VolumeToMesh.h>
+#include <openvdb/tools/LevelSetFilter.h>
 
 namespace {
 	template <typename Out, typename EigenMatrix>
@@ -110,21 +111,27 @@ void fat::mkfatter(
 	using openvdb::Vec3s;
 	using openvdb::Vec3I;
 	using openvdb::Vec4I;
+	using openvdb::TreeAdapter;
 	using openvdb::math::Transform;
 	using openvdb::tools::meshToLevelSet;
 	using openvdb::tools::volumeToMesh;
+	using openvdb::tools::erodeVoxels;
 
 	auto V = convert3<Vec3s>(inV);
 	auto F = convert3<Vec3I>(inF);
 	
 	auto tf = Transform::createLinearTransform(1.0/scale_factor);
-	auto grid = meshToLevelSet<openvdb::FloatGrid>(*tf, V, F, width * scale_factor);
+	double halfwidth = width * scale_factor;
+	if (halfwidth <= 0.0)
+		halfwidth = 2.0;
+	auto grid = meshToLevelSet<openvdb::FloatGrid>(*tf, V, F, halfwidth);
 	std::vector<Vec3s> OV;
 	std::vector<Vec3I> OF;
 	std::vector<Vec4I> OQ;
 
-	// volumeToMesh(*grid, OV, OF, OQ, width * scale_factor);
-	volumeToMesh(*grid, OV, OF, OQ, width, 1.0);
+	openvdb::tools::LevelSetFilter<openvdb::FloatGrid> lsf(*grid);
+	lsf.offset(width);
+	volumeToMesh(*grid, OV, OF, OQ, 0.0, 1.0);
 
 	// convert_back3(OV, outV, 1.0/scale_factor);
 	convert_back3(OV, outV);
