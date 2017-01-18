@@ -62,12 +62,12 @@ s \leq \|p\|  \sqrt{3   -  \text{tr}(R)}\\
 \end{align}
 Since $R_c$ and $R_s$ are orthogonal, the trace is the pairwise sum of the dot products of the columns of $R_c$ and $R_s$ and so it is less than or equal to 3.  So,
 it will not be the case that $ \sqrt{3   -  \text{tr}(R)}$ is imaginary.  Furthermore,
-\begin{align*}
+\begin{align}
  \text{tr}(R_c^TR_s) &= \text{tr}(R_X(\theta)^T R_Y(\phi)^T R_Z(\psi)^TR_Z(\psi + \delta \psi) R_Y(\phi + \delta \phi)R_X(\theta + \delta \theta))\\
  &=  \text{tr}(R_X(\theta)^T R_Y(\phi)^T R_Z(\delta \psi) R_Y(\phi + \delta \phi)R_X(\theta + \delta \theta))\\
 &=  \text{tr}( R_Y(\phi)^T R_Z(\delta \psi) R_Y(\phi + \delta \phi)R_X(\theta + \delta \theta)R_X(\theta)^T)\\
-&= \text{tr}( R_Y(\phi)^T R_Z(\delta \psi) R_Y(\phi + \delta \phi)R_X( \delta \theta))\\
-\end{align*}
+&= \text{tr}( R_Y(\phi)^T R_Z(\delta \psi) R_Y(\phi + \delta \phi)R_X( \delta \theta))
+\end{align}
 which demonstrates that $F_\phi(\delta \theta, \delta \phi, \delta \psi)  = 3   -  \text{tr}(R_c^TR_s)$ is a polynomial in terms of $A = \cos \phi$, $B = \sin \phi$.\\
 
 Explicitly, 
@@ -155,7 +155,7 @@ F_\phi(\delta \theta, \delta \phi, \delta \psi) &\leq |c_1| + |c_2| + |c_3| + |c
     &=  \frac{1}{4} \delta \psi^2 \delta \theta^2 +  \frac{1}{4}\delta \psi^2  |\delta \phi| \delta \theta^2 +
      |\delta \theta||\delta \phi||\delta \psi| +  4  |\delta \theta|  |\delta \psi| +  \delta \theta^2 + \delta\psi^2 + \delta\phi^2
 \end{flalign}
-Note that, if $\delta \theta, \delta \phi, \delta \psi \leq \epsilon  \leq 1$, where $\epsilon \geq  0$, then equation 18 gives
+Note that, if $\delta \theta, \delta \phi, \delta \psi \leq \epsilon  \leq 1$, where $\epsilon \geq  0$, then equation 22 gives
 \begin{flalign*}
 F_\phi(\delta \theta, \delta \phi, \delta \psi) \leq 9 \epsilon^2
 \end{flalign*}
@@ -163,5 +163,87 @@ This implies
 \begin{flalign*}
   s \leq 3\|p\| \max\{|\delta \theta |, |\delta \phi |, |\delta \psi |\}
 \end{flalign*}
-as a bound which may be useful if the $\delta$'s are sufficiently small and $\|p\|$ is not too large.
+as a bound which may be useful if the $\delta$'s are sufficiently small and $\|p\|$ is not too large.\\
+
+\textbf{Alternative Derivation}
+\begin{align*}
+F_\phi(\delta \theta, \delta \phi, \delta \psi)  &= 3 - \text{tr}( R_Y(\phi)^T R_Z(\delta \psi) R_Y(\phi + \delta \phi)R_X( \delta \theta))
+\end{align*}
+and
+\begin{flalign*}
+ \text{tr}( R_Y(\phi)^T R_Z(\delta \psi) R_Y(\phi + \delta \phi)R_X( \delta \theta)) &=
+ \begin{bmatrix}
+ \cos \delta \phi&0& -\sin \delta \phi\\
+ 0&1&0\\
+ \sin \delta \phi&0&\cos \delta\\
+ \end{bmatrix}
+  \begin{bmatrix}
+ \cos \delta \psi&-\sin \delta \psi&0\\
+ \sin \delta \psi&\cos \delta \psi&0\\
+ 0&0&1\\
+ \end{bmatrix}\\
+&\times \begin{bmatrix}
+ \cos (\phi + \delta \phi)&0& \sin (\phi + \delta \phi)\\
+ 0&1&0\\
+ - \sin(\phi + \delta \phi)&0&\cos(\phi + \delta)\\
+ \end{bmatrix}
+  \begin{bmatrix}
+ 1&0&0\\
+ 0&\cos \delta \theta&-\sin \delta \theta\\
+ 0&\sin \delta \theta&\cos \delta \theta\\
+ \end{bmatrix}\\
+ &=\begin{bmatrix}
+ \cos \delta \psi \cos \phi& -\cos \phi \sin \delta \psi&-\sin \phi\\
+ \sin \delta \psi&\cos \delta \psi&0\\
+ \cos\delta\psi\sin \phi& -\sin \delta \psi \sin \phi&\cos \phi
+ \end{bmatrix}\\
+ &\times
+ \begin{bmatrix}
+ \cos(\phi + \delta \phi )& -\sin\delta \theta \sin(\phi + \delta \phi )& \cos\delta \theta \sin(\phi + \delta \phi )\\
+ 0& \cos\delta \theta & -\sin\delta \theta\\
+ \sin(\phi + \delta \phi )&\cos(\phi + \delta \phi)\sin \theta&\cos \delta \theta\cos(\phi + \delta \phi )
+ \end{bmatrix}
+\end{flalign*}
+and the quantity can be computed by taking the sum of the dot products of the rows and columns where the indices
+agree, which gives
+\begin{flalign*}
+ \text{tr}( R_Y(\phi)^T R_Z(\delta \psi) R_Y(\phi + \delta \phi)R_X( \delta \theta)) &= \cos \delta \theta \cos \delta \psi + \cos \delta \theta \cos \phi \cos(\phi +\delta \phi)\\
+  &+ \cos \delta \psi  \cos \phi \cos(\phi +\delta \phi) + \sin\delta \theta \sin\delta \psi \sin \phi\\
+  &+ \sin\delta \theta \sin\delta \psi \sin (\phi +\delta \phi) + \sin \phi \sin (\phi +\delta \phi)\\
+  &+ \cos\delta \theta \cos\delta \psi \sin\phi\sin(\phi+\delta \phi)
+\end{flalign*}
+Making the substitution $\cos x = 1 - 2 \sin^2 \frac{x}{2}$ for $x=\delta \theta, \delta \phi, \delta \psi, \phi$ and simplifying yields
+\begin{flalign*}
+&\text{tr}( R_Y(\phi)^T R_Z(\delta \psi) R_Y(\phi + \delta \phi)R_X( \delta \theta)) =
+\sin ^2\phi\bigg[2 \sin ^2\frac{\delta \theta }{2} \sin ^2\frac{\delta \psi }{2}-4 \sin ^2\frac{\delta \theta }{2} \sin ^2\frac{\delta \psi }{2} \sin ^2\frac{\delta \phi }{2}\bigg]\\
+&+\sin \phi  \bigg[2 \sin \delta \theta \sin \delta \psi -2 \sin \delta \theta  \sin \delta \psi  \sin ^2\frac{\delta \phi }{2}\bigg]\\
+&+\cos ^2\phi  \bigg[4 \sin ^2\frac{\delta \theta }{2} \sin ^2\frac{\delta \psi }{2} \sin ^2\frac{\delta \phi }{2}-2 \sin ^2\frac{\delta \theta }{2} \sin ^2\frac{\delta \psi }{2}\bigg]+\cos \phi \bigg[\sin \delta \theta  \sin \delta \psi  \sin \delta \phi\bigg] \\
+&+\cos \phi  \sin \phi \bigg[4\sin ^2\frac{\delta \theta }{2} \sin ^2\frac{\delta \psi }{2} \sin \delta \phi   \bigg]-4 \sin ^2\frac{\delta \theta }{2} \sin ^2\frac{\delta \psi }{2} \sin ^2\frac{\delta \phi }{2}\\
+&+4 \sin ^2\frac{\delta \theta }{2} \sin ^2\frac{\delta \phi }{2}-4 \sin ^2\frac{\delta \theta }{2}-4 \sin ^2\frac{\delta \psi }{2}+4 \sin ^2\frac{\delta \psi }{2} \sin ^2\frac{\delta \phi }{2}-4 \sin ^2\frac{\delta \phi }{2}\\
+&+6 \sin ^2\frac{\delta \theta }{2} \sin ^2\frac{\delta \psi }{2}+3
+\end{flalign*}
+Making the substitution $A=\cos \phi, B = \sin \phi$ and computing $F_\phi(\delta \theta, \delta \phi, \delta \psi)$ gives
+\begin{flalign*}
+&F_\phi(\delta \theta, \delta \phi, \delta \psi) =
+B^2\bigg[4 \sin ^2\frac{\delta \theta }{2} \sin ^2\frac{\delta \psi }{2} \sin ^2\frac{\delta \phi }{2}-2 \sin ^2\frac{\delta \theta }{2} \sin ^2\frac{\delta \psi }{2}\bigg]\\
+&+B  \bigg[2 \sin \delta \theta  \sin \delta \psi  \sin ^2\frac{\delta \phi }{2}-2 \sin \delta \theta \sin \delta \psi \bigg]\\
+&+A^2  \bigg[2 \sin ^2\frac{\delta \theta }{2} \sin ^2\frac{\delta \psi }{2}-4 \sin ^2\frac{\delta \theta }{2} \sin ^2\frac{\delta \psi }{2} \sin ^2\frac{\delta \phi }{2}\bigg]-\cos \phi \bigg[\sin \delta \theta  \sin \delta \psi  \sin \delta \phi\bigg] \\
+&+AB \bigg[4\sin ^2\frac{\delta \theta }{2} \sin ^2\frac{\delta \psi }{2} \sin \delta \phi    \bigg]+4 \sin ^2\frac{\delta \theta }{2} \sin ^2\frac{\delta \psi }{2} \sin ^2\frac{\delta \phi }{2}\\
+&-4 \sin ^2\frac{\delta \theta }{2} \sin ^2\frac{\delta \phi }{2}+4 \sin ^2\frac{\delta \theta }{2}+4 \sin ^2\frac{\delta \psi }{2}-4 \sin ^2\frac{\delta \psi }{2} \sin ^2\frac{\delta \phi }{2}+4 \sin ^2\frac{\delta \phi }{2}\\
+&-6 \sin ^2\frac{\delta \theta }{2} \sin ^2\frac{\delta \psi }{2}
+\end{flalign*}
+and after some simplification, this becomes
+\begin{flalign*}
+&F_\phi(\delta \theta, \delta \phi, \delta \psi) \leq 8 \sin ^2\frac{\delta \theta }{2} \sin ^2\frac{\delta \psi }{2} \sin ^2\frac{\delta \phi }{2} +4\bigg[\sin ^2\frac{\delta \theta }{2}+ \sin ^2\frac{\delta \psi }{2}+ \sin ^2\frac{\delta \phi }{2}\bigg] \\
+&+6 \sin ^2\frac{\delta \theta }{2} \sin ^2\frac{\delta \psi }{2}+4| \sin \delta \theta || \sin \delta \psi| +  |\sin \delta \theta| | \sin \delta \psi || \sin \delta \phi|
+\end{flalign*}
+and using the inequality $\sin x \leq x$, yields
+\begin{flalign*}
+&F_\phi(\delta \theta, \delta \phi, \delta \psi) \leq   \delta \theta^2 \delta \psi^2  \delta \phi^2 + \delta \theta^2+ \delta \psi^2+ \delta \phi^2 \\
+&+6 \sin ^2\frac{\delta \theta }{2} \sin ^2\frac{\delta \psi }{2}+4| \sin \delta \theta || \sin \delta \psi| +  |\sin \delta \theta| | \sin \delta \psi || \sin \delta \phi|\\
+\end{flalign*}
+which can finally be simplified to
+\begin{flalign}
+F_\phi(\delta \theta, \delta \phi, \delta \psi) \leq   \frac{1}{8}\delta \theta^2 \delta \psi^2  \delta \phi^2 + \frac{3}{8}\delta \theta^2 \delta \psi^2 + \delta \theta^2+ \delta \psi^2+ \delta \phi^2 +4|  \delta \theta ||  \delta \psi| +  | \delta \theta| |  \delta \psi || \delta \phi|
+\end{flalign}
 \end{document}
