@@ -11,6 +11,13 @@
 #include <math.h>
 #include "geo.h"
 #include "path.h"
+#include "bvh_helper.h"
+
+#define OMPL_CC_DISCRETE_PD 1
+
+#if OMPL_CC_DISCRETE_PD
+#include <erocol/hs.h>
+#endif
 
 /*
  * BV: bounding volume, like fcl::OBBRSS<double>
@@ -30,9 +37,20 @@ private:
 	BVHModel rob_bvh_, env_bvh_;
 	std::vector<BVHModel> rob_cvxbvhs_, env_cvxbvhs_;
 	fcl::detail::SplitMethodType split_method_ = fcl::detail::SPLIT_METHOD_MEDIAN;
+#if OMPL_CC_DISCRETE_PD
+	mutable std::unique_ptr<erocol::HModels> hmodels_;
+	erocol::HModels* getHModels() const
+	{
+		if (!hmodels_) {
+			hmodels_.reset(new erocol::HModels(rob_, env_, dtr_, dalpha_));
+		}
+		return hmodels_.get();
+	}
+#endif
 public:
 	using TransformMatrix = Eigen::Matrix<double, 4, 4>;
 	using State = Eigen::Matrix<double, 6, 1>;
+	static constexpr bool DiscreteFullCubeOnly = true;
 
 	ClearanceCalculator(const Geo& rob, Geo& env)
 		:rob_(rob), env_(env)
@@ -58,6 +76,12 @@ public:
 		return {};
 	}
 
+#if OMPL_CC_DISCRETE_PD
+	double getPenDepth(const Transform3& tf) const
+	{
+		return getHModels()->getDiscretePD(tf);
+	}
+#else
 	static double getSingleConvexPD(const BVHModel& rob,
 			const BVHModel& env,
 			const Transform3& tf)
@@ -93,6 +117,7 @@ public:
 		}
 		return ret;
 	}
+#endif
 
 	State getCertainCube(const State& state, bool& isfree, double* pd = nullptr) const
 	{
@@ -107,6 +132,7 @@ public:
 		fcl::distance(&rob_bvh_, tf, &env_bvh_, Transform3::Identity(), request, result);
 		double distance = result.min_distance;
 		double d = distance;
+
 		if (distance <= 0)
 			d = getPenDepth(tf);
 
@@ -152,8 +178,8 @@ public:
 protected:
 	void buildBVHs()
 	{
-		initBVH(rob_bvh_, split_method_, rob_.V, rob_.F);
-		initBVH(env_bvh_, split_method_, env_.V, env_.F);
+		initBVH(rob_bvh_, new fcl::detail::BVSplitter<BV>(split_method_), rob_.V, rob_.F);
+		initBVH(env_bvh_, new fcl::detail::BVSplitter<BV>(split_method_), env_.V, env_.F);
 
 		initConvexBVH(rob_cvxbvhs_, split_method_, rob_);
 		initConvexBVH(env_cvxbvhs_, split_method_, env_);
@@ -169,29 +195,10 @@ protected:
 			const auto& V = geo.cvxV[i];
 			const auto& F = geo.cvxF[i];
 			cvxbvhs.emplace_back();
-			initBVH(cvxbvhs.back(), split_method, V, F);
+			initBVH(cvxbvhs.back(), new fcl::detail::BVSplitter<BV>(split_method), V, F);
 		}
 	}
 
-	template<typename VType, typename FType>
-	static void initBVH(fcl::BVHModel<BV> &bvh,
-			fcl::detail::SplitMethodType split_method,
-			const VType& V,
-			const FType& F)
-	{
-		bvh.bv_splitter.reset(new fcl::detail::BVSplitter<BV>(split_method));
-		bvh.beginModel();
-		std::vector<Eigen::Vector3d> Vs(V.rows());
-		std::vector<fcl::Triangle> Fs(F.rows());
-		for (int i = 0; i < V.rows(); i++)
-			Vs[i] = V.row(i);
-		for (int i = 0; i < F.rows(); i++) {
-			const auto& f = F.row(i);
-			Fs[i] = fcl::Triangle(f(0), f(1), f(2));
-		}
-		bvh.addSubModel(Vs, Fs);
-		bvh.endModel();
-	}
 
 	// Note: dx and dalpha is delta, which is the half size of the cube.
 	static double binsolve(double maxdx, double maxdalpha, double r, double mindist)
@@ -204,7 +211,7 @@ protected:
 			double prob = (upperrange + lowerrange)/2;
 			double dx = maxdx * prob;
 			double dalpha = maxdalpha * prob;
-			double value = 3.0 * r * dalpha + sqrt3 * dx;
+			double value = 2.5 * r * dalpha + sqrt3 * dx;
 			if (value > mindist) {
 				upperrange = prob;
 				mid_is_valid = false;

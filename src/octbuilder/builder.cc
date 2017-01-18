@@ -133,11 +133,12 @@ int worker(NaiveRenderer* renderer)
 		pathsln.readPath(known_path);
 		size_t fps = 15;
 		builder.init_builder(cc);
-		// for (size_t i = 0; i < (pathsln.T.size() - 1) * fps; i++) {
+		for (size_t i = 0; i < (pathsln.T.size() - 1) * fps; i++) {
 		//for (size_t i = 40 * fps; i < 41 * fps; i++) {
-		size_t i = 38.8 * fps; {
+		// size_t i = 38.8 * fps; {
 			double t = double(i) / fps;
 			auto state = pathsln.interpolateState(t);
+			
 			std::cerr << "Time: " << t << "\tState: " << state.transpose() << std::endl;
 			auto node = builder.determinize_cube(state);
 			std::cerr << "\tSAN check: " << *node << std::endl;
