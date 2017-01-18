@@ -200,11 +200,19 @@ int main(int argc, char* argv[])
 		gui.updateMatrices();
 		mats = gui.getMatrixPointers();
 
-		t += 1.0/60.0;
+		t += 1.0/30.0;
+		auto state = path.interpolateState(t);
+		// state << -0.065337, -0.624994, 8.32952,  -2.47891, 1.04311, -1.05538;
+		// state << 0.109556, -0.799887, 7.45506, -2.3654, 1.07839, -0.954136;
+#if 0
 		robot_transform_matrix = path.interpolate(robot, t);
 		//robot_transform_matrix(0, 3) = t;
 		alpha_model_matrix = robot_transform_matrix.cast<float>();
 		// std::cerr << "Transform matrix:\n " << robot_transform_matrix << std::endl;
+#else
+		robot_transform_matrix = Path::stateToMatrix<double>(state, robot.center);
+		alpha_model_matrix = robot_transform_matrix.cast<float>();
+#endif
 
 		robot_pass.setup();
 		CHECK_GL_ERROR(glDrawElements(GL_TRIANGLES, robot.F.rows() * 3,
@@ -218,6 +226,10 @@ int main(int argc, char* argv[])
 		// Poll and swap.
 		glfwPollEvents();
 		glfwSwapBuffers(window);
+
+		bool isfree;
+		(void)cc.getCertainCube(state, isfree);
+		std::cerr << "Free: " << (isfree ? "true" : "false") << std::endl;
 #if 0
 		double mindist = cc.getDistance(robot_transform_matrix);
 		auto clearance = cc.getClearanceCube(robot_transform_matrix, mindist);
@@ -229,8 +241,7 @@ int main(int argc, char* argv[])
 		auto san = cc.sanityCheck(robot_transform_matrix, clearance);
 		std::cerr << "\tSanity: " << san << std::endl;
 #endif
-	}
-	glfwDestroyWindow(window);
+	} glfwDestroyWindow(window);
 	glfwTerminate();
 
 	return 0;

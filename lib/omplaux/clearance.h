@@ -70,9 +70,15 @@ public:
 		if (!result.isCollision()) // Note: after convex decomposition, two colliding objects may have non-collide sub-pieces.
 			return 0;
 		auto nContact = result.numContacts();
+#if 0
 		double pend = result.getContact(0).penetration_depth;
 		for (decltype(nContact) i = 1; i < nContact; i++)
 			pend = std::max(pend, result.getContact(i).penetration_depth);
+#else
+		double pend = -1.0;
+		for (decltype(nContact) i = 0; i < nContact; i++)
+			pend = std::max(pend, result.getContact(i).penetration_depth);
+#endif
 		return pend;
 	}
 
@@ -88,10 +94,10 @@ public:
 		return ret;
 	}
 
-	State getCertainCube(const State& state, bool& isfree) const
+	State getCertainCube(const State& state, bool& isfree, double* pd = nullptr) const
 	{
 		auto trmat = Path::stateToMatrix(state, rob_.center);
-		Transform3 tf;
+		Transform3 tf { Transform3::Identity() };
 		tf = trmat.block<3,4>(0,0);
 
 		fcl::DistanceRequest<Scalar> request;
@@ -104,8 +110,11 @@ public:
 		if (distance <= 0)
 			d = getPenDepth(tf);
 
-		State ret = bound(d, tf);
 		isfree = distance > 0;
+		// std::cerr << "Trying to bound " << state.transpose() << " from free: " << isfree << " and d: " << d << std::endl;
+		State ret = bound(d, tf);
+		if (d <= 0)
+			std::cerr << "fcl distance/collide failed\n";
 
 #if 0
 		std::cerr << "state: " << state.transpose()
@@ -113,6 +122,8 @@ public:
 		          << "\tfree: " << isfree
 		          << std::endl;
 #endif
+		if (pd)
+			*pd = d;
 
 		return ret;
 	}
@@ -128,7 +139,10 @@ public:
 			// v: relative coordinates w.r.t. robot center.
 			Eigen::Vector3d v = tf * Eigen::Vector3d(RV.row(i)) - nrcenter;
 			double r = v.norm();
-			scale_ratio = std::min(scale_ratio, binsolve(dtr_, dalpha_, r, d));
+			double bs = binsolve(dtr_, dalpha_, r, d);
+			scale_ratio = std::min(scale_ratio, bs);
+			// std::cerr << "binsolve d: " << d << " and r: " << r
+			//	<< "\n\treturns: " << bs << "\t or: " << 1.0/bs << std::endl;
 		}
 		State ret;
 		ret << dtr_ * scale_ratio, dtr_ * scale_ratio, dtr_ * scale_ratio,
@@ -190,7 +204,7 @@ protected:
 			double prob = (upperrange + lowerrange)/2;
 			double dx = maxdx * prob;
 			double dalpha = maxdalpha * prob;
-			double value = 5.0/2.0 * r * fabs(dalpha) + sqrt3 * dx;
+			double value = 3.0 * r * dalpha + sqrt3 * dx;
 			if (value > mindist) {
 				upperrange = prob;
 				mid_is_valid = false;

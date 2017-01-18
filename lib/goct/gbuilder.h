@@ -362,7 +362,31 @@ public:
 		return max_depth_;
 #endif
 	}
-protected:
+
+	void init_builder(CC& cc)
+	{
+		cc_ = &cc;
+		current_queue_ = 0;
+		cubes_.clear();
+		root_.reset(Node::makeRoot(mins_, maxs_));
+		fixed_volume_ = 0.0;
+
+		std::cerr << "Init: " << istate_.transpose() << std::endl;
+		std::cerr << "Goal: " << gstate_.transpose() << std::endl;
+
+		goal_cube_ = nullptr;
+		init_cube_ = determinize_cube(istate_);
+		std::cerr << "Init Cube: " << *init_cube_ << std::endl;
+#if PRIORITIZE_SHORTEST_PATH
+		goal_cube_ = determinize_cube(gstate_);
+		cubes_.resize(1);
+		std::cerr << "Goal Cube: " << *goal_cube_ << std::endl;
+#endif
+		add_neighbors_to_list(init_cube_);
+
+		launch_wall_finder();
+	}
+
 	Node* determinize_cube(const Coord& state)
 	{
 		auto current = root_.get();
@@ -386,6 +410,8 @@ protected:
 		}
 		return current;
 	}
+
+protected:
 
 	bool connect_neighbors(Node* node)
 	{
@@ -456,8 +482,12 @@ protected:
 		bool isfree;
 		auto certain = cc_->getCertainCube(state, isfree);
 
+#if 0
 		bool stop = coverage(state, res_, node) ||
 			    coverage(state, certain, node);
+#else
+		bool stop = coverage(state, certain, node);
+#endif
 		node->volume = node->getVolume();
 #if PRIORITIZE_CLEARER_CUBE
 		node->certain_ratio = certain(0) / res_(0);
@@ -475,30 +505,6 @@ protected:
 			}
 			VIS::visCertain(node);
 		}
-	}
-
-	void init_builder(CC& cc)
-	{
-		cc_ = &cc;
-		current_queue_ = 0;
-		cubes_.clear();
-		root_.reset(Node::makeRoot(mins_, maxs_));
-		fixed_volume_ = 0.0;
-
-		std::cerr << "Init: " << istate_.transpose() << std::endl;
-		std::cerr << "Goal: " << gstate_.transpose() << std::endl;
-
-		goal_cube_ = nullptr;
-		init_cube_ = determinize_cube(istate_);
-		std::cerr << "Init Cube: " << *init_cube_ << std::endl;
-#if PRIORITIZE_SHORTEST_PATH
-		goal_cube_ = determinize_cube(gstate_);
-		cubes_.resize(1);
-		std::cerr << "Goal Cube: " << *goal_cube_ << std::endl;
-#endif
-		add_neighbors_to_list(init_cube_);
-
-		launch_wall_finder();
 	}
 
 	void stop_builder()

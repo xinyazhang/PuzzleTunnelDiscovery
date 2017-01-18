@@ -3,8 +3,8 @@
 #include <omplaux/scene_bounding_box.h>
 #include <vecio/arrayvecio.h>
 #include <goct/goctree.h>
-#define ENABLE_DFS 0
-#define PRIORITIZE_SHORTEST_PATH 0
+#define ENABLE_DFS 1
+#define PRIORITIZE_SHORTEST_PATH 1
 // #define ENABLE_DFS 0
 // #define PRIORITIZE_SHORTEST_PATH 1
 // #define PRIORITIZE_CLEARER_CUBE 1
@@ -16,8 +16,9 @@
 
 using std::string;
 
-int  worker(NaiveRenderer* renderer)
+int worker(NaiveRenderer* renderer)
 {
+	string known_path;
 	Eigen::Vector3d robotcenter { Eigen::Vector3d::Zero() };
 #if 0
 	string robotfn = "../res/alpha/alpha-1.2.org.obj";
@@ -29,6 +30,11 @@ int  worker(NaiveRenderer* renderer)
 	string pathfn = "../res/simple/naive2.path";
 	string envcvxpn = "../res/simple/cvx/FullTorus";
 #elif 0
+	string robotfn = "../res/simple/mediumstick.obj";
+	string envfn = "../res/simple/FullTorus.obj";
+	string pathfn = "../res/simple/sticktorus.path";
+	string envcvxpn = "../res/simple/cvx/FullTorus";
+#elif 0
 	string robotfn = "../res/simple/robot.obj";
 	// string robotfn = "../res/simple/LongStick.obj";
 	string envfn = "../res/simple/mFixedElkMeetsCube.obj";
@@ -38,8 +44,10 @@ int  worker(NaiveRenderer* renderer)
 	string robotfn = "../res/simple/mediumstick.obj";
 	string envfn = "../res/simple/boxwithhole2.obj";
 	string pathfn = "../res/simple/box.path";
-	string envcvxpn = "../res/simple/cvx/boxwithhole";
-	robotcenter << 0.0, 0.0, 0.0;
+	string envcvxpn = "../res/simple/cvx/boxrefine/boxwithhole";
+	known_path = "../res/simple/boxreference.path";
+	// robotcenter << 0.0, 0.0, 0.0;
+	robotcenter << -1.1920928955078125e-07, 0.0, 2.384185791015625e-07;
 #else
 	string robotfn = "../res/alpha/rob-1.2.obj";
 	string envfn = "../res/alpha/env-1.2.obj";
@@ -120,11 +128,36 @@ int  worker(NaiveRenderer* renderer)
 
 	using Clock = std::chrono::high_resolution_clock;
 	auto t1 = Clock::now();
-	builder.buildOcTree(cc);
+	if (!known_path.empty()) {
+		Path pathsln;
+		pathsln.readPath(known_path);
+		size_t fps = 15;
+		builder.init_builder(cc);
+		// for (size_t i = 0; i < (pathsln.T.size() - 1) * fps; i++) {
+		//for (size_t i = 40 * fps; i < 41 * fps; i++) {
+		size_t i = 38.8 * fps; {
+			double t = double(i) / fps;
+			auto state = pathsln.interpolateState(t);
+			std::cerr << "Time: " << t << "\tState: " << state.transpose() << std::endl;
+			auto node = builder.determinize_cube(state);
+			std::cerr << "\tSAN check: " << *node << std::endl;
+			bool isfree;
+			(void)cc.getCertainCube(state, isfree);
+			std::cerr << "\tState Free: " << (isfree ? "true" : "false") << std::endl;
+			double pd;
+			auto d = cc.getCertainCube(node->getMedian(), isfree, &pd);
+			std::cerr << "\tMedian Free: " << (isfree ? "true" : "false") << std::endl;
+			std::cerr << "\tMedian Certain: " << d.transpose() << std::endl;
+			std::cerr << "\tPD^T: " << pd << std::endl;
+		}
+	} else {
+		builder.buildOcTree(cc);
+	}
 	auto t2 = Clock::now();
 	std::chrono::duration<double, std::milli> dur = t2 - t1;
 
 	auto slnpath = builder.buildPath();
+	std::cout << "Solution path: " << std::endl;
 	for (const auto& state: slnpath)
 		std::cout << Path::stateToPath<double>(state.block<6, 1>(0,0)).transpose() << std::endl;
 	Builder::VIS::pause();
