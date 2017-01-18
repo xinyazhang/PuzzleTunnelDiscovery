@@ -4,25 +4,30 @@
 #include <goct/nullvisualizer.h>
 #include <iostream>
 
-class TextVisualizer : public NullVisualizer {
+class TextVisualizer : public NodeCounterVisualizer {
 public:
-#if 0
+	static void initialize()
+	{
+		NodeCounterVisualizer::initialize();
+	}
+
 	template<typename Node>
 	static void visSplit(Node* node)
 	{
+#if 0
 		std::cerr << "Split node: " << *node << std::endl;
-	}
 #endif
+		NodeCounterVisualizer::visSplit(node);
+	}
 
+#if 0
 	template<typename Node>
 	static void visCertain(Node* node)
 	{
-#if 0
 		if (node->atState(Node::kCubeFree))
 			std::cerr << "Clear cube: " << *node << std::endl;
 		else
 			std::cerr << "Solid cube: " << *node << std::endl;
-#endif
 		auto median = node->getMedian();
 		if (fabs(median(0)) < 0.25 &&
 		    fabs(median(1)) < 0.25 &&
@@ -31,6 +36,7 @@ public:
 			std::cerr << "Clear Z+ Axis cube: " << *node << std::endl;
 		}
 	}
+#endif
 #if 0
 	template<typename Node>
 	static void visPending(Node* node)

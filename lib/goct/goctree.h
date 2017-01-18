@@ -12,7 +12,7 @@
 #include <memory>
 #include <vector>
 #include <bitset>
-#include <set>
+#include <unordered_set>
 #include <ostream>
 
 struct GOcTreeNodeNoAttribute {
@@ -62,6 +62,7 @@ private:
 		}
 	};
 	typename ChildPolicy::ChildType children_;
+	using NodeSet = std::unordered_set<GOcTreeNode*>;
 
 	GOcTreeNode* parent_;
 	Coord mins_, maxs_;
@@ -265,7 +266,7 @@ public:
 		lhs->adj_.insert(rhs);
 		rhs->adj_.insert(lhs);
 	}
-	const std::set<GOcTreeNode*>& getAdjacency() const { return adj_; }
+	const NodeSet& getAdjacency() const { return adj_; }
 
 	bool isAggressiveFree() const
 	{
@@ -307,9 +308,9 @@ public:
 		}
 		aggadj_.clear();
 	}
-	const std::set<GOcTreeNode*>& getAggressiveAdjacency() const { return aggadj_; }
+	const NodeSet& getAggressiveAdjacency() const { return aggadj_; }
 private:
-	std::set<GOcTreeNode*> adj_, aggadj_;
+	NodeSet adj_, aggadj_;
 };
 
 template<int ND, typename FLOAT = double, typename UserDefinedAtrribute>

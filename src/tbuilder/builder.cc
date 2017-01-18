@@ -4,11 +4,15 @@
 #include <vecio/arrayvecio.h>
 #include <goct/goctree.h>
 #define ENABLE_DFS 0
+#define PRIORITIZE_SHORTEST_PATH 1
+#define PRIORITIZE_CLEARER_CUBE 1
+#define ENABLE_DIJKSTRA 1
 #include <goct/gbuilder.h>
 #include "naivespace.h"
 #include "vis3d.h"
 #include "naiverenderer.h"
 #include "clearancer.h"
+#include <chrono>
 
 using std::string;
 
@@ -19,20 +23,20 @@ int worker(NaiveRenderer* renderer)
 	string envfn = "../res/simple/FullTorus.obj";
 	string pathfn = "../res/simple/naive2.path";
 #else
-	//string robotfn = "../res/simple/robot.obj";
+	// string robotfn = "../res/simple/robot.obj";
 	string robotfn = "../res/simple/LongStick.obj";
 	string envfn = "../res/simple/mFixedElkMeetsCube.obj";
 	string pathfn = "../res/simple/naiveelk.path";
+	string envcvxpn = "../res/simple/cvx/ElkMeetsCube";
 #endif
-
-	Geo robot, env;
-	Path path;
+	Geo robot, env; Path path;
 
 	std::cerr << "Robot Reading\n";
 	robot.read(robotfn);
 	std::cerr << "Robot Read\n";
 	std::cerr << "ENV Reading\n";
 	env.read(envfn);
+	env.readcvx(envcvxpn);
 	std::cerr << "ENV Read\n";
 	std::cerr << "Path Reading\n";
 	path.readPath(pathfn);
@@ -72,14 +76,15 @@ int worker(NaiveRenderer* renderer)
 		  << "\tmax: " << max.transpose() << std::endl;
 	cc.setC(bbmin, bbmax);
 #endif
-	res = (max - min) / 20000.0; // FIXME: how to calculate a resolution?
+	res = (max - min) / 1280000.0; // FIXME: how to calculate a resolution?
 
 	using Builder = GOctreePathBuilder<3,
 	      double,
 	      decltype(cc),
 	      TranslationOnlySpace<3, double>,
-	      //NullVisualizer
-	      NaiveVisualizer3D
+	      // NullVisualizer
+	      NodeCounterVisualizer
+	      // NaiveVisualizer3D
 	      >;
 	Builder::VIS::setRenderer(renderer);
 	Builder builder;
@@ -96,7 +101,11 @@ int worker(NaiveRenderer* renderer)
 	renderer->workerReady();
 	std::cerr << "Worker ready\n";
 
+	using Clock = std::chrono::high_resolution_clock;
+	auto t1 = Clock::now();
 	builder.buildOcTree(cc);
+	auto t2 = Clock::now();
+	std::chrono::duration<double, std::milli> dur = t2 - t1;
 	{
 		auto path = builder.buildPath();
 		if (!path.empty()) {
@@ -111,6 +120,18 @@ int worker(NaiveRenderer* renderer)
 		}
 	}
 	Builder::VIS::pause();
+	std::cerr << "Configuration: ENABLE_DFS = " << ENABLE_DFS
+	          << "\tPRIORITIZE_SHORTEST_PATH = " << PRIORITIZE_SHORTEST_PATH
+	          << std::endl;
+	std::cerr << "Planning takes " << dur.count() << " ms to complete\n";
+	std::cerr << "Maximum cube depth " << builder.getDeepestLevel() << "\n";
+#if COUNT_NODES
+	Builder::VIS::showHistogram();
+#endif
+	auto profiler = cc.getProfiler();
+	std::cerr << "FCL statistics\n\t Distance: " << profiler.getAverageClockMs(decltype(profiler)::DISTANCE)
+		  << "\n\t Collision: " <<  profiler.getAverageClockMs(decltype(profiler)::COLLISION)
+		  << std::endl;
 	std::cerr << "Worker thread exited\n";
 
 	return 0;

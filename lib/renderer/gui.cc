@@ -102,6 +102,11 @@ const glm::vec3& GUI::getCamera() const
 	return camera_->getCamera();
 }
 
+void GUI::setCameraDistance(float d)
+{
+	camera_->setCameraDistance(d);
+}
+
 // Delegrate to the actual GUI object.
 void GUI::KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {

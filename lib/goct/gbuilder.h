@@ -4,11 +4,13 @@
 #include "nullvisualizer.h"
 #include "goctree.h"
 #include <deque>
+#include <thread>
 #include <algorithm>
 #include <functional>
 #include <queue>
 #include <iostream>
 #include <stdexcept>
+#include <boost/heap/priority_queue.hpp>
 
 /*
  * DFS: prioritize larger cubes connected to the initial cube
@@ -16,6 +18,18 @@
  */
 #ifndef ENABLE_DFS
 #define ENABLE_DFS 1
+#endif
+
+#ifndef PRIORITIZE_SHORTEST_PATH
+#define PRIORITIZE_SHORTEST_PATH 0
+#endif
+
+#ifndef ENABLE_DIJKSTRA
+#define ENABLE_DIJKSTRA 0
+#endif
+
+#if !PRIORITIZE_SHORTEST_PATH
+#define PRIORITIZE_CLEARER_CUBE 1
 #endif
 
 template<int ND,
@@ -26,8 +40,11 @@ template<int ND,
 	>
 class GOctreePathBuilder {
 	struct PathBuilderAttribute : public Visualizer::Attribute {
-		//static constexpr auto kUnviewedDistance = ULONG_MAX;
-		double distance; // = kUnviewedDistance;
+#ifdef ENABLE_DIJKSTRA
+		double distance;
+#else
+		int distance;
+#endif
 		const PathBuilderAttribute* prev = nullptr;
 		int epoch = -1;
 	};
@@ -58,8 +75,19 @@ class GOctreePathBuilder {
 			other->getSet()->parent = getSet();
 		}
 	};
+#if !PRIORITIZE_CLEARER_CUBE
+	using NodeAttribute = FindUnionAttribute;
+#else
+	struct NodeDistanceAttribute : public FindUnionAttribute {
+		double certain_ratio;
+	};
+	using NodeAttribute = NodeDistanceAttribute;
+#endif
 public:
-	typedef GOcTreeNode<ND, FLOAT, FindUnionAttribute> Node;
+	/*
+	 * Helper functions
+	 */
+	typedef GOcTreeNode<ND, FLOAT, NodeAttribute> Node;
 	typedef typename Node::Coord Coord;
 	typedef Visualizer VIS;
 
@@ -92,22 +120,54 @@ public:
 	void setupInit(const Coord& initState) { istate_ = initState; }
 	void setupGoal(const Coord& goalState) { gstate_ = goalState; }
 
+	/*
+	 * Tree building
+	 */
 	void buildOcTree(CC& cc)
 	{
 		init_builder(cc);
 		VIS::initialize();
 		VIS::rearmTimer();
+		bool check_path = false;
+		std::unordered_set<Node*> path_nodes;
 		while (true) {
+#if PRIORITIZE_SHORTEST_PATH
+			check_path = isCubeListEmpty();
+#endif
+			if (check_path && goal_cube_) {
+				path_nodes.clear();
+				auto aggpath = buildNodePath(true);
+				for (auto node : aggpath) {
+					if (node->isDetermined())
+						continue;
+					add_to_cube_list(const_cast<Node*>(node));
+					path_nodes.emplace(node);
+				}
+				VIS::visAggPath(convertNodePath(aggpath));
+				if (aggpath.empty()) {
+					std::cerr << "CANNOT FIND A PATH, EXITING\n";
+					break;
+				}
+			}
+
 			auto to_split = pop_from_cube_list();
 			auto children = split_cube(to_split);
+			bool direct_node = (path_nodes.find(to_split) != path_nodes.end());
 			for (auto cube : children) {
+#if !PRIORITIZE_SHORTEST_PATH
 				if (cube->getState() == Node::kCubeUncertain) {
 					add_to_cube_list(cube);
 				}
+#endif
 				connect_neighbors(cube);
 
-				if (!cube->atState(Node::kCubeFree))
+				if (direct_node && cube->atState(Node::kCubeFull))
+					add_neighbors_to_list(cube, true);
+
+				if (!cube->atState(Node::kCubeFree)) {
+					// Full cube may have full neighbors.
 					continue;
+				}
 #if ENABLE_DFS
 				// From now we assume cube.state == free.
 				if (cube->getSet() == init_cube_->getSet()) {
@@ -124,56 +184,154 @@ public:
 				break;
 			if (VIS::timerAlarming()) {
 				VIS::periodicalReport();
-				std::cerr << "Fixed volume: " << fixed_volume_ << std::endl;
+				std::cerr << "Fixed volume: " << fixed_volume_ << "\tDeepest level: " << getDeepestLevel() << std::endl;
 				VIS::rearmTimer();
 
-				if (goal_cube_) {
-					auto aggpath = buildPath(true);
-					VIS::visAggPath(aggpath);
-					if (aggpath.empty()) {
-						std::cerr << "CANNOT FIND A PATH, EXITING\n";
-						break;
-					}
-				}
+				check_path = true;
 			}
 		}
+		stop_builder();
 	}
 
 	std::vector<Eigen::VectorXd> buildPath(bool aggressive = false)
 	{
+		return convertNodePath(buildNodePath(aggressive));
+	}
+
+	std::vector<Eigen::VectorXd> convertNodePath(const std::vector<Node*>& nodes)
+	{
+		std::vector<Eigen::VectorXd> ret;
+		ret.reserve(nodes.size());
+		// ret.emplace_back(istate_);
+		for (const Node *node : nodes) {
+			ret.emplace_back(node->getMedian());
+		}
+		// ret.emplace_back(gstate_);
+		return ret;
+	}
+
+#if ENABLE_DIJKSTRA
+	/*
+	 * Dijkstra with immutable priority queue.
+	 * 
+	 * epoch is used to denote the status of the node:
+	 *      fresh epoch: 
+	 *              Node::distance and Node::prev is valid
+	 *      fin epoch:
+	 *              Node::distance and Node::prev is final
+	 *      others:
+	 *              Both of them are uninitialized or the legacy from
+	 *              previous epoch.
+	 *
+	 * Each node may have multiple copies in Q, since std::priority_queue
+	 * is immutable.
+	 */
+	std::vector<Node*> buildNodePath(bool aggressive = false)
+	{
 		epoch_++;
-		int epoch = epoch_;
+		int freshepoch = epoch_;
+		epoch_++;
+		int finepoch = epoch_;
 		auto goal_cube = goal_cube_;
 
 		init_cube_->distance = 0;
 		init_cube_->prev = init_cube_; // Only circular one
-		init_cube_->epoch = epoch;
 
 		// priority_queue:
 		//      cmp(top, other) always returns false.
 		auto cmp = [](Node* lhs, Node* rhs) -> bool
-			{ return lhs->distance < rhs->distance; };
-		std::priority_queue<Node*, std::deque<Node*>, decltype(cmp)> Q(cmp);
+			{ return lhs->distance > rhs->distance; };
+		std::priority_queue<Node*, std::vector<Node*>, decltype(cmp)> Q(cmp);
 		Q.push(init_cube_);
 
 		bool goal_reached = false;
-		auto loopf = [&Q, &goal_reached, epoch, goal_cube]
+		auto loopf = [&Q, &goal_reached, freshepoch, finepoch, goal_cube]
 			(Node* adj, Node* tip) -> bool {
-				if (adj->prev && adj->epoch == epoch) // No re-insert
-					return false;
-				adj->prev = tip;
-				adj->distance = tip->distance +
-					(tip->getMedian() - adj->getMedian()).norm();
-				adj->epoch = epoch;
+				bool fresh = (adj->epoch != freshepoch && adj->epoch != finepoch);
+				bool do_update = false;
+				// double w = (tip->getMedian() - adj->getMedian()).norm();
+#if PRIORITIZE_CLEARER_CUBE
+				double w = 1.0/adj->certain_ratio; // Perfer cubes further from obs
+#else
+				double w = 1.0; // prefer larger cube.
+#endif
+				double dist = tip->distance + w;
+				do_update = fresh ? true : (adj->distance > dist);
+
+				if (do_update) {
+					adj->prev = tip;
+					adj->distance = dist;
+				}
+				if (fresh)
+					adj->epoch = freshepoch;
 				Q.push(adj);
-				if (adj == goal_cube) {
+				return false;
+			};
+
+		while (!Q.empty() && !goal_reached) {
+			auto tip = Q.top();
+			Q.pop();
+			if (tip->epoch == finepoch) // We may have duplicated nodes in Q.
+				continue;
+			tip->epoch = finepoch;
+			if (tip == goal_cube) {
+				goal_reached = true;
+				break;
+			}
+			for (auto adj : tip->getAdjacency())
+				if (loopf(adj, tip))
+					break;
+			if (!goal_reached && aggressive)
+				for (auto adj : tip->getAggressiveAdjacency())
+					if (loopf(adj, tip))
+						break;
+		}
+		if (!goal_reached)
+			return {};
+		std::vector<Node*> ret;
+		Node* node = goal_cube_;
+		while (node->prev != node) {
+			ret.emplace_back(node);
+			node = const_cast<Node*>(static_cast<const Node*>(node->prev));
+		}
+		std::reverse(ret.begin(), ret.end());
+		return ret;
+	}
+#else
+	/*
+	 * Simple BFS path builder
+	 */
+	std::vector<Node*> buildNodePath(bool aggressive = false)
+	{
+		epoch_++;
+		int finepoch = epoch_;
+		auto goal_cube = goal_cube_;
+		bool goal_reached = false;
+
+		init_cube_->distance = 0;
+		init_cube_->prev = init_cube_; // Only circular one
+		init_cube_->epoch = finepoch;
+
+		std::queue<Node*> Q;
+		Q.push(init_cube_);
+
+		auto loopf = [&Q, &goal_reached, finepoch, goal_cube]
+			(Node* adj, Node* tip) -> bool {
+				if (adj->epoch == finepoch)
+					return false;
+				adj->epoch = finepoch;
+				adj->distance = tip->distance + 1;
+				adj->prev = tip;
+				Q.push(adj);
+				if (goal_cube == adj) {
 					goal_reached = true;
 					return true;
 				}
 				return false;
 			};
+
 		while (!Q.empty() && !goal_reached) {
-			auto tip = Q.top();
+			auto tip = Q.front();
 			Q.pop();
 			for (auto adj : tip->getAdjacency())
 				if (loopf(adj, tip))
@@ -185,19 +343,25 @@ public:
 		}
 		if (!goal_reached)
 			return {};
-		std::vector<Eigen::VectorXd> ret;
-		const Node* node = goal_cube_;
-		ret.emplace_back(gstate_);
+		std::vector<Node*> ret;
+		Node* node = goal_cube_;
 		while (node->prev != node) {
-			ret.emplace_back(node->getMedian());
-			node = static_cast<const Node*>(node->prev);
+			ret.emplace_back(node);
+			node = const_cast<Node*>(static_cast<const Node*>(node->prev));
 		}
-		ret.emplace_back(node->getMedian());
-		ret.emplace_back(istate_);
 		std::reverse(ret.begin(), ret.end());
 		return ret;
 	}
+#endif
 
+	unsigned getDeepestLevel()
+	{
+#if !PRIORITIZE_SHORTEST_PATH
+		return cubes_.size();
+#else
+		return max_depth_;
+#endif
+	}
 protected:
 	Node* determinize_cube(const Coord& state)
 	{
@@ -209,7 +373,7 @@ protected:
 			Node* next = current->getCube(ci);
 			current = next;
 			for (auto cube : children) {
-#if !ENABLE_DFS
+#if !ENABLE_DFS && !PRIORITIZE_SHORTEST_PATH
 				// Add the remaining to the list.
 				// Note: add_to_cube_list requires init_cube_ for DFS
 				//       but init_cube_ is initialized by this
@@ -257,16 +421,27 @@ protected:
 		return node->getState() == Node::kCubeFree;
 	}
 
-	std::vector<Node*> add_neighbors_to_list(Node* node)
+	std::vector<Node*> add_neighbors_to_list(Node* node,
+			bool enforce = false)
 	{
+		// Default policy of PRIORITIZE_SHORTEST_PATH
+		//   Only add cubes on the shortest path
+		// 
+		// Set enforce to true to override this behavior.
+#if PRIORITIZE_SHORTEST_PATH
+		if (!enforce)
+			return {};
+#endif
 		std::vector<Node*> ret;
 		auto op = [=,&ret](int dim, int direct, std::vector<Node*>& neighbors) -> bool
 		{
 			for (auto neighbor: neighbors) {
-				if (neighbor->getState() ==  Node::kCubeUncertain) {
-					if (add_to_cube_list(neighbor, false))
-						ret.emplace_back(neighbor);
-				}
+				if (neighbor->getState() !=  Node::kCubeUncertain)
+					continue;
+				if (enforce && neighbor->getDepth() > node->getDepth())
+					continue;
+				if (add_to_cube_list(neighbor, false))
+					ret.emplace_back(neighbor);
 			}
 			return false;
 		};
@@ -284,6 +459,9 @@ protected:
 		bool stop = coverage(state, res_, node) ||
 			    coverage(state, certain, node);
 		node->volume = node->getVolume();
+#if PRIORITIZE_CLEARER_CUBE
+		node->certain_ratio = certain(0) / res_(0);
+#endif
 		fixed_volume_ += node->getVolume();
 		if (stop) {
 			if (isfree) {
@@ -313,13 +491,32 @@ protected:
 		goal_cube_ = nullptr;
 		init_cube_ = determinize_cube(istate_);
 		std::cerr << "Init Cube: " << *init_cube_ << std::endl;
+#if PRIORITIZE_SHORTEST_PATH
+		goal_cube_ = determinize_cube(gstate_);
+		cubes_.resize(1);
+		std::cerr << "Goal Cube: " << *goal_cube_ << std::endl;
+#endif
 		add_neighbors_to_list(init_cube_);
+
+		launch_wall_finder();
 	}
 
+	void stop_builder()
+	{
+		stop_wall_finder();
+	}
+
+	/*
+	 * Note: split_cube is designed can be called multiple times on the
+	 *       same cube
+	 */
 	std::vector<Node*> split_cube(Node* node)
 	{
+		bool repeated = node->atState(Node::kCubeMixed);
 		node->setState(Node::kCubeMixed);
-		VIS::visSplit(node);
+
+		if (!repeated)
+			VIS::visSplit(node);
 
 		std::vector<Node*> ret;
 		for (unsigned long index = 0; index < (1 << ND); index++) {
@@ -329,7 +526,9 @@ protected:
 		}
 		VIS::withdrawAggAdj(node);
 		node->cancelAggressiveAdjacency();
-		
+#if PRIORITIZE_SHORTEST_PATH
+		max_depth_ = std::max(node->getDepth() + 1, max_depth_);
+#endif
 		return ret;
 	}
 
@@ -340,11 +539,24 @@ protected:
 			depth++;
 		if (depth >= int(cubes_.size()))
 			throw std::runtime_error("CUBE LIST BECOMES EMPTY, TERMINATE");
+#if !PRIORITIZE_CLEARER_CUBE
 		auto ret = cubes_[depth].front();
 		cubes_[depth].pop_front();
+#else
+		auto ret = cubes_[depth].top();
+		cubes_[depth].pop();
+#endif
 		current_queue_ = depth;
 		VIS::visPop(ret);
 		return ret;
+	}
+
+	bool isCubeListEmpty()
+	{
+		for (const auto& list: cubes_)
+			if (!list.empty())
+				return false;
+		return true;
 	}
 
 	bool add_to_cube_list(Node* node, bool check_contacting_free = true)
@@ -358,7 +570,11 @@ protected:
 		int depth = node->getDepth();
 		if (long(cubes_.size()) <= depth)
 			cubes_.resize(depth+1);
+#if !PRIORITIZE_CLEARER_CUBE
 		cubes_[depth].emplace_back(node);
+#else
+		cubes_[depth].push(node);
+#endif
 		node->setState(Node::kCubeUncertainPending);
 		current_queue_ = std::min(current_queue_, depth);
 		VIS::visPending(node);
@@ -407,16 +623,52 @@ protected:
 		}
 	}
 
+#if !PRIORITIZE_CLEARER_CUBE
+	using PerDepthQ = std::deque<Node*>;
+#else
+	struct ClearerNode {
+		bool operator() (Node* lhs, Node* rhs) {
+			return lhs->certain_ratio > rhs->certain_ratio;
+		}
+	};
+	using PerDepthQ = std::priority_queue<Node*, std::vector<Node*>, ClearerNode>;
+#endif
+
 	Coord mins_, maxs_, res_;
 	Coord istate_, gstate_;
 	CC *cc_;
 	std::unique_ptr<Node> root_;
 	int current_queue_;
-	std::vector<std::deque<Node*>> cubes_;
+	std::vector<PerDepthQ> cubes_;
 	Node *init_cube_ = nullptr;
 	Node *goal_cube_ = nullptr;
 	int epoch_ = 0;
 	double fixed_volume_;
+#if PRIORITIZE_SHORTEST_PATH
+	unsigned max_depth_ = 0;
+#endif
+	std::unique_ptr<std::thread> wall_finder_thread_;
+	bool wall_finder_exiting_;
+
+	void launch_wall_finder()
+	{
+		wall_finder_exiting_ = false;
+		if (!wall_finder_thread_)
+			wall_finder_thread_.reset(new std::thread([this](){this->wall_finder();}));
+	}
+
+	void stop_wall_finder()
+	{
+		wall_finder_exiting_ = true;
+		if (wall_finder_thread_)
+			wall_finder_thread_->join();
+		wall_finder_thread_.reset();
+	}
+
+	// Another thread to detect walls?
+	void wall_finder()
+	{
+	}
 };
 
 #endif

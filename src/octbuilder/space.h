@@ -7,8 +7,8 @@ template<int ND, typename FLOAT>
 class TranslationWithEulerAngleGroup {
 	typedef Eigen::Matrix<FLOAT, ND, 1> Coord;
 	static constexpr int TaitBryanThetaIndex = 3;
-	static constexpr int ThetaIndex = 3; // Roll
-	static constexpr int PhiIndex = 4; // Pitch
+	static constexpr int PhiIndex = 3; // Roll
+	static constexpr int ThetaIndex = 4; // Pitch
 	static constexpr int PsiIndex = 5; // Yaw
 public:
 	// [-Pi, Pi)
@@ -28,20 +28,20 @@ public:
 		// FIXME: check the correctness
 		Coord ret = center;
 		ret += delta;
-		double theta = ret(ThetaIndex);
 		double phi = ret(PhiIndex);
+		double theta = ret(ThetaIndex);
 		double psi = ret(PsiIndex);
-		if (phi > M_PI/2.0) {
-			phi = M_PI - phi;
-			ret(TaitBryanThetaIndex + 1) += M_PI;
-			ret(TaitBryanThetaIndex + 2) += M_PI;
-		} else if (phi < -M_PI/2.0) {
-			phi = - phi - M_PI;
-			ret(TaitBryanThetaIndex + 1) += M_PI;
-			ret(TaitBryanThetaIndex + 2) += M_PI;
+		if (theta > M_PI/2.0) {
+			theta = M_PI - theta;
+			phi += M_PI;
+			psi += M_PI;
+		} else if (theta < -M_PI/2.0) {
+			theta = - theta - M_PI;
+			phi += M_PI;
+			psi += M_PI;
 		}
 
-		round_into_2pi(theta);
+		round_into_2pi(phi);
 		round_into_2pi(psi);
 		ret(ThetaIndex) = theta;
 		ret(PhiIndex) = phi;

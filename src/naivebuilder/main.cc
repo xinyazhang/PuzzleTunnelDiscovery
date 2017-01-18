@@ -2,6 +2,10 @@
 #include "naiveclearance.h"
 #include "naivespace.h"
 #include "vis2d.h"
+#define ENABLE_DFS 0
+#define PRIORITIZE_SHORTEST_PATH 1
+#define PRIORITIZE_CLEARER_CUBE 1
+#define ENABLE_DIJKSTRA 1
 #include <goct/goctree.h>
 #include <goct/gbuilder.h>
 #include <string>
@@ -10,8 +14,8 @@ using std::string;
 
 int worker(NaiveRenderer* renderer)
 {
-	// string envfn = "../res/simple/Torus.obj";
-	string envfn = "../res/simple/FullTorus.obj";
+	string envfn = "../res/simple/Torus.obj";
+	// string envfn = "../res/simple/FullTorus.obj";
 	Geo env;
 	env.read(envfn);
 	env.V.block(0, 2, env.V.rows(), 1) *= 0.0001;

@@ -14,6 +14,7 @@ public:
 
 	glm::vec3 getCenter() const { return center_; }
 	const glm::vec3& getCamera() const { return eye_; }
+	void setCameraDistance(float d) { camera_distance_ = d; }
 private:
 	bool fps_mode_ = false;
 	float camera_distance_ = 10.0;
