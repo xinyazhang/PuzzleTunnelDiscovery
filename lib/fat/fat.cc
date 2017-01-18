@@ -130,7 +130,7 @@ void fat::mkfatter(
 	std::vector<Vec4I> OQ;
 
 	openvdb::tools::LevelSetFilter<openvdb::FloatGrid> lsf(*grid);
-	lsf.offset(width);
+	lsf.offset(-width);
 	volumeToMesh(*grid, OV, OF, OQ, 0.0, 1.0);
 
 	// convert_back3(OV, outV, 1.0/scale_factor);
