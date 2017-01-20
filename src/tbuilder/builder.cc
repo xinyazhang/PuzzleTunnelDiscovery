@@ -83,8 +83,8 @@ int worker(NaiveRenderer* renderer)
 	      decltype(cc),
 	      TranslationOnlySpace<3, double>,
 	      // NullVisualizer
-	      NodeCounterVisualizer
-	      // NaiveVisualizer3D
+	      // NodeCounterVisualizer
+	      NaiveVisualizer3D
 	      >;
 	Builder::VIS::setRenderer(renderer);
 	Builder builder;

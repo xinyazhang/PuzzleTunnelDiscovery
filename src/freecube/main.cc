@@ -44,6 +44,11 @@ int main(int argc, char* argv[])
 	string envcvxpn = "../res/simple/cvx/FullTorus";
 	string pathfn = "1.path";
 #elif 1
+	string robotfn = "../res/simple/LongStick.obj";
+	string envfn = "../res/simple/mFixedElkMeetsCube.obj";
+	string pathfn = "agg.path";
+	string envcvxpn;
+#elif 1
 	string robotfn = "../res/simple/mediumstick.obj";
 	string envfn = "../res/simple/boxwithhole2.obj";
 	string pathfn = "../res/simple/boxreference.path";
@@ -228,8 +233,10 @@ int main(int argc, char* argv[])
 		glfwSwapBuffers(window);
 
 		bool isfree;
-		(void)cc.getCertainCube(state, isfree);
+		double pd;
+		(void)cc.getCertainCube(state, isfree, &pd);
 		std::cerr << "Free: " << (isfree ? "true" : "false") << std::endl;
+		std::cerr << "D: " << pd << std::endl;
 #if 0
 		double mindist = cc.getDistance(robot_transform_matrix);
 		auto clearance = cc.getClearanceCube(robot_transform_matrix, mindist);

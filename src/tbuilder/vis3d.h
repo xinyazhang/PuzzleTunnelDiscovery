@@ -53,6 +53,7 @@ public:
 #if SHOW_AGGPATH
 	static void visAggPath(const std::vector<Eigen::VectorXd>& aggpath)
 	{
+		static int path_counter = 0;
 		// std::cerr << "Aggressive path: " << aggpath << std::endl;
 		if (aggpath_token > 0) {
 			renderer_->removeDynamicLine(aggpath_token);
@@ -63,6 +64,15 @@ public:
 			adj.row(i) = aggpath[i];
 		}
 		aggpath_token = renderer_->addDynamicLine(adj);
+		path_counter++;
+		if (path_counter == 300) {
+			for (const auto& v : aggpath) {
+				std::cout << v.transpose() << ' ';
+				std::cout << 0.0 << ' ' << 0.0 << ' ' << 0.0 << ' ' << 1.0;
+				std::cout << std::endl;
+			}
+			std::cerr << "Some Agg Path was printed" << std::endl;
+		}
 		// pause();
 	}
 #endif

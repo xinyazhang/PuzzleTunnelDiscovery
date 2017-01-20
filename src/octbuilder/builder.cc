@@ -3,12 +3,12 @@
 #include <omplaux/scene_bounding_box.h>
 #include <vecio/arrayvecio.h>
 #include <goct/goctree.h>
-#define ENABLE_DFS 1
-#define PRIORITIZE_SHORTEST_PATH 1
-// #define ENABLE_DFS 0
+// #define ENABLE_DFS 1
 // #define PRIORITIZE_SHORTEST_PATH 1
-// #define PRIORITIZE_CLEARER_CUBE 1
-// #define ENABLE_DIJKSTRA 1
+// #define ENABLE_DFS 0
+#define PRIORITIZE_SHORTEST_PATH 1
+#define PRIORITIZE_CLEARER_CUBE 1
+#define ENABLE_DIJKSTRA 1
 #include <goct/gbuilder.h>
 #include "space.h"
 #include "textvisualizer.h"
@@ -44,8 +44,9 @@ int worker(NaiveRenderer* renderer)
 	string robotfn = "../res/simple/mediumstick.obj";
 	string envfn = "../res/simple/boxwithhole2.obj";
 	string pathfn = "../res/simple/box.path";
-	string envcvxpn = "../res/simple/cvx/boxrefine/boxwithhole";
-	known_path = "../res/simple/boxreference.path";
+	string envcvxpn; // We are not using convex decomposition anymore.
+	// string envcvxpn = "../res/simple/cvx/boxrefine/boxwithhole";
+	// known_path = "../res/simple/boxreference.path";
 	// robotcenter << 0.0, 0.0, 0.0;
 	robotcenter << -1.1920928955078125e-07, 0.0, 2.384185791015625e-07;
 #else
@@ -60,7 +61,8 @@ int worker(NaiveRenderer* renderer)
 
 	robot.read(robotfn);
 	env.read(envfn);
-	env.readcvx(envcvxpn);
+	if (!envcvxpn.empty())
+		env.readcvx(envcvxpn);
 	path.readPath(pathfn);
 	robot.center = robotcenter;
 #if 0
