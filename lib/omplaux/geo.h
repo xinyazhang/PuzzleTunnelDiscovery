@@ -18,6 +18,7 @@ struct Geo {
 	std::vector<Eigen::MatrixXi> cvxF;
 
 	void readcvx(const std::string& prefix);
+	void readtet(const std::string& prefix);
 };
 
 #endif

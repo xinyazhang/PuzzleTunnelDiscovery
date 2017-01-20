@@ -2,6 +2,7 @@
 
 #include <igl/readOBJ.h>
 #include <igl/per_vertex_normals.h>
+#include <tetio/readtet.h>
 // #include <iostream>
 
 using std::string;
@@ -35,5 +36,28 @@ void Geo::readcvx(const std::string& prefix)
 		cvxV.emplace_back(std::move(V));
 		cvxF.emplace_back(std::move(F));
 		p++;
+	}
+}
+
+void Geo::readtet(const std::string& prefix)
+{
+	Eigen::MatrixXd V;
+	Eigen::MatrixXi P;
+	::readtet(prefix, V, P);
+	Eigen::MatrixXi tF;
+	tF.resize(4,3);
+	tF << 
+	1, 3, 2,
+	0, 2, 3,
+	3, 1, 0,
+	0, 1, 2;
+
+	for (int i = 0; i < P.rows(); i++) {
+		Eigen::MatrixXd tV(4, V.cols());
+		for (int j = 0; j < 4; j++) {
+			tV.row(i) = V.row(P(i,j));
+		}
+		cvxV.emplace_back(std::move(tV));
+		cvxF.emplace_back(tF);
 	}
 }

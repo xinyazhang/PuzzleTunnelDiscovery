@@ -239,6 +239,8 @@ TARGET_LINK_LIBRARIES(fat openvdb tbb Half)
 EASYLIB(erocol)
 TARGET_LINK_LIBRARIES(erocol fat)
 TARGET_LINK_LIBRARIES(omplaux erocol)
+TARGET_LINK_LIBRARIES(omplaux tetio)
+TARGET_LINK_LIBRARIES(tbuilder erocol)
 
 EASYADD(levelset)
 TARGET_LINK_LIBRARIES(levelset fat)
