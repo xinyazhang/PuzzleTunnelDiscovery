@@ -16,6 +16,14 @@
 #include <chrono>
 #endif
 
+#ifndef ENABLE_DISCRETE_PD
+#define ENABLE_DISCRETE_PD 1
+#endif
+
+#if ENABLE_DISCRETE_PD
+#include <erocol/hs.h>
+#endif
+
 template<typename BV>
 class TranslationOnlyClearance {
 private:
@@ -31,6 +39,18 @@ private:
 	BVHModel rob_bvh_, env_bvh_;
 	std::vector<BVHModel> rob_cvxbvhs_, env_cvxbvhs_;
 	fcl::detail::SplitMethodType split_method_ = fcl::detail::SPLIT_METHOD_MEDIAN;
+
+	double dtr_;
+#if ENABLE_DISCRETE_PD
+	mutable std::unique_ptr<erocol::HModels> hmodels_;
+	erocol::HModels* getHModels() const
+	{
+		if (!hmodels_) {
+			hmodels_.reset(new erocol::HModels(rob_, env_, dtr_, 0.0));
+		}
+		return hmodels_.get();
+	}
+#endif
 
 public:
 #if ENABLE_FCL_PROFILING
@@ -82,6 +102,7 @@ public:
 	// Nobody uses C
 	void setC(double min, double max)
 	{
+		dtr_ = (max - min)/2;
 	}
 
 	Eigen::Vector2d getCSize() const
@@ -89,6 +110,12 @@ public:
 		return {};
 	}
 
+#if ENABLE_DISCRETE_PD
+	double getPenDepth(const Transform3& tf) const
+	{
+		return getHModels()->getDiscretePD(tf) + 1e-6;
+	}
+#else
 	static double getSingleConvexPD(const BVHModel& rob,
 			const BVHModel& env,
 			const Transform3& tf)
@@ -118,6 +145,7 @@ public:
 		}
 		return ret;
 	}
+#endif
 
 	State getCertainCube(const State& state, bool& isfree) const
 	{
