@@ -17,7 +17,7 @@
 #endif
 
 #ifndef ENABLE_DISCRETE_PD
-#define ENABLE_DISCRETE_PD 1
+#define ENABLE_DISCRETE_PD 0
 #endif
 
 #if ENABLE_DISCRETE_PD

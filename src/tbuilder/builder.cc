@@ -18,6 +18,8 @@ using std::string;
 
 int worker(NaiveRenderer* renderer)
 {
+	string tetprefix;
+	string envcvxpn;
 #if 0
 	string robotfn = "../res/simple/robot.obj";
 	string envfn = "../res/simple/FullTorus.obj";
@@ -27,7 +29,8 @@ int worker(NaiveRenderer* renderer)
 	string robotfn = "../res/simple/LongStick.obj";
 	string envfn = "../res/simple/mFixedElkMeetsCube.obj";
 	string pathfn = "../res/simple/naiveelk.path";
-	string envcvxpn = "../res/simple/cvx/ElkMeetsCube";
+	// envcvxpn = "../res/simple/cvx/ElkMeetsCube";
+	tetprefix = "../res/simple/tet/mFixedElkMeetsCube.1";
 #endif
 	Geo robot, env; Path path;
 
@@ -36,7 +39,10 @@ int worker(NaiveRenderer* renderer)
 	std::cerr << "Robot Read\n";
 	std::cerr << "ENV Reading\n";
 	env.read(envfn);
-	env.readcvx(envcvxpn);
+	if (!envcvxpn.empty())
+		env.readcvx(envcvxpn);
+	if (!tetprefix.empty())
+		env.readtet(tetprefix);
 	std::cerr << "ENV Read\n";
 	std::cerr << "Path Reading\n";
 	path.readPath(pathfn);

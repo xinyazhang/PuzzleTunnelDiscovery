@@ -53,11 +53,11 @@ void Geo::readtet(const std::string& prefix)
 	0, 1, 2;
 
 	for (int i = 0; i < P.rows(); i++) {
-		Eigen::MatrixXd tV(4, V.cols());
-		for (int j = 0; j < 4; j++) {
-			tV.row(i) = V.row(P(i,j));
+		Eigen::MatrixXd tV(P.cols(), V.cols());
+		for (int j = 0; j < P.cols(); j++) {
+			tV.row(j) = V.row(P(i,j));
 		}
-		cvxV.emplace_back(std::move(tV));
-		cvxF.emplace_back(tF);
+		cvxV.emplace_back(tV);
+		cvxF.push_back(tF);
 	}
 }
