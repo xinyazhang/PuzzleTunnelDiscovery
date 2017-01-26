@@ -2,6 +2,7 @@
 #define CLEARANCER_H
 
 #include <omplaux/geo.h>
+#include <omplaux/convex.h>
 #include <fcl/fcl.h> // This incldued eigen as well.
 #include <fcl/narrowphase/detail/traversal/collision_node.h>
 #include <fcl/narrowphase/distance.h>
@@ -39,6 +40,10 @@ private:
 	BVHModel rob_bvh_, env_bvh_;
 	std::vector<BVHModel> rob_cvxbvhs_, env_cvxbvhs_;
 	fcl::detail::SplitMethodType split_method_ = fcl::detail::SPLIT_METHOD_MEDIAN;
+
+	using Convex = omplaux::ConvexAdapter;
+	Convex rob_cvx_;
+	std::vector<Convex> env_cvxs_;
 
 	double dtr_;
 #if ENABLE_DISCRETE_PD
@@ -96,6 +101,7 @@ public:
 	TranslationOnlyClearance(const Geo& rob, Geo& env)
 		:rob_(rob), env_(env)
 	{
+		buildCVXs();
 		buildBVHs();
 	}
 
@@ -116,33 +122,75 @@ public:
 		return getHModels()->getDiscretePD(tf) + 1e-6;
 	}
 #else
-	static double getSingleConvexPD(const BVHModel& rob,
-			const BVHModel& env,
-			const Transform3& tf)
+	template<typename GeometryModel>
+	static double getSingleConvexPD(const GeometryModel& rob,
+			const GeometryModel& env,
+			const Transform3& robtf,
+			const Transform3& envtf)
 	{
 		fcl::CollisionRequest<Scalar> request;
 		fcl::CollisionResult<Scalar> result;
 		request.enable_contact = true;
 		request.gjk_solver_type = fcl::GST_LIBCCD;
-		fcl::collide(&rob, tf, &env, Transform3::Identity(), request, result);
+		fcl::collide(&rob, robtf, &env, envtf, request, result);
 		if (!result.isCollision()) // Note: after convex decomposition, two colliding objects may have non-collide sub-pieces.
 			return 0;
 		auto nContact = result.numContacts();
-		double pend = result.getContact(0).penetration_depth;
-		for (decltype(nContact) i = 1; i < nContact; i++)
-			pend = std::max(pend, result.getContact(i).penetration_depth);
+		double pend = -1;
+		for (decltype(nContact) i = 0; i < nContact; i++) {
+			double pd = result.getContact(i).penetration_depth;
+			pend = std::max(pend, pd);
+			// std::cerr << "PD for " << i++ << " is " << pd << std::endl;
+		}
 		return pend;
 	}
 
 	double getPenDepth(const Transform3& tf) const
 	{
 		// TODO: Support non-convex robot.
-		if (env_cvxbvhs_.empty())
-			return getSingleConvexPD(rob_bvh_, env_bvh_, tf);
+		if (env_cvxbvhs_.empty() && env_cvxs_.empty())
+			return getSingleConvexPD(rob_bvh_, env_bvh_, tf, Transform3::Identity());
 		double ret = 0;
+#if 0
 		for (const auto& envcvx : env_cvxbvhs_) {
-			ret = std::max(ret, getSingleConvexPD(rob_bvh_, envcvx, tf));
+			ret = std::max(ret, getSingleConvexPD(rob_, envcvx, tf, Transform3::Identity()));
 		}
+#elif 0
+		int maxi = -1;
+		int i = 0;
+		for (const auto& envcvx : env_cvxs_) {
+			if (i != 37287) {
+				i++;
+				continue;
+			}
+			double pdleft = getSingleConvexPD(rob_cvx_.getFCL(),
+					envcvx.getFCL(),
+					tf,
+					Transform3::Identity()
+					);
+			double pdright = getSingleConvexPD(envcvx.getFCL(),
+					rob_cvx_.getFCL(),
+					Transform3::Identity(),
+					tf
+					);
+			double pd = std::min(pdleft, pdright);
+			if (pd > ret) {
+				ret = pd;
+				maxi = i;
+			}
+			i++;
+		}
+		std::cerr << "PD comes from " << maxi << ", value: " << ret << std::endl;
+#elif 1
+		for (const auto& envcvx : env_cvxs_) {
+			double pd = getSingleConvexPD(rob_cvx_.getFCL(),
+					envcvx.getFCL(),
+					tf,
+					Transform3::Identity()
+					);
+			ret = std::max(pd, ret);
+		}
+#endif
 		return ret;
 	}
 #endif
@@ -163,8 +211,16 @@ public:
 		double d = distance;
 		if (distance <= 0) {
 			profiler_.start();
+#if 0
+			std::cerr.precision(17);
+			std::cerr << "Calculating PD for state: " << state.transpose() << std::endl;
+#endif
 			d = getPenDepth(tf);
 			profiler_.stop(Profiler::COLLISION);
+		} else {
+#if 0
+			std::cerr << "Collision free for state: " << state.transpose() << std::endl;
+#endif
 		}
 
 		State ret;
@@ -183,6 +239,21 @@ protected:
 
 		initConvexBVH(rob_cvxbvhs_, split_method_, rob_);
 		initConvexBVH(env_cvxbvhs_, split_method_, env_);
+	}
+
+	void buildCVXs()
+	{
+		Convex::adapt(rob_.V, rob_.F, rob_cvx_);
+		env_cvxs_.resize(env_.cvxV.size());
+		for(size_t i = 0; i < env_.cvxV.size(); i++) {
+			const auto& V = env_.cvxV[i];
+			const auto& F = env_.cvxF[i];
+			Convex::adapt(V, F, env_cvxs_[i]);
+		}
+		std::cerr << "ROB FCL CVX CENTER: " << rob_cvx_.getFCL().center << std::endl;
+		rob_cvx_.getFCL().center = rob_.center;
+		std::cerr << "ROB FCL CVX CENTER (FIXED): " << rob_cvx_.getFCL().center << std::endl;
+		// TODO: non-Convex robot
 	}
 
 	static void initConvexBVH(std::vector<fcl::BVHModel<BV>> &cvxbvhs,

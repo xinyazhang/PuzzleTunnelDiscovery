@@ -1,6 +1,7 @@
 #include <renderer/quickgl.h>
 #include <renderer/render_pass.h>
 #include <renderer/gui.h>
+#define OMPL_CC_DISCRETE_PD 0
 #include <omplaux/clearance.h>
 #include <omplaux/path.h>
 #include <Eigen/StdVector>
@@ -32,6 +33,8 @@ int main(int argc, char* argv[])
 	GLFWwindow *window = init_glefw(800, 600, "Alpha animation");
 	GUI gui(window);
 
+	string envcvxpn;
+	string tetprefix;
 #if 0
 	string robotfn = "../res/alpha/alpha-1.2.org.obj";
 	string envfn = "../res/alpha/alpha_env-1.2.org.obj";
@@ -46,17 +49,18 @@ int main(int argc, char* argv[])
 #elif 1
 	string robotfn = "../res/simple/LongStick.obj";
 	string envfn = "../res/simple/mFixedElkMeetsCube.obj";
+	tetprefix = "../res/simple/tet/mFixedElkMeetsCube.1";
 	string pathfn = "agg.path";
-	string envcvxpn;
 #elif 1
 	string robotfn = "../res/simple/mediumstick.obj";
 	string envfn = "../res/simple/boxwithhole2.obj";
+	tetprefix = "../res/simple/tet/boxwithhole2.1";
 	string pathfn = "../res/simple/boxreference.path";
-	string envcvxpn = "../res/simple/cvx/boxwithhole";
+	// envcvxpn = "../res/simple/cvx/boxwithhole";
 #else
 	string robotfn = "../res/alpha/rob-1.2.obj";
 	string envfn = "../res/alpha/env-1.2.obj";
-	string envcvxpn = "../res/alpha/cvx/env-1.2";
+	envcvxpn = "../res/alpha/cvx/env-1.2";
 	string pathfn = "1.path";
 	gui.setCameraDistance(150.0f);
 #endif
@@ -66,6 +70,8 @@ int main(int argc, char* argv[])
 	env.read(envfn);
 	if (!envcvxpn.empty())
 		env.readcvx(envcvxpn);
+	if (!tetprefix.empty())
+		env.readtet(tetprefix);
 	path.readPath(pathfn);
 #if 0
 	robot.center << 16.973146438598633, 1.2278236150741577, 10.204807281494141; // From OMPL.app, no idea how they get this.
@@ -141,7 +147,7 @@ int main(int argc, char* argv[])
 	ShaderUniform yellow_diffuse = { "diffuse", vector_binder, yellow_color_data };
 	ShaderUniform robot_model = { "model", matrix_binder, robot_model_data };
 
-	std::cerr << robot.GPUV << std::endl;
+	// std::cerr << robot.GPUV << std::endl;
 	RenderDataInput robot_pass_input;
 	robot_pass_input.assign(0, "vertex_position", robot.GPUV.data(), robot.GPUV.rows(), 3, GL_FLOAT);
 	robot_pass_input.assign(1, "normal", robot.N.data(), robot.N.rows(), 3, GL_FLOAT);
@@ -165,9 +171,20 @@ int main(int argc, char* argv[])
 			);
 
 	RenderDataInput obs_pass_input;
+#if 0
+	int pick = 37287; // 145; // 162;
+	decltype(env.GPUV) subV = env.cvxV[pick].cast<float>();
+	decltype(env.F) subF = env.cvxF[pick];
+	std::cerr << subV << std::endl << subF.array() + 1 << std::endl;
+	// return 0;
+	obs_pass_input.assign(0, "vertex_position", subV.data(), subF.rows(), 3, GL_FLOAT);
+	obs_pass_input.assign(1, "normal", env.N.data(), env.N.rows(), 3, GL_FLOAT);
+	obs_pass_input.assign_index(subF.data(), subF.rows(), 3);
+#else
 	obs_pass_input.assign(0, "vertex_position", env.GPUV.data(), env.GPUV.rows(), 3, GL_FLOAT);
 	obs_pass_input.assign(1, "normal", env.N.data(), env.N.rows(), 3, GL_FLOAT);
 	obs_pass_input.assign_index(env.F.data(), env.F.rows(), 3);
+#endif
 	RenderPass obs_pass(-1,
 			obs_pass_input,
 			{
@@ -187,6 +204,7 @@ int main(int argc, char* argv[])
 			);
 
 	std::cerr.precision(17);
+	double d = -1.0;
 	while (!glfwWindowShouldClose(window)) {
 		// Setup some basic window stuff.
 		int window_width, window_height;
@@ -209,6 +227,13 @@ int main(int argc, char* argv[])
 		auto state = path.interpolateState(t);
 		// state << -0.065337, -0.624994, 8.32952,  -2.47891, 1.04311, -1.05538;
 		// state << 0.109556, -0.799887, 7.45506, -2.3654, 1.07839, -0.954136;
+		// state << 0.144535, -0.764909, 7.49004, -2.35619, 1.07992, -0.951068;
+		// state << 0.1095559501752327, -0.79988721207791902, 7.4550584145276106, -2.3653983749196588, 1.0783884938836057, -0.95413605006486879;
+		// state << -0.065336965642681072, -1.1846516268773293, 8.3295229936171804, -2.5770877236478773, 1.0185632431560658, -1.1044661672776614;
+		// state << 1.2378190555795598, 1.2378190555795598 + d, 1.2378190555795598, 0.0, 0.0, 0.0;
+		d+= 1.0/32.0;
+		if (d > 1.0)
+			d = -1.0;
 #if 0
 		robot_transform_matrix = path.interpolate(robot, t);
 		//robot_transform_matrix(0, 3) = t;

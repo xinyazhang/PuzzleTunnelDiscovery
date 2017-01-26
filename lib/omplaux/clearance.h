@@ -13,7 +13,9 @@
 #include "path.h"
 #include "bvh_helper.h"
 
+#ifndef OMPL_CC_DISCRETE_PD
 #define OMPL_CC_DISCRETE_PD 1
+#endif
 
 #if OMPL_CC_DISCRETE_PD
 #include <erocol/hs.h>
@@ -112,8 +114,11 @@ public:
 		if (env_cvxbvhs_.empty())
 			return getSingleConvexPD(rob_bvh_, env_bvh_, tf);
 		double ret = 0;
+		int i = 0;
 		for (const auto& envcvx : env_cvxbvhs_) {
-			ret = std::max(ret, getSingleConvexPD(rob_bvh_, envcvx, tf));
+			double pd = getSingleConvexPD(rob_bvh_, envcvx, tf);
+			ret = std::max(ret, pd);
+			// std::cerr << "PD for " << i++ << " is " << pd << std::endl;
 		}
 		return ret;
 	}

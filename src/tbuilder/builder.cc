@@ -55,6 +55,19 @@ int worker(NaiveRenderer* renderer)
 	std::cerr << "CC constructing\n";
 	TranslationOnlyClearance<fcl::OBBRSS<double>> cc(robot, env);
 	std::cerr << "CC constructed\n";
+#if 0
+	{
+		for (double d = -1.0; d < 3.0; d += 1.0/32.0) {
+			// san check
+			decltype(cc)::State state;
+			state << 1.2378190555795598, 1.2378190555795598 + d, 1.2378190555795598;
+			bool free;
+			auto certain = cc.getCertainCube(state, free);
+		}
+		std::cerr << "CC san check done\n";
+		return 0;
+	}
+#endif
 
 	typename GOcTreeNode<3, double>::Coord min, max, res;
 #if 0

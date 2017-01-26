@@ -1,3 +1,4 @@
+#define OMPL_CC_DISCRETE_PD 0
 #include <omplaux/clearance.h>
 #include <omplaux/path.h>
 #include <omplaux/scene_bounding_box.h>
@@ -20,6 +21,8 @@ int worker(NaiveRenderer* renderer)
 {
 	string known_path;
 	Eigen::Vector3d robotcenter { Eigen::Vector3d::Zero() };
+	string envcvxpn;
+	string tetprefix;
 #if 0
 	string robotfn = "../res/alpha/alpha-1.2.org.obj";
 	string envfn = "../res/alpha/alpha_env-1.2.org.obj";
@@ -28,32 +31,32 @@ int worker(NaiveRenderer* renderer)
 	string robotfn = "../res/simple/robot.obj";
 	string envfn = "../res/simple/FullTorus.obj";
 	string pathfn = "../res/simple/naive2.path";
-	string envcvxpn = "../res/simple/cvx/FullTorus";
+	envcvxpn = "../res/simple/cvx/FullTorus";
 #elif 0
 	string robotfn = "../res/simple/mediumstick.obj";
 	string envfn = "../res/simple/FullTorus.obj";
 	string pathfn = "../res/simple/sticktorus.path";
-	string envcvxpn = "../res/simple/cvx/FullTorus";
+	envcvxpn = "../res/simple/cvx/FullTorus";
 #elif 0
 	string robotfn = "../res/simple/robot.obj";
 	// string robotfn = "../res/simple/LongStick.obj";
 	string envfn = "../res/simple/mFixedElkMeetsCube.obj";
 	string pathfn = "../res/simple/naiveelk.path";
-	string envcvxpn = "../res/simple/cvx/ElkMeetsCube";
+	envcvxpn = "../res/simple/cvx/ElkMeetsCube";
 #elif 1
 	string robotfn = "../res/simple/mediumstick.obj";
 	string envfn = "../res/simple/boxwithhole2.obj";
 	string pathfn = "../res/simple/box.path";
-	string envcvxpn; // We are not using convex decomposition anymore.
-	// string envcvxpn = "../res/simple/cvx/boxrefine/boxwithhole";
-	// known_path = "../res/simple/boxreference.path";
+	tetprefix = "../res/simple/tet/boxwithhole2.1";
+	// envcvxpn = "../res/simple/cvx/boxrefine/boxwithhole";
+	known_path = "../res/simple/boxreference.path";
 	// robotcenter << 0.0, 0.0, 0.0;
 	robotcenter << -1.1920928955078125e-07, 0.0, 2.384185791015625e-07;
 #else
 	string robotfn = "../res/alpha/rob-1.2.obj";
 	string envfn = "../res/alpha/env-1.2.obj";
 	string pathfn = "../res/alpha/ver1.2.path";
-	string envcvxpn = "../res/alpha/cvx/env-1.2";
+	envcvxpn = "../res/alpha/cvx/env-1.2";
 	robotcenter << 16.973146438598633, 1.2278236150741577, 10.204807281494141;
 #endif
 	Geo robot, env;
@@ -63,6 +66,8 @@ int worker(NaiveRenderer* renderer)
 	env.read(envfn);
 	if (!envcvxpn.empty())
 		env.readcvx(envcvxpn);
+	if (!tetprefix.empty())
+		env.readtet(tetprefix);
 	path.readPath(pathfn);
 	robot.center = robotcenter;
 #if 0
@@ -103,6 +108,7 @@ int worker(NaiveRenderer* renderer)
 	          << "\tmin: " << min.transpose() << "\n"
 		  << "\tmax: " << max.transpose() << std::endl;
 	cc.setC(bbmin, bbmax);
+	// cc.setC(-100, 100);
 	cc.setDAlpha(dalpha);
 #endif
 	res = (max - min) / 20000.0; // FIXME: how to calculate a resolution?
@@ -131,13 +137,15 @@ int worker(NaiveRenderer* renderer)
 	using Clock = std::chrono::high_resolution_clock;
 	auto t1 = Clock::now();
 	if (!known_path.empty()) {
+		std::cerr.precision(17);
 		Path pathsln;
 		pathsln.readPath(known_path);
 		size_t fps = 15;
 		builder.init_builder(cc);
-		for (size_t i = 0; i < (pathsln.T.size() - 1) * fps; i++) {
-		//for (size_t i = 40 * fps; i < 41 * fps; i++) {
+		// for (size_t i = 0; i < (pathsln.T.size() - 1) * fps; i++) {
+		// for (size_t i = 40 * fps; i < 41 * fps; i++) {
 		// size_t i = 38.8 * fps; {
+		size_t i = 41.6 * fps; {
 			double t = double(i) / fps;
 			auto state = pathsln.interpolateState(t);
 			
@@ -147,7 +155,7 @@ int worker(NaiveRenderer* renderer)
 			bool isfree;
 			(void)cc.getCertainCube(state, isfree);
 			std::cerr << "\tState Free: " << (isfree ? "true" : "false") << std::endl;
-			double pd;
+			double pd = -1.0;
 			auto d = cc.getCertainCube(node->getMedian(), isfree, &pd);
 			std::cerr << "\tMedian Free: " << (isfree ? "true" : "false") << std::endl;
 			std::cerr << "\tMedian Certain: " << d.transpose() << std::endl;
