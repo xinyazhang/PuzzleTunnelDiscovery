@@ -36,15 +36,24 @@ public:
 		dir = inv_rot * dir;
 
 		Eigen::Vector3d vec { Eigen::Vector3d::Zero() };
+#if 0
 		std::vector<igl::Hit> hits;
 		igl::ray_mesh_intersect(geocenter, dir, V, F, hits);
-		for (const auto& hit : hits) {
-			if (hit.t > 0) {
-				vec = dir * hit.t;
-				break;
+		if (!hits.empty())
+			vec = dir * hits.back().t;
+#endif
+		double maxdot = V.row(0).dot(dir);
+		int maxi = 0;
+		for (int i = 1; i < V.rows(); i++) {
+			double dot = V.row(i).dot(dir);
+			if (dot > maxdot) {
+				maxi = i;
+				maxdot = dot;
 			}
 		}
-		std::cerr << "Support vec for " << this << " and direction: " << dir.transpose() << " is: " << vec.transpose() << std::endl;
+		vec = rot * V.row(maxi);
+		vec += tr;
+		// std::cerr << "Support vec for " << this << " and direction: " << dir.transpose() << " is: " << vec.transpose() << std::endl;
 		*outvec << vec;
 	}
 
@@ -56,7 +65,7 @@ public:
 	virtual void setTransform(const State& state, const Eigen::Vector3d& rot_center = Eigen::Vector3d::Zero()) override
 	{
 		auto matd = Path::stateToMatrix(state, rot_center);
-		std::cerr << matd << std::endl;
+		// std::cerr << matd << std::endl;
 		tf.setIdentity();
 		tf = matd.block<3,4>(0,0);
 		rot = tf.linear();

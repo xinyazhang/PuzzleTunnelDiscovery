@@ -47,29 +47,34 @@ int main(int argc, char *argv[])
 	string envfn = "sc.obj";
 	auto rob = EigenCCD::create(robfn);
 	auto env = EigenCCD::create(envfn);
-	EigenCCD::State state;
-	state << 0.07457736701164995, -0.76490862891433631, 7.6299513303455253, -2.4175537217077703, 1.0615147052168636, -1.0185632431560658;
-	rob->setTransform(state);
-	ccd_t ccd;
-	CCD_INIT(&ccd); // initialize ccd_t struct
-	ccd_real_t depth;
-	ccd_vec3_t dir, pos;
+	// for (double d = -1.0/2.0; d < 1.0/2.0; d += 1.0/32.0) {
+	for (double d = -1.0/16.0; d < 1.0/16.0; d += 1.0/1024.0) {
+	// double d = 0.0; {
+		EigenCCD::State state;
+		state << 0.07457736701164995 + d, -0.76490862891433631, 7.6299513303455253, -2.4175537217077703, 1.0615147052168636, -1.0185632431560658;
+		rob->setTransform(state);
+		ccd_t ccd;
+		CCD_INIT(&ccd); // initialize ccd_t struct
+		ccd_real_t depth;
+		ccd_vec3_t dir, pos;
 
-	// set up ccd_t struct
-	ccd.support1       = support; // support function for first object
-	ccd.support2       = support; // support function for second object
-	ccd.center1       = center; // support function for first object
-	ccd.center2       = center; // support function for second object
-	ccd.max_iterations = 500;     // maximal number of iterations
-	ccd.epa_tolerance = 1e-6;
+		// set up ccd_t struct
+		ccd.support1       = support; // support function for first object
+		ccd.support2       = support; // support function for second object
+		ccd.center1       = center; // support function for first object
+		ccd.center2       = center; // support function for second object
+		ccd.max_iterations = 500;     // maximal number of iterations
+		ccd.epa_tolerance = 1e-6;
 
-	std::cerr << "rob: " << rob.get() << "\tenv: " << env.get() << std::endl;
-	int res = ccdGJKPenetration(rob.get(), env.get(), &ccd, &depth, &dir, &pos);
-	if (res == 0) {
-		cerr << "Collision point: " << ccdVec3X(&pos) << ' ' << ccdVec3Y(&pos) << ' ' << ccdVec3Z(&pos) << endl;
-		cerr << "PD: " << depth << endl;
-		cerr << "P Direction: " << ccdVec3X(&dir) << ' ' << ccdVec3Y(&dir) << ' ' << ccdVec3Z(&dir) << endl;
-	} else {
-		cerr << "Not colliding" << endl;
+		// std::cerr << "rob: " << rob.get() << "\tenv: " << env.get() << std::endl;
+		int res = ccdGJKPenetration(rob.get(), env.get(), &ccd, &depth, &dir, &pos);
+		// int res = ccdMPRPenetration(rob.get(), env.get(), &ccd, &depth, &dir, &pos);
+		if (res == 0) {
+			cerr << "Collision point: " << ccdVec3X(&pos) << ' ' << ccdVec3Y(&pos) << ' ' << ccdVec3Z(&pos) << endl;
+			cerr << "PD: " << depth << endl;
+			cerr << "P Direction: " << ccdVec3X(&dir) << ' ' << ccdVec3Y(&dir) << ' ' << ccdVec3Z(&dir) << endl;
+		} else {
+			cerr << "Not colliding" << endl;
+		}
 	}
 }
