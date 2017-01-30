@@ -46,7 +46,7 @@ int main(int argc, char* argv[])
 	string envfn = "../res/simple/FullTorus.obj";
 	string envcvxpn = "../res/simple/cvx/FullTorus";
 	string pathfn = "1.path";
-#elif 1
+#elif 0
 	string robotfn = "../res/simple/LongStick.obj";
 	string envfn = "../res/simple/mFixedElkMeetsCube.obj";
 	tetprefix = "../res/simple/tet/mFixedElkMeetsCube.1";
@@ -171,8 +171,8 @@ int main(int argc, char* argv[])
 			);
 
 	RenderDataInput obs_pass_input;
-#if 0
-	int pick = 37287; // 145; // 162;
+#if 1
+	int pick = 162; // 145; // 162;
 	decltype(env.GPUV) subV = env.cvxV[pick].cast<float>();
 	decltype(env.F) subF = env.cvxF[pick];
 	std::cerr << subV << std::endl << subF.array() + 1 << std::endl;
@@ -204,7 +204,8 @@ int main(int argc, char* argv[])
 			);
 
 	std::cerr.precision(17);
-	double d = -1.0;
+	constexpr double scaled = 1024.0;
+	double d = -1.0/scaled;
 	while (!glfwWindowShouldClose(window)) {
 		// Setup some basic window stuff.
 		int window_width, window_height;
@@ -231,9 +232,10 @@ int main(int argc, char* argv[])
 		// state << 0.1095559501752327, -0.79988721207791902, 7.4550584145276106, -2.3653983749196588, 1.0783884938836057, -0.95413605006486879;
 		// state << -0.065336965642681072, -1.1846516268773293, 8.3295229936171804, -2.5770877236478773, 1.0185632431560658, -1.1044661672776614;
 		// state << 1.2378190555795598, 1.2378190555795598 + d, 1.2378190555795598, 0.0, 0.0, 0.0;
-		d+= 1.0/32.0;
-		if (d > 1.0)
-			d = -1.0;
+		// d = 0.0;
+		state << 0.07457736701164995 + d, -0.76490862891433631,
+			7.6299513303455253, -2.4175537217077703,
+			1.0615147052168636, -1.0185632431560658;
 #if 0
 		robot_transform_matrix = path.interpolate(robot, t);
 		//robot_transform_matrix(0, 3) = t;
@@ -241,8 +243,13 @@ int main(int argc, char* argv[])
 		// std::cerr << "Transform matrix:\n " << robot_transform_matrix << std::endl;
 #else
 		robot_transform_matrix = Path::stateToMatrix<double>(state, robot.center);
+		if (d == 0.0)
+			std::cerr << robot_transform_matrix << std::endl;
 		alpha_model_matrix = robot_transform_matrix.cast<float>();
 #endif
+		d+= 1.0/32.0/scaled;
+		if (d > 1.0/scaled)
+			d = -1.0/scaled;
 
 		robot_pass.setup();
 		CHECK_GL_ERROR(glDrawElements(GL_TRIANGLES, robot.F.rows() * 3,

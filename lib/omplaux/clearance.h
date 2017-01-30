@@ -1,6 +1,7 @@
 #ifndef OMPLAUX_CLEARANCE_H
 #define OMPLAUX_CLEARANCE_H
 
+#include "convex.h"
 #include <fcl/fcl.h> // This incldued eigen as well.
 #include <fcl/narrowphase/detail/traversal/collision_node.h>
 #include <fcl/narrowphase/distance.h>
@@ -14,7 +15,7 @@
 #include "bvh_helper.h"
 
 #ifndef OMPL_CC_DISCRETE_PD
-#define OMPL_CC_DISCRETE_PD 1
+#define OMPL_CC_DISCRETE_PD 0
 #endif
 
 #if OMPL_CC_DISCRETE_PD
@@ -39,6 +40,11 @@ private:
 	BVHModel rob_bvh_, env_bvh_;
 	std::vector<BVHModel> rob_cvxbvhs_, env_cvxbvhs_;
 	fcl::detail::SplitMethodType split_method_ = fcl::detail::SPLIT_METHOD_MEDIAN;
+
+	using Convex = omplaux::ConvexAdapter;
+	Convex rob_cvx_;
+	std::vector<Convex> env_cvxs_;
+
 #if OMPL_CC_DISCRETE_PD
 	mutable std::unique_ptr<erocol::HModels> hmodels_;
 	erocol::HModels* getHModels() const
@@ -57,6 +63,7 @@ public:
 	ClearanceCalculator(const Geo& rob, Geo& env)
 		:rob_(rob), env_(env)
 	{
+		buildCVXs();
 		buildBVHs();
 	}
 
@@ -84,8 +91,9 @@ public:
 		return getHModels()->getDiscretePD(tf);
 	}
 #else
-	static double getSingleConvexPD(const BVHModel& rob,
-			const BVHModel& env,
+	template<typename GeometryModel>
+	static double getSingleConvexPD(const GeometryModel& rob,
+			const GeometryModel& env,
 			const Transform3& tf)
 	{
 		fcl::CollisionRequest<Scalar> request;
@@ -111,15 +119,29 @@ public:
 	double getPenDepth(const Transform3& tf) const
 	{
 		// TODO: Support non-convex robot.
-		if (env_cvxbvhs_.empty())
+		if (env_cvxbvhs_.empty() && env_cvxs_.empty())
 			return getSingleConvexPD(rob_bvh_, env_bvh_, tf);
 		double ret = 0;
+		// int i = 0;
+#if 1 // This calls GJK algorithm
 		int i = 0;
+		int maxi = -1;
+		for (const auto& envcvx : env_cvxs_) {
+			double pd = getSingleConvexPD(rob_cvx_.getFCL(), envcvx.getFCL(), tf);
+			if (pd > ret) {
+				ret = pd;
+				maxi = i;
+			}
+			i++;
+		}
+		std::cerr << "PD comes from " << maxi << ", value: " << ret << std::endl;
+#else
 		for (const auto& envcvx : env_cvxbvhs_) {
 			double pd = getSingleConvexPD(rob_bvh_, envcvx, tf);
 			ret = std::max(ret, pd);
 			// std::cerr << "PD for " << i++ << " is " << pd << std::endl;
 		}
+#endif
 		return ret;
 	}
 #endif
@@ -188,6 +210,21 @@ protected:
 
 		initConvexBVH(rob_cvxbvhs_, split_method_, rob_);
 		initConvexBVH(env_cvxbvhs_, split_method_, env_);
+	}
+
+	void buildCVXs()
+	{
+		Convex::adapt(rob_.V, rob_.F, rob_cvx_);
+		env_cvxs_.resize(env_.cvxV.size());
+		for(size_t i = 0; i < env_.cvxV.size(); i++) {
+			const auto& V = env_.cvxV[i];
+			const auto& F = env_.cvxF[i];
+			Convex::adapt(V, F, env_cvxs_[i]);
+		}
+		std::cerr << "ROB FCL CVX CENTER: " << rob_cvx_.getFCL().center << std::endl;
+		rob_cvx_.getFCL().center = rob_.center;
+		std::cerr << "ROB FCL CVX CENTER (FIXED): " << rob_cvx_.getFCL().center << std::endl;
+		// TODO: non-Convex robot
 	}
 
 	static void initConvexBVH(std::vector<fcl::BVHModel<BV>> &cvxbvhs,

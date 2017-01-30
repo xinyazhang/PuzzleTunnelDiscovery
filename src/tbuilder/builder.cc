@@ -25,8 +25,8 @@ int worker(NaiveRenderer* renderer)
 	string envfn = "../res/simple/FullTorus.obj";
 	string pathfn = "../res/simple/naive2.path";
 #else
-	// string robotfn = "../res/simple/robot.obj";
-	string robotfn = "../res/simple/LongStick.obj";
+	string robotfn = "../res/simple/robot.obj";
+	// string robotfn = "../res/simple/LongStick.obj";
 	string envfn = "../res/simple/mFixedElkMeetsCube.obj";
 	string pathfn = "../res/simple/naiveelk.path";
 	// envcvxpn = "../res/simple/cvx/ElkMeetsCube";

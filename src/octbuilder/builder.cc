@@ -145,7 +145,8 @@ int worker(NaiveRenderer* renderer)
 		// for (size_t i = 0; i < (pathsln.T.size() - 1) * fps; i++) {
 		// for (size_t i = 40 * fps; i < 41 * fps; i++) {
 		// size_t i = 38.8 * fps; {
-		size_t i = 41.6 * fps; {
+		// size_t i = 41.6 * fps; {
+		size_t i = 40 * fps; {
 			double t = double(i) / fps;
 			auto state = pathsln.interpolateState(t);
 			
