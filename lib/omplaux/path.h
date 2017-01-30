@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include "geo.h"
 
 struct Path {
 	typedef Eigen::Matrix<float, 4, 4, Eigen::ColMajor> GLMatrix;
