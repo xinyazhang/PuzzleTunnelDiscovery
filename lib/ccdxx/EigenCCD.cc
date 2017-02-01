@@ -2,7 +2,6 @@
 #include <igl/readOBJ.h>
 #include <igl/ray_mesh_intersect.h>
 #include <omplaux/path.h>
-#include <Eigen/Geometry>
 
 void operator << (ccd_vec3_t& ccdvec, const Eigen::Vector3d& vec)
 {
@@ -18,8 +17,8 @@ class EigenCCDImpl : public EigenCCD {
 private:
 	Eigen::MatrixXd V;
 	Eigen::MatrixXi F;
-	Eigen::VectorXd geocenter;
-	Eigen::Transform<double, 3, Eigen::Affine> tf;
+	Eigen::Vector3d geocenter;
+	Transform3 tf;
 	Eigen::Quaternion<double> rot, inv_rot;
 	Eigen::Vector3d tr;
 public:
@@ -32,7 +31,7 @@ public:
 	EigenCCDImpl(
 			Eigen::MatrixXd&& inV,
 			Eigen::MatrixXi&& inF,
-			const Eigen::VectorXd* pgeocenter = nullptr
+			const Eigen::Vector3d* pgeocenter = nullptr
 		    ): V(inV), F(inF)
 	{
 		if (pgeocenter)
@@ -41,8 +40,19 @@ public:
 			geocenter = V.colwise().mean();
 	}
 
+	EigenCCDImpl(
+			const Eigen::MatrixXd& inV,
+			const Eigen::MatrixXi& inF,
+			const Eigen::Vector3d* pgeocenter = nullptr
+		    ): V(inV), F(inF)
+	{
+		if (pgeocenter)
+			geocenter = *pgeocenter;
+		else
+			geocenter = V.colwise().mean();
+	}
 
-	virtual void support(const ccd_vec3_t *indir, ccd_vec3_t *outvec) override
+	virtual void support(const ccd_vec3_t *indir, ccd_vec3_t *outvec) const override
 	{
 		Eigen::Vector3d dir;
 		dir << *indir;
@@ -70,7 +80,7 @@ public:
 		*outvec << vec;
 	}
 
-	virtual void center(ccd_vec3_t *outvec) override
+	virtual void center(ccd_vec3_t *outvec) const override
 	{
 		*outvec << geocenter;
 	}
@@ -81,6 +91,17 @@ public:
 		// std::cerr << matd << std::endl;
 		tf.setIdentity();
 		tf = matd.block<3,4>(0,0);
+		synctf();
+	}
+
+	virtual void setTransform(const Transform3& tfin) override
+	{
+		tf = tfin;
+		synctf();
+	}
+
+	void synctf()
+	{
 		rot = tf.linear();
 		inv_rot = rot.inverse();
 		tr = tf.translation();
@@ -95,30 +116,38 @@ std::unique_ptr<EigenCCD> EigenCCD::create(const std::string& fn)
 std::unique_ptr<EigenCCD> EigenCCD::create(
 		Eigen::MatrixXd&& V,
 		Eigen::MatrixXi&& F,
-		const Eigen::VectorXd* pgeocenter
+		const Eigen::Vector3d* pgeocenter
 		)
 {
 	return std::make_unique<EigenCCDImpl>(std::move(V), std::move(F), pgeocenter);
 }
 
+std::unique_ptr<EigenCCD> EigenCCD::create(
+			const Eigen::MatrixXd& V,
+			const Eigen::MatrixXi& F,
+			const Eigen::Vector3d* pgeocenter
+			)
+{
+	return std::make_unique<EigenCCDImpl>(V, F, pgeocenter);
+}
 
 namespace {
 
 void support(const void *obj, const ccd_vec3_t *dir, ccd_vec3_t *vec)
 {
-	EigenCCD *eic = (EigenCCD *)obj;
+	auto eic = (const EigenCCD *)obj;
 	eic->support(dir, vec);
 }
 
 void center(const void *obj, ccd_vec3_t *center)
 {
-	EigenCCD *eic = (EigenCCD *)obj;
+	auto eic = (const EigenCCD *)obj;
 	eic->center(center);
 }
 
 };
 
-bool EigenCCD::penetrate(EigenCCD* rob, EigenCCD* env, EigenCCD::PenetrationInfo& info)
+bool EigenCCD::penetrate(const EigenCCD* rob, const EigenCCD* env, EigenCCD::PenetrationInfo& info)
 {
 	ccd_t ccd;
 	CCD_INIT(&ccd);

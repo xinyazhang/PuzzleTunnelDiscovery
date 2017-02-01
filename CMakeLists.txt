@@ -254,5 +254,6 @@ SANCHECK(ccd)
 TARGET_LINK_LIBRARIES(sancheck_ccd ${CCD_LIBRARIES})
 
 EASYLIB(ccdxx)
+TARGET_LINK_LIBRARIES(omplaux ccdxx)
 
 # vim: tw=0
