@@ -65,8 +65,11 @@ public:
 		if (!hits.empty())
 			vec = dir * hits.back().t;
 #endif
+		int maxr = 0, maxc = 0;
+		Eigen::VectorXd dots = V * dir;
+		dots.maxCoeff(&maxr, &maxc);
+#if 0
 		double maxdot = V.row(0).dot(dir);
-		int maxi = 0;
 		for (int i = 1; i < V.rows(); i++) {
 			double dot = V.row(i).dot(dir);
 			if (dot > maxdot) {
@@ -74,7 +77,8 @@ public:
 				maxdot = dot;
 			}
 		}
-		vec = rot * V.row(maxi);
+#endif
+		vec = rot * V.row(maxr);
 		vec += tr;
 		// std::cerr << "Support vec for " << this << " and direction: " << dir.transpose() << " is: " << vec.transpose() << std::endl;
 		*outvec << vec;
@@ -149,6 +153,7 @@ void center(const void *obj, ccd_vec3_t *center)
 
 bool EigenCCD::penetrate(const EigenCCD* rob, const EigenCCD* env, EigenCCD::PenetrationInfo& info)
 {
+	int res;
 	ccd_t ccd;
 	CCD_INIT(&ccd);
 	ccd_real_t depth;
@@ -158,10 +163,14 @@ bool EigenCCD::penetrate(const EigenCCD* rob, const EigenCCD* env, EigenCCD::Pen
 	ccd.support2 = ::support;
 	ccd.center1 = ::center;
 	ccd.center2 = ::center;
-	ccd.max_iterations = 500;     // maximal number of iterations
-	ccd.epa_tolerance = 1e-6;
+	ccd.max_iterations = 2500;     // maximal number of iterations
+	ccd.epa_tolerance = 1e-9;
 
-	int res = ccdMPRPenetration(rob, env, &ccd, &depth, &dir, &pos);
+	res = ccdGJKIntersect(rob, env, &ccd);
+	if (!res)
+		return false;
+	res = ccdMPRPenetration(rob, env, &ccd, &depth, &dir, &pos);
+	// int res = ccdGJKPenetration(rob, env, &ccd, &depth, &dir, &pos);
 	if (res == 0) {
 		info.depth = depth;
 		info.dir << dir;
