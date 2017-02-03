@@ -93,6 +93,7 @@ public:
 				maxi = i;
 			}
 			i++;
+			// std::cerr << "getPenDepth: " << i << std::endl;
 		}
 		// std::cerr << "PD comes from " << maxi << ", value: " << ret << std::endl;
 		return ret;

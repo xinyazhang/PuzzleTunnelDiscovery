@@ -232,10 +232,13 @@ int main(int argc, char* argv[])
 		// state << 0.1095559501752327, -0.79988721207791902, 7.4550584145276106, -2.3653983749196588, 1.0783884938836057, -0.95413605006486879;
 		// state << -0.065336965642681072, -1.1846516268773293, 8.3295229936171804, -2.5770877236478773, 1.0185632431560658, -1.1044661672776614;
 		// state << 1.2378190555795598, 1.2378190555795598 + d, 1.2378190555795598, 0.0, 0.0, 0.0;
-		// d = 0.0;
-		state << 0.07457736701164995 + d, -0.76490862891433631,
-			7.6299513303455253, -2.4175537217077703,
-			1.0615147052168636, -1.0185632431560658;
+
+		// A state that CCD dead.
+		state << -4.2627669452726122, -3.1434522840379637, 5.8110650058392217, -0.049087385212340517, 0.46633015951723489, 0.44178646691106466;
+
+		// A state that fcl gives incorrect values.
+		d = 0.0;
+		state << 0.07457736701164995 + d, -0.76490862891433631, 7.6299513303455253, -2.4175537217077703, 1.0615147052168636, -1.0185632431560658;
 #if 0
 		robot_transform_matrix = path.interpolate(robot, t);
 		//robot_transform_matrix(0, 3) = t;
@@ -264,11 +267,13 @@ int main(int argc, char* argv[])
 		glfwPollEvents();
 		glfwSwapBuffers(window);
 
+#if 1
 		bool isfree;
 		double pd;
 		(void)cc.getCertainCube(state, isfree, &pd);
 		std::cerr << "Free: " << (isfree ? "true" : "false") << std::endl;
 		std::cerr << "D: " << pd << std::endl;
+#endif
 #if 0
 		double mindist = cc.getDistance(robot_transform_matrix);
 		auto clearance = cc.getClearanceCube(robot_transform_matrix, mindist);
