@@ -256,4 +256,8 @@ TARGET_LINK_LIBRARIES(sancheck_ccd ${CCD_LIBRARIES})
 EASYLIB(ccdxx)
 TARGET_LINK_LIBRARIES(omplaux ccdxx)
 
+# TODO: remove deps on fcl
+EASYADD(trmap)
+TARGET_LINK_LIBRARIES(trmap omplaux fcl)
+
 # vim: tw=0
