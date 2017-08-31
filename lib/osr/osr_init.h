@@ -7,7 +7,8 @@
 /*
  * OSR: Off-Screen Rendering support functions.
  *      This set of functions does the necessary initialization for OSR.
- * Post-condition: a valid OpenGL context is created, but 
+ * Post-condition: a valid OpenGL context is created, but no guarntee on the
+ *      framebuffer
  */
 namespace osr {
 void init();

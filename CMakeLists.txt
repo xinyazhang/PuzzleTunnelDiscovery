@@ -52,7 +52,7 @@ endif(APPLE)
 
 # C++11 and Debug
 # Note: we focus on gcc/clang right now, so we uses compiler specific solutions.
-set(CMAKE_CXX_FLAGS "--std=c++14  ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "--std=c++14 -fdiagnostics-color=always ${CMAKE_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS "${OpenMP_CXX_FLAGS} ${CMAKE_CXX_FLAGS}")
 set(CMAKE_EXE_LINKER_FLAGS "-g")
 
@@ -262,5 +262,8 @@ TARGET_LINK_LIBRARIES(trmap omplaux fcl)
 
 EASYLIB(osr)
 TARGET_LINK_LIBRARIES(osr gbm EGL)
+
+SANCHECK(osr)
+TARGET_LINK_LIBRARIES(sancheck_osr osr)
 
 # vim: tw=0
