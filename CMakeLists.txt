@@ -260,4 +260,7 @@ TARGET_LINK_LIBRARIES(omplaux ccdxx)
 EASYADD(trmap)
 TARGET_LINK_LIBRARIES(trmap omplaux fcl)
 
+EASYLIB(osr)
+TARGET_LINK_LIBRARIES(osr gbm EGL)
+
 # vim: tw=0
