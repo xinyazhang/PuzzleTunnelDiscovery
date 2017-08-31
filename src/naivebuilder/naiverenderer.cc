@@ -301,6 +301,10 @@ int Naive2DRenderer::run()
 		static float color[4] = { 1.0f, 1.0f, 1.0f, 1.0f};
 		return color;
 	};
+	auto grey_color_data = []() -> const void* {
+		static float color[4] = { 0.5f, 0.5f, 0.5f, 1.0f};
+		return color;
+	};
 	auto green_color_data = []() -> const void* {
 		static float color[4] = { 0.0f, 1.0f, 0.0f, 1.0f};
 		return color;
@@ -316,6 +320,7 @@ int Naive2DRenderer::run()
 	ShaderUniform yellow_diffuse = { "diffuse", vector_binder, yellow_color_data };
 	ShaderUniform blue_diffuse = { "diffuse", vector_binder, blue_color_data };
 	ShaderUniform white_diffuse = { "diffuse", vector_binder, white_color_data };
+	ShaderUniform grey_diffuse = { "diffuse", vector_binder, grey_color_data };
 	ShaderUniform green_diffuse = { "diffuse", vector_binder, green_color_data };
 
 	const Geo& env = p_->env;
@@ -357,7 +362,7 @@ int Naive2DRenderer::run()
 			  std_light,
 			  std_camera,
 			  object_alpha,
-			  yellow_diffuse
+			  white_diffuse
 			  },
 			{ "fragment_color" }
 			);
@@ -378,7 +383,7 @@ int Naive2DRenderer::run()
 			  std_light,
 			  std_camera,
 			  object_alpha,
-			  white_diffuse
+			  grey_diffuse
 			  },
 			{ "fragment_color" }
 			);

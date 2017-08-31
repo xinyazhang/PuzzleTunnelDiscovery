@@ -10,6 +10,7 @@
 #include <igl/all_edges.h>
 #include <igl/writeOBJ.h>
 #include <unordered_map>
+#include <unistd.h>
 
 using std::string;
 using std::endl;

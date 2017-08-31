@@ -1,6 +1,7 @@
 #include <igl/readOBJ.h>
 #include <igl/writeOBJ.h>
 #include <igl/MeshBooleanType.h>
+#include <unistd.h>
 //#define IGL_NO_CORK
 //#undef IGL_STATIC_LIBRARY
 #include <join.h>

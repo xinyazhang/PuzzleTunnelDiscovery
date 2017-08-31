@@ -14,7 +14,9 @@ void san_check(
 	Eigen::MatrixXf C;
 	Eigen::VectorXi I;
 	Eigen::VectorXf sqrD;
-	igl::point_mesh_squared_distance(OV, IV, IF, sqrD, I, C);
+	std::cerr << "This SANCHECK has been disabled due to a bug in libigl (#595)\n";
+	return ;
+	// igl::point_mesh_squared_distance(OV, IV, IF, sqrD, I, C);
 	Eigen::ArrayXf array = sqrD.array();
 	float sq = array.mean();
 	double stddev = std::sqrt(sq - sqexpd);

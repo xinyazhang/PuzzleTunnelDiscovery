@@ -3,6 +3,7 @@
 #include <igl/writeOBJ.h>
 #include <iostream>
 #include <string>
+#include <unistd.h>
 
 using std::endl;
 using std::string;

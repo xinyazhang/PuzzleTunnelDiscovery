@@ -53,7 +53,7 @@ void levelset::generate(
 	using openvdb::Vec3s;
 	using openvdb::Vec3I;
 	using openvdb::Vec4I;
-	auto scaledVA = inV.array();
+	auto scaledVA = inV.array().eval();
 	scaledVA *= scale_factor;
 
 	auto V = convert3<Vec3s>(scaledVA);

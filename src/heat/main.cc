@@ -1,5 +1,5 @@
-#define EIGEN_USE_MKL_ALL
-//#undef EIGEN_USE_MKL_ALL
+// #define EIGEN_USE_MKL_ALL
+#undef EIGEN_USE_MKL_ALL
 
 #include <unistd.h>
 #include <stdio.h>
@@ -15,6 +15,7 @@
 //#include <Eigen/SparseLU> 
 //#include <Eigen/SparseCholesky>
 #ifdef EIGEN_USE_MKL_ALL
+#       warning "Know bug in PardisoSupport: error: `const class Eigen::Product<Eigen::SparseMatrix<double, 1>, Eigen::Matrix<double, -1, 1>, 0>` has no member named `data`; did you mean `dot` ?"
 #       include <Eigen/PardisoSupport>
 #else
 #       include <Eigen/CholmodSupport>
