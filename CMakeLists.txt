@@ -264,6 +264,6 @@ EASYLIB(osr)
 TARGET_LINK_LIBRARIES(osr gbm EGL)
 
 SANCHECK(osr)
-TARGET_LINK_LIBRARIES(sancheck_osr osr)
+TARGET_LINK_LIBRARIES(sancheck_osr osr assimp ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES})
 
 # vim: tw=0
