@@ -14,7 +14,6 @@ namespace osr {
 void init();
 EGLDisplay create_display(int device_idx = 0);
 void create_gl_context(EGLDisplay dpy);
-void setup_renderer();
 void shutdown();
 }
 

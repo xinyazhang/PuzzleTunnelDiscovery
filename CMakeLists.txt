@@ -5,6 +5,7 @@ set (mkobs3d_VERSION_MAJOR 0)
 set (mkobj3d_VERSION_MINOR 2)
 
 message(STATUS, "CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
+message(STATUS "Initially Python links to: ${PYTHON_LIBRARY}")
 
 if (APPLE)
   link_directories(
@@ -261,9 +262,22 @@ EASYADD(trmap)
 TARGET_LINK_LIBRARIES(trmap omplaux fcl)
 
 EASYLIB(osr)
-TARGET_LINK_LIBRARIES(osr gbm EGL)
+TARGET_LINK_LIBRARIES(osr gbm EGL assimp ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES})
 
 SANCHECK(osr)
-TARGET_LINK_LIBRARIES(sancheck_osr osr assimp ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES})
+TARGET_LINK_LIBRARIES(sancheck_osr osr)
+
+# FIND_PACKAGE(pybind11 REQUIRED)
+find_package(PythonLibs 2.7 REQUIRED)
+
+message(STATUS "Python version string: ${PYTHONLIBS_VERSION_STRING}")
+AUX_SOURCE_DIRECTORY(lib/pyosr/ EASY_LOCAL_SRC)
+EASYLIB(pyosr)
+set_target_properties(pyosr PROPERTIES PREFIX "")
+#pybind11_add_module(pyosr MODULE ${EASY_LOCAL_SRC})
+message(STATUS "Python include directory: ${PYTHON_INCLUDE_DIR}")
+TARGET_INCLUDE_DIRECTORIES(pyosr BEFORE PRIVATE ${PYTHON_INCLUDE_DIR})
+message(STATUS "Python library: ${PYTHON_LIBRARY}")
+TARGET_LINK_LIBRARIES(pyosr osr)
 
 # vim: tw=0
