@@ -1,9 +1,12 @@
+#include <GL/glew.h>
 #include "osr_init.h"
 #include <string.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string>
 #include <fcntl.h>
 #include <unistd.h>
+#include <iostream>
 #include <gbm.h>
 #include <vector>
 
@@ -108,6 +111,11 @@ void create_gl_context(EGLDisplay dpy)
 	}
 	if (mesa_platform) {
 		eglMakeCurrent(dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, core_ctx);
+	}
+	glewExperimental = true;
+	if (glewInit() != GLEW_OK) {
+		std::cerr << "glew init fails!" << std::endl;
+		exit(EXIT_SUCCESS);
 	}
 }
 

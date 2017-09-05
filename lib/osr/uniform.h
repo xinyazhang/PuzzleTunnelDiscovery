@@ -5,6 +5,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+namespace osr {
 struct UniformMatrix {
     glm::mat4 model;
     glm::mat4 view;
@@ -22,6 +23,6 @@ struct UniformMatrix {
         proj    = rhs.proj;
     }
 };
-
+}
 
 #endif /* end of include guard: UNIFORM_H */

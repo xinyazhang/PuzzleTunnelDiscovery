@@ -8,8 +8,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-class BoundingBox
-{
+namespace osr {
+
+class BoundingBox {
 public:
     float left, right, top, bottom, front, back;
 
@@ -48,5 +49,6 @@ public:
     }
 };
 
+}
 
 #endif /* end of include guard: LAVA_BBOX_H */

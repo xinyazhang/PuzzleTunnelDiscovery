@@ -1,7 +1,9 @@
 #include "scene.h"
 #include "node.h"
 
-Node::Node(aiNode* node) {
+namespace osr {
+Node::Node(aiNode* node)
+{
     // meshes in current nodes
     for (size_t i = 0; i < node->mNumMeshes; i++) {
         meshes.push_back(node->mMeshes[i]);
@@ -21,6 +23,8 @@ Node::Node(aiNode* node) {
     xform = glm::make_mat4(data);
 }
 
-Node::~Node() {
+Node::~Node()
+{
+}
 
 }

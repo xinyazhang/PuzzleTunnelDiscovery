@@ -1,5 +1,6 @@
 #include "mesh.h"
 
+namespace osr {
 glm::vec3 to_glm_vec3(aiVector3D vec) {
     return glm::vec3(vec.x, vec.y, vec.z);
 }
@@ -85,4 +86,5 @@ Mesh::init()
     CHECK_GL_ERROR(glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t) * indices.size(), indices.data(), GL_STATIC_DRAW));
 
     CHECK_GL_ERROR(glBindVertexArray(0));
+}
 }

@@ -12,8 +12,8 @@
 #include "quickgl.h"
 #include "uniform.h"
 
-class Camera
-{
+namespace osr {
+class Camera {
     UniformMatrix           matrix;
     std::stack<glm::mat4>   stack;
 public:
@@ -69,5 +69,6 @@ public:
         CHECK_GL_ERROR(glUniformMatrix4fv(projLoc,  1, GL_FALSE, glm::value_ptr(matrix.proj)));
     }
 };
+}
 
 #endif /* end of include guard: CAMERA_H */

@@ -12,6 +12,7 @@
 
 #include "camera.h"
 
+namespace osr {
 class Scene;
 
 class Node
@@ -24,5 +25,6 @@ public:
     Node(aiNode* node);
     virtual ~Node();
 };
+}
 
 #endif /* end of include guard: NODE_H */

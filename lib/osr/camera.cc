@@ -1,5 +1,6 @@
 #include "camera.h"
 
+namespace osr {
 Camera::Camera() {
 }
 
@@ -133,4 +134,6 @@ Camera::frustum(float left, float right, float bottom, float top, float near, fl
 void
 Camera::perspective(float fovy, float aspectRatio, float near, float far) {
     matrix.proj = glm::perspective(fovy, aspectRatio, near, far);
+}
+
 }

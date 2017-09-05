@@ -14,10 +14,10 @@
 #include "quickgl.h"
 #include "camera.h"
 
+namespace osr {
 class Scene;
 
-class Mesh
-{
+class Mesh {
     friend class Scene;
     std::vector<Vertex>     vertices;
     std::vector<uint32_t>   indices;
@@ -35,4 +35,6 @@ public:
 private:
     void init();
 };
+}
+
 #endif /* end of include guard: MESH_H */

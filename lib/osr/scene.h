@@ -17,8 +17,8 @@
 #include "camera.h"
 #include "node.h"
 
-class Scene
-{
+namespace osr {
+class Scene {
     size_t              numVertices;
     BoundingBox         bbox;
     glm::vec3           center;
@@ -67,5 +67,6 @@ private:
     void updateBoundingBox(Node* node, glm::mat4 m);
     void render(GLuint program, Camera& camera, glm::mat4 m, Node* node);
 };
+}
 
 #endif /* end of include guard: SCENE_H */

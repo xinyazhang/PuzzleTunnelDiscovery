@@ -1,6 +1,7 @@
 #include <fstream>
 #include "scene.h"
 
+namespace osr {
 Scene::Scene() {
     // do nothing
 }
@@ -106,4 +107,5 @@ Scene::clear() {
     for (auto mesh : meshes)
         delete mesh;
     meshes.resize(0);
+}
 }
