@@ -136,12 +136,14 @@ void Renderer::render_depth_to(std::ostream& fout)
 	}
 }
 
-void Renderer::render_depth_to(std::vector<float>& pixels)
+std::vector<float> Renderer::render_depth_to_buffer()
 {
+	std::vector<float> pixels;
 	render_depth();
 	pixels.resize(pbufferWidth * pbufferHeight);
 	CHECK_GL_ERROR(glReadPixels(0, 0, pbufferWidth, pbufferHeight, GL_RED,
 				    GL_FLOAT, pixels.data()));
+	return pixels;
 }
 
 void Renderer::render_depth()

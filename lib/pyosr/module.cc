@@ -1,6 +1,7 @@
 #include <osr/osr_init.h>
 #include <osr/osr_render.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 #include <iostream>
 #include <stdint.h>
 
@@ -45,11 +46,22 @@ PYBIND11_PLUGIN(pyosr) {
 	m.def("shutdown", &osr::shutdown,
 	      "Close internally opened FDs. "
 	      "User is responsible to free OpenGL/EGL resources");
-	return m.ptr();
 #if 0
 	py::class_<Pet>(m, "Pet")
 		.def(py::init<const std::string &>())
 		.def("setName", &Pet::setName)
 		.def("getName", &Pet::getName);
 #endif
+	using osr::Renderer;
+	py::class_<Renderer>(m, "Renderer")
+		.def(py::init<>())
+		.def("setup", &Renderer::setup)
+		.def("teardown", &Renderer::teardown)
+		.def("loadModelFromFile", &Renderer::loadModelFromFile)
+		.def("angleModel", &Renderer::angleModel)
+		.def("render_depth_to_buffer", &Renderer::render_depth_to_buffer)
+		.def_readwrite("pbufferWidth", &Renderer::pbufferWidth)
+		.def_readwrite("pbufferHeight", &Renderer::pbufferHeight)
+		.def_readwrite("default_depth", &Renderer::default_depth);
+	return m.ptr();
 }

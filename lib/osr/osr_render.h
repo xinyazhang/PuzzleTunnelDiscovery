@@ -20,7 +20,7 @@ public:
 	void loadModelFromFile(const std::string& fn);
 	void angleModel(float latitude, float longitude);
 	void render_depth_to(std::ostream& fout);
-	void render_depth_to(std::vector<float>& pixels);
+	std::vector<float> render_depth_to_buffer();
 
 	int pbufferWidth = 224;
 	int pbufferHeight = 224;
