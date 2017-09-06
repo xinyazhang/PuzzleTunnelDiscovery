@@ -1,11 +1,11 @@
 #ifndef OFF_SCREEN_RENDERING_TO_H
 #define OFF_SCREEN_RENDERING_TO_H
 
+#include <Eigen/Core>
 #include "quickgl.h"
 #include <string>
 #include <ostream>
 #include <memory>
-#include <vector>
 
 namespace osr {
 class Scene;
@@ -20,7 +20,7 @@ public:
 	void loadModelFromFile(const std::string& fn);
 	void angleModel(float latitude, float longitude);
 	void render_depth_to(std::ostream& fout);
-	std::vector<float> render_depth_to_buffer();
+	Eigen::VectorXf render_depth_to_buffer();
 
 	int pbufferWidth = 224;
 	int pbufferHeight = 224;

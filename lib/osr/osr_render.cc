@@ -136,9 +136,9 @@ void Renderer::render_depth_to(std::ostream& fout)
 	}
 }
 
-std::vector<float> Renderer::render_depth_to_buffer()
+Eigen::VectorXf Renderer::render_depth_to_buffer()
 {
-	std::vector<float> pixels;
+	Eigen::VectorXf pixels;
 	render_depth();
 	pixels.resize(pbufferWidth * pbufferHeight);
 	CHECK_GL_ERROR(glReadPixels(0, 0, pbufferWidth, pbufferHeight, GL_RED,
