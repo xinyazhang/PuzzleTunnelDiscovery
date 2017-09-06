@@ -39,7 +39,7 @@ EGLDisplay mesa_create_display(int device_idx)
 }
 
 const EGLint config_attribs[] = {
-	EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,
+	// EGL_SURFACE_TYPE, EGL_PBUFFER_BIT, mesa does not acccept PBuffer.
 	EGL_BLUE_SIZE, 8,
 	EGL_GREEN_SIZE, 8,
 	EGL_RED_SIZE, 8,
