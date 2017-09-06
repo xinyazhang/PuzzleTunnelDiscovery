@@ -33,8 +33,10 @@ EGLDisplay mesa_create_display(int device_idx)
 {
 	string dripath = "/dev/dri/renderD" + std::to_string(128 + device_idx);
 	int fd = open(dripath.data(), O_RDWR | O_CLOEXEC);
+	std::cerr << "FD: " << fd << std::endl;
 	opended_drifds.emplace_back(fd);
 	gbm_device* gbm = gbm_create_device(fd);
+	std::cerr << "gbm: " << gbm << std::endl;
 	return eglGetPlatformDisplay(EGL_PLATFORM_GBM_MESA, gbm, NULL);
 }
 
@@ -106,6 +108,33 @@ void create_gl_context(EGLDisplay dpy)
 			egl_cfg,
 			EGL_NO_CONTEXT,
 			ctx_attribs);
+	std::cerr << "EGLContext: " << core_ctx  << " End of EGLContext" << std::endl;
+	EGLint ctx_err = eglGetError();
+	switch (ctx_err) {
+		case EGL_BAD_MATCH:
+			std::cerr << "EGL_BAD_MATCH" << std::endl;
+			break;
+		case EGL_BAD_DISPLAY:
+			std::cerr << "EGL_BAD_DISPLAY" << std::endl;
+			break;
+		case EGL_NOT_INITIALIZED:
+			std::cerr << "EGL_NOT_INITIALIZED" << std::endl;
+			break;
+		case EGL_BAD_CONFIG:
+			std::cerr << "EGL_BAD_CONFIG" << std::endl;
+			break;
+		case EGL_BAD_CONTEXT:
+			std::cerr << "EGL_BAD_CONTEXT" << std::endl;
+			break;
+		case EGL_BAD_ATTRIBUTE:
+			std::cerr << "EGL_BAD_ATTRIBUTE" << std::endl;
+			break;
+		case EGL_BAD_ALLOC:
+			std::cerr << "EGL_BAD_ALLOC" << std::endl;
+			break;
+		default:
+			break;
+	}
 	if (nvidia_platform) {
 		eglMakeCurrent(dpy, egl_surf, egl_surf, core_ctx);
 	}
@@ -113,9 +142,11 @@ void create_gl_context(EGLDisplay dpy)
 		eglMakeCurrent(dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, core_ctx);
 	}
 	glewExperimental = true;
-	if (glewInit() != GLEW_OK) {
-		std::cerr << "glew init fails!" << std::endl;
-		exit(EXIT_SUCCESS);
+	auto glew_err = glewInit();
+	if (glew_err != GLEW_OK) {
+		std::cerr << "glew init fails for dpy: " << dpy << std::endl;
+		std::cerr << "Reason: " << glewGetErrorString(glew_err) << std::endl;
+		// exit(EXIT_SUCCESS);
 	}
 }
 
