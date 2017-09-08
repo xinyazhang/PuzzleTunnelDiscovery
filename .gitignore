@@ -30,3 +30,8 @@
 # Build and Temp
 build/
 *.swp
+tmp/
+logs/
+
+# Generated C-Obs meshes
+generated-cobs/
