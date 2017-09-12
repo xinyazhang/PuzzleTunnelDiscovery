@@ -117,8 +117,8 @@ void Renderer::loadModelFromFile(const std::string& fn)
 void Renderer::angleModel(float latitude, float longitude)
 {
 	scene_->resetTransform();
-	scene_->rotate(glm::radians(30.0f), 1, 0, 0);              // latitude
-	scene_->rotate(glm::radians(30.0f), 0, 1, 0);              // longitude
+	scene_->rotate(glm::radians(latitude), 1, 0, 0);      // latitude
+	scene_->rotate(glm::radians(longitude), 0, 1, 0);     // longitude
 	scene_->moveToCenter();
 }
 
