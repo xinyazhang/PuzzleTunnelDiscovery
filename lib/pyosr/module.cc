@@ -58,10 +58,15 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("setup", &Renderer::setup)
 		.def("teardown", &Renderer::teardown)
 		.def("loadModelFromFile", &Renderer::loadModelFromFile)
+		.def("loadRobotFromFile", &Renderer::loadRobotFromFile)
 		.def("angleModel", &Renderer::angleModel)
+		.def("scaleToUnit", &Renderer::scaleToUnit)
+		.def_property("state", &Renderer::getRobotState, &Renderer::setRobotState)
 		.def("render_depth_to_buffer", &Renderer::render_depth_to_buffer)
+		.def("render_mvdepth_to_buffer", &Renderer::render_mvdepth_to_buffer)
 		.def_readwrite("pbufferWidth", &Renderer::pbufferWidth)
 		.def_readwrite("pbufferHeight", &Renderer::pbufferHeight)
-		.def_readwrite("default_depth", &Renderer::default_depth);
+		.def_readwrite("default_depth", &Renderer::default_depth)
+		.def_readwrite("views", &Renderer::views);
 	return m.ptr();
 }

@@ -4,7 +4,7 @@ namespace osr {
 Camera::Camera() {
 }
 
-Camera::Camera(Camera& rhs) {
+Camera::Camera(const Camera& rhs) {
     matrix = rhs.matrix;
     stack  = rhs.stack;
 }

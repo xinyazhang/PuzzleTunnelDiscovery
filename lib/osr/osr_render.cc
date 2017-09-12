@@ -1,6 +1,7 @@
 #include "osr_render.h"
 #include "scene.h"
 #include "camera.h"
+#include <glm/gtx/quaternion.hpp>
 
 namespace {
 const char* vertShaderSrc =
@@ -42,11 +43,20 @@ void main() {
 )zzz";
 
 const GLenum drawBuffers[1] = { GL_COLOR_ATTACHMENT0 };
+
+glm::mat4 translate_state_to_matrix(const Eigen::VectorXf& state)
+{
+	glm::quat quat(state(3), state(4), state(5), state(6));
+	glm::mat4 rot = glm::toMat4(quat);
+	return glm::translate(rot, glm::vec3(state(0), state(1), state(2)));
+}
+
 }
 
 namespace osr {
 Renderer::Renderer()
 {
+	camera_rot_ = glm::mat4(1.0f);
 }
 
 Renderer::~Renderer()
@@ -114,12 +124,48 @@ void Renderer::loadModelFromFile(const std::string& fn)
 	scene_->load(fn);
 }
 
+void Renderer::loadRobotFromFile(const std::string& fn)
+{
+	robot_.reset(new Scene);
+	robot_->load(fn);
+	robot_state_.setZero(7);
+	robot_state_(3) = 1.0; // Quaternion for no rotation
+}
+
+void Renderer::scaleToUnit()
+{
+	auto scene_span =  scene_->getBoundingBox().span();
+	float robot_span = 1.0f;
+	if (robot_)
+		robot_span =  robot_->getBoundingBox().span();
+	scene_scale_ = 1.0 / std::max(scene_span, robot_span);
+}
+
 void Renderer::angleModel(float latitude, float longitude)
 {
 	scene_->resetTransform();
+	scene_->scale(glm::vec3(scene_scale_));
 	scene_->rotate(glm::radians(latitude), 1, 0, 0);      // latitude
 	scene_->rotate(glm::radians(longitude), 0, 1, 0);     // longitude
 	scene_->moveToCenter();
+	if (robot_) {
+		robot_->resetTransform();
+		robot_->scale(glm::vec3(scene_scale_));
+		robot_->rotate(glm::radians(latitude), 1, 0, 0);      // latitude
+		robot_->rotate(glm::radians(longitude), 0, 1, 0);     // longitude
+		robot_->moveToCenter();
+	}
+}
+
+void Renderer::angleCamera(float latitude, float longitude)
+{
+	camera_rot_ = glm::mat4(1.0f);
+        camera_rot_ = glm::rotate(camera_rot_,
+			glm::radians(latitude),
+			glm::vec3(1.0f, 0.0f, 0.0f));
+        camera_rot_ = glm::rotate(camera_rot_,
+			glm::radians(longitude),
+			glm::vec3(0.0f, 1.0f, 0.0f));
 }
 
 void Renderer::render_depth_to(std::ostream& fout)
@@ -146,22 +192,39 @@ Eigen::VectorXf Renderer::render_depth_to_buffer()
 	return pixels;
 }
 
+
+/*
+ * render_mvdepth_to_buffer
+ *
+ *     Render an object from multiple views into a matrix.
+ */
+
+Renderer::RMMatrixXf Renderer::render_mvdepth_to_buffer()
+{
+	RMMatrixXf mvpixels;
+	mvpixels.resize(views.rows(), pbufferWidth * pbufferHeight);
+	for(int i = 0; i < views.rows(); i++) {
+		angleCamera(views(i, 0), views(i, 1));
+		render_depth();
+		CHECK_GL_ERROR(glReadPixels(0, 0, pbufferWidth, pbufferHeight,
+					    GL_RED, GL_FLOAT, mvpixels.row(i).data()));
+	}
+	return mvpixels;
+}
+
+void Renderer::setRobotState(const Eigen::VectorXf& state)
+{
+	robot_state_ = state;
+}
+
+Eigen::VectorXf Renderer::getRobotState() const
+{
+	return robot_state_;
+}
+
 void Renderer::render_depth()
 {
-	float eyeDist = 50.0f;
-	float minDist = 1.0f;
-	Camera camera;
-	camera.lookAt(
-			glm::vec3(0.0f, 0.0f, eyeDist),     // eye
-			glm::vec3(0.0f, 0.0f, 0.0f),        // center
-			glm::vec3(0.0f, 1.0f, 0.0f)         // up
-	             );
-	camera.perspective(
-			glm::radians(45.0f),                           // fov
-			(float) pbufferWidth / (float) pbufferHeight,  // aspect ratio
-			minDist,                                       // near plane
-			120.0f                                         // far plane
-			);
+	Camera camera = setup_camera();
 	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 	CHECK_GL_ERROR(glClearTexImage(renderTarget, 0, GL_RED, GL_FLOAT, &default_depth));
 	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, framebufferID));
@@ -175,9 +238,35 @@ void Renderer::render_depth()
 
 	CHECK_GL_ERROR(glUseProgram(shaderProgram));
 	scene_->render(shaderProgram, camera, glm::mat4());
+	if (robot_) {
+		auto mat = translate_state_to_matrix(robot_state_);
+		robot_->render(shaderProgram, camera, mat);
+	}
 	CHECK_GL_ERROR(glUseProgram(0));
 
 	CHECK_GL_ERROR(glFlush());
+}
+
+Camera Renderer::setup_camera()
+{
+	const float eyeDist = 2.0f;
+	const float minDist = 0.01f;
+	Camera cam;
+	glm::vec4 eye = camera_rot_ * glm::vec4(0.0f, 0.0f, eyeDist, 1.0f);
+	glm::vec4 cen = camera_rot_ * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+	glm::vec4 upv = camera_rot_ * glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
+	cam.lookAt(
+			glm::vec3(eye),     // eye
+			glm::vec3(cen),     // CENter
+			glm::vec3(upv)      // UP Vector
+	          );
+	cam.perspective(
+			glm::radians(45.0f),                           // fov
+			(float) pbufferWidth / (float) pbufferHeight,  // aspect ratio
+			minDist,                                       // near plane
+			120.0f                                         // far plane
+			);
+	return cam;
 }
 
 }

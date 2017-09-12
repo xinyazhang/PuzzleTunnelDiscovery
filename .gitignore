@@ -32,6 +32,7 @@ build/
 *.swp
 tmp/
 logs/
+*.pyc
 
 # Generated C-Obs meshes
 generated-cobs/

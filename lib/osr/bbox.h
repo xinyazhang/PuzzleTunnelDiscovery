@@ -26,6 +26,14 @@ public:
         return glm::vec3(left + right, top + bottom, front + back) / 2.0f;
     }
 
+    float span() const
+    {
+	    auto spanX = right - left;
+	    auto spanY = top - bottom;
+	    auto spanZ = front - back;
+	    return std::max(std::max(spanX, spanY), spanZ);
+    }
+
     friend BoundingBox& operator<<(BoundingBox& bbox, glm::vec3 v) {
         bbox.right = std::max(v.x, bbox.right);
         bbox.left  = std::min(v.x, bbox.left);

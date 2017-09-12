@@ -18,7 +18,7 @@ class Camera {
     std::stack<glm::mat4>   stack;
 public:
     Camera();
-    Camera(Camera& rhs);
+    Camera(const Camera& rhs);
     virtual ~Camera();
 
     void commit();
