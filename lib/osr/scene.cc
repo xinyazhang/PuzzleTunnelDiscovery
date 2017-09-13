@@ -17,7 +17,8 @@ Scene::~Scene() {
 }
 
 void
-Scene::load(std::string filename) {
+Scene::load(std::string filename, const glm::vec3* model_color)
+{
     assert(std::ifstream(filename.c_str()).good());
     clear();
 
@@ -43,7 +44,11 @@ Scene::load(std::string filename) {
 
     // generate all meshes
     for (size_t i = 0; i < scene->mNumMeshes; i++) {
-        glm::vec3 color = meshColors[i % meshColors.size()];
+	    glm::vec3 color;
+	    if (model_color)
+		    color = *model_color;
+	    else
+		    color = meshColors[i % meshColors.size()];
         meshes.push_back(new Mesh(scene->mMeshes[i], color));
     }
 

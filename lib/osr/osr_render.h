@@ -6,6 +6,7 @@
 #include <string>
 #include <ostream>
 #include <memory>
+#include <stdint.h>
 
 #define GLM_FORCE_RADIANS
 #include <glm/mat4x4.hpp>
@@ -17,6 +18,7 @@ class Camera;
 class Renderer {
 public:
 	typedef Eigen::Matrix<float, -1, -1, Eigen::RowMajor> RMMatrixXf;
+	typedef Eigen::Matrix<uint8_t, -1, -1, Eigen::RowMajor> RMMatrixXb;
 
 	Renderer();
 	~Renderer();
@@ -31,7 +33,10 @@ public:
 	void render_depth_to(std::ostream& fout);
 	Eigen::VectorXf render_depth_to_buffer();
 	RMMatrixXf render_mvdepth_to_buffer();
+	void render_mvrgbd();
 
+	RMMatrixXb mvrgb;
+	RMMatrixXf mvdepth;
 	/*
 	 * Accessors of Robot State. For rigid bodies, the state vector is:
 	 *      Column 0-2 (x, y, z): translation vector
@@ -53,11 +58,15 @@ public:
 	Eigen::MatrixXf views;
 private:
 	GLuint shaderProgram = 0;
+	GLuint rgbdShaderProgram = 0;
 	GLuint vertShader = 0;
 	GLuint fragShader = 0;
+	GLuint rgbdFragShader = 0;
 	GLuint framebufferID = 0;
 	GLuint depthbufferID = 0;
 	GLuint renderTarget = 0;
+	GLuint rgbdFramebuffer = 0;
+	GLuint rgbTarget = 0;
 
 	std::unique_ptr<Scene> scene_;
 	std::unique_ptr<Scene> robot_;
@@ -66,6 +75,7 @@ private:
 	glm::mat4 camera_rot_;
 
 	void render_depth();
+	void render_rgbd();
 	Camera setup_camera();
 };
 

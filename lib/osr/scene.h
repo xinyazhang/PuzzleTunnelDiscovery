@@ -30,7 +30,7 @@ public:
     Scene(Scene& rhs);
     virtual ~Scene();
 
-    void load(std::string filename);
+    void load(std::string filename, const glm::vec3* model_color = nullptr);
     void render(GLuint program, Camera& camera, glm::mat4 globalXform);
     void clear();
 

@@ -64,9 +64,12 @@ PYBIND11_PLUGIN(pyosr) {
 		.def_property("state", &Renderer::getRobotState, &Renderer::setRobotState)
 		.def("render_depth_to_buffer", &Renderer::render_depth_to_buffer)
 		.def("render_mvdepth_to_buffer", &Renderer::render_mvdepth_to_buffer)
+		.def("render_mvrgbd", &Renderer::render_mvrgbd)
 		.def_readwrite("pbufferWidth", &Renderer::pbufferWidth)
 		.def_readwrite("pbufferHeight", &Renderer::pbufferHeight)
 		.def_readwrite("default_depth", &Renderer::default_depth)
+		.def_readwrite("mvrgb", &Renderer::mvrgb)
+		.def_readwrite("mvdepth", &Renderer::mvdepth)
 		.def_readwrite("views", &Renderer::views);
 	return m.ptr();
 }

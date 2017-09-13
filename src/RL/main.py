@@ -1,6 +1,7 @@
 import pyosr
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.misc import imsave
 
 pyosr.init()
 pyosr.create_gl_context(pyosr.create_display())
@@ -15,14 +16,20 @@ r.default_depth = 0.0
 r.views = np.array([[30.0, float(i)] for i in range(0, 360, 30)], dtype=np.float32)
 print(r.views)
 print(r.views.shape)
-r.state = np.array([0.2, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5], dtype=np.float32)
-mvpix = r.render_mvdepth_to_buffer()
 w = r.pbufferWidth
 h = r.pbufferHeight
+r.state = np.array([0.2, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5], dtype=np.float32)
+r.render_mvrgbd()
+img = r.mvrgb.reshape(w * r.views.shape[0], h, 3)
+imsave('mvrgb.png', img)
+exit()
+
+mvpix = r.render_mvdepth_to_buffer()
 img = mvpix.reshape(w * r.views.shape[0], h)
 print(img.shape)
 plt.pcolor(img)
 plt.show()
+
 
 r.teardown()
 pyosr.shutdown()
