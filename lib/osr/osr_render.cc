@@ -20,7 +20,7 @@ out float linearZ;
 void main() {
     vec4 vm = view * model * vec4(inPosition, 1.0);
     gl_Position = proj * vm;
-    linearZ = vm.z;
+    linearZ = length(vec3(vm));
     fragColor = inColor;
 }
 )zzz";
