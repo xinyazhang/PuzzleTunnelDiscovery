@@ -1,6 +1,7 @@
 import pyosr
 import numpy as np
 import matplotlib.pyplot as plt
+from PIL import Image
 from scipy.misc import imsave
 
 pyosr.init()
@@ -21,7 +22,12 @@ h = r.pbufferHeight
 r.state = np.array([0.2, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5], dtype=np.float32)
 r.render_mvrgbd()
 img = r.mvrgb.reshape(w * r.views.shape[0], h, 3)
+dep = r.mvdepth.reshape(w * r.views.shape[0], h)
+depimg = Image.fromarray(dep)
 imsave('mvrgb.png', img)
+depimg.save('mvdepth.tiff')
+# print(dep[112])
+# plt.imsave('mvdepth.tiff', dep)
 exit()
 
 mvpix = r.render_mvdepth_to_buffer()
