@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
 from scipy.misc import imsave
+import vision
+import tensorflow as tf
 
 pyosr.init()
 pyosr.create_gl_context(pyosr.create_display())
@@ -26,8 +28,33 @@ dep = r.mvdepth.reshape(w * r.views.shape[0], h)
 depimg = Image.fromarray(dep)
 imsave('mvrgb.png', img)
 depimg.save('mvdepth.tiff')
-# print(dep[112])
-# plt.imsave('mvdepth.tiff', dep)
+
+# Vision NN
+
+vis0 = vision.VisionLayerConfig(16)
+vis1 = vision.VisionLayerConfig(16)
+vis1.strides = [1, 3, 3, 1]
+vis1.kernel_size = [5, 5]
+vis2 = vision.VisionLayerConfig(32)
+vis3 = vision.VisionLayerConfig(64)
+
+imgin = img.reshape(r.views.shape[0], w, h, 3)
+depin = r.mvdepth.reshape(r.views.shape[0], w , h, 1)
+print('imgin shape: {}'.format(imgin.shape))
+mv_color = vision.VisionNetwork(imgin.shape,
+        [vis0, vis1, vis2, vis3], 0, 256)
+featvec = mv_color.features
+print('mv_color.featvec.shape = {}'.format(featvec.shape))
+
+sq_featvec = tf.reshape(featvec, [-1, 16, 16, 1]) # Squared feature vector
+chmv_featvec = tf.transpose(sq_featvec, [3, 1, 2, 0])
+print('chmv_featvec {}'.format(chmv_featvec.shape))
+
+pvis0 = vision.VisionLayerConfig(64)
+color = vision.VisionNetwork(None, [pvis0], 0, 256, chmv_featvec)
+featvec = color.features
+print('featvec.shape = {}'.format(featvec.shape))
+
 exit()
 
 mvpix = r.render_mvdepth_to_buffer()
