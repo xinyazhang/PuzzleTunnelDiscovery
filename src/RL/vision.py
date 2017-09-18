@@ -27,6 +27,19 @@ class VisionLayerConfig:
         bias   = tf.Variable(tf.random_uniform(bias_shape,   minval=-d, maxval=d))
         return weight, bias
 
+    @staticmethod
+    def createFromDict(visdict):
+        viscfg_array = []
+        for visdesc in visdict:
+            print(visdesc)
+            viscfg = VisionLayerConfig(visdesc['ch_out'])
+            if visdesc['strides'] is not None:
+                viscfg.strides = visdesc['strides']
+            if visdesc['kernel_size'] is not None:
+                viscfg.kernel_size = visdesc['kernel_size']
+            viscfg_array.append(viscfg)
+        return viscfg_array
+
 class FCLayerConfig:
     ch_in = -1
     ch_out = None
@@ -43,6 +56,11 @@ class FCLayerConfig:
         weight = tf.Variable(tf.random_uniform(weight_shape, minval=-d, maxval=d))
         bias   = tf.Variable(tf.random_uniform(bias_shape,   minval=-d, maxval=d))
         return weight, bias
+
+    def apply_layer(self, prev):
+        flatten = tf.reshape(prev, [1, -1])
+        w,b = self.create_kernel(flatten.shape[-1])
+        return w,b,tf.nn.relu(tf.matmul(flatten, w) + b)
 
 class VisionNetwork:
     thread_index = 0
@@ -97,7 +115,8 @@ class VisionNetwork:
         fclc = FCLayerConfig(self.feature_number)
         self.mv_cnnflatten = tf.reshape(self.nn_layers[-1], [self.view_number, -1])
         print('mv_cnn flatten: {}'.format(self.mv_cnnflatten.shape))
-        w,b = fclc.create_kernel(self.mv_cnnflatten.shape[-1])
-        self.mv_featvec = tf.nn.relu(tf.matmul(self.mv_cnnflatten, w) + b)
+        #w,b = fclc.create_kernel(self.mv_cnnflatten.shape[-1])
+        #self.mv_featvec = tf.nn.relu(tf.matmul(self.mv_cnnflatten, w) + b)
+        w,b,self.mv_featvec = fclc.apply_layer(self.mv_cnnflatten)
         self.nn_featvec = self.mv_featvec
 

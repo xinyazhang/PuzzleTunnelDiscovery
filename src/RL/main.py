@@ -5,64 +5,78 @@ from PIL import Image
 from scipy.misc import imsave
 import vision
 import tensorflow as tf
+import rldriver
+import cat
+import config
 
-pyosr.init()
-pyosr.create_gl_context(pyosr.create_display())
+def test():
+    pyosr.init()
+    pyosr.create_gl_context(pyosr.create_display())
 
-r=pyosr.Renderer()
-r.setup()
-r.loadModelFromFile('../res/alpha/env-1.2.obj')
-r.loadRobotFromFile('../res/alpha/robot.obj')
-r.scaleToUnit()
-r.angleModel(0.0, 0.0)
-r.default_depth = 0.0
-r.views = np.array([[30.0, float(i)] for i in range(0, 360, 30)], dtype=np.float32)
-print(r.views)
-print(r.views.shape)
-w = r.pbufferWidth
-h = r.pbufferHeight
-r.state = np.array([0.2, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5], dtype=np.float32)
-r.render_mvrgbd()
-img = r.mvrgb.reshape(w * r.views.shape[0], h, 3)
-dep = r.mvdepth.reshape(w * r.views.shape[0], h)
-depimg = Image.fromarray(dep)
-imsave('mvrgb.png', img)
-depimg.save('mvdepth.tiff')
+    r=pyosr.Renderer()
+    r.setup()
+    r.loadModelFromFile('../res/alpha/env-1.2.obj')
+    r.loadRobotFromFile('../res/alpha/robot.obj')
+    r.scaleToUnit()
+    r.angleModel(0.0, 0.0)
+    r.default_depth = 0.0
+    r.views = np.array([[30.0, float(i)] for i in range(0, 360, 30)], dtype=np.float32)
+    print(r.views)
+    print(r.views.shape)
+    w = r.pbufferWidth
+    h = r.pbufferHeight
+    r.state = np.array([0.2, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5], dtype=np.float32)
+    r.render_mvrgbd()
+    img = r.mvrgb.reshape(w * r.views.shape[0], h, 3)
+    dep = r.mvdepth.reshape(w * r.views.shape[0], h)
+    depimg = Image.fromarray(dep)
+    imsave('mvrgb.png', img)
+    depimg.save('mvdepth.tiff')
 
-# Vision NN
+    # Vision NN
 
-vis0 = vision.VisionLayerConfig(16)
-vis1 = vision.VisionLayerConfig(16)
-vis1.strides = [1, 3, 3, 1]
-vis1.kernel_size = [5, 5]
-vis2 = vision.VisionLayerConfig(32)
-vis3 = vision.VisionLayerConfig(64)
+    vis0 = vision.VisionLayerConfig(16)
+    vis1 = vision.VisionLayerConfig(16)
+    vis1.strides = [1, 3, 3, 1]
+    vis1.kernel_size = [5, 5]
+    vis2 = vision.VisionLayerConfig(32)
+    vis3 = vision.VisionLayerConfig(64)
 
-imgin = img.reshape(r.views.shape[0], w, h, 3)
-depin = r.mvdepth.reshape(r.views.shape[0], w , h, 1)
-print('imgin shape: {}'.format(imgin.shape))
-mv_color = vision.VisionNetwork(imgin.shape,
-        [vis0, vis1, vis2, vis3], 0, 256)
-featvec = mv_color.features
-print('mv_color.featvec.shape = {}'.format(featvec.shape))
+    imgin = img.reshape(r.views.shape[0], w, h, 3)
+    depin = r.mvdepth.reshape(r.views.shape[0], w , h, 1)
+    print('imgin shape: {}'.format(imgin.shape))
+    mv_color = vision.VisionNetwork(imgin.shape,
+            [vis0, vis1, vis2, vis3], 0, 256)
+    featvec = mv_color.features
+    print('mv_color.featvec.shape = {}'.format(featvec.shape))
 
-sq_featvec = tf.reshape(featvec, [-1, 16, 16, 1]) # Squared feature vector
-chmv_featvec = tf.transpose(sq_featvec, [3, 1, 2, 0])
-print('chmv_featvec {}'.format(chmv_featvec.shape))
+    sq_featvec = tf.reshape(featvec, [-1, 16, 16, 1]) # Squared feature vector
+    chmv_featvec = tf.transpose(sq_featvec, [3, 1, 2, 0])
+    print('chmv_featvec {}'.format(chmv_featvec.shape))
 
-pvis0 = vision.VisionLayerConfig(64)
-color = vision.VisionNetwork(None, [pvis0], 0, 256, chmv_featvec)
-featvec = color.features
-print('featvec.shape = {}'.format(featvec.shape))
+    pvis0 = vision.VisionLayerConfig(64)
+    color = vision.VisionNetwork(None, [pvis0], 0, 256, chmv_featvec)
+    featvec = color.features
+    print('featvec.shape = {}'.format(featvec.shape))
 
-exit()
+    exit()
 
-mvpix = r.render_mvdepth_to_buffer()
-img = mvpix.reshape(w * r.views.shape[0], h)
-print(img.shape)
-plt.pcolor(img)
-plt.show()
+    mvpix = r.render_mvdepth_to_buffer()
+    img = mvpix.reshape(w * r.views.shape[0], h)
+    print(img.shape)
+    plt.pcolor(img)
+    plt.show()
+    r.teardown()
+    pyosr.shutdown()
 
+def train_classification():
+    pyosr.init()
+    pyosr.create_gl_context(pyosr.create_display()) # FIXME: Each thread has one ctx
+    init_state = np.array([0.2, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5], dtype=np.float32)
+    with tf.Graph().as_default():
+        global_step = tf.contrib.framework.get_or_create_global_step()
+        cat = cat.TrainCat(global_step)
+        cat.run()
 
-r.teardown()
-pyosr.shutdown()
+if __name__ == '__main__':
+    train_classification()
