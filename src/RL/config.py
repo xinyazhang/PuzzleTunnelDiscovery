@@ -24,3 +24,15 @@ class Config:
     device = property(get_device)
 
     # TODO: singleton object.
+
+VIEW_CFG = [(30.0, 12), (-30.0, 12), (0, 4), (90, 1), (-90, 1)]
+SV_VISCFG = [ { 'ch_out' : 16, 'strides' : None, 'kernel_size' : None},
+        { 'ch_out' : 32, 'strides' : [1,3,3,1], 'kernel_size' : [5,5]},
+        { 'ch_out' : 64, 'strides' : None, 'kernel_size' : None},
+        { 'ch_out' : 128, 'strides' : None, 'kernel_size' : None} ]
+
+MV_VISCFG = [ { 'ch_out' : 64, 'strides' : None, 'kernel_size' : None} ]
+
+MAX_STEPS = 1000000
+DEFAULT_RES = 224
+BATCH_SIZE = 8
