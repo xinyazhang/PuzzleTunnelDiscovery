@@ -2,6 +2,10 @@ import rldriver
 import config
 import random
 import os
+import tensorflow as tf
+import numpy as np
+import time
+from datetime import datetime
 
 def read_shapenet(filename_queue):
     """Reads and parses examples from ShapeCat data files.
@@ -51,11 +55,11 @@ def read_shapenet(filename_queue):
             tf.decode_raw(record_depth_image_string, tf.float32),
             [result.n_images, result.height, result.width, 1])
 
-    result.depth_images = depth
+    result.image = depth
 
     return result
 
-def distorted_inputs(data_dir)
+def distorted_inputs(data_dir):
     """Construct distorted input
 
     Args:
@@ -66,9 +70,9 @@ def distorted_inputs(data_dir)
       images: Images. 4D tensor of [batch_size, IMAGE_SIZE, IMAGE_SIZE, 1] size.
       labels: Labels. 1D tensor of [batch_size] size.
     """
-    filenames = [os.path.join(data_dir, name)
+    fnq = [os.path.join(data_dir, name)
             for name in filter(lambda x: x.endswith('train'), os.listdir(data_dir))]
-    fnq = random.shuffle(filenames)
+    random.shuffle(fnq)
     filename_queue = tf.train.string_input_producer(fnq)
     read_input = read_shapenet(filename_queue)
     read_input.label.set_shape([1])
@@ -91,31 +95,32 @@ def distorted_inputs(data_dir)
     '''
 
 class TrainCat:
-    def __init__(self, global_step, ckpt_dir='./cat/ckpt', train_dir='./cat/depth_data'):
+    def __init__(self, global_step, ckpt_dir='./cat/ckpt', data_dir='./cat/depth_data'):
         self.ckpt_dir = ckpt_dir
         self.data_dir = data_dir
         self.images, self.labels = distorted_inputs(self.data_dir)
         self.driver = rldriver.RLDriver(['../res/alpha/env-1.2.obj', '../res/alpha/robot.obj'],
-                init_state,
+                np.array([0.2, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5], dtype=np.float32),
                 [(30.0, 12), (-30.0, 12), (0, 4), (90, 1), (-90, 1)],
                 config.SV_VISCFG,
                 config.MV_VISCFG,
                 58,
-                input_tensor=images)
-        print('sv_colorfv = {}'.format(driver.sv_colorfv.shape))
-        print('mv_colorfv = {}'.format(driver.mv_colorfv.shape))
-        print('final = {}'.format(driver.final.shape))
-        self.logits = driver.final
+                input_tensor=self.images)
+        print('sv_colorfv = {}'.format(self.driver.sv_colorfv.shape))
+        print('mv_colorfv = {}'.format(self.driver.mv_colorfv.shape))
+        print('final = {}'.format(self.driver.final.shape))
+        self.logits = self.driver.final
         self.global_step = global_step
         self.cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
-            labels=labels, logits=self.logits, name='cross_entropy_per_example')
+            labels=self.labels, logits=self.logits, name='cross_entropy_per_example')
         cross_entropy_mean = tf.reduce_mean(self.cross_entropy, name='cross_entropy')
         tf.add_to_collection('losses', cross_entropy_mean)
         self.loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
-        opt = tf.train.AdamOptimizer()
-        self.train_op = opt.mininize(self.loss)
+        opt = tf.train.AdamOptimizer(1e-4)
+        self.train_op = opt.minimize(loss=self.loss, global_step=global_step)
 
     def run(self):
+        loss = self.loss
         class _LoggerHook(tf.train.SessionRunHook):
             """Logs loss and runtime."""
 
@@ -143,10 +148,9 @@ class TrainCat:
         with tf.train.MonitoredTrainingSession(
                 checkpoint_dir=self.ckpt_dir,
                 hooks=[tf.train.StopAtStepHook(last_step=config.MAX_STEPS),
-                    tf.train.NanTensorHook(loss),
+                    tf.train.NanTensorHook(self.loss),
                     _LoggerHook()]) as mon_sess:
-            cw = np.array([ 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.4 ])
             epoch = 0
             while not mon_sess.should_stop():
-                mon_sess.run(train_op, feed_dict={chamfer_weights: cw})
+                mon_sess.run(self.train_op)
                 epoch += 1

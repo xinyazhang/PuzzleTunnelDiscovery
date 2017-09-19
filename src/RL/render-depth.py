@@ -30,9 +30,9 @@ def render_everything_to(src, dst):
             dep = dep.reshape(r.views.shape[0],w,h,1)
             outfn = os.path.join(dst, '%07d.train' % modelId)
             with open(outfn, 'w') as f:
-                label = 1
+                label = 0
                 labelbytes = np.array([label],dtype=np.int32).tobytes()
-                # f.write(labelbytes)
+                f.write(labelbytes)
                 f.write(dep.tobytes())
             print('{} -> {}'.format(ffn, outfn))
             modelId += 1

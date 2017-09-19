@@ -75,8 +75,8 @@ def train_classification():
     init_state = np.array([0.2, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5], dtype=np.float32)
     with tf.Graph().as_default():
         global_step = tf.contrib.framework.get_or_create_global_step()
-        cat = cat.TrainCat(global_step)
-        cat.run()
+        cater = cat.TrainCat(global_step)
+        cater.run()
 
 if __name__ == '__main__':
     train_classification()

@@ -22,7 +22,7 @@ class RLDriver:
             output_number = 3 * 2 * 2, # For RL: X,Y,Z * (rotate,translate) * (pos,neg)
             sv_sqfeatnum = 16,
             mv_featnum = 256,
-            input_tensor):
+            input_tensor = None):
         self.renderer = pyosr.Renderer()
         r = self.renderer
         r.setup()
@@ -43,10 +43,17 @@ class RLDriver:
         # TODO: Switch to RGB-D rather than D-only
         CHANNEL = 1
         colorshape = [len(view_array), w, h, CHANNEL]
-        sv_color = vision.VisionNetwork(colorshape,
-                vision.VisionLayerConfig.createFromDict(svconfdict),
-                0, # FIXME: multi-threading
-                sv_sqfeatnum ** 2)
+        if input_tensor is None:
+            sv_color = vision.VisionNetwork(colorshape,
+                    vision.VisionLayerConfig.createFromDict(svconfdict),
+                    0, # FIXME: multi-threading
+                    sv_sqfeatnum ** 2)
+        else:
+            sv_color = vision.VisionNetwork(None,
+                    vision.VisionLayerConfig.createFromDict(svconfdict),
+                    0, # FIXME: multi-threading
+                    sv_sqfeatnum ** 2,
+                    input_tensor)
         sq_svfeatvec = tf.reshape(sv_color.features, [-1, sv_sqfeatnum, sv_sqfeatnum, 1])
         print('sv_color.featvec.shape = {}'.format(sv_color.features.shape))
         sv_featvec = tf.transpose(sq_svfeatvec, [3,1,2,0])
