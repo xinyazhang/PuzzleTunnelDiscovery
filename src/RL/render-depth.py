@@ -4,7 +4,7 @@ import sys
 import os
 import numpy as np
 
-def render_everything_to(src, dst):
+def render_everything_to(src, dst, label):
     pyosr.init()
     pyosr.create_gl_context(pyosr.create_display())
     modelId = 0
@@ -39,5 +39,5 @@ def render_everything_to(src, dst):
 
 if __name__ == '__main__':
     # print(sys.argv)
-    src,dst = sys.argv[1:3]
-    render_everything_to(src, dst)
+    src,dst,label = sys.argv[1:4]
+    render_everything_to(src, dst, label)
