@@ -24,13 +24,13 @@ include_directories(
 FIND_PACKAGE(OpenMP)
 
 # Include Eigen3 and IGL
-FIND_PACKAGE(Eigen3 REQUIRED)
-INCLUDE_DIRECTORIES(SYSTEM ${EIGEN3_INCLUDE_DIR})
-INCLUDE_DIRECTORIES(${IGL_INCLUDE_DIR})
-
 INCLUDE(${CMAKE_SOURCE_DIR}/cmake/FindSUITESPARSE.cmake)
 INCLUDE_DIRECTORIES(${SUITESPARSE_INCLUDE_DIRS})
 INCLUDE_DIRECTORIES(lib/)
+
+FIND_PACKAGE(Eigen3 QUIET)
+INCLUDE_DIRECTORIES(SYSTEM ${EIGEN3_INCLUDE_DIR})
+INCLUDE_DIRECTORIES(${IGL_INCLUDE_DIR})
 
 find_package(OpenGL REQUIRED)
 include_directories(${OpenGL_INCLUDE_DIRS})
@@ -184,7 +184,8 @@ LINK_DIRECTORIES(/opt/intel/compilers_and_libraries/linux/lib/intel64/)
 #LINK_DIRECTORIES(/usr/lib64/openmpi/lib/)
 EASYADD(heat)
 #TARGET_LINK_LIBRARIES(heat ${SUITESPARSE_LIBRARIES} vecio mkl_core mkl_intel_thread mkl_intel_lp64 iomp5 ptscotch scotch scotcherr pastix mpi z)
-TARGET_LINK_LIBRARIES(heat ${SUITESPARSE_LIBRARIES} vecio mkl_core mkl_intel_thread mkl_intel_lp64 iomp5)
+#TARGET_LINK_LIBRARIES(heat ${SUITESPARSE_LIBRARIES} vecio mkl_core mkl_intel_thread mkl_intel_lp64 iomp5)
+message(STATUS "SUITESPARSE LIBS: ${SUITESPARSE_LIBRARIES}")
 TARGET_LINK_LIBRARIES(heat ${SUITESPARSE_LIBRARIES} vecio)
 #TARGET_INCLUDE_DIRECTORIES(heat BEFORE PRIVATE /usr/include/openmpi-x86_64/)
 #TARGET_INCLUDE_DIRECTORIES(heat BEFORE PRIVATE /usr/local/include/pastix/)

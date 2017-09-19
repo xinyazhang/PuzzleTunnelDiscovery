@@ -139,13 +139,11 @@ int main(int argc, char* argv[])
 		msg << "+ Parameters" << std::endl;
 		msg << "\t input                                       " << params.m_fileNameIn << endl;
 		msg << "\t resolution                                  " << params.m_paramsVHACD.m_resolution << endl;
-		msg << "\t max. depth                                  " << params.m_paramsVHACD.m_depth << endl;
 		msg << "\t max. concavity                              " << params.m_paramsVHACD.m_concavity << endl;
 		msg << "\t plane down-sampling                         " << params.m_paramsVHACD.m_planeDownsampling << endl;
 		msg << "\t convex-hull down-sampling                   " << params.m_paramsVHACD.m_convexhullDownsampling << endl;
 		msg << "\t alpha                                       " << params.m_paramsVHACD.m_alpha << endl;
 		msg << "\t beta                                        " << params.m_paramsVHACD.m_beta << endl;
-		msg << "\t gamma                                       " << params.m_paramsVHACD.m_gamma << endl;
 		msg << "\t pca                                         " << params.m_paramsVHACD.m_pca << endl;
 		msg << "\t mode                                        " << params.m_paramsVHACD.m_mode << endl;
 		msg << "\t max. vertices per convex-hull               " << params.m_paramsVHACD.m_maxNumVerticesPerCH << endl;
@@ -179,8 +177,8 @@ int main(int argc, char* argv[])
 		// run V-HACD
 		IVHACD* interfaceVHACD = CreateVHACD();
 
-		bool res = interfaceVHACD->Compute(&points[0], 3, (unsigned int)points.size() / 3,
-				&triangles[0], 3, (unsigned int)triangles.size() / 3, params.m_paramsVHACD);
+		bool res = interfaceVHACD->Compute(&points[0], (unsigned int)points.size() / 3,
+				(const uint32_t *)&triangles[0], (unsigned int)triangles.size() / 3, params.m_paramsVHACD);
 
 		if (res) {
 			unsigned int nConvexHulls = interfaceVHACD->GetNConvexHulls();
@@ -195,7 +193,7 @@ int main(int argc, char* argv[])
 						points.data(), points.size()/3,
 						triangles.data(), triangles.size()/3,
 						ch.m_points, ch.m_nPoints,
-						ch.m_triangles, ch.m_nTriangles);
+						(int*)ch.m_triangles, ch.m_nTriangles);
 				cout << "Done\n";
 			}
 		} else {
@@ -222,13 +220,11 @@ void Usage(const Parameters& params)
     msg << "       --output                    VRML 2.0 output file name" << endl;
     msg << "       --log                       Log file name" << endl;
     msg << "       --resolution                Maximum number of voxels generated during the voxelization stage (default=100,000, range=10,000-16,000,000)" << endl;
-    msg << "       --depth                     Maximum number of clipping stages. During each split stage, parts with a concavity higher than the user defined threshold are clipped according the \"best\" clipping plane (default=20, range=1-32)" << endl;
     msg << "       --concavity                 Maximum allowed concavity (default=0.0025, range=0.0-1.0)" << endl;
     msg << "       --planeDownsampling         Controls the granularity of the search for the \"best\" clipping plane (default=4, range=1-16)" << endl;
     msg << "       --convexhullDownsampling    Controls the precision of the convex-hull generation process during the clipping plane selection stage (default=4, range=1-16)" << endl;
     msg << "       --alpha                     Controls the bias toward clipping along symmetry planes (default=0.05, range=0.0-1.0)" << endl;
     msg << "       --beta                      Controls the bias toward clipping along revolution axes (default=0.05, range=0.0-1.0)" << endl;
-    msg << "       --gamma                     Controls the maximum allowed concavity during the merge stage (default=0.00125, range=0.0-1.0)" << endl;
     msg << "       --delta                     Controls the bias toward maximaxing local concavity (default=0.05, range=0.0-1.0)" << endl;
     msg << "       --pca                       Enable/disable normalizing the mesh before applying the convex decomposition (default=0, range={0,1})" << endl;
     msg << "       --mode                      0: voxel-based approximate convex decomposition, 1: tetrahedron-based approximate convex decomposition (default=0, range={0,1})" << endl;
@@ -265,10 +261,6 @@ void ParseParameters(int argc, char* argv[], Parameters& params)
             if (++i < argc)
                 params.m_paramsVHACD.m_resolution = atoi(argv[i]);
         }
-        else if (!strcmp(argv[i], "--depth")) {
-            if (++i < argc)
-                params.m_paramsVHACD.m_depth = atoi(argv[i]);
-        }
         else if (!strcmp(argv[i], "--concavity")) {
             if (++i < argc)
                 params.m_paramsVHACD.m_concavity = atof(argv[i]);
@@ -288,10 +280,6 @@ void ParseParameters(int argc, char* argv[], Parameters& params)
         else if (!strcmp(argv[i], "--beta")) {
             if (++i < argc)
                 params.m_paramsVHACD.m_beta = atof(argv[i]);
-        }
-        else if (!strcmp(argv[i], "--gamma")) {
-            if (++i < argc)
-                params.m_paramsVHACD.m_gamma = atof(argv[i]);
         }
         else if (!strcmp(argv[i], "--pca")) {
             if (++i < argc)
