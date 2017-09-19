@@ -25,6 +25,7 @@ EGLDisplay nvidia_create_display(int device_idx)
 	EGLint num_devices;
 	auto eglQueryDevicesEXT = (PFNEGLQUERYDEVICESEXTPROC) eglGetProcAddress("eglQueryDevicesEXT");
 	eglQueryDevicesEXT(32, devices, &num_devices);
+	std::cerr << "NVIDIA total devices: " << num_devices << std::endl;
 	auto getPlatformDisplay = (PFNEGLGETPLATFORMDISPLAYEXTPROC) eglGetProcAddress("eglGetPlatformDisplayEXT");
 	return getPlatformDisplay(EGL_PLATFORM_DEVICE_EXT, devices[device_idx], NULL);
 }
@@ -40,7 +41,7 @@ EGLDisplay mesa_create_display(int device_idx)
 	return eglGetPlatformDisplay(EGL_PLATFORM_GBM_MESA, gbm, NULL);
 }
 
-const EGLint config_attribs[] = {
+const EGLint mesa_config_attribs[] = {
 	// EGL_SURFACE_TYPE, EGL_PBUFFER_BIT, mesa does not acccept PBuffer.
 	EGL_BLUE_SIZE, 8,
 	EGL_GREEN_SIZE, 8,
@@ -48,7 +49,17 @@ const EGLint config_attribs[] = {
 	EGL_DEPTH_SIZE, 8,
 	EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT,
 	EGL_NONE
-};    
+};
+
+const EGLint nvidia_config_attribs[] = {
+	EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,
+	EGL_BLUE_SIZE, 8,
+	EGL_GREEN_SIZE, 8,
+	EGL_RED_SIZE, 8,
+	EGL_DEPTH_SIZE, 8,
+	EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT,
+	EGL_NONE
+};
 
 /*
  * Create a small pbuffer for placeholder.
@@ -75,10 +86,13 @@ namespace osr {
 void init()
 {
 	client_exts = eglQueryString(EGL_NO_DISPLAY, EGL_EXTENSIONS);
+	std::cerr << "Client EXTs " << client_exts << std::endl;
 	if (strstr(client_exts, "EGL_MESA_platform_gbm"))
 		mesa_platform = true;
-	if (strstr(client_exts, "EGL_EXT_platform_device"))
+	if (strstr(client_exts, "EGL_EXT_platform_device")) {
+		std::cerr << "Enable NVIDIA\n";
 		nvidia_platform = true;
+	}
 }
 
 EGLDisplay create_display(int device_idx)
@@ -96,11 +110,18 @@ void create_gl_context(EGLDisplay dpy)
 
 	EGLint num_configs;
 	EGLConfig egl_cfg;
+	const EGLint *config_attribs = nullptr;
+
+	if (mesa_platform)
+		config_attribs = mesa_config_attribs;
+	if (nvidia_platform)
+		config_attribs = nvidia_config_attribs;
+
 	eglChooseConfig(dpy, config_attribs, &egl_cfg, 1, &num_configs);
 
 	EGLSurface egl_surf = EGL_NO_SURFACE;
 	if (nvidia_platform)
-		egl_surf = eglCreatePbufferSurface(dpy, egl_cfg, 
+		egl_surf = eglCreatePbufferSurface(dpy, egl_cfg,
 				                  pbuffer_attribs);
 	eglBindAPI(EGL_OPENGL_API);
 

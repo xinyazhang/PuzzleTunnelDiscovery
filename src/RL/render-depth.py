@@ -19,6 +19,7 @@ def render_everything_to(src, dst, label):
     h = r.pbufferHeight
     for root, dirs, files in os.walk(src):
         for fn in files:
+            # print(fn)
             _,ext = os.path.splitext(fn)
             if ext not in ['.dae', '.obj', '.ply']:
                 continue
@@ -30,9 +31,9 @@ def render_everything_to(src, dst, label):
             dep = dep.reshape(r.views.shape[0],w,h,1)
             outfn = os.path.join(dst, '%07d.train' % modelId)
             with open(outfn, 'w') as f:
-                label = 0
-                labelbytes = np.array([label],dtype=np.int32).tobytes()
-                f.write(labelbytes)
+                if label >= 0:
+                    labelbytes = np.array([label],dtype=np.int32).tobytes()
+                    f.write(labelbytes)
                 f.write(dep.tobytes())
             print('{} -> {}'.format(ffn, outfn))
             modelId += 1
@@ -40,4 +41,4 @@ def render_everything_to(src, dst, label):
 if __name__ == '__main__':
     # print(sys.argv)
     src,dst,label = sys.argv[1:4]
-    render_everything_to(src, dst, label)
+    render_everything_to(src, dst, int(label))

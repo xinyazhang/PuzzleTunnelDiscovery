@@ -9,7 +9,7 @@ for path in `(cd $SRC; ls -d */)`
 do
 	echo $path '->' $LBL
 	mkdir -p $DST/$path
-	PYTHONPATH=../bin python2 ../src/RL/render-depth.py "$SRC/$path" "$DST/$path" $LBL
+	PYTHONPATH=../bin python2 ../src/RL/render-depth.py "$SRC/$path" "$DST/$path" "$LBL"
 	LBL=$((LBL+1))
 done
 # PYTHONPATH=../bin python2 ../src/RL/render-depth.py "$@"
