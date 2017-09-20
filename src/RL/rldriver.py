@@ -25,6 +25,8 @@ class RLDriver:
             input_tensor = None):
         self.renderer = pyosr.Renderer()
         r = self.renderer
+        # FIXME: Enable this for actual RL
+        '''
         r.setup()
         r.loadModelFromFile(models[0])
         if len(models) > 1 and models[1] is not None:
@@ -34,6 +36,7 @@ class RLDriver:
         r.scaleToUnit()
         r.angleModel(0.0, 0.0)
         r.default_depth = 0.0
+        '''
         view_array = []
         for angle,ncam in view_config:
             view_array += [ [angle,float(i)] for i in np.arange(0.0, 360.0, 360.0/float(ncam)) ]
