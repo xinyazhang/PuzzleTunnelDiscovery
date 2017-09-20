@@ -63,15 +63,16 @@ def distorted_inputs(data_dir):
     """Construct distorted input
 
     Args:
-      data_dir: Path to the CIFAR-10 data directory.
-      batch_size: Number of images per batch.
+      data_dir: Path to the training data directory.
 
     Returns:
-      images: Images. 4D tensor of [batch_size, IMAGE_SIZE, IMAGE_SIZE, 1] size.
-      labels: Labels. 1D tensor of [batch_size] size.
+      images: Images. 4D tensor of [VIEWS, IMAGE_SIZE, IMAGE_SIZE, 1] size.
+      labels: Labels. 1D tensor of [1] size.
     """
-    fnq = [os.path.join(data_dir, name)
-            for name in filter(lambda x: x.endswith('train'), os.listdir(data_dir))]
+    fnq = []
+    for root,dirs,names in os.walk(data_dir):
+        fnq += [os.path.join(root, name) for name in names]
+    #fnq = [os.path.join(data_dir, name) for name in filter(lambda x: x.endswith('train'), os.listdir(data_dir))]
     random.shuffle(fnq)
     filename_queue = tf.train.string_input_producer(fnq)
     read_input = read_shapenet(filename_queue)
