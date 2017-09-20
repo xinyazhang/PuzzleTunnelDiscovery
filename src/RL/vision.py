@@ -19,13 +19,21 @@ class VisionLayerConfig:
         ch_out = self.ch_out
         [w, h] = self.kernel_size[0:2]
         d = 1.0 / np.sqrt(ch_in * w * h)
-        weight_shape = [w, h, ch_in, ch_out]
+        weight_shape = [1, w, h, ch_in, ch_out]
         bias_shape = [self.ch_out]
         # print('weight_shape {}'.format(weight_shape))
         # print('d {}'.format(d))
         weight = tf.Variable(tf.random_uniform(weight_shape, minval=-d, maxval=d))
         bias   = tf.Variable(tf.random_uniform(bias_shape,   minval=-d, maxval=d))
         return weight, bias
+
+    def apply_layer(self, prev_layer):
+        prev_ch_out = int(prev_layer.shape[-1])
+        w,b = self.create_kernel(prev_ch_out)
+        strides = [1] + self.strides
+        conv = tf.nn.conv3d(prev_layer, w, strides, self.padding)
+        out = tf.nn.relu(conv + b)
+        return w,b,out
 
     @staticmethod
     def createFromDict(visdict):
@@ -58,9 +66,12 @@ class FCLayerConfig:
         return weight, bias
 
     def apply_layer(self, prev):
-        flatten = tf.reshape(prev, [1, -1])
+        # Dim 0 is BATCH
+        print('prev {}'.format(prev.shape))
+        flatten = tf.reshape(prev, [prev.shape[0].value, prev.shape[1].value, -1])
+        print('flatten {}'.format(flatten.shape))
         w,b = self.create_kernel(flatten.shape[-1])
-        return w,b,tf.nn.relu(tf.matmul(flatten, w) + b)
+        return w,b,tf.nn.relu(tf.tensordot(flatten, w, [[2], [0]]) + b)
 
 class VisionNetwork:
     thread_index = 0
@@ -105,18 +116,22 @@ class VisionNetwork:
             prev_layer = self.nn_layers[-1]
             print("prev shape {}".format(prev_layer.shape))
             prev_ch = prev_layer.shape[-1]
-            w,b = conf.create_kernel(prev_ch)
-            conv = tf.nn.conv2d(prev_layer, w, conf.strides, conf.padding)
-            out = tf.nn.relu(conv + b)
+            #w,b = conf.create_kernel(prev_ch)
+            #conv = tf.nn.conv2d(prev_layer, w, conf.strides, conf.padding)
+            #out = tf.nn.relu(conv + b)
+            w,b,out = conf.apply_layer(prev_layer)
             self.nn_layers.append(out)
         if self.feature_number < 0:
             self.nn_featvec = tf.reshape(self.nn_layers[-1], [-1])
             return
         fclc = FCLayerConfig(self.feature_number)
-        self.mv_cnnflatten = tf.reshape(self.nn_layers[-1], [self.view_number, -1])
-        print('mv_cnn flatten: {}'.format(self.mv_cnnflatten.shape))
+        # self.mv_cnnflatten = tf.reshape(self.nn_layers[-1], [self.view_number, -1])
+        # print('mv_cnn flatten: {}'.format(self.mv_cnnflatten.shape))
         #w,b = fclc.create_kernel(self.mv_cnnflatten.shape[-1])
         #self.mv_featvec = tf.nn.relu(tf.matmul(self.mv_cnnflatten, w) + b)
-        w,b,self.mv_featvec = fclc.apply_layer(self.mv_cnnflatten)
+
+        # FLATTEN is handled by FCLayerConfig
+        w,b,self.mv_featvec = fclc.apply_layer(self.nn_layers[-1])
         self.nn_featvec = self.mv_featvec
+
 

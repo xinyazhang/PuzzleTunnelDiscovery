@@ -77,7 +77,15 @@ def distorted_inputs(data_dir):
     filename_queue = tf.train.string_input_producer(fnq)
     read_input = read_shapenet(filename_queue)
     read_input.label.set_shape([1])
-    return read_input.image, read_input.label
+    print('input: {} {}'.format(read_input.image, read_input.label))
+
+    # return read_input.image, read_input.label
+    image_batch, label_batch = tf.train.batch([read_input.image, read_input.label],
+            batch_size=config.BATCH_SIZE,
+            num_threads=2,
+            capacity=3*config.BATCH_SIZE)
+    label_batch = tf.squeeze(label_batch, axis=[1])
+    return image_batch, label_batch
 
     '''
     # Ensure that the random shuffling has good mixing properties.
@@ -112,6 +120,8 @@ class TrainCat:
         print('final = {}'.format(self.driver.final.shape))
         self.logits = self.driver.final
         self.global_step = global_step
+        print('(sparse) labels {}'.format(self.labels.shape))
+        print('logits {}'.format(self.logits.shape))
         self.cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
             labels=self.labels, logits=self.logits, name='cross_entropy_per_example')
         cross_entropy_mean = tf.reduce_mean(self.cross_entropy, name='cross_entropy')

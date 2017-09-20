@@ -57,9 +57,10 @@ class RLDriver:
                     0, # FIXME: multi-threading
                     sv_sqfeatnum ** 2,
                     input_tensor)
-        sq_svfeatvec = tf.reshape(sv_color.features, [-1, sv_sqfeatnum, sv_sqfeatnum, 1])
         print('sv_color.featvec.shape = {}'.format(sv_color.features.shape))
-        sv_featvec = tf.transpose(sq_svfeatvec, [3,1,2,0])
+        sq_svfeatvec = tf.reshape(sv_color.features, [-1, len(view_array), sv_sqfeatnum, sv_sqfeatnum, 1])
+        print('sq_svfeatvec.shape = {}'.format(sq_svfeatvec.shape))
+        sv_featvec = tf.transpose(sq_svfeatvec, [0,4,2,3,1])
 
         mv_color = vision.VisionNetwork(None,
                 vision.VisionLayerConfig.createFromDict(svconfdict),
@@ -70,5 +71,7 @@ class RLDriver:
         self.mv_colorfv = mv_color.features
         conf_final_fc = vision.FCLayerConfig(output_number)
         w,b,final = conf_final_fc.apply_layer(mv_color.features)
+        final = tf.contrib.layers.flatten(final)
+        print('rldriver output {}'.format(final.shape))
         self.final = final
 

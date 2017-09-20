@@ -35,4 +35,4 @@ MV_VISCFG = [ { 'ch_out' : 64, 'strides' : None, 'kernel_size' : None} ]
 
 MAX_STEPS = 1000000
 DEFAULT_RES = 224
-BATCH_SIZE = 8
+BATCH_SIZE = 32
