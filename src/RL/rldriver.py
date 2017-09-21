@@ -73,7 +73,7 @@ class RLDriver:
         print('sv_featvec: {}'.format(sv_featvec.shape))
 
         mv_net = vision.VisionNetwork(None,
-                vision.VisionLayerConfig.createFromDict(svconfdict),
+                vision.VisionLayerConfig.createFromDict(mvconfdict),
                 0, # FIXME: multi-threading
                 mv_featnum,
                 sv_featvec)

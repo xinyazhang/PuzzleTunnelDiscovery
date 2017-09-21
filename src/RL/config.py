@@ -31,7 +31,10 @@ SV_VISCFG = [ { 'ch_out' : 16, 'strides' : None, 'kernel_size' : None},
         { 'ch_out' : 64, 'strides' : None, 'kernel_size' : None},
         { 'ch_out' : 128, 'strides' : None, 'kernel_size' : None} ]
 
-MV_VISCFG = [ { 'ch_out' : 64, 'strides' : None, 'kernel_size' : None} ]
+MV_VISCFG = [ { 'ch_out' : 128, 'strides' : None, 'kernel_size' : None},
+        { 'ch_out' : 256, 'strides' : None, 'kernel_size' : None},
+        { 'ch_out' : 512, 'strides' : None, 'kernel_size' : None},
+        { 'ch_out' : 1024, 'strides' : None, 'kernel_size' : None} ]
 
 MAX_STEPS = 1000000
 DEFAULT_RES = 224

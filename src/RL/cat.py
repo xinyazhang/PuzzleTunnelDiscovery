@@ -113,7 +113,7 @@ class TrainCat:
                 np.array([0.2, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5], dtype=np.float32),
                 [(30.0, 12), (-30.0, 12), (0, 4), (90, 1), (-90, 1)],
                 config.SV_VISCFG,
-                config.MV_VISCFG,
+                config.SV_VISCFG,
                 58,
                 input_tensor=self.images)
         print('sv_colorfv = {}'.format(self.driver.sv_colorfv.shape))
