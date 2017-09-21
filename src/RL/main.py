@@ -6,7 +6,6 @@ from scipy.misc import imsave
 import vision
 import tensorflow as tf
 import rldriver
-import cat
 import config
 
 def test():
@@ -69,14 +68,18 @@ def test():
     r.teardown()
     pyosr.shutdown()
 
-def train_classification():
+def train_puzzle():
     pyosr.init()
     pyosr.create_gl_context(pyosr.create_display()) # FIXME: Each thread has one ctx
     init_state = np.array([0.2, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5], dtype=np.float32)
     with tf.Graph().as_default():
-        global_step = tf.contrib.framework.get_or_create_global_step()
-        cater = cat.TrainCat(global_step)
-        cater.run()
+        driver = rldriver.RLDriver(['../res/alpha/env-1.2.obj', '../res/alpha/robot.obj'],
+                np.array([0.2, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5], dtype=np.float32),
+                [(30.0, 12), (-30.0, 12), (0, 4), (90, 1), (-90, 1)],
+                config.SV_VISCFG,
+                config.MV_VISCFG,
+                6,
+                use_rgb=True)
 
 if __name__ == '__main__':
-    train_classification()
+    train_puzzle()

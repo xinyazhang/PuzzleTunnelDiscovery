@@ -74,6 +74,12 @@ class FCLayerConfig:
         return w,b,tf.nn.relu(tf.tensordot(flatten, w, [[2], [0]]) + b)
 
 class VisionNetwork:
+    '''
+    VisionNetwork: apply CNN+Single FC over [BVWHC] input to get [BVF] output
+
+                   F is specified by feature_number, if feature_number is -1, F
+                   is simply flattened from the last CNN layer
+    '''
     thread_index = 0
     layer_number = 0
     input_placeholders = None
@@ -99,7 +105,7 @@ class VisionNetwork:
         else:
             self.input_tensor = input_tensor
             input_shape = input_tensor.shape
-        self.view_number = int(input_shape[0])
+        self.view_number = int(input_shape[1])
 
     def get_output_tensors(self):
         if not self.nn_layers:
@@ -109,7 +115,6 @@ class VisionNetwork:
     features = property(get_output_tensors)
 
     def infer(self):
-        nviews = int(self.input_tensor.shape[0])
         self.nn_layers = [self.input_tensor]
         self.nn_filters = []
         for conf in self.layer_configs:
@@ -122,7 +127,8 @@ class VisionNetwork:
             w,b,out = conf.apply_layer(prev_layer)
             self.nn_layers.append(out)
         if self.feature_number < 0:
-            self.nn_featvec = tf.reshape(self.nn_layers[-1], [-1])
+            shape_BV = [int(self.input_shape[0]), int(self.input_shape[1]), -1]
+            self.nn_featvec = tf.reshape(self.nn_layers[-1], shape_BV)
             return
         fclc = FCLayerConfig(self.feature_number)
         # self.mv_cnnflatten = tf.reshape(self.nn_layers[-1], [self.view_number, -1])
