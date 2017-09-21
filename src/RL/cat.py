@@ -73,6 +73,7 @@ def distorted_inputs(data_dir):
     for root,dirs,names in os.walk(data_dir):
         fnq += [os.path.join(root, name) for name in names]
     #fnq = [os.path.join(data_dir, name) for name in filter(lambda x: x.endswith('train'), os.listdir(data_dir))]
+    print('Number of input files: {}'.format(len(fnq)))
     random.shuffle(fnq)
     filename_queue = tf.train.string_input_producer(fnq)
     read_input = read_shapenet(filename_queue)
@@ -128,7 +129,7 @@ class TrainCat:
         tf.add_to_collection('losses', cross_entropy_mean)
         self.loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
         opt = tf.train.AdamOptimizer(1e-4)
-        self.train_op = opt.minimize(loss=self.loss, global_step=global_step)
+        self.train_op = opt.minimize(loss=self.loss, global_step=self.global_step)
 
     def run(self):
         loss = self.loss
@@ -165,3 +166,22 @@ class TrainCat:
             while not mon_sess.should_stop():
                 mon_sess.run(self.train_op)
                 epoch += 1
+
+    def eval_once(self):
+        with tf.train.MonitoredTrainingSession(
+                checkpoint_dir=self.ckpt_dir,
+                save_checkpoint_secs=None) as sess:
+            step = 0
+            true_count = 0
+            total_sample_count = 0
+            while total_sample_count < config.NUM_TO_EVALUATE:
+                predictions = sess.run([self.top_k_op])
+                true_count += np.sum(predictions)
+                total_sample_count += config.BATCH_SIZE
+                precision = float(true_count) / float(total_sample_count)
+                print('%s: precision @ 1 = %.3f (%d in %d)' % (datetime.now(), precision, true_count, total_sample_count))
+
+    def eval(self):
+        self.top_k_op = tf.nn.in_top_k(self.logits, self.labels, 1)
+        print('top_k_op {}'.format(self.top_k_op.shape))
+        self.eval_once()
