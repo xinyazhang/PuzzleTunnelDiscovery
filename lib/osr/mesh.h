@@ -5,6 +5,7 @@
 #include <glm/ext.hpp>
 #include <string>
 #include <vector>
+#include <memory>
 
 #include <assimp/scene.h>
 #include <assimp/Importer.hpp>
@@ -19,21 +20,23 @@ class Scene;
 
 class Mesh {
 	friend class Scene;
-	std::vector<Vertex> vertices;
-	std::vector<uint32_t> indices;
-	GLuint vao;
-	GLuint vbo;
-	GLuint ibo;
-
+	std::vector<Vertex> vertices_;
+	std::vector<uint32_t> indices_;
+	GLuint vao_;
+	GLuint vbo_;
+	GLuint ibo_;
+	std::shared_ptr<Mesh> shared_from_;
+	bool empty_mesh_ = false;
 public:
-	Mesh(Mesh& rhs);
+	Mesh(std::shared_ptr<Mesh> other);
 	Mesh(aiMesh* mesh, glm::vec3 color);
 	virtual ~Mesh();
 
 	void render(GLuint program, Camera& camera, glm::mat4 globalXform);
-	std::vector<Vertex>& getVertices() { return vertices; };
-	std::vector<uint32_t>& getIndices() { return indices; };
+	std::vector<Vertex>& getVertices();
+	std::vector<uint32_t>& getIndices();
 
+	size_t getNumberOfFaces() const;
 private:
 	void init();
 };

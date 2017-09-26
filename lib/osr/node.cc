@@ -6,11 +6,11 @@ Node::Node(aiNode* node)
 {
 	// meshes in current nodes
 	for (size_t i = 0; i < node->mNumMeshes; i++) {
-		meshes.push_back(node->mMeshes[i]);
+		meshes.emplace_back(node->mMeshes[i]);
 	}
 	// nodes under current node
 	for (size_t i = 0; i < node->mNumChildren; i++) {
-		nodes.push_back(new Node(node->mChildren[i]));
+		nodes.emplace_back(new Node(node->mChildren[i]));
 	}
 	// transform
 	aiMatrix4x4 m  = node->mTransformation;
@@ -22,4 +22,5 @@ Node::Node(aiNode* node)
 Node::~Node()
 {
 }
+
 }

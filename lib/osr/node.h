@@ -4,6 +4,7 @@
 #include <assimp/scene.h>
 #include <iostream>
 #include <vector>
+#include <memory>
 
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
@@ -17,7 +18,7 @@ class Scene;
 
 class Node {
 	friend class Scene;
-	std::vector<Node*> nodes;
+	std::vector<std::shared_ptr<Node>> nodes;
 	std::vector<uint32_t> meshes;
 	glm::mat4 xform;
 

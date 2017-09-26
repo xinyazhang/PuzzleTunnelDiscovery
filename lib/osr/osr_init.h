@@ -13,7 +13,7 @@
 namespace osr {
 void init();
 EGLDisplay create_display(int device_idx = 0);
-void create_gl_context(EGLDisplay dpy);
+EGLContext create_gl_context(EGLDisplay dpy, EGLContext share_context = EGL_NO_CONTEXT);
 void shutdown();
 }
 

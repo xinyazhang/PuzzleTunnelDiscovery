@@ -34,7 +34,10 @@ PYBIND11_PLUGIN(pyosr) {
 	      "Create EGL Display",
 	      py::arg("device_idx") = 0);
 	m.def("create_gl_context", &osr::create_gl_context,
-	      "Create OpenGL 3.3 Core Profile Context");
+	      "Create OpenGL 3.3 Core Profile Context",
+	      py::arg("dpy"),
+	      py::arg("share_context") = EGL_NO_CONTEXT
+	      );
 #else
 	m.def("create_display",
 	      &create_display_wrapper,
@@ -56,6 +59,7 @@ PYBIND11_PLUGIN(pyosr) {
 	py::class_<Renderer>(m, "Renderer")
 		.def(py::init<>())
 		.def("setup", &Renderer::setup)
+		.def("setupFrom", &Renderer::setupFrom)
 		.def("teardown", &Renderer::teardown)
 		.def("loadModelFromFile", &Renderer::loadModelFromFile)
 		.def("loadRobotFromFile", &Renderer::loadRobotFromFile)

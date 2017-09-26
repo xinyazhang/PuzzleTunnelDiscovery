@@ -24,6 +24,7 @@ public:
 	~Renderer();
 
 	void setup();
+	void setupFrom(const Renderer*);
 	void teardown();
 	void loadModelFromFile(const std::string& fn);
 	void loadRobotFromFile(const std::string& fn);
@@ -57,19 +58,19 @@ public:
 	 */
 	Eigen::MatrixXf views;
 private:
+	void setupNonSharedObjects();
 	GLuint shaderProgram = 0;
 	GLuint rgbdShaderProgram = 0;
-	GLuint vertShader = 0;
-	GLuint fragShader = 0;
-	GLuint rgbdFragShader = 0;
 	GLuint framebufferID = 0;
 	GLuint depthbufferID = 0;
 	GLuint renderTarget = 0;
 	GLuint rgbdFramebuffer = 0;
 	GLuint rgbTarget = 0;
 
-	std::unique_ptr<Scene> scene_;
-	std::unique_ptr<Scene> robot_;
+	bool shared_ = false;
+
+	std::shared_ptr<Scene> scene_;
+	std::shared_ptr<Scene> robot_;
 	float scene_scale_ = 1.0f;
 	Eigen::VectorXf robot_state_;
 	glm::mat4 camera_rot_;

@@ -87,6 +87,32 @@ void Renderer::setup()
 	std::cout << "Renderer: " << renderer << "\n";
 	std::cout << "OpenGL version supported:" << version << "\n";
 
+	setupNonSharedObjects();
+}
+
+void Renderer::setupFrom(const Renderer* other)
+{
+	shared_ = true;
+
+	setupNonSharedObjects();
+
+	scene_.reset(new Scene(other->scene_));
+	if (other->robot_)
+		robot_.reset(new Scene(other->robot_));
+	else
+		robot_.reset();
+}
+
+void Renderer::setupNonSharedObjects()
+{
+	GLuint vertShader = 0;
+	GLuint fragShader = 0;
+	GLuint rgbdFragShader = 0;
+
+	/*
+	 * vertex shader is shareable, but cannot be attached to multiple
+	 * programs
+	 */
 	CHECK_GL_ERROR(vertShader = glCreateShader(GL_VERTEX_SHADER));
 	CHECK_GL_ERROR(fragShader = glCreateShader(GL_FRAGMENT_SHADER));
 	CHECK_GL_ERROR(rgbdFragShader = glCreateShader(GL_FRAGMENT_SHADER));
@@ -104,20 +130,32 @@ void Renderer::setup()
 	CheckShaderCompilation(fragShader);
 	CheckShaderCompilation(rgbdFragShader);
 
+	/*
+	 * GLSL Shader Program is shareable, but it also tracks uniform
+	 * bindings, so we need a copy rather than sharing directly.
+	 */
 	CHECK_GL_ERROR(shaderProgram = glCreateProgram());
 	CHECK_GL_ERROR(glAttachShader(shaderProgram, vertShader));
 	CHECK_GL_ERROR(glAttachShader(shaderProgram, fragShader));
 	CHECK_GL_ERROR(glLinkProgram(shaderProgram));
+	CheckProgramLinkage(shaderProgram);
 
 	CHECK_GL_ERROR(rgbdShaderProgram = glCreateProgram());
 	CHECK_GL_ERROR(glAttachShader(rgbdShaderProgram, vertShader));
 	CHECK_GL_ERROR(glAttachShader(rgbdShaderProgram, rgbdFragShader));
 	CHECK_GL_ERROR(glLinkProgram(rgbdShaderProgram));
-
-	CheckProgramLinkage(shaderProgram);
 	CheckProgramLinkage(rgbdShaderProgram);
 
-	// set up render-to-texture
+	/*
+	 * Delete non-used shaders to recycle resources.
+	 */
+	CHECK_GL_ERROR(glDeleteShader(vertShader));
+	CHECK_GL_ERROR(glDeleteShader(fragShader));
+	CHECK_GL_ERROR(glDeleteShader(rgbdFragShader));
+
+	/*
+	 * Create depth FB
+	 */
 	CHECK_GL_ERROR(glGenFramebuffers(1, &framebufferID));
 	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, framebufferID));
 	CHECK_GL_ERROR(glGenTextures(1, &renderTarget));
@@ -158,10 +196,9 @@ void Renderer::teardown()
 	CHECK_GL_ERROR(glDeleteFramebuffers(1, &framebufferID));
 	CHECK_GL_ERROR(glDeleteRenderbuffers(1, &depthbufferID));
 	CHECK_GL_ERROR(glDeleteTextures(1, &renderTarget));
-
-	CHECK_GL_ERROR(glDeleteShader(vertShader));
-	CHECK_GL_ERROR(glDeleteShader(fragShader));
+	CHECK_GL_ERROR(glDeleteTextures(1, &rgbTarget));
 	CHECK_GL_ERROR(glDeleteProgram(shaderProgram));
+	CHECK_GL_ERROR(glDeleteProgram(rgbdShaderProgram));
 
 	scene_.reset();
 }
@@ -322,11 +359,19 @@ void Renderer::render_rgbd()
 {
 	Camera camera = setup_camera();
 	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+#if 0
+	static const uint8_t black[] = {0, 0, 255, 0};
+#else
 	static const uint8_t black[] = {0, 0, 0, 0};
+#endif
 	static const float zeros[] = {0.0f, 0.0f, 0.0f, 0.0f};
 	CHECK_GL_ERROR(glClearTexImage(rgbTarget, 0, GL_RGB, GL_UNSIGNED_BYTE, &black));
 	CHECK_GL_ERROR(glClearTexImage(renderTarget, 0, GL_RED, GL_FLOAT, &default_depth));
 	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, rgbdFramebuffer));
+#if 0
+	CHECK_GL_ERROR(glFlush());
+	return;
+#endif
 
 	CHECK_GL_ERROR(glEnable(GL_DEPTH_TEST));
 	CHECK_GL_ERROR(glDepthFunc(GL_LESS));

@@ -104,7 +104,7 @@ EGLDisplay create_display(int device_idx)
 	return EGL_NO_DISPLAY;
 }
 
-void create_gl_context(EGLDisplay dpy)
+EGLContext create_gl_context(EGLDisplay dpy, EGLContext share_context)
 {
 	eglInitialize(dpy, nullptr, nullptr);
 
@@ -127,7 +127,7 @@ void create_gl_context(EGLDisplay dpy)
 
 	EGLContext core_ctx = eglCreateContext(dpy,
 			egl_cfg,
-			EGL_NO_CONTEXT,
+			share_context,
 			ctx_attribs);
 	std::cerr << "EGLContext: " << core_ctx  << " End of EGLContext" << std::endl;
 	EGLint ctx_err = eglGetError();
@@ -169,6 +169,7 @@ void create_gl_context(EGLDisplay dpy)
 		std::cerr << "Reason: " << glewGetErrorString(glew_err) << std::endl;
 		// exit(EXIT_SUCCESS);
 	}
+	return core_ctx;
 }
 
 void shutdown()

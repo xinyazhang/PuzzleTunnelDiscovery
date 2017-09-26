@@ -3,20 +3,33 @@
 
 namespace osr {
 Scene::Scene()
+	:xform_(xform_data_)
 {
 	// do nothing
 }
 
-Scene::Scene(Scene& rhs)
+Scene::Scene(std::shared_ptr<Scene> other)
+	:xform_(other->xform_data_), shared_from_(other)
 {
-	xform = rhs.xform;
-	root = rhs.root;
-	bbox = rhs.bbox;
+	// std::cerr<< "COPY Scene FROM " << other.get() << " TO " << this << std::endl;
+	root_ = other->root_;
+	bbox_ = other->bbox_;
+
+	for (auto mesh : other->meshes_) {
+		/*
+		 * Copy Mesh object to get a different VAO for current OpenGL
+		 * context.
+		 */
+		meshes_.emplace_back(new Mesh(mesh));
+	}
+	// std::cerr << "xform_data_: " << shared_from_->xform_data_[0][0] << std::endl;
+	// std::cerr << "xform_: " << xform_[0][0] << std::endl;
 }
 
 Scene::~Scene()
 {
-	clear();
+	root_.reset();
+	meshes_.clear();
 }
 
 void Scene::load(std::string filename, const glm::vec3* model_color)
@@ -45,39 +58,42 @@ void Scene::load(std::string filename, const glm::vec3* model_color)
 			color = *model_color;
 		else
 			color = meshColors[i % meshColors.size()];
-		meshes.push_back(new Mesh(scene->mMeshes[i], color));
+		meshes_.emplace_back(new Mesh(scene->mMeshes[i], color));
 	}
 
 	// construct scene graph
-	root = new Node(scene->mRootNode);
+	root_.reset(new Node(scene->mRootNode));
 
-	updateBoundingBox(root, glm::mat4());
+	center_ = glm::vec3(0.0f);
+	vertex_total_number_ = 0;
+	updateBoundingBox(root_.get(), glm::mat4());
+	center_ = center_ / vertex_total_number_;
 }
 
 void Scene::updateBoundingBox(Node* node, glm::mat4 m)
 {
-	size_t numVertices = 0;
 	glm::mat4 xform = m * node->xform;
 	for (auto i : node->meshes) {
-		Mesh* mesh = meshes[i];
-		for (auto vec : mesh->vertices) {
+		auto mesh = meshes_[i];
+		for (const auto& vec : mesh->getVertices()) {
 			glm::vec3 v =
 			    glm::vec3(xform * glm::vec4(vec.position, 1.0));
-			bbox << v;
-			numVertices++;
-			center += v;
+			bbox_ << v;
+			vertex_total_number_++;
+			center_ += v;
 		}
 	}
 	for (auto child : node->nodes) {
-		updateBoundingBox(child, xform);
+		updateBoundingBox(child.get(), xform);
 	}
-	center = center / numVertices;
 }
 
 void Scene::render(GLuint program, Camera& camera, glm::mat4 m)
 {
 	// render(program, camera, m * xform, root);
-	for (auto mesh : meshes) mesh->render(program, camera, m * xform);
+	for (auto mesh : meshes_) {
+		mesh->render(program, camera, m * xform_);
+	}
 }
 
 void Scene::render(GLuint program, Camera& camera, glm::mat4 m, Node* node)
@@ -88,25 +104,20 @@ void Scene::render(GLuint program, Camera& camera, glm::mat4 m, Node* node)
         std::cout << "matrix: " << std::endl << glm::to_string(xform) << std::endl;
 #endif
 	for (auto i : node->meshes) {
-		Mesh* mesh = meshes[i];
+		auto mesh = meshes_[i];
 		mesh->render(program, camera, xform);
 	}
 	for (auto child : node->nodes) {
-		render(program, camera, xform, child);
+		render(program, camera, xform, child.get());
 	}
 }
 
 void Scene::clear()
 {
-	xform = glm::mat4();
-	center = glm::vec3();
-	numVertices = 0;
-	bbox = BoundingBox();
-	if (root) {
-		delete root;
-		root = nullptr;
-	}
-	for (auto mesh : meshes) delete mesh;
-	meshes.resize(0);
+	xform_ = glm::mat4();
+	center_ = glm::vec3();
+	bbox_ = BoundingBox();
+	root_.reset();
+	meshes_.clear();
 }
 }

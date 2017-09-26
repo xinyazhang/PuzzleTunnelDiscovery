@@ -10,6 +10,7 @@ class RLDriver:
         - NN configuration
     '''
     renderer = None
+    master = None
 
     '''
         models: files name of [model, robot], or [model], or [model, None]
@@ -28,28 +29,36 @@ class RLDriver:
             sv_sqfeatnum = 16,
             mv_featnum = 256,
             input_tensor = None,
-            use_rgb = False):
+            use_rgb = False,
+            master_driver = None):
         self.renderer = pyosr.Renderer()
         r = self.renderer
-        r.setup()
-        r.loadModelFromFile(models[0])
-        if len(models) > 1 and models[1] is not None:
-            r.loadRobotFromFile(models[1])
-            r.state = np.array(init_state, dtype=np.float32)
-        print('robot loaded')
-        r.scaleToUnit()
-        r.angleModel(0.0, 0.0)
-        r.default_depth = 0.0
+        if master_driver is None:
+            r.setup()
+            r.loadModelFromFile(models[0])
+            if len(models) > 1 and models[1] is not None:
+                r.loadRobotFromFile(models[1])
+                r.state = np.array(init_state, dtype=np.float32)
+            print('robot loaded')
+            r.scaleToUnit()
+            r.angleModel(0.0, 0.0)
+            r.default_depth = 0.0
+        else:
+            r.setupFrom(master_driver.renderer)
+            r.default_depth = master_driver.renderer.default_depth
+        self.master = master_driver
+
         view_array = []
         for angle,ncam in view_config:
             view_array += [ [angle,float(i)] for i in np.arange(0.0, 360.0, 360.0/float(ncam)) ]
+        r.views = np.array(view_array, dtype=np.float32)
 
         w = r.pbufferWidth
         h = r.pbufferHeight
         # TODO: Switch to RGB-D rather than D-only
         CHANNEL = 1
         colorshape = [1, len(view_array), w, h, CHANNEL] if input_tensor is None else None
-        sv_depth_featvec = self.create_sv_net(colorshape,
+        sv_depth_featvec = self._create_sv_features(colorshape,
                 input_tensor,
                 svconfdict,
                 len(view_array),
@@ -59,7 +68,7 @@ class RLDriver:
             CHANNEL = 3
             # input_tensor is always for depth
             colorshape = [1, len(view_array), w, h, CHANNEL]
-            sv_rgb_featvec = self.create_sv_net(colorshape,
+            sv_rgb_featvec = self._create_sv_features(colorshape,
                     None,
                     svconfdict,
                     len(view_array),
@@ -86,7 +95,7 @@ class RLDriver:
         print('rldriver output {}'.format(final.shape))
         self.final = final
 
-    def create_sv_net(self, input_shape, input_tensor, svconfdict, num_views, sv_sqfeatnum):
+    def _create_sv_features(self, input_shape, input_tensor, svconfdict, num_views, sv_sqfeatnum):
         '''
         Create Per-View NN from given configuration
 
