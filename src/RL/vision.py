@@ -87,6 +87,7 @@ class VisionNetwork:
     view_number = 0
     feature_number = -1
     nn_layers = [] # 0 is input, -1 is output
+    nn_args = []
     nn_filters = []
     nn_featvec = None
 
@@ -116,6 +117,7 @@ class VisionNetwork:
 
     def infer(self):
         self.nn_layers = [self.input_tensor]
+        self.nn_args = []
         self.nn_filters = []
         for conf in self.layer_configs:
             prev_layer = self.nn_layers[-1]
@@ -126,6 +128,7 @@ class VisionNetwork:
             #out = tf.nn.relu(conv + b)
             w,b,out = conf.apply_layer(prev_layer)
             self.nn_layers.append(out)
+            self.nn_args.append((w,b))
         if self.feature_number < 0:
             shape_BV = [int(self.input_shape[0]), int(self.input_shape[1]), -1]
             self.nn_featvec = tf.reshape(self.nn_layers[-1], shape_BV)
@@ -138,6 +141,12 @@ class VisionNetwork:
 
         # FLATTEN is handled by FCLayerConfig
         w,b,self.mv_featvec = fclc.apply_layer(self.nn_layers[-1])
+        self.nn_args.append((w,b))
         self.nn_featvec = self.mv_featvec
 
+    def get_nn_args(self):
+        '''
+        Return a flatten list from the stored list of tuples.
+        '''
+        return list(sum(self.nn_args, ()))
 
