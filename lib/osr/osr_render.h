@@ -14,7 +14,20 @@
 namespace osr {
 class Scene;
 class Camera;
+class CDModel;
 
+/*
+ * osr::Renderer
+ *
+ *      This class loads robot and environment model, and render them to
+ *      buffers. At the same time, it is also responsible for collision
+ *      detection (CD).
+ *
+ *      Only support rigid body for now.
+ *
+ *      TODO: We may want a better name because CD is also handled by this
+ *      class.
+ */
 class Renderer {
 public:
 	typedef Eigen::Matrix<float, -1, -1, Eigen::RowMajor> RMMatrixXf;
@@ -46,6 +59,8 @@ public:
 	void setRobotState(const Eigen::VectorXf& state);
 	Eigen::VectorXf getRobotState() const;
 
+	bool isValid(const Eigen::VectorXf& state) const;
+
 	int pbufferWidth = 224;
 	int pbufferHeight = 224;
 	float default_depth = 5.0f;
@@ -71,6 +86,8 @@ private:
 
 	std::shared_ptr<Scene> scene_;
 	std::shared_ptr<Scene> robot_;
+	std::shared_ptr<CDModel> cd_scene_;
+	std::shared_ptr<CDModel> cd_robot_;
 	float scene_scale_ = 1.0f;
 	Eigen::VectorXf robot_state_;
 	glm::mat4 camera_rot_;

@@ -50,6 +50,13 @@ PYBIND11_PLUGIN(pyosr) {
 	      "Close internally opened FDs. "
 	      "User is responsible to free OpenGL/EGL resources");
 #if 0
+	m.def("transit", &osr::transitState,
+	      "State Transition, given action and corresponding magnitude",
+	      py::arg("state"),
+	      py::arg("action"),
+	      py::arg("mag"));
+#endif
+#if 0
 	py::class_<Pet>(m, "Pet")
 		.def(py::init<const std::string &>())
 		.def("setName", &Pet::setName)
@@ -66,6 +73,7 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("angleModel", &Renderer::angleModel)
 		.def("scaleToUnit", &Renderer::scaleToUnit)
 		.def_property("state", &Renderer::getRobotState, &Renderer::setRobotState)
+		.def("is_valid_state", &Renderer::isValid)
 		.def("render_depth_to_buffer", &Renderer::render_depth_to_buffer)
 		.def("render_mvdepth_to_buffer", &Renderer::render_mvdepth_to_buffer)
 		.def("render_mvrgbd", &Renderer::render_mvrgbd)

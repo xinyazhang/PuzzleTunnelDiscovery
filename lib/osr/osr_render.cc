@@ -1,7 +1,9 @@
 #include "osr_render.h"
 #include "scene.h"
 #include "camera.h"
+#include "cdmodel.h"
 #include <glm/gtx/quaternion.hpp>
+#include <glm/gtx/io.hpp>
 
 namespace {
 const char* vertShaderSrc =
@@ -97,10 +99,13 @@ void Renderer::setupFrom(const Renderer* other)
 	setupNonSharedObjects();
 
 	scene_.reset(new Scene(other->scene_));
-	if (other->robot_)
+	cd_scene_.reset(new CDModel(*other->scene_));
+	if (other->robot_) {
 		robot_.reset(new Scene(other->robot_));
-	else
+		cd_robot_.reset(new CDModel(*other->robot_));
+	} else {
 		robot_.reset();
+	}
 }
 
 void Renderer::setupNonSharedObjects()
@@ -235,12 +240,14 @@ void Renderer::angleModel(float latitude, float longitude)
 	scene_->rotate(glm::radians(latitude), 1, 0, 0);      // latitude
 	scene_->rotate(glm::radians(longitude), 0, 1, 0);     // longitude
 	scene_->moveToCenter();
+	cd_scene_.reset(new CDModel(*scene_));
 	if (robot_) {
 		robot_->resetTransform();
 		robot_->scale(glm::vec3(scene_scale_));
 		robot_->rotate(glm::radians(latitude), 1, 0, 0);      // latitude
 		robot_->rotate(glm::radians(longitude), 0, 1, 0);     // longitude
 		robot_->moveToCenter();
+		cd_robot_.reset(new CDModel(*robot_));
 	}
 }
 
@@ -328,6 +335,40 @@ void Renderer::setRobotState(const Eigen::VectorXf& state)
 Eigen::VectorXf Renderer::getRobotState() const
 {
 	return robot_state_;
+}
+
+bool Renderer::isValid(const Eigen::VectorXf& state) const
+{
+	if (!cd_scene_ || !cd_robot_)
+		return true;
+	Eigen::Quaternion<float> rot(state(3), state(4), state(5), state(6));
+	Eigen::Vector3f trans(state(0), state(1), state(2));
+	Transform robTf, envTf;
+	robTf.setIdentity();
+	envTf.setIdentity();
+#if 0
+	Eigen::Matrix4f robTfm, envTfm;
+	auto tf = robot_->transform();
+	auto etf = scene_->transform();
+	for (int i = 0; i < 4; i++) {
+		for (int j = 0; j < 4; j++) {
+			robTfm(i, j) = tf[i][j];
+			envTfm(i, j) = etf[i][j];
+		}
+	}
+	robTf = robTfm.block<3,4>(0,0);
+	envTf = envTfm.block<3,4>(0,0);
+	std::cerr << " Rob TF (glm):\n" << tf << "\n";
+	std::cerr << " Rob TFm :\n" << robTfm << "\n";
+	std::cerr << " Rob TF (before):\n" << robTf.matrix() << "\n";
+#endif
+	robTf.rotate(rot);
+	robTf.translate(trans);
+#if 0
+	std::cerr << " Env TF:\n" << envTf.matrix() << "\n";
+	std::cerr << " Rob TF:\n" << robTf.matrix() << "\n";
+#endif
+	return !CDModel::collide(*cd_scene_, envTf, *cd_robot_, robTf);
 }
 
 void Renderer::render_depth()

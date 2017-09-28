@@ -71,6 +71,8 @@ public:
 	void rotate(float rad, float x, float y, float z) {
 		xform_= glm::rotate(xform_, rad, glm::vec3(x, y, z));
 	}
+
+	void addToCDModel(CDModel& ) const;
 private:
 	void updateBoundingBox(Node* node, glm::mat4 m);
 	void render(GLuint program, Camera& camera, glm::mat4 m, Node* node);

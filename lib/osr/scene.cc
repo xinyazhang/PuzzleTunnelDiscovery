@@ -1,4 +1,5 @@
 #include "scene.h"
+#include "cdmodel.h"
 #include <fstream>
 
 namespace osr {
@@ -109,6 +110,13 @@ void Scene::render(GLuint program, Camera& camera, glm::mat4 m, Node* node)
 	}
 	for (auto child : node->nodes) {
 		render(program, camera, xform, child.get());
+	}
+}
+
+void Scene::addToCDModel(CDModel& model) const
+{
+	for (auto mesh : meshes_) {
+		mesh->addToCDModel(xform_, model);
 	}
 }
 

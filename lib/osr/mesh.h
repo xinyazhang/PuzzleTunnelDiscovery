@@ -17,6 +17,7 @@
 
 namespace osr {
 class Scene;
+class CDModel;
 
 class Mesh {
 	friend class Scene;
@@ -37,6 +38,7 @@ public:
 	std::vector<uint32_t>& getIndices();
 
 	size_t getNumberOfFaces() const;
+	void addToCDModel(const glm::mat4&, CDModel&) const;
 private:
 	void init();
 };

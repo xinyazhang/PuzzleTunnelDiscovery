@@ -1,6 +1,10 @@
 #include "mesh.h"
+#include "cdmodel.h"
+#include <algorithm>
+#include <fcl/collision.h>
 
 namespace osr {
+
 glm::vec3 to_glm_vec3(aiVector3D vec)
 {
 	return glm::vec3(vec.x, vec.y, vec.z);
@@ -80,6 +84,11 @@ void Mesh::render(GLuint program, Camera& camera, glm::mat4 globalXform)
 	                              GL_UNSIGNED_INT, 0));
 
 	CHECK_GL_ERROR(glBindBuffer(GL_ARRAY_BUFFER, 0));
+}
+
+void Mesh::addToCDModel(const glm::mat4& m, CDModel& model) const
+{
+	model.addVF(m, vertices_, indices_);
 }
 
 
