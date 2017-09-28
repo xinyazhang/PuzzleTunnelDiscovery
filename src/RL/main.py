@@ -78,7 +78,6 @@ def train_puzzle():
                 [(30.0, 12), (-30.0, 12), (0, 4), (90, 1), (-90, 1)],
                 config.SV_VISCFG,
                 config.MV_VISCFG,
-                6,
                 use_rgb=True)
 
 if __name__ == '__main__':

@@ -17,7 +17,6 @@ def test_rldriver_worker(dpy, glctx, masterdriver, tfgraph):
                     [(30.0, 12), (-30.0, 12), (0, 4), (90, 1), (-90, 1)],
                     config.SV_VISCFG,
                     config.MV_VISCFG,
-                    6,
                     use_rgb = True,
                     master_driver=masterdriver)
         sync_op = driver.get_sync_from_master_op()
@@ -54,7 +53,6 @@ def test_rldriver_main():
                 [(30.0, 12), (-30.0, 12), (0, 4), (90, 1), (-90, 1)],
                 config.SV_VISCFG,
                 config.MV_VISCFG,
-                6,
                 use_rgb=True)
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
