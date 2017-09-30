@@ -7,6 +7,7 @@
 #include <ostream>
 #include <memory>
 #include <stdint.h>
+#include <tuple>
 
 #define GLM_FORCE_RADIANS
 #include <glm/mat4x4.hpp>
@@ -72,6 +73,32 @@ public:
 	 *        Column 1: longitude
 	 */
 	Eigen::MatrixXf views;
+	/*
+	 * State transition
+	 *
+	 *      state: initial state
+	 *      action: which action (translate/rotate w.r.t +-XYZ axes) to
+	 *              take
+	 *              odd: positive action
+	 *              even: negative action
+	 *              0-5: translation w.r.t. XYZ
+	 *              6-11: rotation w.r.t. XYZ
+	 *      magnitudes: magnitudes of transition vector and radius of rotation
+	 *      deltas: stepping magnitudes for discrete CD, (0) for
+	 *              translation, (1) for rotation.
+	 *
+	 * Return value: tuple of (new state, is final, progress)
+	 *      new state: indicate the last valid state
+	 *      is final: indicate if the return state finished the expected action.
+	 *      progress: 0.0 - 1.0, the ratio b/w the finished action and the
+	 *                expected action. progress < 1.0 implies is final == False
+	 */
+	std::tuple<Eigen::VectorXf, bool, float>
+	transitState(const Eigen::VectorXf& state,
+	             int action,
+	             Eigen::Vector2f magnitudes,
+	             Eigen::Vector2f deltas) const;
+
 private:
 	void setupNonSharedObjects();
 	GLuint shaderProgram = 0;
@@ -97,6 +124,14 @@ private:
 	Camera setup_camera();
 };
 
+constexpr int kActionDimension = 3;
+/* *2 for pos/neg */
+constexpr int kActionPerTransformType = kActionDimension * 2;
+/* *2 for translation/rotation */
+constexpr int kTotalNumberOfActions = kActionPerTransformType * 2;
+
+/* 3 for Translation, 4 for quaternion in SO(3) */
+constexpr int kStateDimension = 3 + 4;
 }
 
 #endif // OFF_SCREEN_RENDERING_TO_H

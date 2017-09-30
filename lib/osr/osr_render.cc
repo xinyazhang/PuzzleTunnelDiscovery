@@ -69,6 +69,17 @@ glm::mat4 translate_state_to_matrix(const Eigen::VectorXf& state)
 	return glm::translate(rot, glm::vec3(state(0), state(1), state(2)));
 }
 
+osr::Transform translate_state_to_transform(const Eigen::VectorXf& state)
+{
+	Eigen::Quaternion<float> rot(state(3), state(4), state(5), state(6));
+	Eigen::Vector3f trans(state(0), state(1), state(2));
+	osr::Transform tf;
+	tf.setIdentity();
+	tf.rotate(rot);
+	tf.translate(trans);
+	return tf;
+}
+
 }
 
 namespace osr {
@@ -341,11 +352,9 @@ bool Renderer::isValid(const Eigen::VectorXf& state) const
 {
 	if (!cd_scene_ || !cd_robot_)
 		return true;
-	Eigen::Quaternion<float> rot(state(3), state(4), state(5), state(6));
-	Eigen::Vector3f trans(state(0), state(1), state(2));
-	Transform robTf, envTf;
-	robTf.setIdentity();
+	Transform envTf;
 	envTf.setIdentity();
+	auto robTf = translate_state_to_transform(state);
 #if 0
 	Eigen::Matrix4f robTfm, envTfm;
 	auto tf = robot_->transform();
@@ -362,8 +371,6 @@ bool Renderer::isValid(const Eigen::VectorXf& state) const
 	std::cerr << " Rob TFm :\n" << robTfm << "\n";
 	std::cerr << " Rob TF (before):\n" << robTf.matrix() << "\n";
 #endif
-	robTf.rotate(rot);
-	robTf.translate(trans);
 #if 0
 	std::cerr << " Env TF:\n" << envTf.matrix() << "\n";
 	std::cerr << " Rob TF:\n" << robTf.matrix() << "\n";
@@ -454,6 +461,75 @@ Camera Renderer::setup_camera()
 			120.0f                                         // far plane
 			);
 	return cam;
+}
+
+std::tuple<Eigen::VectorXf, bool, float>
+Renderer::transitState(const Eigen::VectorXf& state,
+                       int action,
+                       Eigen::Vector2f magnitudes,
+                       Eigen::Vector2f deltas) const
+{
+	int magidx = action < kActionPerTransformType ? 0 : 1;
+	if (action >= kTotalNumberOfActions) {
+		/*
+		 * Invalid action, return the initial state.
+		 */
+		return std::make_tuple(state, false, 0.0f);
+	}
+	auto magnitude = magnitudes(magidx);
+	auto delta = deltas(magidx);
+	auto accum = delta;
+	Eigen::Quaternion<float> rot(state(3), state(4), state(5), state(6));
+	Eigen::Vector3f trans(state(0), state(1), state(2));
+	float sym = action % 2 == 0 ? 1.0f : -1.0f;
+	/*
+	 * action (0-11) to XYZ (0-2)
+	 * X: 0,1 or 6,7
+	 * Y: 2,3 or 8,9
+	 * Z: 4,5 or 10,11
+	 */
+	int axis_id = (action - kActionPerTransformType * magidx) / 2;
+	Eigen::Quaternion<float> deltarot;
+	Eigen::Vector3f tfvec { Eigen::Vector3f::Zero() };
+	tfvec(axis_id) = 1.0f;
+	Eigen::AngleAxis<float> aa(delta * sym, tfvec);
+	tfvec *= delta * sym;
+	/*
+	 * Post condition:
+	 *      tfvec or aa presents the delta action
+	 */
+	std::function<void()> applier;
+	if (magidx == 0) {
+		applier = [&rot, &trans, &tfvec, &aa]() {
+			trans += tfvec;
+		};
+	} else {
+		applier = [&rot, &trans, &tfvec, &aa]() {
+			rot = aa * rot;
+		};
+	}
+	Eigen::VectorXf nstate(kStateDimension);
+	bool done = true;
+	while (accum <= magnitude) {
+		applier();
+		nstate << trans(0), trans(1), trans(2),
+		          rot.w(), rot.x(),
+		          rot.y(), rot.z();
+		if (!isValid(nstate)) {
+			done = false;
+			break;
+		}
+		/* Last iteration? Exit */
+		if (accum == magnitude)
+			break;
+		accum += delta;
+		/* Fix the last iteration to magnitude, to keep prog <= 1.0 */
+		if (accum >= magnitude) {
+			accum = magnitude;
+		}
+	}
+	float prog = accum / magnitude;
+	return std::make_tuple(nstate, done, prog);
 }
 
 }

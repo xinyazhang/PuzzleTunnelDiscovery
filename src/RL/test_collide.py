@@ -36,6 +36,11 @@ def test():
     print("Is colliding free? {} {} Expecting False".format(r.state, r.is_valid_state(r.state)))
     r.state = np.array([0.7, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5], dtype=np.float32)
     print("Is colliding free? {} {} Expecting True".format(r.state, r.is_valid_state(r.state)))
+    goal_state = np.array([0.04, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5], dtype=np.float32)
+    mags = np.array([0.7 - 0.04, 0.125], dtype=np.float32)
+    deltas = np.array([0.0125, 0.0125], dtype=np.float32)
+    print(r.transit_state(r.state, 1, mags, deltas))
+    print(r.transit_state(r.state, 6, mags, deltas))
     exit()
     for x in np.arange(-0.8, 0.8, 0.02):
         r.state = np.array([x, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5], dtype=np.float32)

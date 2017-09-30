@@ -74,6 +74,7 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("scaleToUnit", &Renderer::scaleToUnit)
 		.def_property("state", &Renderer::getRobotState, &Renderer::setRobotState)
 		.def("is_valid_state", &Renderer::isValid)
+		.def("transit_state", &Renderer::transitState)
 		.def("render_depth_to_buffer", &Renderer::render_depth_to_buffer)
 		.def("render_mvdepth_to_buffer", &Renderer::render_mvdepth_to_buffer)
 		.def("render_mvrgbd", &Renderer::render_mvrgbd)
