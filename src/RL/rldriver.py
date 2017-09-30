@@ -6,9 +6,7 @@ import vision
 class RLDriver:
     '''
     RLDriver: driver the RL process from given configurations including:
-        - Robot models and states
-        - NN configuration
-    '''
+        - Robot models and states - NN configuration '''
     renderer = None
     master = None
     sv_rgb_net = None
@@ -154,3 +152,13 @@ class RLDriver:
 
         self.sync_op_group = tf.group(*sync_ops)
         return self.sync_op_group
+
+    def get_reward(self, action):
+        nstate, done, ratio = r.transit_state(r.state, action,
+                config.MAGNITUDES, config.STATE_CHECK_DELTAS)
+        reward = 0.0
+        if not done and ratio > 0.0:
+            reward = 1.0
+        if numpy.linalg.norm(nstate[0:3]) > 1.0:
+            reward = 64.0
+        return nstate, reward

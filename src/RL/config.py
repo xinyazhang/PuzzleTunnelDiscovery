@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import numpy as np
 
 class Config:
     LOCAL_T_MAX = 20            # repeat step size
@@ -40,3 +41,6 @@ MAX_STEPS = 1000000
 DEFAULT_RES = 224
 BATCH_SIZE = 32
 NUM_TO_EVALUATE = 10000
+
+MAGNITUDES = np.array([0.0125, 0.025], dtype=np.float32)
+STATE_CHECK_DELTAS = np.array([0.00125, 0.0025], dtype=np.float32)
