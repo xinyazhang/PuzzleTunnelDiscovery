@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+from operator import mul
 
 class VisionLayerConfig:
     strides = [1, 2, 2, 1]
@@ -68,10 +69,15 @@ class FCLayerConfig:
     def apply_layer(self, prev):
         # Dim 0 is BATCH
         print('prev {}'.format(prev.shape))
-        flatten = tf.reshape(prev, [prev.shape[0].value, prev.shape[1].value, -1])
+        flatten = tf.reshape(prev, [-1, prev.shape[1].value, reduce(mul, prev.shape[2:].as_list(), 1)])
         print('flatten {}'.format(flatten.shape))
         w,b = self.create_kernel(flatten.shape[-1])
-        return w,b,tf.nn.relu(tf.tensordot(flatten, w, [[2], [0]]) + b)
+        print('w,b {} {}'.format(w.get_shape(), b.get_shape()))
+        td = tf.tensordot(flatten, w, [[2], [0]])
+        print('tdshape {}'.format(td.get_shape()))
+        td.set_shape([None, self.ch_out])
+        print('tdshape set to {}'.format(td.get_shape()))
+        return w,b,tf.nn.relu(td + b)
 
 class VisionNetwork:
     '''
@@ -82,7 +88,7 @@ class VisionNetwork:
     '''
     thread_index = 0
     layer_number = 0
-    input_placeholders = None
+    input_tensor = None
     layer_configs = None
     view_number = 0
     feature_number = -1
@@ -141,6 +147,7 @@ class VisionNetwork:
 
         # FLATTEN is handled by FCLayerConfig
         w,b,self.mv_featvec = fclc.apply_layer(self.nn_layers[-1])
+        print("mv_featvec {}".format(self.mv_featvec.get_shape()))
         self.nn_args.append((w,b))
         self.nn_featvec = self.mv_featvec
 
