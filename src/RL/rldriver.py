@@ -2,18 +2,29 @@ import pyosr
 import numpy as np
 import tensorflow as tf
 import vision
+import config
 
 class RLDriver:
     '''
     RLDriver: driver the RL process from given configurations including:
-        - Robot models and states - NN configuration '''
+        - Robot models and states - NN configuration
+    '''
     renderer = None
     master = None
     sv_rgb_net = None
     sv_depth_net = None
     mv_net = None
     decision_net_args = []
+    value_net_args = []
     sync_op_group = None
+    mags = config.STATE_TRANSITION_DEFAULT_MAGS
+    deltas = config.STATE_TRANSITION_DEFAULT_DELTAS
+    a3c_local_t = config.A3C_LOCAL_T
+    a3c_gamma = config.RL_GAMMA
+    a3c_entropy_beta = config.ENTROPY_BETA
+    action_size = 0
+    grads_applier = None
+    grads_apply_op = None
 
     '''
         models: files name of [model, robot], or [model], or [model, None]
@@ -33,7 +44,10 @@ class RLDriver:
             mv_featnum = 256,
             input_tensor = None,
             use_rgb = False,
-            master_driver = None):
+            master_driver = None,
+            grads_applier = None):
+        self.grads_applier = grads_applier
+        self.action_size = output_number
         self.renderer = pyosr.Renderer()
         r = self.renderer
         if master_driver is None:
@@ -60,22 +74,24 @@ class RLDriver:
         h = r.pbufferHeight
         # TODO: Switch to RGB-D rather than D-only
         CHANNEL = 1
-        colorshape = [1, len(view_array), w, h, CHANNEL] if input_tensor is None else None
-        self.sv_depth_net, sv_depth_featvec = self._create_sv_features(colorshape,
+        inputshape = [None, len(view_array), w, h, CHANNEL] if input_tensor is None else None
+        self.sv_depth_net, sv_depth_featvec = self._create_sv_features(inputshape,
                 input_tensor,
                 svconfdict,
                 len(view_array),
                 sv_sqfeatnum)
+        self.sv_depth_shape = inputshape
         print('sv_depth_featvec: {}'.format(sv_depth_featvec.shape))
         if use_rgb is True:
             CHANNEL = 3
             # input_tensor is always for depth
-            colorshape = [1, len(view_array), w, h, CHANNEL]
-            self.sv_rgb_net, sv_rgb_featvec = self._create_sv_features(colorshape,
+            inputshape = [None, len(view_array), w, h, CHANNEL]
+            self.sv_rgb_net, sv_rgb_featvec = self._create_sv_features(inputshape,
                     None,
                     svconfdict,
                     len(view_array),
                     sv_sqfeatnum)
+            self.sv_rgb_shape = inputshape
             # Concat B1WHV and B1WHV into B1WHV
             print('sv_rgb_featvec: {}'.format(sv_rgb_featvec.shape))
             sv_featvec = tf.concat([sv_depth_featvec, sv_rgb_featvec], 4)
@@ -100,6 +116,11 @@ class RLDriver:
         print('rldriver output {}'.format(final.shape))
         self.final = final
         self.decision_net_args = [w,b]
+
+        self.value_net = vision.FCLayerConfig(1)
+        w,b,value = self.value_net.apply_layer(mv_net.features)
+        self.value = value
+        self.value_net_args = [w,b]
 
     def _create_sv_features(self, input_shape, input_tensor, svconfdict, num_views, sv_sqfeatnum):
         '''
@@ -137,6 +158,8 @@ class RLDriver:
         if self.sv_rgb_net is not None:
             args.append(self.sv_rgb_net.get_nn_args())
         args.append(self.mv_net.get_nn_args())
+        args.append(self.decision_net_args)
+        args.append(self.value_net_args)
         return sum(args, []) # Concatenate (+) all element in args, which is a list of list.
 
     def get_sync_from_master_op(self):
@@ -158,7 +181,124 @@ class RLDriver:
                 config.MAGNITUDES, config.STATE_CHECK_DELTAS)
         reward = 0.0
         if not done and ratio > 0.0:
-            reward = 1.0
+            reward = 0.002
         if numpy.linalg.norm(nstate[0:3]) > 1.0:
-            reward = 64.0
+            reward = 1.0
         return nstate, reward
+
+    def evaluate(self, sess, targets=None):
+        if targets is None:
+            targets = [self.final, self.value]
+        if self.sv_rgb_net:
+            self.r.render_mvrgbd()
+            img = r.mvrgb.reshape(self.sv_rgb_shape)
+            dep = r.mvdepth.reshape(self.sv_depth_shape)
+            input_dict = {self.sv_rgb_net.input_tensor : img,
+                    self.sv_depth_net.input_tensor : dep }
+        else:
+            img = None
+            dep = r.render_mvdepth_to_buffer().reshape(self.sv_depth_shape)
+            input_dict = { self.sv_depth_net.input_tensor : dep }
+        return sess.run(targets, feed_dict=input_dict)
+
+    def train_a3c(self, sess):
+        states = []
+        actions = []
+        rewards = []
+        values = []
+
+        sess.run(self.get_sync_from_master_op())
+
+        r = self.renderer
+        reaching_terminal = False
+        for i in range(self.a3c_local_t):
+            policy, value = self.evaluate(sess)
+            action = self.make_decision(policy) # TODO
+
+            states.append([img, dep])
+            actions.append(action)
+            values.append(value)
+
+            nstate,final,ratio = r.transit_state(r.state, action, self.mags, self.deltas)
+
+            reward,reaching_terminal = self.calc_reward(state, final, ratio)
+            rewards.append(reward)
+            r.state = nstate
+            if reaching_terminal:
+                break;
+
+        self.apply_grads_a3c(sess, actions, states, rewards, values, reaching_terminal)
+
+    def get_total_loss(self):
+        if self.total_loss:
+            return self.total_loss
+        # Action taken
+        self.a3c_batch_a_tensor = tf.placeholder([None, self.action_size], dtype=tf.float32)
+
+        # Temporal Difference
+        self.a3c_batch_td_tensor = tf.placeholder([None], dtype=tf.float32)
+
+        # Log policy, clipped to prevent NaN
+        log_policy = tf.log(tf.clip_by_value(self.final, 1e-20, 1.0))
+        entropy = -tf.reduce_sum(self.final * log_policy, reduction_indices=[1])
+        policy_loss = -tf.reduce_sum( tf.reduce_sum(tf.multiply(log_pi,
+            self.a3c_batch_a_tensor), reduction_indices=1) * self.a3c_batch_td_tensor + entropy
+            * self.entropy_beta)
+
+        self.a3c_batch_R_tensor = tf.placeholder([None], dtype=tf.float32)
+        value_loss = 0.5 * tf.nn.l2_loss(self.a3c_batch_R_tensor - self.value)
+        self.total_loss = policy_loss + total_loss
+        return self.total_loss
+
+    def get_apply_grads_op(self):
+        if self.grads_apply_op:
+            return self.grads_apply_op
+        self.grads = tf.gradients(self.total_loss, self.get_nn_args(),
+                gate_gradients=False, aggregation_method=None,
+                colocate_gradients_with_ops=False)
+        self.grads_apply_op = self.grads_applier(self.master.get_nn_args(), self.grads)
+       return self.grads_apply_op
+
+    def apply_grads_a3c(self, actions, states, rewards, values):
+        R = 0.0
+        if not reaching_terminal:
+            R = self.evaluate(sess, targets=[self.value])
+
+        batch_rgba = []
+        batch_depth = []
+        batch_a = []
+        batch_td = []
+        batch_R = []
+        for (ai, ri, si, Vi) in zip(actions, rewards, states, values):
+            R = ri + self.a3c_gamma * R
+            td = R - Vi
+            a = np.zeros([self.action_size], dtype=np.float32)
+            a[ai] = 1
+
+            if self.sv_rgb_net:
+                batch_rgba.append(si[0])
+                batch_depth.append(si[1])
+            else:
+                batch_depth.append(si[0])
+            batch_a.append(a)
+            batch_td.append(td)
+            batch_R.append(R)
+        cur_learning_rate = 7.0 * (10.0 ** -4.0) # FIXME
+        grads_applier = self.get_apply_grads_op()
+        if self.sv_rgb_net:
+            sess.run(grads_applier,
+                feed_dict={
+                    self.sv_rgb_net.input_tensor: batch_rgba,
+                    self.sv_depth_net.input_tensor: batch_depth,
+                    self.a3c_batch_a_tensor: batch_a,
+                    self.a3c_batch_td_tensor: batch_td,
+                    self.a3c_batch_R_tensor: batch_R,
+                    self.learning_rate_input: cur_learning_rate} )
+        else:
+            sess.run(grads_applier,
+                feed_dict={
+                    self.sv_rgb_net.input_tensor: batch_rgba,
+                    self.a3c_batch_a_tensor: batch_a,
+                    self.a3c_batch_td_tensor: batch_td,
+                    self.a3c_batch_R_tensor: batch_R,
+                    self.learning_rate_input: cur_learning_rate} )
