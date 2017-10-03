@@ -54,7 +54,8 @@ def test_rldriver_main():
     glctx = pyosr.create_gl_context(dpy)
     g = tf.Graph()
     with g.as_default():
-        grad_applier = RMSPropApplier(learning_rate=tf.placeholder(tf.float32),
+        learning_rate_input = tf.placeholder(tf.float32)
+        grad_applier = RMSPropApplier(learning_rate=learning_rate_input,
                                       decay=RMSP_ALPHA,
                                       momentum=0.0,
                                       epsilon=RMSP_EPSILON,
@@ -76,11 +77,27 @@ def test_rldriver_main():
                     grads_applier=grad_applier)
         driver.get_sync_from_master_op()
         driver.get_apply_grads_op()
+        driver.learning_rate_input = learning_rate_input
+        driver.a3c_local_t = 2
         global_step = tf.contrib.framework.get_or_create_global_step()
+        saver = tf.train.Saver(masterdriver.get_nn_args() + [global_step])
+        last_time = time.time()
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
+            ckpt = tf.train.get_checkpoint_state(checkpoint_dir=ckpt_dir)
+            print('ckpt {}'.format(ckpt))
+            if ckpt and ckpt.model_checkpoint_path:
+                saver.restore(sess, ckpt.model_checkpoint_path)
+                print('Restored!')
+            epoch = 0
             while True:
                 driver.train_a3c(sess)
+                epoch += 1
+                if epoch % 1000 == 0 or time.time() - last_time >= 10:
+                    print("Saving checkpoint")
+                    saver.save(sess, ckpt_dir, global_step=global_step)
+                    last_time = time.time()
+                print("Epoch {}".format(epoch))
         '''
         with tf.train.MonitoredTrainingSession(
                 checkpoint_dir=ckpt_dir,
