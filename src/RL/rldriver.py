@@ -171,8 +171,8 @@ class RLDriver:
             return self.sync_op_group
         master_args = self.master.get_nn_args()
         self_args = self.get_nn_args()
-        print('master_args {}'.format(master_args))
-        print('self_args {}'.format(self_args))
+        # print('master_args {}'.format(master_args))
+        # print('self_args {}'.format(self_args))
         sync_ops = []
 
         for src,dst in zip(master_args, self_args):
@@ -189,6 +189,8 @@ class RLDriver:
         reward = 0.0
         if not done and ratio > 0.0:
             reward = 0.002
+        elif ratio == 0.0:
+            reward = -0.002
         if np.linalg.norm(nstate[0:3]) > 1.0:
             reward = 1.0
             reaching_end = True
@@ -215,6 +217,7 @@ class RLDriver:
         if self.sv_rgb_net:
             r.render_mvrgbd()
             img = r.mvrgb.reshape(self.sv_rgb_shape)
+            # print('img shape {}'.format(img.shape))
             dep = r.mvdepth.reshape(self.sv_depth_shape)
             input_dict = {self.sv_rgb_net.input_tensor : img,
                     self.sv_depth_net.input_tensor : dep }
@@ -236,6 +239,10 @@ class RLDriver:
         reaching_terminal = False
         for i in range(self.a3c_local_t):
             policy, value, img, dep = self.evaluate(sess)
+            policy = policy.reshape(self.action_size)
+            value = np.asscalar(value)
+            # print("policy {}".format(policy))
+            # print("value {}".format(value))
             action = self.make_decision(policy) # TODO
 
             states.append([img, dep])
@@ -282,10 +289,10 @@ class RLDriver:
                 self.grads)
         return self.grads_apply_op
 
-    def apply_grads_a3c(self, actions, states, rewards, values):
+    def apply_grads_a3c(self, sess, actions, states, rewards, values, reaching_terminal):
         R = 0.0
         if not reaching_terminal:
-            R = self.evaluate(sess, targets=[self.value])
+            R = np.asscalar(self.evaluate(sess, targets=[self.value])[0])
 
         batch_rgba = []
         batch_depth = []
@@ -299,16 +306,20 @@ class RLDriver:
             a[ai] = 1
 
             if self.sv_rgb_net:
-                batch_rgba.append(si[0])
-                batch_depth.append(si[1])
+                img = np.squeeze(si[0], [0])
+                dep = np.squeeze(si[1], axis=0)
+                # print('dep {}'.format(dep.shape))
             else:
-                batch_depth.append(si[0])
+                img = None
+                dep = np.squeeze(si[0], [0])
+            batch_rgba.append(img)
+            batch_depth.append(dep)
             batch_a.append(a)
             batch_td.append(td)
             batch_R.append(R)
         cur_learning_rate = 7.0 * (10.0 ** -4.0) # FIXME
         grads_applier = self.get_apply_grads_op()
-        if self.sv_rgb_net:
+        if self.sv_rgb_net is not None:
             sess.run(grads_applier,
                 feed_dict={
                     self.sv_rgb_net.input_tensor: batch_rgba,
@@ -320,7 +331,7 @@ class RLDriver:
         else:
             sess.run(grads_applier,
                 feed_dict={
-                    self.sv_rgb_net.input_tensor: batch_rgba,
+                    self.sv_depth_net.input_tensor: batch_depth,
                     self.a3c_batch_a_tensor: batch_a,
                     self.a3c_batch_td_tensor: batch_td,
                     self.a3c_batch_R_tensor: batch_R,
