@@ -3,6 +3,7 @@ import numpy as np
 import tensorflow as tf
 import vision
 import config
+import random
 
 class RLDriver:
     '''
@@ -23,8 +24,10 @@ class RLDriver:
     a3c_gamma = config.RL_GAMMA
     a3c_entropy_beta = config.ENTROPY_BETA
     action_size = 0
+    total_loss = None
     grads_applier = None
     grads_apply_op = None
+    epsilon = 0.8 # argument for epsilon-greedy policy
 
     '''
         models: files name of [model, robot], or [model], or [model, None]
@@ -63,6 +66,7 @@ class RLDriver:
         else:
             r.setupFrom(master_driver.renderer)
             r.default_depth = master_driver.renderer.default_depth
+            r.state = np.array(init_state, dtype=np.float32)
         self.master = master_driver
 
         view_array = []
@@ -80,7 +84,7 @@ class RLDriver:
                 svconfdict,
                 len(view_array),
                 sv_sqfeatnum)
-        self.sv_depth_shape = inputshape
+        self.sv_depth_shape = [ s if s is not None else -1 for s in inputshape ]
         print('sv_depth_featvec: {}'.format(sv_depth_featvec.shape))
         if use_rgb is True:
             CHANNEL = 3
@@ -91,7 +95,7 @@ class RLDriver:
                     svconfdict,
                     len(view_array),
                     sv_sqfeatnum)
-            self.sv_rgb_shape = inputshape
+            self.sv_rgb_shape = [ s if s is not None else -1 for s in inputshape ]
             # Concat B1WHV and B1WHV into B1WHV
             print('sv_rgb_featvec: {}'.format(sv_rgb_featvec.shape))
             sv_featvec = tf.concat([sv_depth_featvec, sv_rgb_featvec], 4)
@@ -167,6 +171,8 @@ class RLDriver:
             return self.sync_op_group
         master_args = self.master.get_nn_args()
         self_args = self.get_nn_args()
+        print('master_args {}'.format(master_args))
+        print('self_args {}'.format(self_args))
         sync_ops = []
 
         for src,dst in zip(master_args, self_args):
@@ -177,20 +183,37 @@ class RLDriver:
         return self.sync_op_group
 
     def get_reward(self, action):
+        r = self.renderer
         nstate, done, ratio = r.transit_state(r.state, action,
                 config.MAGNITUDES, config.STATE_CHECK_DELTAS)
         reward = 0.0
         if not done and ratio > 0.0:
             reward = 0.002
-        if numpy.linalg.norm(nstate[0:3]) > 1.0:
+        if np.linalg.norm(nstate[0:3]) > 1.0:
             reward = 1.0
-        return nstate, reward
+            reaching_end = True
+        else:
+            reaching_end = False
+        return nstate, reward, reaching_end
+
+    def make_decision(self, policy):
+        '''
+        Implement epsilon-greedy policy here
+
+        TODO: incorporate RRT here?
+        '''
+        greedy = random.random()
+        if greedy < self.epsilon:
+            return np.argmax(policy)
+        else:
+            return random.randrange(len(policy))
 
     def evaluate(self, sess, targets=None):
         if targets is None:
             targets = [self.final, self.value]
+        r = self.renderer
         if self.sv_rgb_net:
-            self.r.render_mvrgbd()
+            r.render_mvrgbd()
             img = r.mvrgb.reshape(self.sv_rgb_shape)
             dep = r.mvdepth.reshape(self.sv_depth_shape)
             input_dict = {self.sv_rgb_net.input_tensor : img,
@@ -199,7 +222,7 @@ class RLDriver:
             img = None
             dep = r.render_mvdepth_to_buffer().reshape(self.sv_depth_shape)
             input_dict = { self.sv_depth_net.input_tensor : dep }
-        return sess.run(targets, feed_dict=input_dict)
+        return sess.run(targets, feed_dict=input_dict) + [img, dep]
 
     def train_a3c(self, sess):
         states = []
@@ -212,16 +235,14 @@ class RLDriver:
         r = self.renderer
         reaching_terminal = False
         for i in range(self.a3c_local_t):
-            policy, value = self.evaluate(sess)
+            policy, value, img, dep = self.evaluate(sess)
             action = self.make_decision(policy) # TODO
 
             states.append([img, dep])
             actions.append(action)
             values.append(value)
 
-            nstate,final,ratio = r.transit_state(r.state, action, self.mags, self.deltas)
-
-            reward,reaching_terminal = self.calc_reward(state, final, ratio)
+            nstate,reward,reaching_terminal = self.get_reward(action)
             rewards.append(reward)
             r.state = nstate
             if reaching_terminal:
@@ -230,34 +251,36 @@ class RLDriver:
         self.apply_grads_a3c(sess, actions, states, rewards, values, reaching_terminal)
 
     def get_total_loss(self):
-        if self.total_loss:
+        if self.total_loss is not None:
             return self.total_loss
         # Action taken
-        self.a3c_batch_a_tensor = tf.placeholder([None, self.action_size], dtype=tf.float32)
+        self.a3c_batch_a_tensor = tf.placeholder(tf.float32, shape=[None, self.action_size])
 
         # Temporal Difference
-        self.a3c_batch_td_tensor = tf.placeholder([None], dtype=tf.float32)
+        self.a3c_batch_td_tensor = tf.placeholder(tf.float32, shape=[None])
 
         # Log policy, clipped to prevent NaN
         log_policy = tf.log(tf.clip_by_value(self.final, 1e-20, 1.0))
         entropy = -tf.reduce_sum(self.final * log_policy, reduction_indices=[1])
-        policy_loss = -tf.reduce_sum( tf.reduce_sum(tf.multiply(log_pi,
+        policy_loss = -tf.reduce_sum( tf.reduce_sum(tf.multiply(log_policy,
             self.a3c_batch_a_tensor), reduction_indices=1) * self.a3c_batch_td_tensor + entropy
-            * self.entropy_beta)
+            * self.a3c_entropy_beta)
 
-        self.a3c_batch_R_tensor = tf.placeholder([None], dtype=tf.float32)
+        self.a3c_batch_R_tensor = tf.placeholder(tf.float32, shape=[None])
         value_loss = 0.5 * tf.nn.l2_loss(self.a3c_batch_R_tensor - self.value)
-        self.total_loss = policy_loss + total_loss
+        self.total_loss = policy_loss + value_loss
         return self.total_loss
 
     def get_apply_grads_op(self):
-        if self.grads_apply_op:
+        if self.grads_apply_op is not None:
             return self.grads_apply_op
-        self.grads = tf.gradients(self.total_loss, self.get_nn_args(),
+        print("self.master {}".format(self.master))
+        self.grads = tf.gradients(self.get_total_loss(), self.get_nn_args(),
                 gate_gradients=False, aggregation_method=None,
                 colocate_gradients_with_ops=False)
-        self.grads_apply_op = self.grads_applier(self.master.get_nn_args(), self.grads)
-       return self.grads_apply_op
+        self.grads_apply_op = self.grads_applier.apply_gradients(self.master.get_nn_args(),
+                self.grads)
+        return self.grads_apply_op
 
     def apply_grads_a3c(self, actions, states, rewards, values):
         R = 0.0

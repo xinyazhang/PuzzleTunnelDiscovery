@@ -24,7 +24,7 @@ def test():
     print(r.views.shape)
     w = r.pbufferWidth
     h = r.pbufferHeight
-    r.state = np.array([1.0, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5], dtype=np.float32)
+    r.state = np.array([0.125, -0.075, 0.0, 0.5, 0.5, 0.5, 0.5], dtype=np.float32)
     r.render_mvrgbd()
     img = r.mvrgb.reshape(w * r.views.shape[0], h, 3)
     dep = r.mvdepth.reshape(w * r.views.shape[0], h)
