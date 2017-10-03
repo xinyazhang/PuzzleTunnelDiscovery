@@ -75,7 +75,7 @@ class FCLayerConfig:
         print('w,b {} {}'.format(w.get_shape(), b.get_shape()))
         td = tf.tensordot(flatten, w, [[2], [0]])
         print('tdshape {}'.format(td.get_shape()))
-        td.set_shape([None, self.ch_out])
+        td.set_shape([None, prev.shape[1].value, self.ch_out])
         print('tdshape set to {}'.format(td.get_shape()))
         return w,b,tf.nn.relu(td + b)
 
