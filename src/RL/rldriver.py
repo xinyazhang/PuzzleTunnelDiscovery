@@ -182,6 +182,9 @@ class RLDriver:
         self.sync_op_group = tf.group(*sync_ops)
         return self.sync_op_group
 
+    def is_end(self, state):
+        return np.linalg.norm(state[0:3]) > 1.0
+
     def get_reward(self, action):
         r = self.renderer
         nstate, done, ratio = r.transit_state(r.state, action,
@@ -191,11 +194,8 @@ class RLDriver:
             reward = 0.002
         elif ratio == 0.0:
             reward = -0.002
-        if np.linalg.norm(nstate[0:3]) > 1.0:
-            reward = 1.0
-            reaching_end = True
-        else:
-            reaching_end = False
+        reaching_end = self.is_end(nstate)
+        reward = 1.0 if reaching_end else reward
         return nstate, reward, reaching_end
 
     def make_decision(self, policy):
@@ -227,6 +227,15 @@ class RLDriver:
             input_dict = { self.sv_depth_net.input_tensor : dep }
         return sess.run(targets, feed_dict=input_dict) + [img, dep]
 
+    def act(self, sess):
+        r = self.renderer
+        reaching_terminal = False
+        while not reaching_terminal:
+            policy, value, img, dep = self.evaluate(sess)
+            policy = policy.reshape(self.action_size)
+            action = self.make_decision(policy)
+            nstate,reward,reaching_terminal = self.get_reward(action)
+
     def train_a3c(self, sess):
         states = []
         actions = []
@@ -243,7 +252,7 @@ class RLDriver:
             value = np.asscalar(value)
             # print("policy {}".format(policy))
             # print("value {}".format(value))
-            action = self.make_decision(policy) # TODO
+            action = self.make_decision(policy)
 
             states.append([img, dep])
             actions.append(action)
