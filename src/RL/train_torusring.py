@@ -47,14 +47,15 @@ device = "/gpu:0"
 MODELS = ['../res/simple/FullTorus.obj', '../res/simple/robot.obj']
 init_state = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0], dtype=np.float32)
 view_config = [(30.0, 12), (-30.0, 12), (0, 4), (90, 1), (-90, 1)]
-ckpt_dir = './ttorus/ckpt'
+ckpt_dir = './ttorus/ckpt/'
+ckpt_prefix = 'torus-vs-ring-ckpt'
 
 def test_rldriver_main():
     pyosr.init()
     dpy = pyosr.create_display()
     glctx = pyosr.create_gl_context(dpy)
     g = tf.Graph()
-    mkdir_p(ckpt_dir)
+    util.mkdir_p(ckpt_dir)
     with g.as_default():
         learning_rate_input = tf.placeholder(tf.float32)
         grad_applier = RMSPropApplier(learning_rate=learning_rate_input,
@@ -92,15 +93,16 @@ def test_rldriver_main():
             epoch = 0
             if ckpt and ckpt.model_checkpoint_path:
                 saver.restore(sess, ckpt.model_checkpoint_path)
-                epoch = sess.run(global_step)[0]
+                epoch = sess.run(global_step)
                 print('Restored!, global_step {}'.format(epoch))
-            while True:
+            while epoch < 100 * 1000:
                 driver.train_a3c(sess)
                 epoch += 1
                 sess.run(increment_global_step)
-                if epoch % 1000 == 0 or time.time() - last_time >= 10:
+                if epoch % 1000 == 0 or time.time() - last_time >= 10 * 60:
                     print("Saving checkpoint")
-                    saver.save(sess, ckpt_dir, global_step=global_step)
+                    fn = saver.save(sess, ckpt_dir+ckpt_prefix, global_step=global_step)
+                    print("Saved checkpoint to {}".format(fn))
                     last_time = time.time()
                 print("Epoch {}".format(epoch))
         '''
