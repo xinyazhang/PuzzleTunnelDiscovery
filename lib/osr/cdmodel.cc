@@ -34,7 +34,7 @@ void CDModel::addVF(const glm::mat4& m,
 	std::transform(verts.begin(), verts.end(), vertices.begin(),
 			[m](const Vertex& vert) -> fcl::Vector3f {
 				glm::vec4 oldp(vert.position, 1.0f);
-				glm::vec3 newp = m * oldp;
+				glm::vec4 newp = m * oldp;
 				return { newp[0],
 					 newp[1],
 					 newp[2] };
