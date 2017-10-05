@@ -476,9 +476,15 @@ Renderer::transitState(const Eigen::VectorXf& state,
 		 */
 		return std::make_tuple(state, false, 0.0f);
 	}
+	if (!isValid(state)) {
+		/*
+		 * Invalid initial state
+		 */
+		return std::make_tuple(state, false, 0.0f);
+	}
 	auto magnitude = magnitudes(magidx);
-	auto delta = deltas(magidx);
-	auto accum = delta;
+	auto deltacap = deltas(magidx);
+	auto accum = 0.0f;
 	Eigen::Quaternion<float> rot(state(3), state(4), state(5), state(6));
 	Eigen::Vector3f trans(state(0), state(1), state(2));
 	float sym = action % 2 == 0 ? 1.0f : -1.0f;
@@ -492,44 +498,48 @@ Renderer::transitState(const Eigen::VectorXf& state,
 	Eigen::Quaternion<float> deltarot;
 	Eigen::Vector3f tfvec { Eigen::Vector3f::Zero() };
 	tfvec(axis_id) = 1.0f;
-	Eigen::AngleAxis<float> aa(delta * sym, tfvec);
-	tfvec *= delta * sym;
 	/*
 	 * Post condition:
 	 *      tfvec or aa presents the delta action
 	 */
-	std::function<void()> applier;
+	std::function<void(float)> applier;
 	if (magidx == 0) {
-		applier = [&rot, &trans, &tfvec, &aa]() {
-			trans += tfvec;
+		applier = [&rot, &trans, &tfvec](float delta) {
+			trans += delta * tfvec;
 		};
 	} else {
-		applier = [&rot, &trans, &tfvec, &aa]() {
+		applier = [&rot, &trans, &tfvec, sym](float delta) {
+			Eigen::AngleAxis<float> aa(delta * sym, tfvec);
 			rot = aa * rot;
 		};
 	}
-	Eigen::VectorXf nstate(kStateDimension);
+	Eigen::VectorXf nstate(kStateDimension), freestate(state);
 	bool done = true;
-	while (accum <= magnitude) {
-		applier();
+	while (true) {
+		float delta = std::min(deltacap, magnitude - accum);
+		float naccum = accum + delta;
+		applier(delta);
 		nstate << trans(0), trans(1), trans(2),
 		          rot.w(), rot.x(),
 		          rot.y(), rot.z();
+		/*
+		 * Verify the new state at accum + delta
+		 */
 		if (!isValid(nstate)) {
 			done = false;
 			break;
 		}
-		/* Last iteration? Exit */
+		freestate = nstate;
+		/*
+		 * naccum is valid, proceed.
+		 */
+		accum = naccum;
+		/* Exit when reaches last iteration */
 		if (accum == magnitude)
 			break;
-		accum += delta;
-		/* Fix the last iteration to magnitude, to keep prog <= 1.0 */
-		if (accum >= magnitude) {
-			accum = magnitude;
-		}
 	}
 	float prog = accum / magnitude;
-	return std::make_tuple(nstate, done, prog);
+	return std::make_tuple(freestate, done, prog);
 }
 
 }
