@@ -190,9 +190,13 @@ class RLDriver:
         nstate, done, ratio = r.transit_state(r.state, action,
                 config.MAGNITUDES, config.STATE_CHECK_DELTAS)
         reward = 0.0
+        '''
         if not done and ratio > 0.0:
             reward = 0.002
         elif ratio == 0.0:
+            reward = -0.002
+        '''
+        if ratio == 0.0:
             reward = -0.002
         reaching_end = self.is_end(nstate)
         reward = 1.0 if reaching_end else reward
