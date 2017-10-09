@@ -187,7 +187,8 @@ class RLDriver:
         return self.sync_op_group
 
     def is_end(self, state):
-        return np.linalg.norm(state[0:3]) > 1.0
+        # return np.linalg.norm(state[0:3]) > 1.0
+        return self.renderer.is_disentangled(state)
 
     def get_reward(self, action):
         r = self.renderer
