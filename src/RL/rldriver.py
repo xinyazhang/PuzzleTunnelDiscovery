@@ -4,6 +4,7 @@ import tensorflow as tf
 import vision
 import config
 import random
+from math import sqrt,pi,sin,cos
 
 class RLDriver:
     '''
@@ -20,6 +21,7 @@ class RLDriver:
     sync_op_group = None
     mags = config.STATE_TRANSITION_DEFAULT_MAGS
     deltas = config.STATE_TRANSITION_DEFAULT_DELTAS
+    max_iteration_per_epoch = config.MAX_ITERATION_PER_EPOCH
     a3c_local_t = config.A3C_LOCAL_T
     a3c_gamma = config.RL_GAMMA
     a3c_entropy_beta = config.ENTROPY_BETA
@@ -53,6 +55,8 @@ class RLDriver:
         self.action_size = output_number
         self.renderer = pyosr.Renderer()
         r = self.renderer
+        r.pbufferWidth = config.DEFAULT_RES
+        r.pbufferHeight = config.DEFAULT_RES
         if master_driver is None:
             r.setup()
             r.loadModelFromFile(models[0])
@@ -241,34 +245,33 @@ class RLDriver:
             nstate,reward,reaching_terminal = self.get_reward(action)
 
     def train_a3c(self, sess):
-        states = []
-        actions = []
-        rewards = []
-        values = []
-
         sess.run(self.get_sync_from_master_op())
-
         r = self.renderer
-        reaching_terminal = False
-        for i in range(self.a3c_local_t):
-            policy, value, img, dep = self.evaluate(sess)
-            policy = policy.reshape(self.action_size)
-            value = np.asscalar(value)
-            # print("policy {}".format(policy))
-            # print("value {}".format(value))
-            action = self.make_decision(policy)
 
-            states.append([img, dep])
-            actions.append(action)
-            values.append(value)
+        for it in range(self.max_iteration_per_epoch):
+            reaching_terminal = False
+            states = []
+            actions = []
+            rewards = []
+            values = []
+            for i in range(self.a3c_local_t):
+                policy, value, img, dep = self.evaluate(sess)
+                policy = policy.reshape(self.action_size)
+                value = np.asscalar(value)
+                # print("policy {}".format(policy))
+                # print("value {}".format(value))
+                action = self.make_decision(policy)
 
-            nstate,reward,reaching_terminal = self.get_reward(action)
-            rewards.append(reward)
-            r.state = nstate
-            if reaching_terminal:
-                break;
+                states.append([img, dep])
+                actions.append(action)
+                values.append(value)
 
-        self.apply_grads_a3c(sess, actions, states, rewards, values, reaching_terminal)
+                nstate,reward,reaching_terminal = self.get_reward(action)
+                rewards.append(reward)
+                r.state = nstate
+                if reaching_terminal:
+                    break;
+            self.apply_grads_a3c(sess, actions, states, rewards, values, reaching_terminal)
 
     def get_total_loss(self):
         if self.total_loss is not None:
@@ -301,6 +304,27 @@ class RLDriver:
         self.grads_apply_op = self.grads_applier.apply_gradients(self.master.get_nn_args(),
                 self.grads)
         return self.grads_apply_op
+
+    def restart_epoch(self):
+        '''
+        Generate a valid random configuration
+
+        TODO: non-uniform distribution
+        '''
+        r = self.renderer
+        while True:
+            tr = np.random.rand(3) * 2.0 - 1.0
+            u1,u2,u3 = np.random.rand(3)
+            quat = [sqrt(1-u1)*sin(2*pi*u2),
+                    sqrt(1-u1)*cos(2*pi*u2),
+                    sqrt(u1)*sin(2*pi*u3),
+                    sqrt(u1)*cos(2*pi*u3)]
+            part1 = np.array(tr, dtype=np.float32)
+            part2 = np.array(quat, dtype=np.float32)
+            r.state = np.concatenate((part1, part2))
+            if r.is_valid_state(r.state):
+                break
+
 
     def apply_grads_a3c(self, sess, actions, states, rewards, values, reaching_terminal):
         R = 0.0

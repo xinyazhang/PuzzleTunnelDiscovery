@@ -47,9 +47,9 @@ device = "/gpu:0"
 MODELS = ['../res/simple/FullTorus.obj', '../res/simple/robot.obj']
 init_state = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0], dtype=np.float32)
 view_config = [(30.0, 12), (-30.0, 12), (0, 4), (90, 1), (-90, 1)]
-ckpt_dir = './ttorus/ckpt-mt/'
+ckpt_dir = './ttorus/ckpt-mt-2/'
 ckpt_prefix = 'torus-vs-ring-ckpt'
-THREAD = 2
+THREAD = 4
 
 graph_completes = [threading.Event() for i in range(THREAD)]
 init_done = threading.Event()
@@ -72,7 +72,7 @@ def torus_worker(index, dpy, glctx, masterdriver, tfgraph, grad_applier, lrtenso
         driver.get_sync_from_master_op()
         driver.get_apply_grads_op()
         driver.learning_rate_input = lrtensor
-        driver.a3c_local_t = 32
+        # driver.a3c_local_t = 32
         graph_completes[index].set()
         init_done.wait()
         '''
@@ -102,6 +102,7 @@ def torus_worker(index, dpy, glctx, masterdriver, tfgraph, grad_applier, lrtenso
                 print("Saved checkpoint to {}".format(fn))
                 last_time = time.time()
             print("Epoch {}".format(epoch))
+            driver.restart_epoch()
 
 def torus_master():
     pyosr.init()
@@ -136,7 +137,10 @@ def torus_master():
                 print('Restored!, global_step {}'.format(epoch))
             threads = []
             for i in range(THREAD):
-                thread = threading.Thread(target=torus_worker, args=(i, dpy, glctx, masterdriver, g, grad_applier, learning_rate_input, global_step, increment_global_step, sess, saver))
+                thread_args = (i, dpy, glctx, masterdriver, g, grad_applier,
+                        learning_rate_input, global_step,
+                        increment_global_step, sess, saver)
+                thread = threading.Thread(target=torus_worker, args=thread_args)
                 thread.start()
                 graph_completes[i].wait()
                 threads.append(thread)

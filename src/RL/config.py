@@ -27,23 +27,25 @@ class Config:
     # TODO: singleton object.
 
 VIEW_CFG = [(30.0, 12), (-30.0, 12), (0, 4), (90, 1), (-90, 1)]
-SV_VISCFG = [ { 'ch_out' : 16, 'strides' : None, 'kernel_size' : None},
+SV_VISCFG = [ { 'ch_out' : 32, 'strides' : None, 'kernel_size' : None},
         { 'ch_out' : 32, 'strides' : [1,3,3,1], 'kernel_size' : [5,5]},
         { 'ch_out' : 64, 'strides' : None, 'kernel_size' : None},
         { 'ch_out' : 128, 'strides' : None, 'kernel_size' : None} ]
 
 MV_VISCFG = [ { 'ch_out' : 128, 'strides' : None, 'kernel_size' : None},
         { 'ch_out' : 256, 'strides' : None, 'kernel_size' : None},
-        { 'ch_out' : 512, 'strides' : None, 'kernel_size' : None},
-        { 'ch_out' : 1024, 'strides' : None, 'kernel_size' : None} ]
+        { 'ch_out' : 256, 'strides' : None, 'kernel_size' : None},
+        { 'ch_out' : 512, 'strides' : None, 'kernel_size' : None} ]
 
 MAX_STEPS = 1000000
-DEFAULT_RES = 224
+#DEFAULT_RES = 224
+DEFAULT_RES = 112
 BATCH_SIZE = 32
 NUM_TO_EVALUATE = 10000
 
 MAGNITUDES = np.array([0.0125, 0.025], dtype=np.float32)
 STATE_CHECK_DELTAS = np.array([0.00125, 0.0025], dtype=np.float32)
+MAX_ITERATION_PER_EPOCH = 16
 A3C_LOCAL_T = 32
 RL_GAMMA = 0.99 # discount factor for rewards
 ENTROPY_BETA = 0.01
