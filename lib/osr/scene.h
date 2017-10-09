@@ -50,7 +50,11 @@ public:
 	void render(GLuint program, Camera& camera, glm::mat4 globalXform);
 	void clear();
 
-	glm::mat4 transform() const { return xform_; }
+	/*
+	 * Calibration transform matrix shall centralize the scene and scale
+	 * it to unit size.
+	 */
+	glm::mat4 getCalibrationTransform() const { return xform_; }
 	BoundingBox getBoundingBox() const { return bbox_; }
 
 	void moveToCenter() { translate(-center_); }

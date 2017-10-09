@@ -66,7 +66,7 @@ glm::mat4 translate_state_to_matrix(const Eigen::VectorXf& state)
 {
 	glm::quat quat(state(3), state(4), state(5), state(6));
 	glm::mat4 rot = glm::toMat4(quat);
-	return glm::translate(rot, glm::vec3(state(0), state(1), state(2)));
+	return glm::translate(glm::mat4(1.0f), glm::vec3(state(0), state(1), state(2))) * rot;
 }
 
 osr::Transform translate_state_to_transform(const Eigen::VectorXf& state)
@@ -377,6 +377,16 @@ bool Renderer::isValid(const Eigen::VectorXf& state) const
 	std::cerr << " Rob TF:\n" << robTf.matrix() << "\n";
 #endif
 	return !CDModel::collide(*cd_scene_, envTf, *cd_robot_, robTf);
+}
+
+bool Renderer::isDisentangled(const Eigen::VectorXf& state) const
+{
+	if (!cd_scene_ || !cd_robot_)
+		return true;
+	Transform envTf;
+	envTf.setIdentity();
+	auto robTf = translate_state_to_transform(state);
+	return !CDModel::collideBB(*cd_scene_, envTf, *cd_robot_, robTf);
 }
 
 void Renderer::render_depth()

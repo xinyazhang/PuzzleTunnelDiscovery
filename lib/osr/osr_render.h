@@ -61,6 +61,7 @@ public:
 	Eigen::VectorXf getRobotState() const;
 
 	bool isValid(const Eigen::VectorXf& state) const;
+	bool isDisentangled(const Eigen::VectorXf& state) const;
 
 	int pbufferWidth = 224;
 	int pbufferHeight = 224;

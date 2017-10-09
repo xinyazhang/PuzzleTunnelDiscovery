@@ -25,6 +25,13 @@ public:
 			    const Transform& envTf,
 			    const CDModel& rob,
 			    const Transform& robTf);
+	/*
+	 * Collide env vs rob w.r.t. their Bounding Boxes
+	 */
+	static bool collideBB(const CDModel& env,
+			      const Transform& envTf,
+			      const CDModel& rob,
+			      const Transform& robTf);
 };
 
 }
