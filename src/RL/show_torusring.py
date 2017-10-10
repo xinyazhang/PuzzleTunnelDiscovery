@@ -107,7 +107,7 @@ def show_torus_ring():
                         policy, value, img, dep = driver.evaluate(sess)
                         policy = policy.reshape(driver.action_size)
                         action = driver.make_decision(policy)
-                        nstate,reward,reaching_terminal = driver.get_reward(action)
+                        nstate,reward,self.reaching_terminal = driver.get_reward(action)
                         valid = r.is_valid_state(nstate)
                         print('Current Value {} Policy {} Action {} Reward {}'.format(value, policy, action, reward))
                         print('\tNew State {} Collision Free ? {}'.format(nstate, valid))
