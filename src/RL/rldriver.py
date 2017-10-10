@@ -30,6 +30,7 @@ class RLDriver:
     grads_applier = None
     grads_apply_op = None
     epsilon = 0.8 # argument for epsilon-greedy policy
+    worker_thread_index = -1
 
     '''
         models: files name of [model, robot], or [model], or [model, None]
@@ -50,7 +51,9 @@ class RLDriver:
             input_tensor = None,
             use_rgb = False,
             master_driver = None,
-            grads_applier = None):
+            grads_applier = None,
+            worker_thread_index = -1):
+        self.worker_thread_index = worker_thread_index
         self.grads_applier = grads_applier
         self.action_size = output_number
         self.renderer = pyosr.Renderer()
@@ -246,15 +249,16 @@ class RLDriver:
             nstate,reward,reaching_terminal = self.get_reward(action)
 
     def train_a3c(self, sess):
-        sess.run(self.get_sync_from_master_op())
         r = self.renderer
 
         for it in range(self.max_iteration_per_epoch):
+            sess.run(self.get_sync_from_master_op())
             reaching_terminal = False
             states = []
             actions = []
             rewards = []
             values = []
+            start_at = r.state
             for i in range(self.a3c_local_t):
                 policy, value, img, dep = self.evaluate(sess)
                 policy = policy.reshape(self.action_size)
@@ -272,7 +276,15 @@ class RLDriver:
                 r.state = nstate
                 if reaching_terminal:
                     break;
+            # r.state = start_at
+            # policy_old, value_old, _, _ = self.evaluate(sess)
             self.apply_grads_a3c(sess, actions, states, rewards, values, reaching_terminal)
+            sess.run(self.get_sync_from_master_op())
+            # policy_new, value_new, _, _ = self.evaluate(sess)
+            # print('[{}] policy old {}'.format(self.worker_thread_index, policy_old))
+            # print('[{}] policy new {}'.format(self.worker_thread_index, policy_new))
+            # print('[{}] value old {}'.format(self.worker_thread_index, value_old))
+            # print('[{}] value new {}'.format(self.worker_thread_index, value_new))
 
     def get_total_loss(self):
         if self.total_loss is not None:
@@ -330,15 +342,30 @@ class RLDriver:
 
 
     def apply_grads_a3c(self, sess, actions, states, rewards, values, reaching_terminal):
+        '''
+        Calculate the grads w.r.t. the loss from policy delta and value delta
+        Note: please ensure self.renderer.state is the last state, otherwise R
+              would be incorrect.
+        '''
         R = 0.0
         if not reaching_terminal:
             R = np.asscalar(self.evaluate(sess, targets=[self.value])[0])
+        else:
+            R = 1.0
+
+        states.reverse()
+        actions.reverse()
+        rewards.reverse()
+        values.reverse()
 
         batch_rgba = []
         batch_depth = []
         batch_a = []
         batch_td = []
         batch_R = []
+        '''
+        Calculate the per-step "true" value for current iteration
+        '''
         for (ai, ri, si, Vi) in zip(actions, rewards, states, values):
             R = ri + self.a3c_gamma * R
             td = R - Vi
@@ -357,7 +384,10 @@ class RLDriver:
             batch_a.append(a)
             batch_td.append(td)
             batch_R.append(R)
-        cur_learning_rate = 7.0 * (10.0 ** -4.0) # FIXME
+        '''
+        TODO: reverse batch_* if using LSTM
+        '''
+        cur_learning_rate = 1.0 * (10.0 ** -3.0) # FIXME
         grads_applier = self.get_apply_grads_op()
         if self.sv_rgb_net is not None:
             sess.run(grads_applier,
