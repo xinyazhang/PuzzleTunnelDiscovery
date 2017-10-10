@@ -48,7 +48,7 @@ device = "/gpu:0"
 MODELS = ['../res/simple/FullTorus.obj', '../res/simple/robot.obj']
 init_state = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0], dtype=np.float32)
 view_config = [(30.0, 12), (-30.0, 12), (0, 4), (90, 1), (-90, 1)]
-ckpt_dir = './ttorus/ckpt'
+ckpt_dir = './ttorus/ckpt-mt-3'
 
 def show_torus_ring():
     pyosr.init()
@@ -108,7 +108,10 @@ def show_torus_ring():
                         policy = policy.reshape(driver.action_size)
                         action = driver.make_decision(policy)
                         nstate,reward,reaching_terminal = driver.get_reward(action)
-                        print('Action {}, New State {}'.format(action, nstate))
+                        valid = r.is_valid_state(nstate)
+                        print('Current Value {} Policy {} Action {} Reward {}'.format(value, policy, action, reward))
+                        print('\tNew State {} Collision Free ? {}'.format(nstate, valid))
+                        # print('Action {}, New State {}'.format(action, nstate))
                         rgb = np.squeeze(img[0, 0, :, : ,:], axis=[0,1])
                         if self.im is None:
                             print('rgb {}'.format(rgb.shape))
