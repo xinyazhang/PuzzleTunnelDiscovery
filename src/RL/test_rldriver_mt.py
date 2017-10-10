@@ -41,6 +41,11 @@ def test_rldriver_worker(dpy, glctx, masterdriver, tfgraph):
             print('After {}'.format(value_after))
             print('Delta {}'.format(np.linalg.norm(value_before - value_after)))
 
+'''
+Torus final state
+0.11249993  0.02 0.12499992  0.99983597  0.01287497  0.00606527 0.01132157
+'''
+
 def test_rldriver_main():
     pyosr.init()
     dpy = pyosr.create_display()
