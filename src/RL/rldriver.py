@@ -120,7 +120,7 @@ class RLDriver:
         self.mv_fv = mv_net.features
         conf_final_fc = vision.FCLayerConfig(output_number)
         w,b,final = conf_final_fc.apply_layer(mv_net.features)
-        final = tf.contrib.layers.flatten(final)
+        final = tf.nn.softmax(tf.contrib.layers.flatten(final))
         print('rldriver output {}'.format(final.shape))
         self.final = final
         self.decision_net_args = [w,b]
@@ -323,6 +323,8 @@ class RLDriver:
             part1 = np.array(tr, dtype=np.float32)
             part2 = np.array(quat, dtype=np.float32)
             r.state = np.concatenate((part1, part2))
+            if r.is_disentangled(r.state):
+                continue
             if r.is_valid_state(r.state):
                 break
 
