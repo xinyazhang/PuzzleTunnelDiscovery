@@ -31,6 +31,7 @@ class RLDriver:
     grads_apply_op = None
     epsilon = 0.8 # argument for epsilon-greedy policy
     worker_thread_index = -1
+    init_state = None
 
     '''
         models: files name of [model, robot], or [model], or [model, None]
@@ -53,6 +54,7 @@ class RLDriver:
             master_driver = None,
             grads_applier = None,
             worker_thread_index = -1):
+        self.init_state = init_state
         self.worker_thread_index = worker_thread_index
         self.grads_applier = grads_applier
         self.action_size = output_number
@@ -124,14 +126,15 @@ class RLDriver:
         conf_final_fc = vision.FCLayerConfig(output_number)
         w,b,final = conf_final_fc.apply_layer(mv_net.features)
         final = tf.nn.softmax(tf.contrib.layers.flatten(final))
-        print('rldriver output {}'.format(final.shape))
+        print('RLDRIVER POLICY OUTPUT {}'.format(final.shape))
         self.final = final
         self.decision_net_args = [w,b]
 
         self.value_net = vision.FCLayerConfig(1)
         w,b,value = self.value_net.apply_layer(mv_net.features)
-        self.value = value
+        self.value = tf.squeeze(value)
         self.value_net_args = [w,b]
+        print('RLDRIVER VALUE OUTPUT {}'.format(self.value.shape))
 
     def _create_sv_features(self, input_shape, input_tensor, svconfdict, num_views, sv_sqfeatnum):
         '''
@@ -216,6 +219,7 @@ class RLDriver:
 
         TODO: incorporate RRT here?
         '''
+        # return 5
         greedy = random.random()
         if greedy < self.epsilon:
             return np.argmax(policy)
@@ -276,15 +280,23 @@ class RLDriver:
                 r.state = nstate
                 if reaching_terminal:
                     break;
-            # r.state = start_at
-            # policy_old, value_old, _, _ = self.evaluate(sess)
+            '''
+            end_at = r.state
+            r.state = start_at
+            policy_old, value_old, _, _ = self.evaluate(sess)
+            r.state = end_at
+            '''
+
             self.apply_grads_a3c(sess, actions, states, rewards, values, reaching_terminal)
             sess.run(self.get_sync_from_master_op())
-            # policy_new, value_new, _, _ = self.evaluate(sess)
-            # print('[{}] policy old {}'.format(self.worker_thread_index, policy_old))
-            # print('[{}] policy new {}'.format(self.worker_thread_index, policy_new))
-            # print('[{}] value old {}'.format(self.worker_thread_index, value_old))
-            # print('[{}] value new {}'.format(self.worker_thread_index, value_new))
+
+            '''
+            policy_new, value_new, _, _ = self.evaluate(sess)
+            print('[{}] policy old {}'.format(self.worker_thread_index, policy_old))
+            print('[{}] policy new {}'.format(self.worker_thread_index, policy_new))
+            print('[{}] value old {}'.format(self.worker_thread_index, value_old))
+            print('[{}] value new {}'.format(self.worker_thread_index, value_new))
+            '''
 
     def get_total_loss(self):
         if self.total_loss is not None:
@@ -324,6 +336,10 @@ class RLDriver:
 
         TODO: non-uniform distribution
         '''
+        '''
+        self.renderer.state = self.init_state
+        return
+        '''
         r = self.renderer
         while True:
             tr = np.random.rand(3) * 2.0 - 1.0
@@ -350,8 +366,6 @@ class RLDriver:
         R = 0.0
         if not reaching_terminal:
             R = np.asscalar(self.evaluate(sess, targets=[self.value])[0])
-        else:
-            R = 1.0
 
         states.reverse()
         actions.reverse()
@@ -365,6 +379,9 @@ class RLDriver:
         batch_R = []
         '''
         Calculate the per-step "true" value for current iteration
+        '''
+        '''
+        print('[{}] R start with {}'.format(self.worker_thread_index, R))
         '''
         for (ai, ri, si, Vi) in zip(actions, rewards, states, values):
             R = ri + self.a3c_gamma * R
@@ -384,6 +401,10 @@ class RLDriver:
             batch_a.append(a)
             batch_td.append(td)
             batch_R.append(R)
+        '''
+        print('[{}] batch_a[0] {}'.format(self.worker_thread_index, batch_a[0]))
+        print('[{}] batch_R {}'.format(self.worker_thread_index, batch_R))
+        '''
         '''
         TODO: reverse batch_* if using LSTM
         '''

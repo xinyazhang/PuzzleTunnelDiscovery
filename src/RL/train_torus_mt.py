@@ -47,7 +47,7 @@ device = "/gpu:0"
 MODELS = ['../res/simple/FullTorus.obj', '../res/simple/robot.obj']
 init_state = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0], dtype=np.float32)
 view_config = [(30.0, 12), (-30.0, 12), (0, 4), (90, 1), (-90, 1)]
-ckpt_dir = './ttorus/ckpt-mt-2/'
+ckpt_dir = './ttorus/ckpt-mt-5/'
 ckpt_prefix = 'torus-vs-ring-ckpt'
 THREAD = 4
 
@@ -66,7 +66,8 @@ def torus_worker(index, dpy, glctx, masterdriver, tfgraph, grad_applier, lrtenso
                     config.MV_VISCFG,
                     use_rgb=True,
                     master_driver=masterdriver,
-                    grads_applier=grad_applier)
+                    grads_applier=grad_applier,
+                    worker_thread_index=index)
         print("THREAD {} DRIVER CREATED".format(index))
         driver.epsilon = 1.0 - (index + 1) * (1.0 / (THREAD + 1))
         driver.get_sync_from_master_op()
@@ -89,8 +90,10 @@ def torus_worker(index, dpy, glctx, masterdriver, tfgraph, grad_applier, lrtenso
             print("Init_done on thread {}, continuing".format(index))
         '''
         last_time = time.time()
+        # FIXME: ttorus/ckpt-mt-5 are not loading global_step into epoch
         epoch = 0
         while epoch < 100 * 1000:
+        #while epoch < 2 * 1000:
             driver.train_a3c(sess)
             epoch += 1
             sess.run(increment_global_step)
