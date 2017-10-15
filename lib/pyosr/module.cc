@@ -73,6 +73,8 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("angleModel", &Renderer::angleModel)
 		.def("scaleToUnit", &Renderer::scaleToUnit)
 		.def_property("state", &Renderer::getRobotState, &Renderer::setRobotState)
+		.def_property_readonly("scene_matrix", &Renderer::getSceneMatrix)
+		.def_property_readonly("robot_matrix", &Renderer::getRobotMatrix)
 		.def("is_valid_state", &Renderer::isValid)
 		.def("is_disentangled", &Renderer::isDisentangled)
 		.def("transit_state", &Renderer::transitState)

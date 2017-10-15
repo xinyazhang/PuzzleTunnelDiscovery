@@ -100,6 +100,9 @@ public:
 	             Eigen::Vector2f magnitudes,
 	             Eigen::Vector2f deltas) const;
 
+	Eigen::Matrix4f getSceneMatrix() const;
+	Eigen::Matrix4f getRobotMatrix() const;
+
 private:
 	void setupNonSharedObjects();
 	GLuint shaderProgram = 0;
