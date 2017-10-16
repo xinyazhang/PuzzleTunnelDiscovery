@@ -1,11 +1,12 @@
 cmake_minimum_required(VERSION 3.0)
 
 project(mkobs3d CXX)
+SET(CMAKE_BUILD_TYPE Debug) # Seems CMAKE does not recognize -DCMAKE_BUILD_TYPE
 set (mkobs3d_VERSION_MAJOR 0)
 set (mkobj3d_VERSION_MINOR 2)
 
-message(STATUS, "CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
-message(STATUS "Initially Python links to: ${PYTHON_LIBRARY}")
+message(STATUS "Initial CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
+message(STATUS "Initial Python links to: ${PYTHON_LIBRARY}")
 
 if (APPLE)
   link_directories(
@@ -53,9 +54,11 @@ endif(APPLE)
 
 # C++11 and Debug
 # Note: we focus on gcc/clang right now, so we uses compiler specific solutions.
+message(STATUS "BEFORE C++14 CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS "--std=c++14 -fdiagnostics-color=always ${CMAKE_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS "${OpenMP_CXX_FLAGS} ${CMAKE_CXX_FLAGS}")
 set(CMAKE_EXE_LINKER_FLAGS "-g")
+message(STATUS "AFTER C++14 CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
 
 # Define function to copy binaries to bin/
 FUNCTION(FINALCOPY target files)
@@ -108,25 +111,31 @@ ENDFUNCTION()
 #	BINARY_DIR "${OBJ2PLY_BIN}")
 #FINALCOPY(OBJ2PLY ${OBJ2PLY_BIN}/obj2ply)
 
-FIND_PACKAGE(Boost 1.54.0 COMPONENTS timer)
+FIND_PACKAGE(Boost 1.54.0 REQUIRED COMPONENTS timer system)
 MESSAGE("Boost include dir: ${Boost_INCLUDE_DIR}")
 MESSAGE("Boost libraries: ${Boost_LIBRARIES}")
 INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIR})
+message(STATUS "AFTER Boost CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
 FIND_PACKAGE(Threads REQUIRED)
 SET(CMAKE_THREAD_LIBS_INIT Threads::Threads)
 MESSAGE("Threads: ${CMAKE_THREAD_LIBS_INIT}")
+message(STATUS "AFTER Thread CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
 FIND_PACKAGE(CGAL COMPONENTS Core REQUIRED)
-INCLUDE(${CGAL_USE_FILE})
+message(STATUS "AFTER CGAL CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
 SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CGAL_MODULES_DIR}")
 FIND_PACKAGE(GMP REQUIRED)
+message(STATUS "AFTER GMP CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
 FIND_PACKAGE(MPFR REQUIRED)
+message(STATUS "AFTER MPFR CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
 
 # FCL (Flexible Collision Library) support
 SET(FCL_BUILD_TESTS OFF CACHE BOOL "Disable testcases for fcl" FORCE)
+SET(CMAKE_BUILD_TYPE Debug)
 ADD_SUBDIRECTORY(third-party/fcl/)
 # Prioritize bundled fcl.
 INCLUDE_DIRECTORIES(BEFORE SYSTEM ${CMAKE_BINARY_DIR}/third-party/fcl/include/)
 INCLUDE_DIRECTORIES(BEFORE SYSTEM ${CMAKE_SOURCE_DIR}/third-party/fcl/include/)
+SET(CMAKE_BUILD_TYPE Debug)
 
 # Main program
 ADD_EXECUTABLE(blend src/boolean/main.cc)
@@ -266,7 +275,7 @@ EASYADD(trmap)
 TARGET_LINK_LIBRARIES(trmap omplaux fcl)
 
 EASYLIB(osr)
-TARGET_LINK_LIBRARIES(osr gbm EGL assimp fcl ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES})
+TARGET_LINK_LIBRARIES(osr gbm EGL assimp fcl ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${Boost_LIBRARIES})
 
 SANCHECK(osr)
 TARGET_LINK_LIBRARIES(sancheck_osr osr)

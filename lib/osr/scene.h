@@ -49,6 +49,7 @@ public:
 	void load(std::string filename, const glm::vec3* model_color = nullptr);
 	void render(GLuint program, Camera& camera, glm::mat4 globalXform);
 	void clear();
+	glm::vec3 getCenter() const { return center_; }
 
 	/*
 	 * Calibration transform matrix shall centralize the scene and scale
@@ -57,7 +58,7 @@ public:
 	glm::mat4 getCalibrationTransform() const { return xform_; }
 	BoundingBox getBoundingBox() const { return bbox_; }
 
-	void moveToCenter() { translate(-center_); }
+	void moveToCenter();
 	void resetTransform() { xform_= glm::mat4(); }
 	void translate(glm::vec3 offset) {
 		xform_= glm::translate(xform_, offset);
@@ -65,9 +66,9 @@ public:
 	void translate(float x, float y, float z) {
 		xform_= glm::translate(xform_, glm::vec3(x, y, z));
 	}
-	void scale(glm::vec3 factor) { xform_= glm::scale(xform_, factor); }
+	void scale(glm::vec3 factor) { xform_= glm::scale(factor) * xform_; }
 	void scale(float x, float y, float z) {
-		xform_= glm::scale(xform_, glm::vec3(x, y, z));
+		scale(glm::vec3(x,y,z));
 	}
 	void rotate(float rad, glm::vec3 axis) {
 		xform_= glm::rotate(xform_, rad, axis);

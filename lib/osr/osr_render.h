@@ -34,6 +34,12 @@ public:
 	typedef Eigen::Matrix<float, -1, -1, Eigen::RowMajor> RMMatrixXf;
 	typedef Eigen::Matrix<uint8_t, -1, -1, Eigen::RowMajor> RMMatrixXb;
 
+	typedef double StateScalar;
+	typedef Eigen::Vector3d StateTrans;
+	typedef Eigen::Quaternion<double> StateQuat;
+	typedef Eigen::VectorXd StateVector;
+	typedef Eigen::Matrix4d StateMatrix;
+
 	Renderer();
 	~Renderer();
 
@@ -57,11 +63,11 @@ public:
 	 *      Column 0-2 (x, y, z): translation vector
 	 *      Column 3-6 (a, b, c, d): Quaternion a + bi + cj + dk for rotation.
 	 */
-	void setRobotState(const Eigen::VectorXf& state);
-	Eigen::VectorXf getRobotState() const;
+	void setRobotState(const StateVector& state);
+	StateVector getRobotState() const;
 
-	bool isValid(const Eigen::VectorXf& state) const;
-	bool isDisentangled(const Eigen::VectorXf& state) const;
+	bool isValid(const StateVector& state) const;
+	bool isDisentangled(const StateVector& state) const;
 
 	int pbufferWidth = 224;
 	int pbufferHeight = 224;
@@ -94,15 +100,26 @@ public:
 	 *      progress: 0.0 - 1.0, the ratio b/w the finished action and the
 	 *                expected action. progress < 1.0 implies is final == False
 	 */
-	std::tuple<Eigen::VectorXf, bool, float>
-	transitState(const Eigen::VectorXf& state,
+	std::tuple<StateVector, bool, float>
+	transitState(const StateVector& state,
 	             int action,
 	             Eigen::Vector2f magnitudes,
 	             Eigen::Vector2f deltas) const;
 
-	Eigen::Matrix4f getSceneMatrix() const;
-	Eigen::Matrix4f getRobotMatrix() const;
+	StateMatrix getSceneMatrix() const;
+	StateMatrix getRobotMatrix() const;
 
+	/*
+	 * Interpolate states
+	 */
+	static StateVector interpolate(const StateVector& pkey,
+	                               const StateVector& nkey,
+	                               StateScalar tau);
+	/*
+	 * Translate from unscale and uncentralized world coordinates to the
+	 * unit cube coordinates
+	 */
+	StateVector translateToUnitState(const StateVector& state);
 private:
 	void setupNonSharedObjects();
 	GLuint shaderProgram = 0;
@@ -120,7 +137,7 @@ private:
 	std::shared_ptr<CDModel> cd_scene_;
 	std::shared_ptr<CDModel> cd_robot_;
 	float scene_scale_ = 1.0f;
-	Eigen::VectorXf robot_state_;
+	StateVector robot_state_;
 	glm::mat4 camera_rot_;
 
 	void render_depth();

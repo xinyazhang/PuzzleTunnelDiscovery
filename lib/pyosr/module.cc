@@ -78,6 +78,8 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("is_valid_state", &Renderer::isValid)
 		.def("is_disentangled", &Renderer::isDisentangled)
 		.def("transit_state", &Renderer::transitState)
+		.def("translate_to_unit_state", &Renderer::translateToUnitState)
+		.def_static("interpolate", &Renderer::interpolate)
 		.def("render_depth_to_buffer", &Renderer::render_depth_to_buffer)
 		.def("render_mvdepth_to_buffer", &Renderer::render_mvdepth_to_buffer)
 		.def("render_mvrgbd", &Renderer::render_mvrgbd)

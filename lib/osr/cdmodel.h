@@ -9,7 +9,7 @@
 
 namespace osr {
 class Scene;
-using Transform = Eigen::Transform<float, 3, Eigen::AffineCompact>;
+using Transform = Eigen::Transform<double, 3, Eigen::AffineCompact>;
 
 class CDModel {
 	struct CDModelData;

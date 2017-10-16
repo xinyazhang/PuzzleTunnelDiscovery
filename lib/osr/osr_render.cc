@@ -62,17 +62,24 @@ void main() {
 const GLenum drawBuffers[1] = { GL_COLOR_ATTACHMENT0 };
 const GLenum rgbdDrawBuffers[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
 
-glm::mat4 translate_state_to_matrix(const Eigen::VectorXf& state)
+using Renderer = osr::Renderer;
+using StateScalar = Renderer::StateScalar;
+using StateQuat = Renderer::StateQuat;
+using StateTrans = Renderer::StateTrans;
+using StateVector = Renderer::StateVector;
+using StateMatrix = Renderer::StateMatrix;
+
+glm::mat4 translate_state_to_matrix(const StateVector& state)
 {
 	glm::quat quat(state(3), state(4), state(5), state(6));
 	glm::mat4 rot = glm::toMat4(quat);
 	return glm::translate(glm::mat4(1.0f), glm::vec3(state(0), state(1), state(2))) * rot;
 }
 
-osr::Transform translate_state_to_transform(const Eigen::VectorXf& state)
+osr::Transform translate_state_to_transform(const StateVector& state)
 {
-	Eigen::Quaternion<float> rot(state(3), state(4), state(5), state(6));
-	Eigen::Vector3f trans(state(0), state(1), state(2));
+	StateQuat rot(state(3), state(4), state(5), state(6));
+	StateTrans trans(state(0), state(1), state(2));
 	osr::Transform tf;
 	tf.setIdentity();
 	tf.rotate(rot);
@@ -80,13 +87,27 @@ osr::Transform translate_state_to_transform(const Eigen::VectorXf& state)
 	return tf;
 }
 
-auto glm2Eigen(const glm::mat4 m)
+auto glm2Eigen(const glm::mat4& m)
 {
-	Eigen::Matrix4f ret;
-	ret << m[0][0], m[0][1], m[0][2], m[0][3],
-	       m[1][0], m[1][1], m[1][2], m[1][3],
-	       m[2][0], m[2][1], m[2][2], m[2][3],
-	       m[3][0], m[3][1], m[3][2], m[3][3];
+	StateMatrix ret;
+	ret.setZero();
+#if 0
+	for (int i = 0; i < 4; i++)
+		for (int j = 0; j < 4; j++) {
+			// We have to print these numbers otherwise there
+			// would be errors. Probably a compiler's bug
+			std::cout << m[i][j] << std::endl;
+			ret(i, j) = m[j][i];
+		}
+	for (int i = 0; i < 4; i++)
+		for (int j = 0; j < 4; j++)
+			ret(i,j) = m[i][j];
+#endif
+	// GLM uses column major
+	ret << m[0][0], m[1][0], m[2][0], m[3][0],
+	       m[0][1], m[1][1], m[2][1], m[3][1],
+	       m[0][2], m[1][2], m[2][2], m[3][2],
+	       m[0][3], m[1][3], m[2][3], m[3][3];
 	return ret;
 }
 
@@ -258,17 +279,19 @@ void Renderer::scaleToUnit()
 void Renderer::angleModel(float latitude, float longitude)
 {
 	scene_->resetTransform();
+	scene_->moveToCenter();
+	// std::cerr << "Before scale " << scene_->getCalibrationTransform() << std::endl;
 	scene_->scale(glm::vec3(scene_scale_));
+	// std::cerr << "After scale " << scene_->getCalibrationTransform() << std::endl;
 	scene_->rotate(glm::radians(latitude), 1, 0, 0);      // latitude
 	scene_->rotate(glm::radians(longitude), 0, 1, 0);     // longitude
-	scene_->moveToCenter();
 	cd_scene_.reset(new CDModel(*scene_));
 	if (robot_) {
 		robot_->resetTransform();
+		robot_->moveToCenter();
 		robot_->scale(glm::vec3(scene_scale_));
 		robot_->rotate(glm::radians(latitude), 1, 0, 0);      // latitude
 		robot_->rotate(glm::radians(longitude), 0, 1, 0);     // longitude
-		robot_->moveToCenter();
 		cd_robot_.reset(new CDModel(*robot_));
 	}
 }
@@ -349,22 +372,22 @@ void Renderer::render_mvrgbd()
 }
 
 
-void Renderer::setRobotState(const Eigen::VectorXf& state)
+void Renderer::setRobotState(const StateVector& state)
 {
 	robot_state_ = state;
 }
 
-Eigen::VectorXf Renderer::getRobotState() const
+StateVector Renderer::getRobotState() const
 {
 	return robot_state_;
 }
 
-bool Renderer::isValid(const Eigen::VectorXf& state) const
+bool Renderer::isValid(const StateVector& state) const
 {
 	if (!cd_scene_ || !cd_robot_)
 		return true;
 	Transform envTf;
-	envTf.setIdentity();
+	envTf = glm2Eigen(scene_->getCalibrationTransform());
 	auto robTf = translate_state_to_transform(state);
 #if 0
 	Eigen::Matrix4f robTfm, envTfm;
@@ -389,7 +412,7 @@ bool Renderer::isValid(const Eigen::VectorXf& state) const
 	return !CDModel::collide(*cd_scene_, envTf, *cd_robot_, robTf);
 }
 
-bool Renderer::isDisentangled(const Eigen::VectorXf& state) const
+bool Renderer::isDisentangled(const StateVector& state) const
 {
 	if (!cd_scene_ || !cd_robot_)
 		return true;
@@ -430,10 +453,10 @@ void Renderer::render_rgbd()
 	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 #if 0
 	static const uint8_t black[] = {0, 0, 255, 0};
+	static const float zeros[] = {0.0f, 0.0f, 0.0f, 0.0f};
 #else
 	static const uint8_t black[] = {0, 0, 0, 0};
 #endif
-	static const float zeros[] = {0.0f, 0.0f, 0.0f, 0.0f};
 	CHECK_GL_ERROR(glClearTexImage(rgbTarget, 0, GL_RGB, GL_UNSIGNED_BYTE, &black));
 	CHECK_GL_ERROR(glClearTexImage(renderTarget, 0, GL_RED, GL_FLOAT, &default_depth));
 	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, rgbdFramebuffer));
@@ -484,8 +507,8 @@ Camera Renderer::setup_camera()
 	return cam;
 }
 
-std::tuple<Eigen::VectorXf, bool, float>
-Renderer::transitState(const Eigen::VectorXf& state,
+std::tuple<StateVector, bool, float>
+Renderer::transitState(const StateVector& state,
                        int action,
                        Eigen::Vector2f magnitudes,
                        Eigen::Vector2f deltas) const
@@ -506,8 +529,8 @@ Renderer::transitState(const Eigen::VectorXf& state,
 	auto magnitude = magnitudes(magidx);
 	auto deltacap = deltas(magidx);
 	auto accum = 0.0f;
-	Eigen::Quaternion<float> rot(state(3), state(4), state(5), state(6));
-	Eigen::Vector3f trans(state(0), state(1), state(2));
+	StateQuat rot(state(3), state(4), state(5), state(6));
+	StateTrans trans(state(0), state(1), state(2));
 	float sym = action % 2 == 0 ? 1.0f : -1.0f;
 	/*
 	 * action (0-11) to XYZ (0-2)
@@ -516,8 +539,8 @@ Renderer::transitState(const Eigen::VectorXf& state,
 	 * Z: 4,5 or 10,11
 	 */
 	int axis_id = (action - kActionPerTransformType * magidx) / 2;
-	Eigen::Quaternion<float> deltarot;
-	Eigen::Vector3f tfvec { Eigen::Vector3f::Zero() };
+	StateQuat deltarot;
+	StateTrans tfvec { StateTrans::Zero() };
 	tfvec(axis_id) = 1.0f;
 	/*
 	 * Post condition:
@@ -530,11 +553,11 @@ Renderer::transitState(const Eigen::VectorXf& state,
 		};
 	} else {
 		applier = [&rot, &trans, &tfvec, sym](float delta) {
-			Eigen::AngleAxis<float> aa(delta * sym, tfvec);
+			Eigen::AngleAxis<StateScalar> aa(delta * sym, tfvec);
 			rot = aa * rot;
 		};
 	}
-	Eigen::VectorXf nstate(kStateDimension), freestate(state);
+	StateVector nstate(kStateDimension), freestate(state);
 	bool done = true;
 	while (true) {
 		float delta = std::min(deltacap, magnitude - accum);
@@ -563,20 +586,52 @@ Renderer::transitState(const Eigen::VectorXf& state,
 	return std::make_tuple(freestate, done, prog);
 }
 
-Eigen::Matrix4f
+StateMatrix
 Renderer::getSceneMatrix() const
 {
 	if (!scene_)
-		return Eigen::Matrix4f::Identity();
+		return StateMatrix::Identity();
 	return glm2Eigen(scene_->getCalibrationTransform());
 }
 
-Eigen::Matrix4f
+StateMatrix
 Renderer::getRobotMatrix() const
 {
 	if (!robot_)
-		return Eigen::Matrix4f::Identity();
+		return StateMatrix::Identity();
 	return glm2Eigen(robot_->getCalibrationTransform());
+}
+
+StateVector
+Renderer::interpolate(const StateVector& pkey,
+                      const StateVector& nkey,
+                      StateScalar tau)
+{
+	StateTrans p0(pkey(0), pkey(1), pkey(2));
+	StateTrans p1(nkey(0), nkey(1), nkey(2));
+	StateTrans pinterp = p0 * (1-tau) + p1 * tau;
+	StateQuat Qfrom { pkey(3), pkey(4), pkey(5), pkey(6) };
+	StateQuat Qto { nkey(3), nkey(4), nkey(5), nkey(6) };
+	StateQuat Qinterp = Qfrom.slerp(tau, Qto);
+	StateVector ret(7);
+	ret << pinterp(0), pinterp(1), pinterp(2),
+	       Qinterp.w(), Qinterp.x(), Qinterp.y(), Qinterp.z();
+	return ret;
+}
+
+StateVector
+Renderer::translateToUnitState(const StateVector& state)
+{
+#if 1
+	Eigen::Vector4d t(state(0), state(1), state(2), 1.0f);
+	Eigen::Vector4d nt = glm2Eigen(scene_->getCalibrationTransform()) * t;
+	StateVector ret(7);
+	ret << nt(0), nt(1), nt(2),
+               state(3), state(4), state(5), state(6);
+	return ret;
+#else
+	return state;
+#endif
 }
 
 }

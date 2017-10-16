@@ -1,6 +1,7 @@
 #include "scene.h"
 #include "cdmodel.h"
 #include <fstream>
+#include <glm/gtx/io.hpp>
 
 namespace osr {
 Scene::Scene()
@@ -118,6 +119,12 @@ void Scene::addToCDModel(CDModel& model) const
 	for (auto mesh : meshes_) {
 		mesh->addToCDModel(xform_, model);
 	}
+}
+
+void Scene::moveToCenter()
+{
+	std::cerr << "Move by " << -center_ << std::endl;
+	translate(-center_);
 }
 
 void Scene::clear()

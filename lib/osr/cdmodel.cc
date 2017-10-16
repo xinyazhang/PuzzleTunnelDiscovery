@@ -5,8 +5,9 @@
 
 namespace osr {
 struct CDModel::CDModelData {
-	using Scalar = float;
-	typedef fcl::OBBRSS<Scalar> BVType;
+	using Scalar = double;
+	using Vector3 = fcl::Vector3d;
+	typedef fcl::AABB<Scalar> BVType;
 	typedef fcl::BVHModel<BVType> Model;
 	Model model;
 
@@ -44,23 +45,32 @@ void CDModel::addVF(const glm::mat4& m,
 		const std::vector<Vertex>& verts,
 		const std::vector<uint32_t>& indices)
 {
-	std::vector<fcl::Vector3f> vertices;
+	using VType = CDModelData::Vector3;
+	std::vector<VType> vertices;
 	std::vector<fcl::Triangle> triangles;
-	vertices.resize(verts.size());
-	std::transform(verts.begin(), verts.end(), vertices.begin(),
-			[m](const Vertex& vert) -> fcl::Vector3f {
-				glm::vec4 oldp(vert.position, 1.0f);
-				glm::vec4 newp = m * oldp;
-				return { newp[0],
-					 newp[1],
-					 newp[2] };
-	                } );
+	glm::dmat4 mm(m);
+#if 1
+	for (const auto& vert: verts) {
+		glm::dvec4 oldp(vert.position, 1.0);
+		glm::dvec4 newp = mm * oldp;
+		vertices.emplace_back(newp[0], newp[1], newp[2]);
+	}
+#else
+	vertices.emplace_back(1.0, 0.0, 0.0);
+	vertices.emplace_back(0.0, 1.0, 0.0);
+	vertices.emplace_back(0.0, 0.0, 1.0);
+#endif
+#if 1
 	triangles.resize(indices.size() / 3);
 	for (size_t i = 0; i < triangles.size(); i++) {
 		triangles[i].set(indices[3 * i + 0],
 			         indices[3 * i + 1],
 			         indices[3 * i + 2]);
 	}
+#else
+	triangles.resize(1);
+	triangles[0].set(0, 1, 2);
+#endif
 
 	model_->model.addSubModel(vertices, triangles);
 }
@@ -72,10 +82,13 @@ bool CDModel::collide(const CDModel& env,
 {
 	fcl::CollisionRequest<CDModelData::Scalar> req;
 	fcl::CollisionResult<CDModelData::Scalar> res;
+	Transform t1 = envTf;
+	Transform t2 = robTf;
+	size_t ret;
 
-	size_t ret = fcl::collide(&rob.model_->model, robTf,
-			&env.model_->model, envTf,
-			req, res);
+	ret = fcl::collide(&rob.model_->model, t1,
+	                   &env.model_->model, t2,
+	                   req, res);
 #if 0
 	std::cerr << "Collide with \n" << transform.matrix() << "\nreturns: " << ret << std::endl;
 #endif
