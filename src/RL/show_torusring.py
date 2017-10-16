@@ -44,11 +44,12 @@ class _LoggerHook(tf.train.SessionRunHook):
 RMSP_ALPHA = 0.99 # decay parameter for RMSProp
 RMSP_EPSILON = 0.1 # epsilon parameter for RMSProp
 GRAD_NORM_CLIP = 40.0 # gradient norm clipping
-device = "/gpu:0"
+device = "/cpu:0"
 MODELS = ['../res/simple/FullTorus.obj', '../res/simple/robot.obj']
 init_state = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0], dtype=np.float32)
 view_config = [(30.0, 12), (-30.0, 12), (0, 4), (90, 1), (-90, 1)]
-ckpt_dir = './ttorus/ckpt-mt-3'
+ckpt_dir = './ttorus/ckpt-mt-6'
+# ckpt_dir = './ttorus/ckpt-guided'
 
 def show_torus_ring():
     pyosr.init()
@@ -79,6 +80,8 @@ def show_torus_ring():
             ckpt = tf.train.get_checkpoint_state(checkpoint_dir=ckpt_dir)
             print('ckpt {}'.format(ckpt))
             epoch = 0
+            policy_before, value_before, _, _ = masterdriver.evaluate(sess)
+            #print("Last b before {}".format(sess.run(masterdriver.get_nn_args()[-2])))
             if ckpt and ckpt.model_checkpoint_path:
                 saver.restore(sess, ckpt.model_checkpoint_path)
                 epoch = sess.run(global_step)
@@ -86,6 +89,9 @@ def show_torus_ring():
             else:
                 print('Cannot find checkpoint at {}'.format(ckpt_dir))
                 return
+            policy_after, value_after, _, _ = masterdriver.evaluate(sess)
+            print("Value Before Restoring {} and After {}".format(value_before, value_after))
+            # print("Last b {}".format(sess.run(masterdriver.get_nn_args()[-2])))
             driver = masterdriver
             r = masterdriver.renderer
             fig = plt.figure()
@@ -106,7 +112,7 @@ def show_torus_ring():
                     if not self.reaching_terminal:
                         policy, value, img, dep = driver.evaluate(sess)
                         policy = policy.reshape(driver.action_size)
-                        action = driver.make_decision(policy)
+                        action = driver.make_decision(policy, sess)
                         nstate,reward,self.reaching_terminal = driver.get_reward(action)
                         valid = r.is_valid_state(nstate)
                         print('Current Value {} Policy {} Action {} Reward {}'.format(value, policy, action, reward))

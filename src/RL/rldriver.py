@@ -213,7 +213,7 @@ class RLDriver:
         reward = 1.0 if reaching_end else reward
         return nstate, reward, reaching_end
 
-    def make_decision(self, policy):
+    def make_decision(self, policy, sess):
         '''
         Implement epsilon-greedy policy here
 
@@ -222,11 +222,32 @@ class RLDriver:
         # return 5
         greedy = random.random()
         if greedy < self.epsilon:
+            '''
+            Based on policy output
             return np.argmax(policy)
+            '''
+
+            '''
+            Based on value output
+            '''
+            r = self.renderer
+            state_backup = r.state
+            max_value = 0.0
+            action_pick = None
+            for action in range(self.action_size):
+                nstate, _, _= r.transit_state(state_backup, action,
+                        config.MAGNITUDES, config.STATE_CHECK_DELTAS)
+                r.state = nstate
+                value = self.evaluate(sess, targets=[self.value], keep_images=False)
+                if action_pick is None or value > max_value:
+                    action_pick = action
+                    max_value = value
+            r.state = state_backup
+            return action_pick
         else:
             return random.randrange(len(policy))
 
-    def evaluate(self, sess, targets=None):
+    def evaluate(self, sess, targets=None, keep_images=True):
         if targets is None:
             targets = [self.final, self.value]
         r = self.renderer
@@ -241,7 +262,10 @@ class RLDriver:
             img = None
             dep = r.render_mvdepth_to_buffer().reshape(self.sv_depth_shape)
             input_dict = { self.sv_depth_net.input_tensor : dep }
-        return sess.run(targets, feed_dict=input_dict) + [img, dep]
+        if keep_images:
+            return sess.run(targets, feed_dict=input_dict) + [img, dep]
+        else:
+            return sess.run(targets, feed_dict=input_dict)
 
     def act(self, sess):
         r = self.renderer
@@ -249,7 +273,7 @@ class RLDriver:
         while not reaching_terminal:
             policy, value, img, dep = self.evaluate(sess)
             policy = policy.reshape(self.action_size)
-            action = self.make_decision(policy)
+            action = self.make_decision(policy, sess)
             nstate,reward,reaching_terminal = self.get_reward(action)
 
     def train_a3c(self, sess):
@@ -269,7 +293,7 @@ class RLDriver:
                 value = np.asscalar(value)
                 # print("policy {}".format(policy))
                 # print("value {}".format(value))
-                action = self.make_decision(policy)
+                action = self.make_decision(policy, sess)
 
                 states.append([img, dep])
                 actions.append(action)
