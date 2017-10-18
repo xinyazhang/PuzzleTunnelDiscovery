@@ -5,6 +5,8 @@ SET(CMAKE_BUILD_TYPE Debug) # Seems CMAKE does not recognize -DCMAKE_BUILD_TYPE
 set (mkobs3d_VERSION_MAJOR 0)
 set (mkobj3d_VERSION_MINOR 2)
 
+FIND_PACKAGE(PkgConfig REQUIRED)
+
 message(STATUS "Initial CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
 message(STATUS "Initial Python links to: ${PYTHON_LIBRARY}")
 
@@ -42,7 +44,6 @@ include_directories(${GLEW_INCLUDE_DIRS})
 link_libraries(${GLEW_LIBRARIES})
 
 # GLFW
-FIND_PACKAGE(PkgConfig REQUIRED)
 pkg_search_module(GLFW3 REQUIRED glfw3)
 INCLUDE_DIRECTORIES(${GLFW3_INCLUDE_DIRS})
 SET(GLFW3_LIBRARY ${GLFW3_LIBRARIES})
@@ -51,6 +52,11 @@ MESSAGE(STATUS "GLFW: ${GLFW3_LIBRARIES}")
 if (APPLE)
 	  find_library(COCOA_LIBRARY Cocoa REQUIRED)
 endif(APPLE)
+
+# OMPL library
+pkg_search_module(ompl REQUIRED ompl)
+MESSAGE(STATUS "OMPL INC: ${ompl_INCLUDE_DIRS}")
+INCLUDE_DIRECTORIES(${ompl_INCLUDE_DIRS})
 
 # C++11 and Debug
 # Note: we focus on gcc/clang right now, so we uses compiler specific solutions.
@@ -274,12 +280,19 @@ TARGET_LINK_LIBRARIES(omplaux ccdxx)
 EASYADD(trmap)
 TARGET_LINK_LIBRARIES(trmap omplaux fcl)
 
+# Off-Screen Renderer for RL (reinforcement learning)
 EASYLIB(osr)
 TARGET_LINK_LIBRARIES(osr gbm EGL assimp fcl ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${Boost_LIBRARIES})
 
 SANCHECK(osr)
 TARGET_LINK_LIBRARIES(sancheck_osr osr)
 
+# Blender PRM and RRT for RL's GT (Ground Truth)
+EASYADD(mtblender)
+## Note: do not use ompl_LIBRARIES, which pulls into too many denpendencies.
+TARGET_LINK_LIBRARIES(mtblender ompl fcl)
+
+# PYOSR
 # FIND_PACKAGE(pybind11 REQUIRED)
 find_package(PythonLibs 2.7 REQUIRED)
 
