@@ -1,5 +1,5 @@
-#ifndef CAMERA_H
-#define CAMERA_H
+#ifndef OSR_CAMERA_H
+#define OSR_CAMERA_H
 
 #include <stack>
 #include <iostream>

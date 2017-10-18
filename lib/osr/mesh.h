@@ -1,5 +1,5 @@
-#ifndef MESH_H
-#define MESH_H
+#ifndef OSR_MESH_H
+#define OSR_MESH_H
 
 #include <GL/glew.h>
 #include <glm/ext.hpp>

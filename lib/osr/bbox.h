@@ -1,5 +1,5 @@
-#ifndef LAVA_BBOX_H
-#define LAVA_BBOX_H
+#ifndef OSR_BBOX_H
+#define OSR_BBOX_H
 
 #include <iostream>
 #include <algorithm>

@@ -1,5 +1,5 @@
-#ifndef UNIFORM_H
-#define UNIFORM_H
+#ifndef OSR_UNIFORM_H
+#define OSR_UNIFORM_H
 
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>

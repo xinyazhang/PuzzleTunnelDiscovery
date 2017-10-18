@@ -1,5 +1,5 @@
-#ifndef SCENE_H
-#define SCENE_H
+#ifndef OSR_SCENE_H
+#define OSR_SCENE_H
 
 #include <string>
 #include <vector>

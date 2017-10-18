@@ -1,5 +1,5 @@
-#ifndef GEOMETRY_H
-#define GEOMETRY_H
+#ifndef OSR_GEOMETRY_H
+#define OSR_GEOMETRY_H
 
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>

@@ -1,5 +1,5 @@
-#ifndef NODE_H
-#define NODE_H
+#ifndef OSR_NODE_H
+#define OSR_NODE_H
 
 #include <assimp/scene.h>
 #include <iostream>

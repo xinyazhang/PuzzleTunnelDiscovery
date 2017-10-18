@@ -1,5 +1,5 @@
-#ifndef QUICKGL_H
-#define QUICKGL_H
+#ifndef OSR_QUICKGL_H
+#define OSR_QUICKGL_H
 
 #ifndef QUICKGL_NOT_INCLUDE_GLEW
 #include <GL/glew.h>
