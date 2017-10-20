@@ -63,28 +63,17 @@ const GLenum drawBuffers[1] = { GL_COLOR_ATTACHMENT0 };
 const GLenum rgbdDrawBuffers[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
 
 using Renderer = osr::Renderer;
-using StateScalar = Renderer::StateScalar;
-using StateQuat = Renderer::StateQuat;
-using StateTrans = Renderer::StateTrans;
-using StateVector = Renderer::StateVector;
-using StateMatrix = Renderer::StateMatrix;
+using StateScalar = osr::StateScalar;
+using StateQuat = osr::StateQuat;
+using StateTrans = osr::StateTrans;
+using StateVector = osr::StateVector;
+using StateMatrix = osr::StateMatrix;
 
 glm::mat4 translate_state_to_matrix(const StateVector& state)
 {
 	glm::quat quat(state(3), state(4), state(5), state(6));
 	glm::mat4 rot = glm::toMat4(quat);
 	return glm::translate(glm::mat4(1.0f), glm::vec3(state(0), state(1), state(2))) * rot;
-}
-
-osr::Transform translate_state_to_transform(const StateVector& state)
-{
-	StateQuat rot(state(3), state(4), state(5), state(6));
-	StateTrans trans(state(0), state(1), state(2));
-	osr::Transform tf;
-	tf.setIdentity();
-	tf.rotate(rot);
-	tf.translate(trans);
-	return tf;
 }
 
 auto glm2Eigen(const glm::mat4& m)
@@ -263,7 +252,7 @@ void Renderer::loadRobotFromFile(const std::string& fn)
 	robot_.reset(new Scene);
 	const glm::vec3 red(1.0f, 0.0f, 0.0f);
 	robot_->load(fn, &red);
-	robot_state_.setZero(7);
+	robot_state_.setZero();
 	robot_state_(3) = 1.0; // Quaternion for no rotation
 }
 
@@ -507,12 +496,18 @@ Camera Renderer::setup_camera()
 	return cam;
 }
 
+
 std::tuple<StateVector, bool, float>
 Renderer::transitState(const StateVector& state,
                        int action,
-                       Eigen::Vector2f magnitudes,
-                       Eigen::Vector2f deltas) const
+                       double transit_magnitude,
+                       double verify_delta) const
 {
+	Eigen::Vector2f magnitudes;
+	magnitudes << transit_magnitude , std::cos(transit_magnitude);
+	Eigen::Vector2f deltas;
+	deltas << verify_delta, std::cos(verify_delta);
+
 	int magidx = action < kActionPerTransformType ? 0 : 1;
 	if (action >= kTotalNumberOfActions) {
 		/*
@@ -557,7 +552,7 @@ Renderer::transitState(const StateVector& state,
 			rot = aa * rot;
 		};
 	}
-	StateVector nstate(kStateDimension), freestate(state);
+	StateVector nstate, freestate(state);
 	bool done = true;
 	while (true) {
 		float delta = std::min(deltacap, magnitude - accum);
@@ -586,6 +581,28 @@ Renderer::transitState(const StateVector& state,
 	return std::make_tuple(freestate, done, prog);
 }
 
+
+std::tuple<StateVector, bool, float>
+Renderer::transitStateTo(const StateVector& from,
+                         const StateVector& to,
+                         double magnitude) const
+{
+	double dist = distance(from, to);
+	int nseg = int(std::ceil(std::max(1.0, dist/magnitude)));
+	double rate = 1.0 / double(nseg);
+	StateVector last_free = from;
+	for (int i = 1; i <= nseg; i++) {
+		double tau = i * rate;
+		auto state = interpolate(from, to, tau);
+		if (!isValid(state)) {
+			return std::make_tuple(last_free, false, (i-1)*rate);
+		}
+		last_free = state;
+	}
+	return std::make_tuple(to, true, 1.0);
+}
+
+
 StateMatrix
 Renderer::getSceneMatrix() const
 {
@@ -603,29 +620,12 @@ Renderer::getRobotMatrix() const
 }
 
 StateVector
-Renderer::interpolate(const StateVector& pkey,
-                      const StateVector& nkey,
-                      StateScalar tau)
-{
-	StateTrans p0(pkey(0), pkey(1), pkey(2));
-	StateTrans p1(nkey(0), nkey(1), nkey(2));
-	StateTrans pinterp = p0 * (1-tau) + p1 * tau;
-	StateQuat Qfrom { pkey(3), pkey(4), pkey(5), pkey(6) };
-	StateQuat Qto { nkey(3), nkey(4), nkey(5), nkey(6) };
-	StateQuat Qinterp = Qfrom.slerp(tau, Qto);
-	StateVector ret(7);
-	ret << pinterp(0), pinterp(1), pinterp(2),
-	       Qinterp.w(), Qinterp.x(), Qinterp.y(), Qinterp.z();
-	return ret;
-}
-
-StateVector
 Renderer::translateToUnitState(const StateVector& state)
 {
 #if 1
 	Eigen::Vector4d t(state(0), state(1), state(2), 1.0f);
 	Eigen::Vector4d nt = glm2Eigen(scene_->getCalibrationTransform()) * t;
-	StateVector ret(7);
+	StateVector ret;
 	ret << nt(0), nt(1), nt(2),
                state(3), state(4), state(5), state(6);
 	return ret;

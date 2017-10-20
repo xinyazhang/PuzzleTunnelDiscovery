@@ -6,7 +6,7 @@ import math
 import aniconf12 as aniconf
 
 def interpolate(pkey, nkey, tau):
-    return pyosr.Renderer.interpolate(pkey, nkey, tau)
+    return pyosr.interpolate(pkey, nkey, tau)
 
 def reanimate():
     pyosr.init()

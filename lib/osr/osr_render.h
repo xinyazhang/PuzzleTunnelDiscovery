@@ -1,7 +1,7 @@
 #ifndef OFF_SCREEN_RENDERING_TO_H
 #define OFF_SCREEN_RENDERING_TO_H
 
-#include <Eigen/Core>
+#include "osr_state.h"
 #include "quickgl.h"
 #include <string>
 #include <ostream>
@@ -33,12 +33,6 @@ class Renderer {
 public:
 	typedef Eigen::Matrix<float, -1, -1, Eigen::RowMajor> RMMatrixXf;
 	typedef Eigen::Matrix<uint8_t, -1, -1, Eigen::RowMajor> RMMatrixXb;
-
-	typedef double StateScalar;
-	typedef Eigen::Vector3d StateTrans;
-	typedef Eigen::Quaternion<double> StateQuat;
-	typedef Eigen::VectorXd StateVector;
-	typedef Eigen::Matrix4d StateMatrix;
 
 	Renderer();
 	~Renderer();
@@ -99,22 +93,24 @@ public:
 	 *      is final: indicate if the return state finished the expected action.
 	 *      progress: 0.0 - 1.0, the ratio b/w the finished action and the
 	 *                expected action. progress < 1.0 implies is final == False
+	 * 
+	 * TODO: change deltas to double, to align with distance defined in
+	 * GTGenerator (or MTBlender)
 	 */
 	std::tuple<StateVector, bool, float>
 	transitState(const StateVector& state,
 	             int action,
-	             Eigen::Vector2f magnitudes,
-	             Eigen::Vector2f deltas) const;
+                     double transit_magnitude,
+                     double verify_delta) const;
+
+	std::tuple<StateVector, bool, float>
+	transitStateTo(const StateVector& from,
+	               const StateVector& to,
+	               double magnitude) const;
 
 	StateMatrix getSceneMatrix() const;
 	StateMatrix getRobotMatrix() const;
 
-	/*
-	 * Interpolate states
-	 */
-	static StateVector interpolate(const StateVector& pkey,
-	                               const StateVector& nkey,
-	                               StateScalar tau);
 	/*
 	 * Translate from unscale and uncentralized world coordinates to the
 	 * unit cube coordinates
@@ -145,14 +141,6 @@ private:
 	Camera setup_camera();
 };
 
-constexpr int kActionDimension = 3;
-/* *2 for pos/neg */
-constexpr int kActionPerTransformType = kActionDimension * 2;
-/* *2 for translation/rotation */
-constexpr int kTotalNumberOfActions = kActionPerTransformType * 2;
-
-/* 3 for Translation, 4 for quaternion in SO(3) */
-constexpr int kStateDimension = 3 + 4;
 }
 
 #endif // OFF_SCREEN_RENDERING_TO_H

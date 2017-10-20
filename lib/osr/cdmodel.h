@@ -2,14 +2,12 @@
 #define OSR_CD_MODEL_H
 
 #include "geometry.h"
-#include <Eigen/Core>
-#include <Eigen/Geometry>
+#include "osr_state.h"
 #include <memory>
 #include <vector>
 
 namespace osr {
 class Scene;
-using Transform = Eigen::Transform<double, 3, Eigen::AffineCompact>;
 
 class CDModel {
 	struct CDModelData;

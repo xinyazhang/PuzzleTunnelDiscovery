@@ -1,5 +1,6 @@
 #include <osr/osr_render.h>
 #include <osr/osr_init.h>
+#include <osr/gtgenerator.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
 #include <iostream>
@@ -79,7 +80,6 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("is_disentangled", &Renderer::isDisentangled)
 		.def("transit_state", &Renderer::transitState)
 		.def("translate_to_unit_state", &Renderer::translateToUnitState)
-		.def_static("interpolate", &Renderer::interpolate)
 		.def("render_depth_to_buffer", &Renderer::render_depth_to_buffer)
 		.def("render_mvdepth_to_buffer", &Renderer::render_mvdepth_to_buffer)
 		.def("render_mvrgbd", &Renderer::render_mvrgbd)
@@ -89,5 +89,16 @@ PYBIND11_PLUGIN(pyosr) {
 		.def_readwrite("mvrgb", &Renderer::mvrgb)
 		.def_readwrite("mvdepth", &Renderer::mvdepth)
 		.def_readwrite("views", &Renderer::views);
+	using osr::GTGenerator;
+	py::class_<GTGenerator>(m, "GTGenerator")
+		.def(py::init<Renderer&>())
+		.def("load_roadmap_file", &GTGenerator::loadRoadMapFile)
+		.def("generate_gt_path", &GTGenerator::generateGTPath)
+		.def_readwrite("verify_magnitude", &GTGenerator::verify_magnitude)
+		.def_readwrite("gamma", &GTGenerator::gamma)
+		.def_readwrite("rl_stepping_size", &GTGenerator::rl_stepping_size)
+		;
+	m.def("interpolate", &osr::interpolate,
+	      "Interpolate between two SE3 states");
 	return m.ptr();
 }
