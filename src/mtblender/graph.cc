@@ -35,10 +35,10 @@ std::ostream& operator << (std::ostream& fout, Vertex& v)
 		sep = " ";
 	}
 	/* Our library uses wxyz convention */
-	fout << v.rot.w() << " "
-	     << v.rot.x() << " "
-	     << v.rot.y() << " "
-	     << v.rot.z();
+	fout << " " << v.rot.w()
+	     << " " << v.rot.x()
+	     << " " << v.rot.y()
+	     << " " << v.rot.z();
 	return fout;
 }
 
