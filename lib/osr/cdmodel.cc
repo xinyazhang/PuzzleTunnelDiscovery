@@ -7,7 +7,7 @@ namespace osr {
 struct CDModel::CDModelData {
 	using Scalar = double;
 	using Vector3 = fcl::Vector3d;
-	typedef fcl::AABB<Scalar> BVType;
+	typedef fcl::OBBRSS<Scalar> BVType;
 	typedef fcl::BVHModel<BVType> Model;
 	Model model;
 
