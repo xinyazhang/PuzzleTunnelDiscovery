@@ -60,6 +60,7 @@ public:
 	void setRobotState(const StateVector& state);
 	StateVector getRobotState() const;
 
+	std::tuple<Transform, Transform> getCDTransforms(const StateVector& state) const;
 	bool isValid(const StateVector& state) const;
 	bool isDisentangled(const StateVector& state) const;
 

@@ -374,14 +374,32 @@ StateVector Renderer::getRobotState() const
 	return robot_state_;
 }
 
+
+std::tuple<Transform, Transform>
+Renderer::getCDTransforms(const StateVector& state) const
+{
+	Transform envTf;
+	Transform robTf;
+#if 0
+	envTf = getSceneMatrix();
+	robTf = translate_state_to_transform(state);
+	robTf = robTf * getRobotMatrix();
+#else
+	envTf.setIdentity();
+	robTf = translate_state_to_transform(state);
+#endif
+	return std::make_tuple(envTf, robTf);
+}
+
+
 bool Renderer::isValid(const StateVector& state) const
 {
 	if (!cd_scene_ || !cd_robot_)
 		return true;
 	Transform envTf;
-	envTf.setIdentity();
 	Transform robTf;
-	robTf = translate_state_to_transform(state);
+	std::tie(envTf, robTf) = getCDTransforms(state);
+	std::cerr << "CD with\n" << envTf.matrix() << "\n\n" << robTf.matrix() << "\n";
 	// std::cerr << translate_state_to_matrix(state) << '\n';
 	// std::cerr << robTf.matrix() << '\n';
 #if 0
@@ -414,8 +432,7 @@ bool Renderer::isDisentangled(const StateVector& state) const
 	Transform envTf;
 	Transform robTf;
 #if 1
-	envTf.setIdentity();
-	robTf = translate_state_to_transform(state);
+	std::tie(envTf, robTf) = getCDTransforms(state);
 #else
 	envTf.setIdentity();
 	robTf.setIdentity();
