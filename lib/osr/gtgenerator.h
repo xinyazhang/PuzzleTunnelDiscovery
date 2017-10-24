@@ -25,13 +25,27 @@ public:
 
 	void loadRoadMapFile(const std::string&);
 	void loadRoadMap(std::istream&&);
+	void saveVerifiedRoadMapFile(const std::string& fn);
+	void initKNN(); // Initialize internal KNN structure
+	void initKNNInBatch(); // Initialize internal KNN structure with its std::vector interface
+	void initGT();  // Initialize Ground Truth Distance
+
+	void installGTData(const ArrayOfStates& vertices,
+	                   const Eigen::Matrix<int, -1, 2>& edges,
+	                   const Eigen::VectorXf& gt_distance,
+	                   const Eigen::VectorXi& gt_next);
+	std::tuple<ArrayOfStates,
+	           Eigen::Matrix<int, -1, 2>,
+	           Eigen::VectorXf,
+	           Eigen::VectorXi>
+	extractGTData() const;
 
 	/*
 	 * generate states, and corresponding actions for training
 	 * 
 	 * implicity argument: rl_stepping_size for magnitude of actions.
 	 */
-	std::tuple<ArrayOfStates, Eigen::VectorXi>
+	std::tuple<ArrayOfStates, Eigen::VectorXi, bool>
 	generateGTPath(const StateVector& init_state,
 	               int max_steps);
 
@@ -63,7 +77,6 @@ private:
 	int getGoalStateIndex() const;
 	float getGoalStateReward() const;
 
-	void initValue();
 	float estimateSteps(NNVertex from, NNVertex to) const;
 
 	/*

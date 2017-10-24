@@ -19,6 +19,38 @@ std::istream& operator >> (std::istream& fin, Edge& e)
 	return fin >> e.first >> e.second;
 }
 
+class Progress {
+private:
+	size_t total_;
+	size_t counter_;
+	const char* task_;
+public:
+	Progress(const char* task = "Progress", size_t total = 0)
+		:task_(task), total_(total), counter_(0)
+	{
+	}
+
+	void increase()
+	{
+		counter_ += 1;
+		bool show = false;
+		if (total_ > 0 && total_ < 10) {
+			show = true;
+		} else if (total_ >= 10 && counter_ % (total_/10) == 0) {
+			show = true;
+		} else if (counter_ % (100 * 1000) == 0) {
+			show = true;
+		}
+		if (show) {
+			std::cerr << "[" << task_ << "] " << counter_;
+			if (total_ > 0) {
+				std::cerr << " / " << total_;
+			}
+			std::cerr << std::endl;
+		}
+	}
+};
+
 struct GTGenerator::KNN {
 	std::vector<std::unique_ptr<Vertex>> V_;
 	std::vector<Edge> E_;
@@ -58,13 +90,40 @@ struct GTGenerator::KNN {
 
 	void build()
 	{
-		for (const auto& vp : V_)
+		Progress prog("KNN", V_.size());
+		for (const auto& vp : V_) {
 			nn_->add(vp.get());
+			prog.increase();
+		}
+	}
+
+	void batch_build()
+	{
+		std::cerr << "Building KNN...";
+		std::vector<NNVertex> batch_input(V_.size());
+		for (size_t i = 0; i < batch_input.size(); i++)
+			batch_input[i] = V_[i].get();
+		nn_->add(batch_input);
+		std::cerr << "Done\n";
+	}
+
+	void dumpTo(std::ostream&& fout) const
+	{
+		fout.precision(17);
+		for (const auto& nv : V_) {
+			fout << "v";
+			for (int i = 0; i < nv->state.rows(); i++)
+				fout << " " << nv->state(i);
+			fout << std::endl;
+		}
+		for (const auto& e : E_) {
+			fout << "e " << e.first << " " << e.second << std::endl;
+		}
 	}
 };
 
 GTGenerator::GTGenerator(Renderer& r)
-	:r_(r)
+	:r_(r), knn_(new KNN)
 {
 }
 
@@ -77,16 +136,28 @@ void GTGenerator::loadRoadMapFile(const std::string& fn)
 	loadRoadMap(std::ifstream(fn));
 }
 
+void GTGenerator::saveVerifiedRoadMapFile(const std::string& fn)
+{
+	knn_->dumpTo(std::ofstream(fn));
+}
+
 void GTGenerator::loadRoadMap(std::istream&& fin)
 {
+	size_t loc = 0;
+	Progress prog("Reading");
+	Progress evprog("Edge Verification", 10);
+	std::string typestr;
 	while (!fin.eof()) {
-		char type;
-		fin >> type;
+		fin >> typestr;
+		char type = typestr[0];
+		// std::cerr << typestr << std::endl;
 		if (fin.eof())
 			break;
 		if (type == 'v') {
 			auto *nv = new Vertex;
+			// std::cerr << nv->state.rows() << ' ' << nv->state.cols() << std::endl;
 			vecio::read(fin, nv->state);
+			// std::cerr << nv->state.transpose() << std::endl;
 			knn_->add(nv);
 		} else if (type == 'e') {
 			Edge e;
@@ -97,17 +168,129 @@ void GTGenerator::loadRoadMap(std::istream&& fin)
 			fin >> e;
 			if (verifyEdge(e))
 				knn_->add(e);
+			evprog.increase();
+		}
+		prog.increase();
+#if 0
+		loc++;
+		if (loc % 100000 == 0) {
+			std::cerr << "[Reading] " << loc << " lines" << std::endl;
+		}
+#endif
+	}
+}
+
+void GTGenerator::initKNN()
+{
+	knn_->build();
+}
+
+void GTGenerator::initKNNInBatch()
+{
+	knn_->batch_build();
+}
+
+void GTGenerator::initGT()
+{
+	int NV = int(knn_->V_.size());
+	dist_values_ = Eigen::VectorXf::Constant(NV, -1);
+	// std::cerr << dist_values_ << std::endl;
+	Eigen::VectorXi done_marks = Eigen::VectorXi::Constant(NV, 0);
+
+	dist_values_[getGoalStateIndex()] = getGoalStateReward();
+	auto cmp = [this](NNVertex lhs, NNVertex rhs) -> bool
+	{
+		return dist_values_[lhs->index] > dist_values_[rhs->index];
+	};
+	std::priority_queue<NNVertex, std::vector<NNVertex>, decltype(cmp)> Q(cmp);
+
+	Progress prog("Dijkstra", knn_->V_.size());
+	for (int i = 0; i < int(knn_->V_.size()); i++) {
+		auto nv = knn_->V_[i].get();
+		if (r_.isDisentangled(nv->state)) {
+			Q.push(nv);
+			dist_values_(i) = 0.0;
+			prog.increase();
 		}
 	}
 
-	knn_->build();
-	initValue();
+	while (!Q.empty()) {
+		auto tip = Q.top();
+		Q.pop();
+		auto index = tip->index;
+		if (done_marks(index))
+			continue;
+		done_marks(index) = 1;
+		prog.increase();
+		auto tip_value = dist_values_(tip->index);
+		for (auto adj_index : tip->adjs) {
+			auto adj = knn_->V_[adj_index].get();
+			auto steps = estimateSteps(tip, adj);
+			bool do_update = dist_values_(adj_index) < 0 or
+				         dist_values_(adj_index) > tip_value + steps;
+			if (do_update) {
+				dist_values_(adj_index) = tip_value + steps;
+				adj->next = tip->index;
+				Q.push(adj);
+			}
+		}
+	}
+} 
+
+void GTGenerator::installGTData(const ArrayOfStates& vertices,
+	                        const Eigen::Matrix<int, -1, 2>& edges,
+	                        const Eigen::VectorXf& gt_distance,
+	                        const Eigen::VectorXi& gt_next)
+{
+	knn_->V_.resize(vertices.rows());
+	for(int i = 0; i < vertices.rows(); i++) {
+		knn_->V_[i].reset(new Vertex);
+		Vertex& v = *knn_->V_[i];
+		v.index = i;
+		v.state = vertices.row(i);
+		v.next = gt_next[i];
+	}
+	dist_values_ = gt_distance;
+	for (int i = 0; i < edges.rows(); i++) {
+		Edge e(edges(i,0), edges(i,1));
+		knn_->add(e);
+	}
+}
+
+
+
+std::tuple<ArrayOfStates,
+	   Eigen::Matrix<int, -1, 2>,
+	   Eigen::VectorXf,
+	   Eigen::VectorXi>
+GTGenerator::extractGTData() const
+{
+	ArrayOfStates vertices;
+	Eigen::Matrix<int, -1, 2> edges;
+	Eigen::VectorXf gt_distance;
+	Eigen::VectorXi gt_next;
+
+	vertices.resize(knn_->V_.size(), Eigen::NoChange);
+	gt_next.resize(knn_->V_.size());
+	for(int i = 0; i < vertices.rows(); i++) {
+		vertices.row(i) = knn_->V_[i]->state;
+		gt_next(i) = knn_->V_[i]->next;
+	}
+	gt_distance = dist_values_;
+	edges.resize(knn_->E_.size(), Eigen::NoChange);
+	for (int i = 0; i < edges.rows(); i++) {
+		const Edge& e = knn_->E_[i];
+		edges.row(i) << e.first, e.second;
+	}
+
+	return std::make_tuple(vertices, edges, gt_distance, gt_next);
 }
 
 bool GTGenerator::verifyEdge(const GTGenerator::Edge& e) const
 {
 	auto s0 = r_.translateToUnitState(knn_->V_[e.first]->state);
 	auto s1 = r_.translateToUnitState(knn_->V_[e.second]->state);
+	std::cerr << "state distance " << distance(s0, s1) << std::endl;
 	return std::get<1>(r_.transitStateTo(s0, s1, verify_magnitude));
 }
 
@@ -131,55 +314,12 @@ float GTGenerator::getGoalStateReward() const
 	return 1.0f;
 }
 
-void GTGenerator::initValue()
-{
-	int NV = int(knn_->V_.size());
-	dist_values_ = Eigen::VectorXf(NV, -1);
-	Eigen::VectorXi done_marks(NV, 0);
-
-	dist_values_[getGoalStateIndex()] = getGoalStateReward();
-	auto cmp = [this](NNVertex lhs, NNVertex rhs) -> bool
-	{
-		return dist_values_[lhs->index] > dist_values_[rhs->index];
-	};
-	std::priority_queue<NNVertex, std::vector<NNVertex>, decltype(cmp)> Q(cmp);
-
-	for (int i = 0; i < int(knn_->V_.size()); i++) {
-		auto nv = knn_->V_[i].get();
-		if (r_.isDisentangled(nv->state)) {
-			Q.push(nv);
-			dist_values_(i) = 0.0;
-		}
-	}
-
-	while (!Q.empty()) {
-		auto tip = Q.top();
-		Q.pop();
-		auto index = tip->index;
-		if (done_marks(index))
-			continue;
-		done_marks(index) = 1;
-		auto tip_value = dist_values_(tip->index);
-		for (auto adj_index : tip->adjs) {
-			auto adj = knn_->V_[adj_index].get();
-			auto steps = estimateSteps(tip, adj);
-			bool do_update = dist_values_(adj_index) < 0 or
-				         dist_values_(adj_index) > tip_value + steps;
-			if (do_update) {
-				dist_values_(adj_index) = tip_value + steps;
-				adj->next = tip->index;
-				Q.push(adj);
-			}
-		}
-	}
-}
-
 float GTGenerator::estimateSteps(NNVertex from, NNVertex to) const
 {
 	return KNN::distance(from, to) / rl_stepping_size;
 }
 
-std::tuple<ArrayOfStates, Eigen::VectorXi>
+std::tuple<ArrayOfStates, Eigen::VectorXi, bool>
 GTGenerator::generateGTPath(const StateVector& init_state,
                             int max_steps)
 {
@@ -210,6 +350,7 @@ GTGenerator::generateGTPath(const StateVector& init_state,
 	 */
 	NNVertex current = &init_vertex;
 	StateVector current_state = init_state;
+	bool terminated = true;
 	while (current->index != getGoalStateIndex()) {
 		next = knn_->V_[current->index].get();
 		current_state = castTrajectory(current_state,
@@ -217,16 +358,20 @@ GTGenerator::generateGTPath(const StateVector& init_state,
 				states,
 				actions);
 		current = next;
+		if (actions.size() > max_steps) {
+			terminated = false;
+			break;
+		}
 	}
 	ArrayOfStates ret_states;
 	ret_states.resize(states.size(), Eigen::NoChange);
 	for (size_t i = 0; i < states.size(); i++)
 		ret_states.row(i) = states[i];
 	Eigen::VectorXi ret_actions;
-	ret_actions.resize(actions.size(), Eigen::NoChange);
+	ret_actions.resize(actions.size());
 	for (size_t i = 0; i < actions.size(); i++)
 		ret_actions(i) = actions[i];
-	return std::make_tuple(ret_states, ret_actions);
+	return std::make_tuple(ret_states, ret_actions, terminated);
 }
 
 StateVector
