@@ -53,10 +53,11 @@ if (APPLE)
 	  find_library(COCOA_LIBRARY Cocoa REQUIRED)
 endif(APPLE)
 
-# OMPL library
-pkg_search_module(ompl REQUIRED ompl)
-MESSAGE(STATUS "OMPL INC: ${ompl_INCLUDE_DIRS}")
-INCLUDE_DIRECTORIES(${ompl_INCLUDE_DIRS})
+# OMPL library shall be installed to default place
+# Do NOT use pkg_search_module, it pulls too many dependencies and requires libfcl installed, while we use bundled libfcl.
+# pkg_search_module(ompl REQUIRED ompl)
+# MESSAGE(STATUS "OMPL INC: ${ompl_INCLUDE_DIRS}")
+# INCLUDE_DIRECTORIES(${ompl_INCLUDE_DIRS})
 
 # C++11 and Debug
 # Note: we focus on gcc/clang right now, so we uses compiler specific solutions.
@@ -267,7 +268,7 @@ EASYADD(levelset)
 TARGET_LINK_LIBRARIES(levelset fat)
 
 SANCHECK(fatten)
-PKG_SEARCH_MODULE(CCD REQUIRED libccd)
+PKG_SEARCH_MODULE(CCD REQUIRED ccd)
 INCLUDE_DIRECTORIES(${CCD_INCLUDE_DIRS})
 
 SANCHECK(ccd)
@@ -282,7 +283,7 @@ TARGET_LINK_LIBRARIES(trmap omplaux fcl)
 
 # Off-Screen Renderer for RL (reinforcement learning)
 EASYLIB(osr)
-TARGET_LINK_LIBRARIES(osr gbm EGL assimp fcl ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${Boost_LIBRARIES})
+TARGET_LINK_LIBRARIES(osr gbm EGL assimp fcl ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${Boost_LIBRARIES} ompl)
 
 SANCHECK(osr)
 TARGET_LINK_LIBRARIES(sancheck_osr osr)
