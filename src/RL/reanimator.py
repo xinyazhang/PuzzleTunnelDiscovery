@@ -19,7 +19,7 @@ def reanimate():
     r.scaleToUnit()
     r.angleModel(0.0, 0.0)
     r.default_depth = 0.0
-    r.views = np.array([[0.0, 0.0]], dtype=np.float32)
+    r.views = np.array([[15.0, 110.0]], dtype=np.float32)
     print(r.scene_matrix)
     print(r.robot_matrix)
     # return
@@ -53,7 +53,8 @@ def reanimate():
                 rgb = r.mvrgb.reshape((r.pbufferWidth, r.pbufferHeight, 3))
                 print(r.state)
                 valid = r.is_valid_state(r.state)
-                print('\tNew State {} Collision Free ? {}'.format(r.state, valid))
+                disentangled = r.is_disentangled(r.state)
+                print('\tNew State {} Collision Free ? {} Disentangled ? {}'.format(r.state, valid, disentangled))
                 if not valid:
                     print('\tNOT COLLISION FREE, SAN CHECK FAILED')
                     self.reaching_terminal = True
@@ -70,6 +71,17 @@ def reanimate():
     keys[:, [3,4,5,6]] = keys[:,[6,3,4,5]]
     print('after keys[0] {}'.format(keys[0]))
     ra = ReAnimator(r, keys, 1.0)
+    '''
+    st0 = np.array([21.782108575648873,11.070742691783639,13.072090341969885,0.99496368307688909,-0.050573680994590003,0.08255004745739393,0.025981951687884433], dtype=np.float64)
+    st1 = np.array([24.404447383193428,16.614281021136808,17.241012748680941,0.89856334412742611,-0.42392368380753659,0.035352511370216902,0.10780921499298371], dtype=np.float64)
+    st2 = np.array([25.04292893291256,16.429006629785405,21.742598419634952,-0.080755517119222811,-0.980264716314169,0.167639957003235,0.066756851485538532], dtype=np.float64)
+    ra = ReAnimator(r, [st1, st2], 0.0125)
+    '''
+    '''
+    st1 = np.array([21.75988005530629,19.55840991214458,18.407298399116954,0.8747148780179097,-0.40598294544114955,0.21522777832862061,0.15404133737658857], dtype=np.float64)
+    st2 = np.array([16.242401343877191,15.371074546390151,23.775856491398514,0.38753152804205182,-0.26626876971877833,-0.75270143169934201,-0.46082622729571437], dtype=np.float64)
+    ra = ReAnimator(r, [st1, st2], 0.0125/2.0)
+    '''
     ani = animation.FuncAnimation(fig, ra.perform)
     plt.show()
 
