@@ -51,6 +51,7 @@ void CDModel::addVF(const glm::mat4& m,
 	std::vector<VType> vertices;
 	std::vector<fcl::Triangle> triangles;
 	glm::dmat4 mm(m);
+	// glm::dmat4 mm(1.0);
 #if 1
 	for (const auto& vert: verts) {
 		glm::dvec4 oldp(vert.position, 1.0);
@@ -74,6 +75,8 @@ void CDModel::addVF(const glm::mat4& m,
 	triangles.resize(1);
 	triangles[0].set(0, 1, 2);
 #endif
+	std::cerr << "CD First Vertex: " << vertices.front() << std::endl;
+	std::cerr << "CD Mode Size: " << vertices.size() << ' ' << triangles.size() << std::endl;
 
 	model_->model.addSubModel(vertices, triangles);
 }
@@ -85,15 +88,13 @@ bool CDModel::collide(const CDModel& env,
 {
 	fcl::CollisionRequest<CDModelData::Scalar> req;
 	fcl::CollisionResult<CDModelData::Scalar> res;
-	Transform t1 = envTf;
-	Transform t2 = robTf;
 	size_t ret;
 
-	ret = fcl::collide(&rob.model_->model, t1,
-	                   &env.model_->model, t2,
+	ret = fcl::collide(&env.model_->model, envTf,
+	                   &rob.model_->model, robTf,
 	                   req, res);
 #if 0
-	std::cerr << "Collide with \n" << transform.matrix() << "\nreturns: " << ret << std::endl;
+	std::cerr << "Collide with \n" << t1.matrix() << "\nand\n" << t2.matrix() << "\nreturns: " << ret << std::endl;
 #endif
 	return ret > 0;
 }
