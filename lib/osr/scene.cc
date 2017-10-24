@@ -41,8 +41,16 @@ void Scene::load(std::string filename, const glm::vec3* model_color)
 
 	using namespace Assimp;
 	Assimp::Importer importer;
+#if 0
 	uint32_t flags = aiProcess_Triangulate | aiProcess_GenSmoothNormals |
 			 aiProcess_FlipUVs | aiProcess_PreTransformVertices;
+#endif
+	/* Use the same flags to align with OMPL */
+	uint32_t flags = aiProcess_Triangulate            |
+		         aiProcess_JoinIdenticalVertices  |
+		         aiProcess_SortByPType            |
+		         aiProcess_OptimizeGraph          |
+		         aiProcess_OptimizeMeshes;
 	const aiScene* scene = importer.ReadFile(filename, flags);
 
 	const static std::vector<glm::vec3> meshColors = {
@@ -123,7 +131,8 @@ void Scene::addToCDModel(CDModel& model) const
 
 void Scene::moveToCenter()
 {
-	std::cerr << "Move by " << -center_ << std::endl;
+	std::cerr.precision(17);
+	std::cerr << "Move by " << -center_.x << ' ' << -center_.y << ' ' << -center_.z << std::endl;
 	translate(-center_);
 }
 

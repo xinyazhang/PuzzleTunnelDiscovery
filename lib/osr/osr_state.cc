@@ -9,7 +9,7 @@ osr::Transform translate_state_to_transform(const StateVector& state)
 	osr::Transform tf;
 	tf.setIdentity();
 	tf.rotate(rot);
-	tf.translate(trans);
+	tf.pretranslate(trans);
 	return tf;
 }
 

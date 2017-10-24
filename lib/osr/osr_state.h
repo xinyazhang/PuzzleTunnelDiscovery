@@ -16,8 +16,8 @@ constexpr int kStateDimension = 3 + 4;
 typedef double StateScalar;
 typedef Eigen::Vector3d StateTrans;
 typedef Eigen::Quaternion<double> StateQuat;
-typedef Eigen::Matrix<double, kStateDimension, 1> StateVector;
-typedef Eigen::Matrix<double, kStateDimension, -1> ArrayOfStates;
+typedef Eigen::Matrix<double, kStateDimension, 1> StateVector; // Column vector
+typedef Eigen::Matrix<double, -1, kStateDimension> ArrayOfStates; // State per-ROW
 typedef Eigen::Matrix4d StateMatrix;
 using Transform = Eigen::Transform<double, 3, Eigen::AffineCompact>;
 

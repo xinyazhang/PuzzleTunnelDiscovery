@@ -112,10 +112,11 @@ public:
 	StateMatrix getRobotMatrix() const;
 
 	/*
-	 * Translate from unscale and uncentralized world coordinates to the
-	 * unit cube coordinates
+	 * Translate from/to unscale and uncentralized world coordinates
+	 * to/from the unit cube coordinates
 	 */
 	StateVector translateToUnitState(const StateVector& state);
+	StateVector translateFromUnitState(const StateVector& state);
 private:
 	void setupNonSharedObjects();
 	GLuint shaderProgram = 0;
@@ -135,6 +136,9 @@ private:
 	float scene_scale_ = 1.0f;
 	StateVector robot_state_;
 	glm::mat4 camera_rot_;
+	glm::mat4 the_world_;
+	Eigen::Matrix4d calib_mat_, inv_calib_mat_;
+	Eigen::Vector3d world_rebase_;
 
 	void render_depth();
 	void render_rgbd();

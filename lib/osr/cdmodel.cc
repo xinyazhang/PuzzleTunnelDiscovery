@@ -33,6 +33,8 @@ CDModel::CDModel(const Scene& scene)
 	auto& uncern = model_->uncentrializer;
 	uncern.setIdentity();
 	uncern.translate(aabb.center());
+	std::cerr << "AABB center: " << aabb.center().transpose() << std::endl;
+	std::cerr << "AABB size: " << aabb.width() << ' ' << aabb.height() << ' ' << aabb.depth() << std::endl;
 	model_->bbox = std::make_unique<BBOX>(aabb.width()/2,
 			aabb.height()/2, aabb.depth()/2);
 }
@@ -54,6 +56,7 @@ void CDModel::addVF(const glm::mat4& m,
 		glm::dvec4 oldp(vert.position, 1.0);
 		glm::dvec4 newp = mm * oldp;
 		vertices.emplace_back(newp[0], newp[1], newp[2]);
+		// std::cerr << vertices.back().transpose() << '\n';
 	}
 #else
 	vertices.emplace_back(1.0, 0.0, 0.0);
@@ -102,9 +105,15 @@ bool CDModel::collideBB(const CDModel& env,
 {
 	fcl::CollisionRequest<CDModelData::Scalar> req;
 	fcl::CollisionResult<CDModelData::Scalar> res;
+#if 1
 	size_t ret = fcl::collide(rob.model_->bbox.get(), robTf * rob.model_->uncentrializer,
 			env.model_->bbox.get(), envTf * env.model_->uncentrializer,
 			req, res);
+#else
+	size_t ret = fcl::collide(rob.model_->bbox.get(), robTf,
+			env.model_->bbox.get(), envTf,
+			req, res);
+#endif
 	return ret > 0;
 }
 

@@ -74,6 +74,8 @@ glm::mat4 translate_state_to_matrix(const StateVector& state)
 	glm::quat quat(state(3), state(4), state(5), state(6));
 	glm::mat4 rot = glm::toMat4(quat);
 	return glm::translate(glm::mat4(1.0f), glm::vec3(state(0), state(1), state(2))) * rot;
+	// return glm::translate(glm::mat4(1.0f), glm::vec3(state(0), state(1), state(2)));
+	// return rot;
 }
 
 auto glm2Eigen(const glm::mat4& m)
@@ -125,10 +127,8 @@ void Renderer::setupFrom(const Renderer* other)
 	setupNonSharedObjects();
 
 	scene_.reset(new Scene(other->scene_));
-	cd_scene_.reset(new CDModel(*other->scene_));
 	if (other->robot_) {
 		robot_.reset(new Scene(other->robot_));
-		cd_robot_.reset(new CDModel(*other->robot_));
 	} else {
 		robot_.reset();
 	}
@@ -268,12 +268,13 @@ void Renderer::scaleToUnit()
 void Renderer::angleModel(float latitude, float longitude)
 {
 	scene_->resetTransform();
-	scene_->moveToCenter();
 	// std::cerr << "Before scale " << scene_->getCalibrationTransform() << std::endl;
 	scene_->scale(glm::vec3(scene_scale_));
 	// std::cerr << "After scale " << scene_->getCalibrationTransform() << std::endl;
 	scene_->rotate(glm::radians(latitude), 1, 0, 0);      // latitude
 	scene_->rotate(glm::radians(longitude), 0, 1, 0);     // longitude
+	calib_mat_ = glm2Eigen(scene_->getCalibrationTransform());
+	inv_calib_mat_ = calib_mat_.inverse();
 	cd_scene_.reset(new CDModel(*scene_));
 	if (robot_) {
 		robot_->resetTransform();
@@ -287,7 +288,9 @@ void Renderer::angleModel(float latitude, float longitude)
 
 void Renderer::angleCamera(float latitude, float longitude)
 {
-	camera_rot_ = glm::mat4(1.0f);
+	// camera_rot_ = glm::mat4(1.0f);
+	camera_rot_ = glm::translate(glm::vec3(scene_->getCalibrationTransform() *
+				     glm::vec4(scene_->getCenter(), 1.0)));
         camera_rot_ = glm::rotate(camera_rot_,
 			glm::radians(latitude),
 			glm::vec3(1.0f, 0.0f, 0.0f));
@@ -376,8 +379,11 @@ bool Renderer::isValid(const StateVector& state) const
 	if (!cd_scene_ || !cd_robot_)
 		return true;
 	Transform envTf;
-	envTf = glm2Eigen(scene_->getCalibrationTransform());
-	auto robTf = translate_state_to_transform(state);
+	envTf.setIdentity();
+	Transform robTf;
+	robTf = translate_state_to_transform(state);
+	// std::cerr << translate_state_to_matrix(state) << '\n';
+	// std::cerr << robTf.matrix() << '\n';
 #if 0
 	Eigen::Matrix4f robTfm, envTfm;
 	auto tf = robot_->transform();
@@ -406,8 +412,14 @@ bool Renderer::isDisentangled(const StateVector& state) const
 	if (!cd_scene_ || !cd_robot_)
 		return true;
 	Transform envTf;
+	Transform robTf;
+#if 1
 	envTf.setIdentity();
-	auto robTf = translate_state_to_transform(state);
+	robTf = translate_state_to_transform(state);
+#else
+	envTf.setIdentity();
+	robTf.setIdentity();
+#endif
 	return !CDModel::collideBB(*cd_scene_, envTf, *cd_robot_, robTf);
 }
 
@@ -624,7 +636,22 @@ Renderer::translateToUnitState(const StateVector& state)
 {
 #if 1
 	Eigen::Vector4d t(state(0), state(1), state(2), 1.0f);
-	Eigen::Vector4d nt = glm2Eigen(scene_->getCalibrationTransform()) * t;
+	Eigen::Vector4d nt = calib_mat_ * t;
+	StateVector ret;
+	ret << nt(0), nt(1), nt(2),
+               state(3), state(4), state(5), state(6);
+	return ret;
+#else
+	return state;
+#endif
+}
+
+StateVector
+Renderer::translateFromUnitState(const StateVector& state)
+{
+#if 1
+	Eigen::Vector4d t(state(0), state(1), state(2), 1.0f);
+	Eigen::Vector4d nt = inv_calib_mat_ * t;
 	StateVector ret;
 	ret << nt(0), nt(1), nt(2),
                state(3), state(4), state(5), state(6);
