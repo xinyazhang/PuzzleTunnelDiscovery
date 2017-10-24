@@ -1,4 +1,5 @@
 #include "camera.h"
+#include <glm/gtx/io.hpp>
 
 namespace osr {
 Camera::Camera() {
@@ -134,6 +135,22 @@ Camera::frustum(float left, float right, float bottom, float top, float near, fl
 void
 Camera::perspective(float fovy, float aspectRatio, float near, float far) {
     matrix.proj = glm::perspective(fovy, aspectRatio, near, far);
+}
+
+void
+Camera::uniform(GLuint program, glm::mat4 xform)
+{
+	GLint modelLoc, viewLoc, projLoc;
+	CHECK_GL_ERROR(modelLoc = glGetUniformLocation(program, "model"));
+	CHECK_GL_ERROR(viewLoc  = glGetUniformLocation(program, "view"));
+	CHECK_GL_ERROR(projLoc  = glGetUniformLocation(program, "proj"));
+	if (modelLoc == -1) { std::cerr << "cannot find model matrix uniform location" << std::endl; exit(EXIT_FAILURE); }
+	if (viewLoc == -1)  { std::cerr << "cannot find view matrix uniform location"  << std::endl; exit(EXIT_FAILURE); }
+	if (projLoc == -1)  { std::cerr << "cannot find proj matrix uniform location"  << std::endl; exit(EXIT_FAILURE); }
+	CHECK_GL_ERROR(glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(matrix.model * xform)));
+	// std::cerr << "Render with\n" << matrix.model * xform << "\n";
+	CHECK_GL_ERROR(glUniformMatrix4fv(viewLoc,  1, GL_FALSE, glm::value_ptr(matrix.view)));
+	CHECK_GL_ERROR(glUniformMatrix4fv(projLoc,  1, GL_FALSE, glm::value_ptr(matrix.proj)));
 }
 
 }
