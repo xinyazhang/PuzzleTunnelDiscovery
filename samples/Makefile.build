@@ -147,6 +147,17 @@ visinvp: visheat
 inv.evadiff: mk
 	./evadiff -i ../inv/hollowed.1 -f inv.0.1.nbheat -p inv.cpath > inv.evadiff
 	
-.PHONY: follow nvis vispath tp tetp
+blend-low.map.verified:
+	./rl-verifymap.sh blend-low.map
+	
+blend-low.map.verified.merged:
+	cp blend-low.map.verified blend-low.map.verified.merged
+	echo "e 0 23100" >> blend-low.map.verified.merged
+	echo "e 1 23531" >> blend-low.map.verified.merged
+	
+blend-low.gt.npz:
+	./rl-precalcmap.sh blend-low.map.verified.merged blend-low.gt
+
+.PHONY: follow nvis vispath tp tetp blend-low.map.verified blend-low.map.verified.merged blend-low.gt.npz
 
 # vim: tw=0
