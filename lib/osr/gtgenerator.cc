@@ -4,6 +4,7 @@
 #include <vecio/matio.h>
 #include <ompl/datastructures/NearestNeighborsGNAT.h>
 #include <fstream>
+#include <atomic>
 
 namespace osr {
 
@@ -22,7 +23,7 @@ std::istream& operator >> (std::istream& fin, Edge& e)
 class Progress {
 private:
 	size_t total_;
-	size_t counter_;
+	std::atomic<size_t> counter_;
 	const char* task_;
 public:
 	Progress(const char* task = "Progress", size_t total = 0)
@@ -32,17 +33,17 @@ public:
 
 	void increase()
 	{
-		counter_ += 1;
+		auto counter = (++counter_);
 		bool show = false;
 		if (total_ > 0 && total_ < 10) {
 			show = true;
-		} else if (total_ >= 10 && counter_ % (total_/10) == 0) {
+		} else if (total_ >= 10 && counter % (total_/10) == 0) {
 			show = true;
-		} else if (counter_ % (100 * 1000) == 0) {
+		} else if (counter % (100 * 1000) == 0) {
 			show = true;
 		}
 		if (show) {
-			std::cerr << "[" << task_ << "] " << counter_;
+			std::cerr << "[" << task_ << "] " << counter;
 			if (total_ > 0) {
 				std::cerr << " / " << total_;
 			}
@@ -145,8 +146,8 @@ void GTGenerator::loadRoadMap(std::istream&& fin)
 {
 	size_t loc = 0;
 	Progress prog("Reading");
-	Progress evprog("Edge Verification", 10);
 	std::string typestr;
+	std::vector<Edge> pending;
 	while (!fin.eof()) {
 		fin >> typestr;
 		char type = typestr[0];
@@ -166,9 +167,7 @@ void GTGenerator::loadRoadMap(std::istream&& fin)
 		} else if (type == 'p') {
 			Edge e;
 			fin >> e;
-			if (verifyEdge(e))
-				knn_->add(e);
-			evprog.increase();
+			pending.emplace_back(e);
 		}
 		prog.increase();
 #if 0
@@ -177,6 +176,27 @@ void GTGenerator::loadRoadMap(std::istream&& fin)
 			std::cerr << "[Reading] " << loc << " lines" << std::endl;
 		}
 #endif
+	}
+	Eigen::VectorXi pending_passed;
+	pending_passed.setZero(pending.size());
+	Progress evprog("Edge Verification", pending.size());
+
+	{
+		#pragma omp parallel for
+		for (int i = 0; i < pending_passed.size(); i++) {
+			const auto& e = pending[i];
+			if (verifyEdge(e)) {
+				pending_passed(i) = 1;
+			}
+			evprog.increase();
+		}
+	}
+
+	for (int i = 0; i < pending_passed.size(); i++) {
+		if (pending_passed(i)) {
+			const auto& e = pending[i];
+			knn_->add(e);
+		}
 	}
 }
 
