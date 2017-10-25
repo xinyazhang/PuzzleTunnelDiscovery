@@ -16,13 +16,11 @@
 namespace osr {
 class Scene;
 
-class Node {
-	friend class Scene;
+struct Node {
 	std::vector<std::shared_ptr<Node>> nodes;
 	std::vector<uint32_t> meshes;
 	glm::mat4 xform;
 
-public:
 	Node(aiNode* node);
 	virtual ~Node();
 };

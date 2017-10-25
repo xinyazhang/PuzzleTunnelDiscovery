@@ -16,16 +16,8 @@ Scene::Scene(std::shared_ptr<Scene> other)
 	// std::cerr<< "COPY Scene FROM " << other.get() << " TO " << this << std::endl;
 	root_ = other->root_;
 	bbox_ = other->bbox_;
-
-	for (auto mesh : other->meshes_) {
-		/*
-		 * Copy Mesh object to get a different VAO for current OpenGL
-		 * context.
-		 */
-		meshes_.emplace_back(new Mesh(mesh));
-	}
-	// std::cerr << "xform_data_: " << shared_from_->xform_data_[0][0] << std::endl;
-	// std::cerr << "xform_: " << xform_[0][0] << std::endl;
+	meshes_ = other->meshes_;
+	center_ = other->center_;
 }
 
 Scene::~Scene()
@@ -98,30 +90,6 @@ void Scene::updateBoundingBox(Node* node, glm::mat4 m)
 	}
 }
 
-void Scene::render(GLuint program, Camera& camera, glm::mat4 m)
-{
-	// render(program, camera, m * xform, root);
-	for (auto mesh : meshes_) {
-		mesh->render(program, camera, m * xform_);
-	}
-}
-
-void Scene::render(GLuint program, Camera& camera, glm::mat4 m, Node* node)
-{
-	glm::mat4 xform = m * node->xform;
-#if 0
-    if (node->meshes.size() > 0)
-        std::cout << "matrix: " << std::endl << glm::to_string(xform) << std::endl;
-#endif
-	for (auto i : node->meshes) {
-		auto mesh = meshes_[i];
-		mesh->render(program, camera, xform);
-	}
-	for (auto child : node->nodes) {
-		render(program, camera, xform, child.get());
-	}
-}
-
 void Scene::addToCDModel(CDModel& model) const
 {
 	for (auto mesh : meshes_) {
@@ -144,4 +112,5 @@ void Scene::clear()
 	root_.reset();
 	meshes_.clear();
 }
+
 }

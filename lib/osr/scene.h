@@ -13,12 +13,14 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include "camera.h"
 #include "mesh.h"
 #include "node.h"
 
 namespace osr {
 
+class Camera;
+class SceneRenderer;
+class CDModel;
 /*
  * Scene
  *
@@ -33,6 +35,8 @@ namespace osr {
  *      different context.
  */
 class Scene {
+	friend class SceneRenderer;
+
 	size_t vertex_total_number_;
 	BoundingBox bbox_;
 	glm::vec3 center_;
@@ -47,7 +51,6 @@ public:
 	virtual ~Scene();
 
 	void load(std::string filename, const glm::vec3* model_color = nullptr);
-	void render(GLuint program, Camera& camera, glm::mat4 globalXform);
 	void clear();
 	glm::vec3 getCenter() const { return center_; }
 
@@ -80,7 +83,6 @@ public:
 	void addToCDModel(CDModel& ) const;
 private:
 	void updateBoundingBox(Node* node, glm::mat4 m);
-	void render(GLuint program, Camera& camera, glm::mat4 m, Node* node);
 };
 }
 

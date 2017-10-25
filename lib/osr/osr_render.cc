@@ -1,5 +1,6 @@
 #include "osr_render.h"
 #include "scene.h"
+#include "scene_renderer.h"
 #include "camera.h"
 #include "cdmodel.h"
 #include <glm/gtx/quaternion.hpp>
@@ -127,10 +128,13 @@ void Renderer::setupFrom(const Renderer* other)
 	setupNonSharedObjects();
 
 	scene_.reset(new Scene(other->scene_));
+	scene_renderer_.reset(new SceneRenderer(other->scene_renderer_));
 	if (other->robot_) {
 		robot_.reset(new Scene(other->robot_));
+		robot_renderer_.reset(new SceneRenderer(other->robot_renderer_));
 	} else {
 		robot_.reset();
+		robot_renderer_.reset();
 	}
 }
 
@@ -238,6 +242,9 @@ void Renderer::teardown()
 	CHECK_GL_ERROR(glDeleteProgram(rgbdShaderProgram));
 
 	scene_.reset();
+	robot_.reset();
+	scene_renderer_.reset();
+	robot_renderer_.reset();
 }
 
 void Renderer::loadModelFromFile(const std::string& fn)
@@ -245,6 +252,7 @@ void Renderer::loadModelFromFile(const std::string& fn)
 	scene_.reset(new Scene);
 	const glm::vec3 blue(0.0f, 0.0f, 1.0f);
 	scene_->load(fn, &blue);
+	scene_renderer_.reset(new SceneRenderer(scene_));
 }
 
 void Renderer::loadRobotFromFile(const std::string& fn)
@@ -254,6 +262,8 @@ void Renderer::loadRobotFromFile(const std::string& fn)
 	robot_->load(fn, &red);
 	robot_state_.setZero();
 	robot_state_(3) = 1.0; // Quaternion for no rotation
+
+	robot_renderer_.reset(new SceneRenderer(robot_));
 }
 
 void Renderer::scaleToUnit()
@@ -291,6 +301,7 @@ void Renderer::angleCamera(float latitude, float longitude)
 	// camera_rot_ = glm::mat4(1.0f);
 	camera_rot_ = glm::translate(glm::vec3(scene_->getCalibrationTransform() *
 				     glm::vec4(scene_->getCenter(), 1.0)));
+	// std::cerr << "Init camera_rot_\n"  << camera_rot_ << std::endl;
         camera_rot_ = glm::rotate(camera_rot_,
 			glm::radians(latitude),
 			glm::vec3(1.0f, 0.0f, 0.0f));
@@ -455,10 +466,10 @@ void Renderer::render_depth()
 	CHECK_GL_ERROR(glClear(GL_DEPTH_BUFFER_BIT));
 
 	CHECK_GL_ERROR(glUseProgram(shaderProgram));
-	scene_->render(shaderProgram, camera, glm::mat4());
+	scene_renderer_->render(shaderProgram, camera, glm::mat4());
 	if (robot_) {
 		auto mat = translate_state_to_matrix(robot_state_);
-		robot_->render(shaderProgram, camera, mat);
+		robot_renderer_->render(shaderProgram, camera, mat);
 	}
 	CHECK_GL_ERROR(glUseProgram(0));
 
@@ -493,10 +504,10 @@ void Renderer::render_rgbd()
 	CHECK_GL_ERROR(glClear(GL_DEPTH_BUFFER_BIT));
 
 	CHECK_GL_ERROR(glUseProgram(rgbdShaderProgram));
-	scene_->render(rgbdShaderProgram, camera, glm::mat4());
+	scene_renderer_->render(rgbdShaderProgram, camera, glm::mat4());
 	if (robot_) {
 		auto mat = translate_state_to_matrix(robot_state_);
-		robot_->render(rgbdShaderProgram, camera, mat);
+		robot_renderer_->render(rgbdShaderProgram, camera, mat);
 	}
 	CHECK_GL_ERROR(glUseProgram(0));
 

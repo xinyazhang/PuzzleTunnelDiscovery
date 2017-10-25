@@ -14,6 +14,7 @@
 
 namespace osr {
 class Scene;
+class SceneRenderer;
 class Camera;
 class CDModel;
 
@@ -31,6 +32,9 @@ class CDModel;
  */
 class Renderer {
 public:
+	/*
+	 * Define type for framebuffer attributes.
+	 */
 	typedef Eigen::Matrix<float, -1, -1, Eigen::RowMajor> RMMatrixXf;
 	typedef Eigen::Matrix<uint8_t, -1, -1, Eigen::RowMajor> RMMatrixXb;
 
@@ -132,6 +136,9 @@ private:
 
 	std::shared_ptr<Scene> scene_;
 	std::shared_ptr<Scene> robot_;
+	std::shared_ptr<SceneRenderer> scene_renderer_;
+	std::shared_ptr<SceneRenderer> robot_renderer_;
+
 	std::shared_ptr<CDModel> cd_scene_;
 	std::shared_ptr<CDModel> cd_robot_;
 	float scene_scale_ = 1.0f;
