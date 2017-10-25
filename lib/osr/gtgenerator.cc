@@ -10,6 +10,8 @@ namespace osr {
 
 constexpr int kNearestFromInitState = 8;
 constexpr double kEpsilonDistance = 1e-8;
+constexpr int kGraphNextFlagNoValue = -1;
+constexpr int kGraphNextFlagFinalState = -2;
 
 using Edge = GTGenerator::Edge;
 using Vertex = GTGenerator::Vertex;
@@ -224,16 +226,25 @@ void GTGenerator::initGT()
 	};
 	std::priority_queue<NNVertex, std::vector<NNVertex>, decltype(cmp)> Q(cmp);
 
-	Progress prog("Dijkstra", knn_->V_.size());
+#if 1
+	Progress initprog("FindBoundary", knn_->V_.size());
 	for (int i = 0; i < int(knn_->V_.size()); i++) {
 		auto nv = knn_->V_[i].get();
-		if (r_.isDisentangled(nv->state)) {
+		auto unit_state = r_.translateToUnitState(nv->state);
+		if (r_.isDisentangled(unit_state)) {
 			Q.push(nv);
 			dist_values_(i) = 0.0;
-			prog.increase();
+			nv->next = kGraphNextFlagFinalState;
 		}
+		initprog.increase();
 	}
+	std::cerr << "Total bounday states: " << Q.size() << std::endl;
+#else
+	knn_->V_[getGoalStateIndex()]->next = kGraphNextFlagFinalState;
+	Q.push(knn_->V_[getGoalStateIndex()].get());
+#endif
 
+	Progress prog("Dijkstra", knn_->V_.size());
 	while (!Q.empty()) {
 		auto tip = Q.top();
 		Q.pop();
@@ -252,6 +263,10 @@ void GTGenerator::initGT()
 				dist_values_(adj_index) = tip_value + steps;
 				adj->next = tip->index;
 				Q.push(adj);
+				std::cerr << tip->index << " -> "
+				          << adj->next << " : "
+					  << dist_values_(adj_index)
+					  << std::endl;
 			}
 		}
 	}
@@ -310,7 +325,7 @@ bool GTGenerator::verifyEdge(const GTGenerator::Edge& e) const
 {
 	auto s0 = r_.translateToUnitState(knn_->V_[e.first]->state);
 	auto s1 = r_.translateToUnitState(knn_->V_[e.second]->state);
-	std::cerr << "state distance " << distance(s0, s1) << std::endl;
+	// std::cerr << "state distance " << distance(s0, s1) << std::endl;
 	return std::get<1>(r_.transitStateTo(s0, s1, verify_magnitude));
 }
 
@@ -343,6 +358,8 @@ std::tuple<ArrayOfStates, Eigen::VectorXi, bool>
 GTGenerator::generateGTPath(const StateVector& init_state,
                             int max_steps)
 {
+	NNVertex next = nullptr;
+#if 0
 	Vertex init_vertex;
 	init_vertex.index = -1;
 	init_vertex.state = init_state;
@@ -359,26 +376,38 @@ GTGenerator::generateGTPath(const StateVector& init_state,
 			break;
 		}
 	}
-	init_vertex.next = next->index;
-	// TODO: cannot find neighbour
 	assert(next != nullptr);
-	std::vector<StateVector> states;
-	std::vector<int> actions;
-
+	init_vertex.next = next->index;
 	/*
 	 * current means the a vertex that's close to the current_state
 	 */
 	NNVertex current = &init_vertex;
+#else
+	NNVertex current = knn_->V_[0].get();
+#endif
 	StateVector current_state = init_state;
+	// TODO: cannot find neighbour
+	std::vector<StateVector> states;
+	std::vector<int> actions;
+
 	bool terminated = true;
 	while (current->index != getGoalStateIndex()) {
-		next = knn_->V_[current->index].get();
+		if (current->next == kGraphNextFlagFinalState) {
+			break;
+		}
+		next = knn_->V_[current->next].get();
 		current_state = castTrajectory(current_state,
 				next->state,
 				states,
-				actions);
+				actions,
+				max_steps);
+		std::cerr << "Trajectory: " << current->index
+		          << " -> " << next->index << std::endl;
+#if 0
+		break;
+#endif
 		current = next;
-		if (actions.size() > max_steps) {
+		if (actions.size() >= max_steps) {
 			terminated = false;
 			break;
 		}
@@ -398,28 +427,43 @@ StateVector
 GTGenerator::castTrajectory(const StateVector& from,
 			    const StateVector& to,
 			    std::vector<StateVector>& states,
-			    std::vector<int>& actions)
+			    std::vector<int>& actions,
+			    int max_steps)
 {
+#if 0
+	/* W/O CD */
+	states.emplace_back(to);
+	actions.emplace_back(1);
+	return to;
+#else
 	StateVector current = from;
-	while (true) {
+	while (distance(current, to) > rl_stepping_size && actions.size() < max_steps) {
 		Eigen::VectorXd dists(kTotalNumberOfActions);
 		ArrayOfStates nexts;
 		nexts.resize(kTotalNumberOfActions, Eigen::NoChange);
 		for (int i = 0; i < kTotalNumberOfActions; i++) {
-			auto tup = r_.transitState(current, i, rl_stepping_size, verify_magnitude);
+			auto unit_current = r_.translateToUnitState(current);
+			auto tup = r_.transitState(unit_current, i,
+						   rl_stepping_size,
+						   verify_magnitude);
 			if (std::get<2>(tup) == 0.0) {
 				dists(i) = 1000.0;
 				continue;
 			}
 			dists(i) = distance(std::get<0>(tup), to);
-			nexts.row(i) = std::get<0>(tup);
+			nexts.row(i) = r_.translateFromUnitState(std::get<0>(tup));
 		}
 		int action;
 		dists.minCoeff(&action);
+		if (dists(action) > 100.0) {
+			std::cerr << "SAN CHECK 6/2D10: TRAPPED, EVERY ACTION FAILED\n";
+		}
 		states.emplace_back(nexts.row(action));
 		actions.emplace_back(action);
+		current = nexts.row(action);
 	}
 	return current;
+#endif
 }
 
 }

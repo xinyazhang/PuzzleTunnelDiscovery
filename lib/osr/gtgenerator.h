@@ -90,7 +90,8 @@ private:
 	StateVector castTrajectory(const StateVector& from,
 	                           const StateVector& to,
 	                           std::vector<StateVector>& states,
-	                           std::vector<int>& actions);
+	                           std::vector<int>& actions,
+	                           int max_steps);
 };
 
 }
