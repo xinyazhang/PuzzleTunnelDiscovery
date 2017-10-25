@@ -47,7 +47,7 @@ MAGNITUDES = np.array([0.0125, 0.025], dtype=np.float32)
 STATE_CHECK_DELTAS = np.array([0.00125, 0.0025], dtype=np.float32)
 MAX_ITERATION_PER_EPOCH = 16
 A3C_LOCAL_T = 32
-RL_GAMMA = 0.99 # discount factor for rewards
+RL_GAMMA = 0.999 # discount factor for rewards
 ENTROPY_BETA = 0.01
 
 STATE_TRANSITION_DEFAULT_MAGS = np.array([0.02, 0.125], dtype=np.float32)
