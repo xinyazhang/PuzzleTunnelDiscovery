@@ -399,7 +399,7 @@ bool Renderer::isValid(const StateVector& state) const
 	Transform envTf;
 	Transform robTf;
 	std::tie(envTf, robTf) = getCDTransforms(state);
-	std::cerr << "CD with\n" << envTf.matrix() << "\n\n" << robTf.matrix() << "\n";
+	// std::cerr << "CD with\n" << envTf.matrix() << "\n\n" << robTf.matrix() << "\n";
 	// std::cerr << translate_state_to_matrix(state) << '\n';
 	// std::cerr << robTf.matrix() << '\n';
 #if 0
@@ -533,9 +533,9 @@ Renderer::transitState(const StateVector& state,
                        double verify_delta) const
 {
 	Eigen::Vector2f magnitudes;
-	magnitudes << transit_magnitude , std::cos(transit_magnitude);
+	magnitudes << transit_magnitude , transit_magnitude * M_PI;
 	Eigen::Vector2f deltas;
-	deltas << verify_delta, std::cos(verify_delta);
+	deltas << verify_delta, verify_delta * M_PI;
 
 	int magidx = action < kActionPerTransformType ? 0 : 1;
 	if (action >= kTotalNumberOfActions) {
