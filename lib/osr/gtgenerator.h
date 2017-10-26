@@ -16,6 +16,7 @@
 namespace osr {
 
 class Renderer;
+class Progress;
 
 class GTGenerator {
 	struct KNN;
@@ -91,7 +92,8 @@ private:
 	                           const StateVector& to,
 	                           std::vector<StateVector>& states,
 	                           std::vector<int>& actions,
-	                           int max_steps);
+	                           int max_steps,
+	                           Progress* = nullptr);
 };
 
 }

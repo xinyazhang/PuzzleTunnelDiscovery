@@ -228,9 +228,12 @@ void GTGenerator::initGT()
 
 #if 1
 	Progress initprog("FindBoundary", knn_->V_.size());
-	for (int i = 0; i < int(knn_->V_.size()); i++) {
+	ArrayOfStates unit_states;
+	unit_states.resize(knn_->V_.size(), Eigen::NoChange);
+	for (int i = 0; i < unit_states.rows(); i++) {
 		auto nv = knn_->V_[i].get();
 		auto unit_state = r_.translateToUnitState(nv->state);
+		unit_states.row(i) = unit_state;
 		if (r_.isDisentangled(unit_state)) {
 			Q.push(nv);
 			dist_values_(i) = 0.0;
@@ -256,7 +259,9 @@ void GTGenerator::initGT()
 		auto tip_value = dist_values_(tip->index);
 		for (auto adj_index : tip->adjs) {
 			auto adj = knn_->V_[adj_index].get();
-			auto steps = estimateSteps(tip, adj);
+			// auto steps = estimateSteps(tip, adj);
+			auto steps = distance(unit_states.row(tip->index),
+					      unit_states.row(adj_index));
 			bool do_update = dist_values_(adj_index) < 0 or
 				         dist_values_(adj_index) > tip_value + steps;
 			if (do_update) {
@@ -389,6 +394,7 @@ GTGenerator::generateGTPath(const StateVector& init_state,
 	// TODO: cannot find neighbour
 	std::vector<StateVector> states;
 	std::vector<int> actions;
+	Progress prog("Taking Actions", max_steps);
 
 	bool terminated = true;
 	while (current->index != getGoalStateIndex()) {
@@ -400,7 +406,8 @@ GTGenerator::generateGTPath(const StateVector& init_state,
 				next->state,
 				states,
 				actions,
-				max_steps);
+				max_steps,
+				&prog);
 		std::cerr << "Trajectory: " << current->index
 		          << " -> " << next->index << std::endl;
 #if 0
@@ -428,7 +435,8 @@ GTGenerator::castTrajectory(const StateVector& from,
 			    const StateVector& to,
 			    std::vector<StateVector>& states,
 			    std::vector<int>& actions,
-			    int max_steps)
+			    int max_steps,
+			    Progress* prog)
 {
 #if 0
 	/* W/O CD */
@@ -436,13 +444,17 @@ GTGenerator::castTrajectory(const StateVector& from,
 	actions.emplace_back(1);
 	return to;
 #else
-	StateVector current = from;
-	while (distance(current, to) > rl_stepping_size && actions.size() < max_steps) {
+	auto unit_to = r_.translateToUnitState(to);
+	auto unit_current = r_.translateToUnitState(from);
+	while (actions.size() < max_steps) {
+		auto unit_distance = distance(unit_current, unit_to);
+		std::cerr << "CURRENT UNIT DISTANCE " << unit_distance << std::endl;
+		if (unit_distance < rl_stepping_size)
+			break;
 		Eigen::VectorXd dists(kTotalNumberOfActions);
 		ArrayOfStates nexts;
 		nexts.resize(kTotalNumberOfActions, Eigen::NoChange);
 		for (int i = 0; i < kTotalNumberOfActions; i++) {
-			auto unit_current = r_.translateToUnitState(current);
 			auto tup = r_.transitState(unit_current, i,
 						   rl_stepping_size,
 						   verify_magnitude);
@@ -450,19 +462,31 @@ GTGenerator::castTrajectory(const StateVector& from,
 				dists(i) = 1000.0;
 				continue;
 			}
-			dists(i) = distance(std::get<0>(tup), to);
-			nexts.row(i) = r_.translateFromUnitState(std::get<0>(tup));
+			dists(i) = distance(std::get<0>(tup), unit_to);
+			nexts.row(i) = std::get<0>(tup);
 		}
 		int action;
 		dists.minCoeff(&action);
 		if (dists(action) > 100.0) {
 			std::cerr << "SAN CHECK 6/2D10: TRAPPED, EVERY ACTION FAILED\n";
+			std::cerr << dists << std::endl;
 		}
-		states.emplace_back(nexts.row(action));
+		// if (distance(nexts.row(action), to) > distance(current, to)) {
+		if (dists(action) > unit_distance) {
+			std::cerr << "SAN CHECK 1/1D6: CANNOT CONVERGE INTO STEPPING SIZE\n";
+			// std::cerr << "\tCURRENT: " << distance(current, to);
+			// std::cerr << "\n\tNEXT: " << distance(nexts.row(action), to) << '\n';
+			std::cerr << "\tCURRENT: " << unit_distance;
+			std::cerr << "\n\tNEXT: " << dists(action) << '\n';
+			break;
+		}
 		actions.emplace_back(action);
-		current = nexts.row(action);
+		unit_current = nexts.row(action);
+		states.emplace_back(r_.translateFromUnitState(unit_current));
+		if (prog)
+			prog->increase();
 	}
-	return current;
+	return r_.translateFromUnitState(unit_current); // Note: do not return states.back(), the iteration may not be executed.
 #endif
 }
 
