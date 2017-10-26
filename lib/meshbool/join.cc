@@ -1,6 +1,5 @@
 #include "join.h"
 #include <igl/copyleft/cgal/mesh_boolean.h>
-#include <igl/viewer/Viewer.h>
 
 void mesh_bool(
 		const Eigen::MatrixXd& VA, const Eigen::MatrixXi& FA,
