@@ -1,3 +1,4 @@
+#include <osr/osr_state.h>
 #include <osr/osr_render.h>
 #include <osr/osr_init.h>
 #include <osr/gtgenerator.h>
@@ -63,24 +64,32 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("setName", &Pet::setName)
 		.def("getName", &Pet::getName);
 #endif
+	m.def("distance", &osr::distance,
+	      "Calculate the distance between to unit states");
 	using osr::Renderer;
-	py::class_<Renderer>(m, "Renderer")
+	using osr::UnitWorld;
+	py::class_<UnitWorld>(m, "UnitWorld")
+		.def(py::init<>())
+		.def("setupFrom", &UnitWorld::copyFrom)
+		.def("loadModelFromFile", &UnitWorld::loadModelFromFile)
+		.def("loadRobotFromFile", &UnitWorld::loadRobotFromFile)
+		.def("scaleToUnit", &UnitWorld::scaleToUnit)
+		.def("angleModel", &UnitWorld::angleModel)
+		.def_property("state", &UnitWorld::getRobotState, &UnitWorld::setRobotState)
+		.def("is_valid_state", &UnitWorld::isValid)
+		.def("is_disentangled", &UnitWorld::isDisentangled)
+		.def("transit_state", &UnitWorld::transitState)
+		.def("transit_state_to", &UnitWorld::transitStateTo)
+		.def("translate_to_unit_state", &UnitWorld::translateToUnitState)
+		.def_property_readonly("scene_matrix", &UnitWorld::getSceneMatrix)
+		.def_property_readonly("robot_matrix", &UnitWorld::getRobotMatrix);
+	py::class_<Renderer, UnitWorld>(m, "Renderer")
 		.def(py::init<>())
 		.def("setup", &Renderer::setup)
 		.def("setupFrom", &Renderer::setupFrom)
 		.def("teardown", &Renderer::teardown)
-		.def("loadModelFromFile", &Renderer::loadModelFromFile)
-		.def("loadRobotFromFile", &Renderer::loadRobotFromFile)
-		.def("angleModel", &Renderer::angleModel)
-		.def("scaleToUnit", &Renderer::scaleToUnit)
-		.def_property("state", &Renderer::getRobotState, &Renderer::setRobotState)
-		.def_property_readonly("scene_matrix", &Renderer::getSceneMatrix)
-		.def_property_readonly("robot_matrix", &Renderer::getRobotMatrix)
-		.def("is_valid_state", &Renderer::isValid)
-		.def("is_disentangled", &Renderer::isDisentangled)
-		.def("transit_state", &Renderer::transitState)
-		.def("transit_state_to", &Renderer::transitStateTo)
-		.def("translate_to_unit_state", &Renderer::translateToUnitState)
+		// .def("loadModelFromFile", &Renderer::loadModelFromFile)
+		// .def("loadRobotFromFile", &Renderer::loadRobotFromFile)
 		.def("render_depth_to_buffer", &Renderer::render_depth_to_buffer)
 		.def("render_mvdepth_to_buffer", &Renderer::render_mvdepth_to_buffer)
 		.def("render_mvrgbd", &Renderer::render_mvrgbd)
