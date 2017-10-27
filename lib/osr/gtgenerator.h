@@ -48,7 +48,13 @@ public:
 	 */
 	std::tuple<ArrayOfStates, Eigen::VectorXi, bool>
 	generateGTPath(const StateVector& init_state,
-	               int max_steps);
+	               int max_steps,
+	               bool for_rl = true);
+
+	std::tuple<ArrayOfStates, Eigen::VectorXi>
+	projectTrajectory(const StateVector& from,
+	                  const StateVector& to,
+	                  int max_steps = -1);
 
 	struct Vertex {
 		int index;
@@ -93,7 +99,8 @@ private:
 	                           std::vector<StateVector>& states,
 	                           std::vector<int>& actions,
 	                           int max_steps,
-	                           Progress* = nullptr);
+	                           Progress* = nullptr,
+	                           bool for_rl = true);
 };
 
 }

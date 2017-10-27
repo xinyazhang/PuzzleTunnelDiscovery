@@ -361,7 +361,8 @@ float GTGenerator::estimateSteps(NNVertex from, NNVertex to) const
 
 std::tuple<ArrayOfStates, Eigen::VectorXi, bool>
 GTGenerator::generateGTPath(const StateVector& init_state,
-                            int max_steps)
+                            int max_steps,
+                            bool for_rl)
 {
 	NNVertex next = nullptr;
 #if 0
@@ -407,7 +408,8 @@ GTGenerator::generateGTPath(const StateVector& init_state,
 				states,
 				actions,
 				max_steps,
-				&prog);
+				&prog,
+				for_rl);
 		std::cerr << "Trajectory: " << current->index
 		          << " -> " << next->index << std::endl;
 #if 0
@@ -430,23 +432,47 @@ GTGenerator::generateGTPath(const StateVector& init_state,
 	return std::make_tuple(ret_states, ret_actions, terminated);
 }
 
+std::tuple<ArrayOfStates, Eigen::VectorXi>
+GTGenerator::projectTrajectory(const StateVector& from,
+	                       const StateVector& to,
+	                       int max_steps)
+{
+	std::vector<StateVector> states;
+	std::vector<int> actions;
+	castTrajectory(from,
+	               to,
+	               states,
+	               actions,
+	               max_steps);
+	ArrayOfStates ret_states;
+	ret_states.resize(states.size(), Eigen::NoChange);
+	for (size_t i = 0; i < states.size(); i++)
+		ret_states.row(i) = states[i];
+	Eigen::VectorXi ret_actions;
+	ret_actions.resize(actions.size());
+	for (size_t i = 0; i < actions.size(); i++)
+		ret_actions(i) = actions[i];
+	return std::make_tuple(ret_states, ret_actions);
+}
+
 StateVector
 GTGenerator::castTrajectory(const StateVector& from,
 			    const StateVector& to,
 			    std::vector<StateVector>& states,
 			    std::vector<int>& actions,
 			    int max_steps,
-			    Progress* prog)
+			    Progress* prog,
+			    bool for_rl)
 {
-#if 0
-	/* W/O CD */
-	states.emplace_back(to);
-	actions.emplace_back(1);
-	return to;
-#else
+	if (!for_rl) {
+		/* W/O CD */
+		states.emplace_back(to);
+		actions.emplace_back(1);
+		return to;
+	}
 	auto unit_to = r_.translateToUnitState(to);
 	auto unit_current = r_.translateToUnitState(from);
-	while (actions.size() < max_steps) {
+	while (actions.size() < max_steps or max_steps < 0) {
 		auto unit_distance = distance(unit_current, unit_to);
 		std::cerr << "CURRENT UNIT DISTANCE " << unit_distance << std::endl;
 		if (unit_distance < rl_stepping_size)
@@ -454,6 +480,8 @@ GTGenerator::castTrajectory(const StateVector& from,
 		Eigen::VectorXd dists(kTotalNumberOfActions);
 		ArrayOfStates nexts;
 		nexts.resize(kTotalNumberOfActions, Eigen::NoChange);
+		{
+#pragma omp parallel for
 		for (int i = 0; i < kTotalNumberOfActions; i++) {
 			auto tup = r_.transitState(unit_current, i,
 						   rl_stepping_size,
@@ -465,8 +493,10 @@ GTGenerator::castTrajectory(const StateVector& from,
 			dists(i) = distance(std::get<0>(tup), unit_to);
 			nexts.row(i) = std::get<0>(tup);
 		}
+		}
 		int action;
 		dists.minCoeff(&action);
+		std::cerr << dists << std::endl;
 		if (dists(action) > 100.0) {
 			std::cerr << "SAN CHECK 6/2D10: TRAPPED, EVERY ACTION FAILED\n";
 			std::cerr << dists << std::endl;
@@ -487,7 +517,6 @@ GTGenerator::castTrajectory(const StateVector& from,
 			prog->increase();
 	}
 	return r_.translateFromUnitState(unit_current); // Note: do not return states.back(), the iteration may not be executed.
-#endif
 }
 
 }

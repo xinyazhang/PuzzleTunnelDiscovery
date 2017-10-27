@@ -110,6 +110,10 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("install_gtdata", &GTGenerator::installGTData)
 		.def("extract_gtdata", &GTGenerator::extractGTData)
 		.def("generate_gt_path", &GTGenerator::generateGTPath)
+		.def("project_trajectory", &GTGenerator::projectTrajectory,
+		     py::arg("from"),
+		     py::arg("to"),
+		     py::arg("max_steps") = -1)
 		.def_readwrite("verify_magnitude", &GTGenerator::verify_magnitude)
 		.def_readwrite("gamma", &GTGenerator::gamma)
 		.def_readwrite("rl_stepping_size", &GTGenerator::rl_stepping_size)
