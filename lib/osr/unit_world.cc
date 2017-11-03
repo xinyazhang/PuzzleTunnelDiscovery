@@ -212,6 +212,10 @@ UnitWorld::transitState(const StateVector& state,
 	StateTrans trans(state(0), state(1), state(2));
 	float sym = action % 2 == 0 ? 1.0f : -1.0f;
 	/*
+	 * Normalize the quaternion to prevent instability.
+	 */
+	rot.normalize();
+	/*
 	 * action (0-11) to XYZ (0-2)
 	 * X: 0,1 or 6,7
 	 * Y: 2,3 or 8,9
@@ -234,6 +238,7 @@ UnitWorld::transitState(const StateVector& state,
 		applier = [&rot, &trans, &tfvec, sym](float delta) {
 			Eigen::AngleAxis<StateScalar> aa(delta * sym, tfvec);
 			rot = aa * rot;
+			rot.normalize();
 		};
 	}
 	StateVector nstate, freestate(state);

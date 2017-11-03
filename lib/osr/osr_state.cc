@@ -23,6 +23,8 @@ interpolate(const StateVector& pkey,
 	StateTrans pinterp = p0 * (1-tau) + p1 * tau;
 	StateQuat Qfrom { pkey(3), pkey(4), pkey(5), pkey(6) };
 	StateQuat Qto { nkey(3), nkey(4), nkey(5), nkey(6) };
+	Qfrom.normalize();
+	Qto.normalize();
 	StateQuat Qinterp = Qfrom.slerp(tau, Qto);
 	StateVector ret;
 	ret << pinterp(0), pinterp(1), pinterp(2),
