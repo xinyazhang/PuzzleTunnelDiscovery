@@ -188,9 +188,9 @@ UnitWorld::transitState(const StateVector& state,
                        double verify_delta) const
 {
 	Eigen::Vector2f magnitudes;
-	magnitudes << transit_magnitude , transit_magnitude * M_PI * 2;
+	magnitudes << transit_magnitude , transit_magnitude * 2;
 	Eigen::Vector2f deltas;
-	deltas << verify_delta, verify_delta * M_PI * 2;
+	deltas << verify_delta, verify_delta * 2;
 
 	int magidx = action < kActionPerTransformType ? 0 : 1;
 	if (action >= kTotalNumberOfActions) {

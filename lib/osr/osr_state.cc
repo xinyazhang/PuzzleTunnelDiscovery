@@ -37,7 +37,7 @@ double distance(const StateVector& lhv, const StateVector& rhv)
 	double trdist = (lhv.segment<3>(0) - rhv.segment<3>(0)).norm();
 	double dot = lhv.segment<4>(3).dot(rhv.segment<4>(3));
 	double rotdist = std::abs(std::acos(dot));
-	return trdist + rotdist / M_PI;
+	return trdist + rotdist;
 }
 
 }
