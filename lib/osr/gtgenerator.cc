@@ -371,7 +371,7 @@ GTGenerator::generateGTPath(const StateVector& init_state,
                             bool for_rl)
 {
 	NNVertex next = nullptr;
-#if 0
+#if 1
 	Vertex init_vertex;
 	init_vertex.index = -1;
 	init_vertex.state = init_state;
@@ -379,14 +379,25 @@ GTGenerator::generateGTPath(const StateVector& init_state,
 	std::vector<NNVertex> neighbors;
 	knn_->nn_->nearestK(&init_vertex, kNearestFromInitState, neighbors);
 
-	NNVertex next = nullptr;
 	auto s0 = uw_.translateToUnitState(init_state);
+	std::cerr << "Finding NN from " << init_state.transpose() << std::endl;
+	std::cerr << "  (Checking if Valid) " << uw_.isValid(s0) << std::endl;
 	for (const auto neigh : neighbors) {
 		auto s1 = uw_.translateToUnitState(neigh->state);
-		if (std::get<1>(uw_.transitStateTo(s0, s1, verify_magnitude))) {
+		std::cerr << "\tTrying " << neigh->state.transpose() << std::endl;
+		auto tup = uw_.transitStateTo(s0, s1, verify_magnitude);
+		std::cerr << "\tEnds at "
+			  << uw_.translateFromUnitState(std::get<0>(tup)).transpose()
+		          << std::endl;
+		std::cerr << "\tTerm " << std::get<1>(tup) << std::endl;
+		std::cerr << "\tTau " << std::get<2>(tup) << std::endl;
+		if (std::get<1>(tup)) {
 			next = neigh;
 			break;
 		}
+	}
+	if (!next) {
+		return std::make_tuple(ArrayOfStates(), Eigen::VectorXi(), false);
 	}
 	assert(next != nullptr);
 	init_vertex.next = next->index;
