@@ -2,6 +2,7 @@
 #include "scene.h"
 #include "cdmodel.h"
 #include <glm/gtx/io.hpp>
+#include <atomic>
 
 namespace osr {
 
@@ -278,15 +279,37 @@ UnitWorld::transitStateTo(const StateVector& from,
 {
 	double dist = distance(from, to);
 	int nseg = int(std::ceil(std::max(1.0, dist/verify_delta)));
+	std::cerr << "\t\tNSeg: " << nseg << std::endl;
 	double rate = 1.0 / double(nseg);
 	StateVector last_free = from;
-	for (int i = 1; i <= nseg; i++) {
-		double tau = i * rate;
-		auto state = interpolate(from, to, tau);
-		if (!isValid(state)) {
-			return std::make_tuple(last_free, false, (i-1)*rate);
+	Eigen::VectorXi valid;
+	valid.setZero(nseg);
+	std::atomic<bool> hitInvalid(false);
+	{
+#pragma omp parallel for
+		for (int i = 1; i <= nseg; i++) {
+			if (hitInvalid.load())
+				continue;
+			double tau = i * rate;
+			auto state = interpolate(from, to, tau);
+			if (!isValid(state)) {
+				valid(i - 1) = 0;
+				hitInvalid.store(true);
+			} else {
+				valid(i - 1) = 1;
+			}
 		}
-		last_free = state;
+	}
+	for (int i = 0; i < nseg; i++) {
+		if (!valid(i)) {
+			/*
+			 * Note: valid(0) records the validity of (i+1) * rate
+			 * So i * rate is the correct tau
+			 */
+			double tau = i * rate;
+			auto last_free = interpolate(from, to, tau);
+			return std::make_tuple(last_free, false, tau);
+		}
 	}
 	return std::make_tuple(to, true, 1.0);
 }
