@@ -89,7 +89,7 @@ def reanimate(gtfn, pathfn):
     fn = 'blend-cont-saved.npz'
     if not os.path.isfile(fn):
         print("Translating into Cont. Actions...")
-        cont_tr, cont_rot, _ = gt.cast_path_to_cont_actions_in_UW(keys)
+        cont_tr, cont_rot, _, _ = gt.cast_path_to_cont_actions_in_UW(keys)
         print("Done")
         np.savez('blend-cont.npz', TR=cont_tr, ROT=cont_rot)
     else:

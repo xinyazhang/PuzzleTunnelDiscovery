@@ -462,11 +462,13 @@ GTGenerator::projectTrajectory(const StateVector& from,
 }
 
 
-std::tuple<ArrayOfTrans, ArrayOfAA, bool>
-GTGenerator::castPathToContActionsInUW(const ArrayOfStates& path)
+std::tuple<ArrayOfTrans, ArrayOfAA, Eigen::VectorXd, bool>
+GTGenerator::castPathToContActionsInUW(const ArrayOfStates& path,
+				       bool path_is_verified)
 {
 	std::vector<StateTrans> trans_array;
 	std::vector<AngleAxisVector> aa_array;
+	std::vector<double> mags_array;
 	ArrayOfStates unit_states;
 	unit_states.resize(path.rows(), Eigen::NoChange);
 	Progress uprog("To Unit World", path.rows());
@@ -480,8 +482,11 @@ GTGenerator::castPathToContActionsInUW(const ArrayOfStates& path)
 		const StateVector& from = unit_states.row(i-1);
 		const StateVector& to = unit_states.row(i);
 		double dtau = rl_stepping_size / distance(from, to);
-		auto tup = uw_.transitStateTo(from, to, verify_magnitude);
-		double end_tau = std::get<2>(tup);
+		double end_tau = 1.0;
+		if (!path_is_verified) {
+			auto tup = uw_.transitStateTo(from, to, verify_magnitude);
+			end_tau = std::get<2>(tup);
+		}
 		double prev_tau = 0;
 		double tau = 0;
 		bool done = false;
@@ -498,6 +503,7 @@ GTGenerator::castPathToContActionsInUW(const ArrayOfStates& path)
 			auto diff_tup = differential(prev, curr);
 			trans_array.emplace_back(std::get<0>(diff_tup));
 			aa_array.emplace_back(std::get<1>(diff_tup));
+			mags_array.emplace_back(distance(prev, curr));
 		}
 		prog.increase();
 		if (end_tau < 1.0) {
@@ -513,7 +519,13 @@ GTGenerator::castPathToContActionsInUW(const ArrayOfStates& path)
 	ret_aa.resize(aa_array.size(), Eigen::NoChange);
 	for (size_t i = 0; i < aa_array.size(); i++)
 		ret_aa.row(i) = aa_array[i];
-	return std::make_tuple(ret_trans, ret_aa, terminated);
+	Eigen::VectorXd ret_dists(mags_array.size());
+	double distance_from_goal = 0;
+	for (int i = int(mags_array.size() - 1); i >= 0; i--) {
+		distance_from_goal += mags_array[i];
+		ret_dists(i) = distance_from_goal;
+	}
+	return std::make_tuple(ret_trans, ret_aa, ret_dists, terminated);
 }
 
 

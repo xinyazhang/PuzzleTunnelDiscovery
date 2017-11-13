@@ -111,7 +111,10 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("install_gtdata", &GTGenerator::installGTData)
 		.def("extract_gtdata", &GTGenerator::extractGTData)
 		.def("generate_gt_path", &GTGenerator::generateGTPath)
-		.def("cast_path_to_cont_actions_in_UW", &GTGenerator::castPathToContActionsInUW)
+		.def("cast_path_to_cont_actions_in_UW", &GTGenerator::castPathToContActionsInUW,
+		     py::arg("path"),
+		     py::arg("path_is_verified") = false
+		    )
 		.def("project_trajectory", &GTGenerator::projectTrajectory,
 		     py::arg("from"),
 		     py::arg("to"),

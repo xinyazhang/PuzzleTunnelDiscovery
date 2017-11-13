@@ -62,8 +62,9 @@ public:
 	 * 
 	 * All actions are in UnitWorld
 	 */
-	std::tuple<ArrayOfTrans, ArrayOfAA, bool>
-	castPathToContActionsInUW(const ArrayOfStates& path);
+	std::tuple<ArrayOfTrans, ArrayOfAA, Eigen::VectorXd, bool>
+	castPathToContActionsInUW(const ArrayOfStates& path,
+	                          bool path_is_verified = false);
 
 	struct Vertex {
 		int index;
