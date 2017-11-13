@@ -1,6 +1,7 @@
 #include "unit_world.h"
 #include "scene.h"
 #include "cdmodel.h"
+#include <iostream>
 #include <glm/gtx/io.hpp>
 #include <atomic>
 

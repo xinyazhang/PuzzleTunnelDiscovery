@@ -1,7 +1,5 @@
 import pyosr
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 import math
 import aniconf12 as aniconf
 import sys

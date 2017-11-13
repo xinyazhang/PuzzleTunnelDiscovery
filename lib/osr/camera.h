@@ -1,6 +1,8 @@
 #ifndef OSR_CAMERA_H
 #define OSR_CAMERA_H
 
+#if GPU_ENABLED
+
 #include <stack>
 #include <iostream>
 
@@ -59,5 +61,7 @@ public:
     void uniform(GLuint program, glm::mat4 xform);
 };
 }
+
+#endif // GPU_ENABLED
 
 #endif /* end of include guard: CAMERA_H */

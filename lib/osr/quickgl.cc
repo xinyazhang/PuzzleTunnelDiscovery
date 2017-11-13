@@ -1,3 +1,5 @@
+#if GPU_ENABLED
+
 #include "quickgl.h"
 #include <stdlib.h>
 #include <iostream>
@@ -58,3 +60,5 @@ void CheckProgramLinkage(GLuint program)
 		exit(EXIT_FAILURE);
 	}
 }
+
+#endif // GPU_ENABLED

@@ -1,4 +1,5 @@
 #include <osr/osr_state.h>
+#include <osr/unit_world.h>
 #include <osr/osr_render.h>
 #include <osr/osr_init.h>
 #include <osr/gtgenerator.h>
@@ -9,6 +10,7 @@
 
 namespace py = pybind11;
 
+#if GPU_ENABLED
 namespace {
 uintptr_t create_display_wrapper(int device_idx = 0)
 {
@@ -24,11 +26,13 @@ void create_gl_context_wrapper(uintptr_t dpy)
 }
 
 }
+#endif // GPU_ENABLED
 
 // For older pybind11
 // Replace this with PYBIND11_MODULE(osr, m) after pybind11 v2.2.0
 PYBIND11_PLUGIN(pyosr) {
 	py::module m("pyosr", "Off-Screen Rendering");
+#if GPU_ENABLED
 	m.def("init", &osr::init, "Initialize OSR");
 #if 1
 	m.def("create_display",
@@ -51,6 +55,7 @@ PYBIND11_PLUGIN(pyosr) {
 	m.def("shutdown", &osr::shutdown,
 	      "Close internally opened FDs. "
 	      "User is responsible to free OpenGL/EGL resources");
+#endif // GPU_ENABLED
 #if 0
 	m.def("transit", &osr::transitState,
 	      "State Transition, given action and corresponding magnitude",
@@ -66,7 +71,6 @@ PYBIND11_PLUGIN(pyosr) {
 #endif
 	m.def("distance", &osr::distance,
 	      "Calculate the distance between to unit states");
-	using osr::Renderer;
 	using osr::UnitWorld;
 	py::class_<UnitWorld>(m, "UnitWorld")
 		.def(py::init<>())
@@ -85,6 +89,8 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("translate_from_unit_state", &UnitWorld::translateFromUnitState)
 		.def_property_readonly("scene_matrix", &UnitWorld::getSceneMatrix)
 		.def_property_readonly("robot_matrix", &UnitWorld::getRobotMatrix);
+#if GPU_ENABLED
+	using osr::Renderer;
 	py::class_<Renderer, UnitWorld>(m, "Renderer")
 		.def(py::init<>())
 		.def("setup", &Renderer::setup)
@@ -101,6 +107,7 @@ PYBIND11_PLUGIN(pyosr) {
 		.def_readwrite("mvrgb", &Renderer::mvrgb)
 		.def_readwrite("mvdepth", &Renderer::mvdepth)
 		.def_readwrite("views", &Renderer::views);
+#endif // GPU_ENABLED
 	using osr::GTGenerator;
 	py::class_<GTGenerator>(m, "GTGenerator")
 		.def(py::init<UnitWorld&>())

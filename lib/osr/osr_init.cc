@@ -1,3 +1,5 @@
+#if GPU_ENABLED
+
 #include <GL/glew.h>
 #include "osr_init.h"
 #include <string.h>
@@ -181,3 +183,5 @@ void shutdown()
 }
 
 }
+
+#endif // GPU_ENABLED

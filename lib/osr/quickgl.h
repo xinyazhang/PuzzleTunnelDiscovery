@@ -1,6 +1,8 @@
 #ifndef OSR_QUICKGL_H
 #define OSR_QUICKGL_H
 
+#if GPU_ENABLED
+
 #ifndef QUICKGL_NOT_INCLUDE_GLEW
 #include <GL/glew.h>
 #endif
@@ -32,5 +34,7 @@ const char* DebugGLErrorToString(int error);
 
 void CheckShaderCompilation(GLuint shader);
 void CheckProgramLinkage(GLuint program);
+
+#endif // GPU_ENABLED
 
 #endif

@@ -1,3 +1,5 @@
+#if GPU_ENABLED
+
 #include "mesh_renderer.h"
 #include "camera.h"
 #include "mesh.h"
@@ -98,3 +100,4 @@ MeshRenderer::render(GLuint program, Camera& camera, glm::mat4 globalXform)
 
 }
 
+#endif // GPU_ENABLED

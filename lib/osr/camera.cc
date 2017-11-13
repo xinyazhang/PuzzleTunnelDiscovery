@@ -1,3 +1,5 @@
+#if GPU_ENABLED
+
 #include "camera.h"
 #include <glm/gtx/io.hpp>
 
@@ -154,3 +156,5 @@ Camera::uniform(GLuint program, glm::mat4 xform)
 }
 
 }
+
+#endif // GPU_ENABLED

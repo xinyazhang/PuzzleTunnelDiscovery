@@ -23,8 +23,39 @@ include_directories(
   "/usr/local/Cellar/glew/2.0.0/include/"
   "/Users/randallsmith/Documents/sdks/git/libigl/include"
   "/lusr/include")
+link_directories("$ENV{HOME}/.local/lib")
 
 FIND_PACKAGE(OpenMP)
+
+SET(USE_GPU TRUE)
+
+find_package(OpenGL QUIET)
+if (OpenGL_FOUND)
+	include_directories(${OpenGL_INCLUDE_DIRS})
+	link_directories(${OpenGL_LIBRARY_DIRS})
+else (OpenGL_FOUND)
+	SET(USE_GPU FALSE)
+endif (OpenGL_FOUND)
+
+find_package(GLEW QUIET)
+if (GLEW_FOUND)
+	include_directories(${GLEW_INCLUDE_DIRS})
+	link_libraries(${GLEW_LIBRARIES})
+else (GLEW_FOUND)
+	SET(USE_GPU FALSE)
+endif (GLEW_FOUND)
+
+# GLFW
+pkg_search_module(GLFW3 QUIET glfw3)
+INCLUDE_DIRECTORIES(${GLFW3_INCLUDE_DIRS})
+if (GLFW3_FOUND)
+	SET(GLFW3_LIBRARY ${GLFW3_LIBRARIES})
+	MESSAGE(STATUS "GLFW: ${GLFW3_LIBRARIES}")
+else (GLFW3_FOUND)
+	SET(USE_GPU FALSE)
+endif(GLFW3_FOUND)
+
+message(STATUS "Using GPU ${USE_GPU}")
 
 # Include Eigen3 and IGL
 INCLUDE(${CMAKE_SOURCE_DIR}/cmake/FindSUITESPARSE.cmake)
@@ -35,19 +66,6 @@ FIND_PACKAGE(Eigen3 QUIET)
 INCLUDE_DIRECTORIES(SYSTEM ${EIGEN3_INCLUDE_DIR})
 INCLUDE_DIRECTORIES(${IGL_INCLUDE_DIR})
 
-find_package(OpenGL REQUIRED)
-include_directories(${OpenGL_INCLUDE_DIRS})
-link_directories(${OpenGL_LIBRARY_DIRS})
-
-find_package(GLEW REQUIRED)
-include_directories(${GLEW_INCLUDE_DIRS})
-link_libraries(${GLEW_LIBRARIES})
-
-# GLFW
-pkg_search_module(GLFW3 REQUIRED glfw3)
-INCLUDE_DIRECTORIES(${GLFW3_INCLUDE_DIRS})
-SET(GLFW3_LIBRARY ${GLFW3_LIBRARIES})
-MESSAGE(STATUS "GLFW: ${GLFW3_LIBRARIES}")
 
 if (APPLE)
 	  find_library(COCOA_LIBRARY Cocoa REQUIRED)
@@ -127,12 +145,14 @@ FIND_PACKAGE(Threads REQUIRED)
 SET(CMAKE_THREAD_LIBS_INIT Threads::Threads)
 MESSAGE("Threads: ${CMAKE_THREAD_LIBS_INIT}")
 message(STATUS "AFTER Thread CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
-FIND_PACKAGE(CGAL REQUIRED COMPONENTS Common Core)
+
+# CGAL Mess
+FIND_PACKAGE(CGAL QUIET COMPONENTS Common Core)
 message(STATUS "AFTER CGAL CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
 SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CGAL_MODULES_DIR}")
-FIND_PACKAGE(GMP REQUIRED)
+FIND_PACKAGE(GMP QUIET)
 message(STATUS "AFTER GMP CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
-FIND_PACKAGE(MPFR REQUIRED)
+FIND_PACKAGE(MPFR QUIET)
 message(STATUS "AFTER MPFR CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
 
 # set(CGAL_LIB "${CGAL_LIB};CGAL")
@@ -141,6 +161,8 @@ message(STATUS "CGAL LIBRARIES ${CGAL_LIBRARIES}")
 message(STATUS "CGAL LIBRARY ${CGAL_LIBRARY}")
 set(CGAL_LIB "${CGAL_LIBRARY};${CGAL_Core_LIBRARY}")
 message(STATUS "CGAL LIB ${CGAL_LIB}")
+
+message(STATUS "CGAL_FOUND: ${CGAL_FOUND}")
 
 # FCL (Flexible Collision Library) support
 SET(FCL_BUILD_TESTS OFF CACHE BOOL "Disable testcases for fcl" FORCE)
@@ -169,12 +191,15 @@ EASYLIB(heatio)
 EASYLIB(vecio)
 EASYLIB(geopick)
 EASYLIB(mazeinfo)
-EASYLIB(renderer)
 EASYLIB(omplaux)
 EASYLIB(goct)
 
 TARGET_LINK_LIBRARIES(mazeinfo vertcolorply)
-TARGET_LINK_LIBRARIES(renderer  ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY})
+
+if (USE_GPU)
+EASYLIB(renderer)
+TARGET_LINK_LIBRARIES(renderer ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY})
+endif(USE_GPU)
 
 EASYADD(meshgen)
 TARGET_LINK_LIBRARIES(meshgen mazeinfo)
@@ -220,8 +245,10 @@ TARGET_LINK_LIBRARIES(heat ${SUITESPARSE_LIBRARIES} vecio)
 EASYADD(mass)
 TARGET_LINK_LIBRARIES(mass tetio vecio)
 
+if (USE_GPU)
 EASYADD(visheat)
 TARGET_LINK_LIBRARIES(visheat vertcolorply ${CMAKE_THREAD_LIBS_INIT} ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY} tetio heatio)
+endif (USE_GPU)
 
 EASYADD(follow)
 TARGET_LINK_LIBRARIES(follow tetio heatio)
@@ -242,6 +269,15 @@ TARGET_LINK_LIBRARIES(evadiff tetio heatio)
 #EASYADD(minkview2)
 #TARGET_LINK_LIBRARIES(minkview2 ${CGAL_LIBRARIES} ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY})
 
+EASYLIB(erocol)
+TARGET_LINK_LIBRARIES(erocol fat)
+TARGET_LINK_LIBRARIES(omplaux erocol)
+TARGET_LINK_LIBRARIES(omplaux tetio)
+# 
+# All visualizer required GPU
+#
+if (USE_GPU)
+
 SET(viscommon renderer ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY})
 
 EASYADD(freecube)
@@ -256,20 +292,19 @@ EASYADD(naivebuilder)
 TARGET_LINK_LIBRARIES(naivebuilder ${octbuildercommon} ${viscommon})
 
 EASYADD(tbuilder)
-TARGET_LINK_LIBRARIES(tbuilder ${octbuildercommon} ${viscommon})
+TARGET_LINK_LIBRARIES(tbuilder ${octbuildercommon} ${viscommon} erocol)
+endif (USE_GPU)
 
-FIND_PACKAGE(vhacd REQUIRED)
+FIND_PACKAGE(vhacd QUIET)
+IF ($(vhacd_FOUND))
 EASYADD(convexpp)
 TARGET_LINK_LIBRARIES(convexpp vhacd ${CMAKE_THREAD_LIBS_INIT} ${GMP_LIBRARIES} ${MPFR_LIBRARIES} ${CGAL_LIB} ${Boost_LIBRARIES})
+ELSE ($(vhacd_FOUND))
+	MESSAGE(STATUS "convexpp is NOT BUILT")
+ENDIF ($(vhacd_FOUND))
 
 EASYLIB(fat)
 TARGET_LINK_LIBRARIES(fat openvdb tbb Half)
-
-EASYLIB(erocol)
-TARGET_LINK_LIBRARIES(erocol fat)
-TARGET_LINK_LIBRARIES(omplaux erocol)
-TARGET_LINK_LIBRARIES(omplaux tetio)
-TARGET_LINK_LIBRARIES(tbuilder erocol)
 
 EASYADD(levelset)
 TARGET_LINK_LIBRARIES(levelset fat)
@@ -289,11 +324,18 @@ EASYADD(trmap)
 TARGET_LINK_LIBRARIES(trmap omplaux fcl)
 
 # Off-Screen Renderer for RL (reinforcement learning)
+# However if OpenGL is disabled, then the renderer part is not compiled.
 EASYLIB(osr)
+if (USE_GPU)
+TARGET_COMPILE_DEFINITIONS(osr PRIVATE GPU_ENABLED=1)
 TARGET_LINK_LIBRARIES(osr gbm EGL assimp fcl ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${Boost_LIBRARIES} ompl)
 
 SANCHECK(osr)
 TARGET_LINK_LIBRARIES(sancheck_osr osr)
+else (USE_GPU)
+TARGET_COMPILE_DEFINITIONS(osr PRIVATE GPU_ENABLED=0)
+TARGET_LINK_LIBRARIES(osr assimp fcl ${Boost_LIBRARIES} ompl)
+endif (USE_GPU)
 
 # Blender PRM and RRT for RL's GT (Ground Truth)
 EASYADD(mtblender)

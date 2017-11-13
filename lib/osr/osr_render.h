@@ -1,6 +1,8 @@
 #ifndef OFF_SCREEN_RENDERING_TO_H
 #define OFF_SCREEN_RENDERING_TO_H
 
+#if GPU_ENABLED
+
 #include "osr_state.h"
 #include "unit_world.h"
 #include "quickgl.h"
@@ -90,5 +92,7 @@ private:
 };
 
 }
+
+#endif // GPU_ENABLED
 
 #endif // OFF_SCREEN_RENDERING_TO_H

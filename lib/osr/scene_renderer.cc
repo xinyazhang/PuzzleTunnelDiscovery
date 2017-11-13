@@ -1,3 +1,5 @@
+#if GPU_ENABLED
+
 #include "scene_renderer.h"
 #include "mesh_renderer.h"
 #include "node.h"
@@ -73,3 +75,5 @@ SceneRenderer::render(GLuint program, Camera& camera, glm::mat4 m, Node* node)
 }
 
 }
+
+#endif // GPU_ENABLED

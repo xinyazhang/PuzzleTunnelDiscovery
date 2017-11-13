@@ -1,3 +1,5 @@
+#if GPU_ENABLED
+
 #include "osr_render.h"
 #include "scene.h"
 #include "scene_renderer.h"
@@ -397,3 +399,5 @@ Camera Renderer::setup_camera()
 }
 
 }
+
+#endif // GPU_ENABLED

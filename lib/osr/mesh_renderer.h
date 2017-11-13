@@ -1,6 +1,8 @@
 #ifndef OFF_SCREEN_RENDERING_MESH_RENDERER_H
 #define OFF_SCREEN_RENDERING_MESH_RENDERER_H
 
+#if GPU_ENABLED
+
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
 #include <GL/glew.h>
@@ -43,5 +45,7 @@ public:
 };
 
 }
+
+#endif // GPU_ENABLED
 
 #endif
