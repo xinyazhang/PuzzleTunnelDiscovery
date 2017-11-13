@@ -56,6 +56,15 @@ public:
 	                  const StateVector& to,
 	                  int max_steps = -1);
 
+	/*
+	 * Returns array of translation, array of axis angle rotations, and
+	 * boolean for if path terminated.
+	 * 
+	 * All actions are in UnitWorld
+	 */
+	std::tuple<ArrayOfTrans, ArrayOfAA, bool>
+	castPathToContActionsInUW(const ArrayOfStates& path);
+
 	struct Vertex {
 		int index;
 		StateVector state;

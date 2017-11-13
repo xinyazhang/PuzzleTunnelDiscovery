@@ -67,7 +67,13 @@ public:
 	std::tuple<StateVector, bool, float>
 	transitStateTo(const StateVector& from,
 	               const StateVector& to,
-	               double magnitude) const;
+	               double verify_delta) const;
+
+	std::tuple<StateVector, bool, float>
+	transitStateBy(const StateVector& from,
+	               const StateTrans& tr,
+	               const AngleAxisVector& aa,
+	               double verify_delta) const;
 
 	StateMatrix getSceneMatrix() const;
 	StateMatrix getRobotMatrix() const;

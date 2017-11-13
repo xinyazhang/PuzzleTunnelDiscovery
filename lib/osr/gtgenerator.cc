@@ -230,17 +230,22 @@ void GTGenerator::initGT()
 	Progress initprog("FindBoundary", knn_->V_.size());
 	ArrayOfStates unit_states;
 	unit_states.resize(knn_->V_.size(), Eigen::NoChange);
-	for (int i = 0; i < unit_states.rows(); i++) {
-		auto nv = knn_->V_[i].get();
-		auto unit_state = r_.translateToUnitState(nv->state);
-		unit_states.row(i) = unit_state;
-		if (r_.isDisentangled(unit_state)) {
-			Q.push(nv);
-			dist_values_(i) = 0.0;
-			nv->next = kGraphNextFlagFinalState;
+	{
+// #pragma omp parallel for
+		for (int i = 0; i < unit_states.rows(); i++) {
+			auto nv = knn_->V_[i].get();
+			auto unit_state = r_.translateToUnitState(nv->state);
+			unit_states.row(i) = unit_state;
+			if (r_.isDisentangled(unit_state)) {
+				dist_values_(i) = 0.0;
+				nv->next = kGraphNextFlagFinalState;
+			}
+			initprog.increase();
 		}
-		initprog.increase();
 	}
+	for (int i = 0; i < unit_states.rows(); i++)
+		if (dist_values_(i) == 0.0)
+			Q.push(knn_->V_[i].get());
 	std::cerr << "Total bounday states: " << Q.size() << std::endl;
 #else
 	knn_->V_[getGoalStateIndex()]->next = kGraphNextFlagFinalState;
@@ -254,6 +259,7 @@ void GTGenerator::initGT()
 		auto index = tip->index;
 		if (done_marks(index))
 			continue;
+		std::cerr << "non-dup tip distance: " << dist_values_(tip->index) << std::endl;
 		done_marks(index) = 1;
 		prog.increase();
 		auto tip_value = dist_values_(tip->index);
@@ -454,6 +460,62 @@ GTGenerator::projectTrajectory(const StateVector& from,
 		ret_actions(i) = actions[i];
 	return std::make_tuple(ret_states, ret_actions);
 }
+
+
+std::tuple<ArrayOfTrans, ArrayOfAA, bool>
+GTGenerator::castPathToContActionsInUW(const ArrayOfStates& path)
+{
+	std::vector<StateTrans> trans_array;
+	std::vector<AngleAxisVector> aa_array;
+	ArrayOfStates unit_states;
+	unit_states.resize(path.rows(), Eigen::NoChange);
+	Progress uprog("To Unit World", path.rows());
+	for (int i = 0; i < path.rows(); i++) {
+		unit_states.row(i) = r_.translateToUnitState(path.row(i));
+		uprog.increase();
+	}
+	bool terminated = true;
+	Progress prog("Cont. Actions", path.rows());
+	for (int i = 1; i < path.rows(); i++) {
+		const StateVector& from = unit_states.row(i-1);
+		const StateVector& to = unit_states.row(i);
+		double dtau = rl_stepping_size / distance(from, to);
+		auto tup = r_.transitStateTo(from, to, verify_magnitude);
+		double end_tau = std::get<2>(tup);
+		double prev_tau = 0;
+		double tau = 0;
+		bool done = false;
+		while (!done) {
+			prev_tau = tau;
+			tau += dtau;
+			if (tau > end_tau) {
+				tau = end_tau;
+				done = true;
+			}
+			std::cerr << tau << std::endl;
+			StateVector prev = interpolate(from, to, prev_tau);
+			StateVector curr = interpolate(from, to, tau);
+			auto diff_tup = differential(prev, curr);
+			trans_array.emplace_back(std::get<0>(diff_tup));
+			aa_array.emplace_back(std::get<1>(diff_tup));
+		}
+		prog.increase();
+		if (end_tau < 1.0) {
+			terminated = false;
+			break;
+		}
+	}
+	ArrayOfTrans ret_trans;
+	ret_trans.resize(trans_array.size(), Eigen::NoChange);
+	for (size_t i = 0; i < trans_array.size(); i++)
+		ret_trans.row(i) = trans_array[i];
+	ArrayOfAA ret_aa;
+	ret_aa.resize(aa_array.size(), Eigen::NoChange);
+	for (size_t i = 0; i < aa_array.size(); i++)
+		ret_aa.row(i) = aa_array[i];
+	return std::make_tuple(ret_trans, ret_aa, terminated);
+}
+
 
 StateVector
 GTGenerator::castTrajectory(const StateVector& from,

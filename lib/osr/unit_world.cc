@@ -274,10 +274,10 @@ UnitWorld::transitState(const StateVector& state,
 std::tuple<StateVector, bool, float>
 UnitWorld::transitStateTo(const StateVector& from,
                          const StateVector& to,
-                         double magnitude) const
+                         double verify_delta) const
 {
 	double dist = distance(from, to);
-	int nseg = int(std::ceil(std::max(1.0, dist/magnitude)));
+	int nseg = int(std::ceil(std::max(1.0, dist/verify_delta)));
 	double rate = 1.0 / double(nseg);
 	StateVector last_free = from;
 	for (int i = 1; i <= nseg; i++) {
@@ -289,6 +289,26 @@ UnitWorld::transitStateTo(const StateVector& from,
 		last_free = state;
 	}
 	return std::make_tuple(to, true, 1.0);
+}
+
+
+std::tuple<StateVector, bool, float>
+UnitWorld::transitStateBy(const StateVector& from,
+	                  const StateTrans& tr,
+	                  const AngleAxisVector& aav,
+	                  double verify_delta) const
+{
+	StateTrans base;
+	base << from(0), from(1), from(2);
+	base += tr;
+	StateQuat rot(from(3), from(4), from(5), from(6));
+	Eigen::AngleAxis<StateScalar> aa(aav.norm(), aav.normalized());
+	rot = aa * rot;
+	StateVector to;
+	to << base(0), base(1), base(2),
+	      rot.w(), rot.x(),
+	      rot.y(), rot.z();
+	return transitStateTo(from, to ,verify_delta);
 }
 
 

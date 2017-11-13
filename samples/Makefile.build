@@ -155,9 +155,9 @@ blend-low.map.verified.merged:
 	echo "e 0 23100" >> blend-low.map.verified.merged
 	echo "e 1 23531" >> blend-low.map.verified.merged
 	
-blend-low.gt.npz:
-	./rl-precalcmap.sh blend-low.map.verified.merged blend-low.gt
+test-blend-low.gt.npz:
+	./rl-precalcmap.sh blend-low.map.verified.merged test-blend-low.gt
 
-.PHONY: follow nvis vispath tp tetp blend-low.map.verified blend-low.map.verified.merged blend-low.gt.npz
+.PHONY: follow nvis vispath tp tetp blend-low.map.verified blend-low.map.verified.merged test-blend-low.gt.npz
 
 # vim: tw=0

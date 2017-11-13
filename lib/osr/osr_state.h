@@ -3,6 +3,7 @@
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include <tuple>
 
 namespace osr {
 constexpr int kActionDimension = 3;
@@ -17,7 +18,10 @@ typedef double StateScalar;
 typedef Eigen::Vector3d StateTrans;
 typedef Eigen::Quaternion<double> StateQuat;
 typedef Eigen::Matrix<double, kStateDimension, 1> StateVector; // Column vector
+typedef Eigen::Vector3d AngleAxisVector;
 typedef Eigen::Matrix<double, -1, kStateDimension> ArrayOfStates; // State per-ROW
+typedef Eigen::Matrix<double, -1, 3> ArrayOfTrans;
+typedef Eigen::Matrix<double, -1, 3> ArrayOfAA;
 typedef Eigen::Matrix4d StateMatrix;
 using Transform = Eigen::Transform<double, 3, Eigen::AffineCompact>;
 
@@ -30,6 +34,9 @@ StateVector interpolate(const StateVector& pkey,
 	                const StateVector& nkey,
 	                StateScalar tau);
 double distance(const StateVector& lhv, const StateVector& rhv);
+
+std::tuple<StateTrans, AngleAxisVector>
+differential(const StateVector& from, const StateVector& to);
 
 }
 

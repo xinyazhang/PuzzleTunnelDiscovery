@@ -80,6 +80,7 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("is_disentangled", &UnitWorld::isDisentangled)
 		.def("transit_state", &UnitWorld::transitState)
 		.def("transit_state_to", &UnitWorld::transitStateTo)
+		.def("transit_state_by", &UnitWorld::transitStateBy)
 		.def("translate_to_unit_state", &UnitWorld::translateToUnitState)
 		.def_property_readonly("scene_matrix", &UnitWorld::getSceneMatrix)
 		.def_property_readonly("robot_matrix", &UnitWorld::getRobotMatrix);
@@ -110,6 +111,7 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("install_gtdata", &GTGenerator::installGTData)
 		.def("extract_gtdata", &GTGenerator::extractGTData)
 		.def("generate_gt_path", &GTGenerator::generateGTPath)
+		.def("cast_path_to_cont_actions_in_UW", &GTGenerator::castPathToContActionsInUW)
 		.def("project_trajectory", &GTGenerator::projectTrajectory,
 		     py::arg("from"),
 		     py::arg("to"),

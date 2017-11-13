@@ -67,10 +67,11 @@ def reanimate():
 
     fig = plt.figure()
     keys = np.loadtxt(aniconf.keys_fn)
-    print('before keys[0] {}'.format(keys[0]))
-    keys[:, [3,4,5,6]] = keys[:,[6,3,4,5]]
-    print('after keys[0] {}'.format(keys[0]))
-    ra = ReAnimator(r, keys, 1.0)
+    if aniconf.keys_w_last:
+        print('before keys[0] {}'.format(keys[0]))
+        keys[:, [3,4,5,6]] = keys[:,[6,3,4,5]]
+        print('after keys[0] {}'.format(keys[0]))
+    ra = ReAnimator(r, keys, 4.0)
     '''
     st0 = np.array([21.782108575648873,11.070742691783639,13.072090341969885,0.99496368307688909,-0.050573680994590003,0.08255004745739393,0.025981951687884433], dtype=np.float64)
     st1 = np.array([24.404447383193428,16.614281021136808,17.241012748680941,0.89856334412742611,-0.42392368380753659,0.035352511370216902,0.10780921499298371], dtype=np.float64)

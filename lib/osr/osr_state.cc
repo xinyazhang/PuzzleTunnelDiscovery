@@ -40,4 +40,16 @@ double distance(const StateVector& lhv, const StateVector& rhv)
 	return trdist + rotdist;
 }
 
+std::tuple<StateTrans, AngleAxisVector>
+differential(const StateVector& from, const StateVector& to)
+{
+	StateTrans tr = to.segment<3>(0) - from.segment<3>(0);
+	StateQuat rot_from(from(3), from(4), from(5), from(6));
+	StateQuat rot_to(to(3), to(4), to(5), to(6));
+	StateQuat rot_delta = rot_to * rot_from.inverse();
+	Eigen::AngleAxis<StateScalar> aa(rot_delta);
+	AngleAxisVector aav = aa.axis() * aa.angle();
+	return std::make_tuple(tr, aav);
+}
+
 }
