@@ -15,13 +15,13 @@
 
 namespace osr {
 
-class Renderer;
+class UnitWorld;
 class Progress;
 
 class GTGenerator {
 	struct KNN;
 public:
-	GTGenerator(Renderer&);
+	GTGenerator(UnitWorld&);
 	~GTGenerator();
 
 	void loadRoadMapFile(const std::string&);
@@ -85,7 +85,7 @@ public:
 	 */
 	double rl_stepping_size;
 private:
-	Renderer& r_;
+	UnitWorld& uw_;
 	std::unique_ptr<KNN> knn_;
 	Eigen::VectorXf dist_values_;
 

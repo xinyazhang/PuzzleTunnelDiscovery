@@ -125,8 +125,8 @@ struct GTGenerator::KNN {
 	}
 };
 
-GTGenerator::GTGenerator(Renderer& r)
-	:r_(r), knn_(new KNN)
+GTGenerator::GTGenerator(UnitWorld& uw)
+	:uw_(uw), knn_(new KNN)
 {
 }
 
@@ -234,9 +234,9 @@ void GTGenerator::initGT()
 // #pragma omp parallel for
 		for (int i = 0; i < unit_states.rows(); i++) {
 			auto nv = knn_->V_[i].get();
-			auto unit_state = r_.translateToUnitState(nv->state);
+			auto unit_state = uw_.translateToUnitState(nv->state);
 			unit_states.row(i) = unit_state;
-			if (r_.isDisentangled(unit_state)) {
+			if (uw_.isDisentangled(unit_state)) {
 				dist_values_(i) = 0.0;
 				nv->next = kGraphNextFlagFinalState;
 			}
@@ -334,10 +334,10 @@ GTGenerator::extractGTData() const
 
 bool GTGenerator::verifyEdge(const GTGenerator::Edge& e) const
 {
-	auto s0 = r_.translateToUnitState(knn_->V_[e.first]->state);
-	auto s1 = r_.translateToUnitState(knn_->V_[e.second]->state);
+	auto s0 = uw_.translateToUnitState(knn_->V_[e.first]->state);
+	auto s1 = uw_.translateToUnitState(knn_->V_[e.second]->state);
 	// std::cerr << "state distance " << distance(s0, s1) << std::endl;
-	return std::get<1>(r_.transitStateTo(s0, s1, verify_magnitude));
+	return std::get<1>(uw_.transitStateTo(s0, s1, verify_magnitude));
 }
 
 
@@ -380,10 +380,10 @@ GTGenerator::generateGTPath(const StateVector& init_state,
 	knn_->nn_->nearestK(&init_vertex, kNearestFromInitState, neighbors);
 
 	NNVertex next = nullptr;
-	auto s0 = r_.translateToUnitState(init_state);
+	auto s0 = uw_.translateToUnitState(init_state);
 	for (const auto neigh : neighbors) {
-		auto s1 = r_.translateToUnitState(neigh->state);
-		if (std::get<1>(r_.transitStateTo(s0, s1, verify_magnitude))) {
+		auto s1 = uw_.translateToUnitState(neigh->state);
+		if (std::get<1>(uw_.transitStateTo(s0, s1, verify_magnitude))) {
 			next = neigh;
 			break;
 		}
@@ -471,7 +471,7 @@ GTGenerator::castPathToContActionsInUW(const ArrayOfStates& path)
 	unit_states.resize(path.rows(), Eigen::NoChange);
 	Progress uprog("To Unit World", path.rows());
 	for (int i = 0; i < path.rows(); i++) {
-		unit_states.row(i) = r_.translateToUnitState(path.row(i));
+		unit_states.row(i) = uw_.translateToUnitState(path.row(i));
 		uprog.increase();
 	}
 	bool terminated = true;
@@ -480,7 +480,7 @@ GTGenerator::castPathToContActionsInUW(const ArrayOfStates& path)
 		const StateVector& from = unit_states.row(i-1);
 		const StateVector& to = unit_states.row(i);
 		double dtau = rl_stepping_size / distance(from, to);
-		auto tup = r_.transitStateTo(from, to, verify_magnitude);
+		auto tup = uw_.transitStateTo(from, to, verify_magnitude);
 		double end_tau = std::get<2>(tup);
 		double prev_tau = 0;
 		double tau = 0;
@@ -532,8 +532,8 @@ GTGenerator::castTrajectory(const StateVector& from,
 		actions.emplace_back(1);
 		return to;
 	}
-	auto unit_to = r_.translateToUnitState(to);
-	auto unit_current = r_.translateToUnitState(from);
+	auto unit_to = uw_.translateToUnitState(to);
+	auto unit_current = uw_.translateToUnitState(from);
 	while (actions.size() < max_steps or max_steps < 0) {
 		auto unit_distance = distance(unit_current, unit_to);
 		std::cerr << "CURRENT UNIT DISTANCE " << unit_distance << std::endl;
@@ -545,7 +545,7 @@ GTGenerator::castTrajectory(const StateVector& from,
 		{
 #pragma omp parallel for
 		for (int i = 0; i < kTotalNumberOfActions; i++) {
-			auto tup = r_.transitState(unit_current, i,
+			auto tup = uw_.transitState(unit_current, i,
 						   rl_stepping_size,
 						   verify_magnitude);
 			if (std::get<2>(tup) == 0.0) {
@@ -574,11 +574,11 @@ GTGenerator::castTrajectory(const StateVector& from,
 		}
 		actions.emplace_back(action);
 		unit_current = nexts.row(action);
-		states.emplace_back(r_.translateFromUnitState(unit_current));
+		states.emplace_back(uw_.translateFromUnitState(unit_current));
 		if (prog)
 			prog->increase();
 	}
-	return r_.translateFromUnitState(unit_current); // Note: do not return states.back(), the iteration may not be executed.
+	return uw_.translateFromUnitState(unit_current); // Note: do not return states.back(), the iteration may not be executed.
 }
 
 }

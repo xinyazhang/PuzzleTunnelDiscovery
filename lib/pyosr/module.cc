@@ -102,7 +102,7 @@ PYBIND11_PLUGIN(pyosr) {
 		.def_readwrite("views", &Renderer::views);
 	using osr::GTGenerator;
 	py::class_<GTGenerator>(m, "GTGenerator")
-		.def(py::init<Renderer&>())
+		.def(py::init<UnitWorld&>())
 		.def("load_roadmap_file", &GTGenerator::loadRoadMapFile)
 		.def("save_verified_roadmap_file", &GTGenerator::saveVerifiedRoadMapFile)
 		.def("init_knn", &GTGenerator::initKNN)
