@@ -82,6 +82,7 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("transit_state_to", &UnitWorld::transitStateTo)
 		.def("transit_state_by", &UnitWorld::transitStateBy)
 		.def("translate_to_unit_state", &UnitWorld::translateToUnitState)
+		.def("translate_from_unit_state", &UnitWorld::translateFromUnitState)
 		.def_property_readonly("scene_matrix", &UnitWorld::getSceneMatrix)
 		.def_property_readonly("robot_matrix", &UnitWorld::getRobotMatrix);
 	py::class_<Renderer, UnitWorld>(m, "Renderer")
