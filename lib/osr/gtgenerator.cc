@@ -184,7 +184,7 @@ void GTGenerator::loadRoadMap(std::istream&& fin)
 	Progress evprog("Edge Verification", pending.size());
 
 	{
-		#pragma omp parallel for
+		// #pragma omp parallel for
 		for (int i = 0; i < pending_passed.size(); i++) {
 			const auto& e = pending[i];
 			if (verifyEdge(e)) {
@@ -375,13 +375,21 @@ GTGenerator::generateGTPath(const StateVector& init_state,
 	Vertex init_vertex;
 	init_vertex.index = -1;
 	init_vertex.state = init_state;
+	auto s0 = uw_.translateToUnitState(init_state);
 
 	std::vector<NNVertex> neighbors;
 	knn_->nn_->nearestK(&init_vertex, kNearestFromInitState, neighbors);
+	std::sort(neighbors.begin(), neighbors.end(),
+		[s0, this](const NNVertex& lhs, const NNVertex& rhs) -> bool {
+			double ldist = distance(uw_.translateToUnitState(lhs->state), s0);
+			double rdist = distance(uw_.translateToUnitState(rhs->state), s0);
+			return ldist < rdist;
+		}
+		 );
 
-	auto s0 = uw_.translateToUnitState(init_state);
 	std::cerr << "Finding NN from " << init_state.transpose() << std::endl;
 	std::cerr << "  (Checking if Valid) " << uw_.isValid(s0) << std::endl;
+	size_t verified_neigh = 0;
 	for (const auto neigh : neighbors) {
 		auto s1 = uw_.translateToUnitState(neigh->state);
 		std::cerr << "\tTrying " << neigh->state.transpose() << std::endl;
@@ -395,6 +403,9 @@ GTGenerator::generateGTPath(const StateVector& init_state,
 			next = neigh;
 			break;
 		}
+		verified_neigh++;
+		if (verified_neigh > kNearestFromInitState)
+			break;
 	}
 	if (!next) {
 		return std::make_tuple(ArrayOfStates(), Eigen::VectorXi(), false);
@@ -508,7 +519,7 @@ GTGenerator::castPathToContActionsInUW(const ArrayOfStates& path,
 				tau = end_tau;
 				done = true;
 			}
-			std::cerr << tau << std::endl;
+			// std::cerr << tau << std::endl;
 			StateVector prev = interpolate(from, to, prev_tau);
 			StateVector curr = interpolate(from, to, tau);
 			auto diff_tup = differential(prev, curr);
@@ -566,7 +577,7 @@ GTGenerator::castTrajectory(const StateVector& from,
 		ArrayOfStates nexts;
 		nexts.resize(kTotalNumberOfActions, Eigen::NoChange);
 		{
-#pragma omp parallel for
+// #pragma omp parallel for
 		for (int i = 0; i < kTotalNumberOfActions; i++) {
 			auto tup = uw_.transitState(unit_current, i,
 						   rl_stepping_size,

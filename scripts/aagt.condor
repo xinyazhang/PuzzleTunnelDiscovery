@@ -1,0 +1,11 @@
++Group = "GRAD"
++Project = "GRAPHICS_VISUALIZATION"
++ProjectDescription = "Solve hard Alpha Puzzle"
+
+universe = vanilla
+Executable = aa-gt.sh
+Error = aagt-2/$(Process).err
+Output = aagt-2/$(Process).out
+Log = aagt-2/$(Process).log
+arguments = --map blend-low.gt.npz --sample 64 --batchbase $(Process) --path aagt-2/
+Queue 128

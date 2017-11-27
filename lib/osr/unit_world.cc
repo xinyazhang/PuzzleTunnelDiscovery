@@ -287,7 +287,7 @@ UnitWorld::transitStateTo(const StateVector& from,
 	valid.setZero(nseg);
 	std::atomic<bool> hitInvalid(false);
 	{
-#pragma omp parallel for
+// #pragma omp parallel for
 		for (int i = 1; i <= nseg; i++) {
 			if (hitInvalid.load())
 				continue;

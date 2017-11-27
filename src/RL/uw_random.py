@@ -4,7 +4,7 @@ from math import sqrt,pi,sin,cos
 
 def gen_init_state(uw):
     while True:
-        tr = np.random.rand(3) * 2.0 - 1.0
+        tr = np.random.rand(3) - 0.5
         u1,u2,u3 = np.random.rand(3)
         quat = [sqrt(1-u1)*sin(2*pi*u2),
                 sqrt(1-u1)*cos(2*pi*u2),
