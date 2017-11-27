@@ -18,3 +18,13 @@ def gen_init_state(uw):
         if uw.is_valid_state(state):
             break
     return uw.translate_from_unit_state(state)
+
+def random_continuous_action(max_stepping):
+    stepping = max_stepping * random.random()
+    rratio = random.random()
+    tmag = stepping * (1-ratio)
+    rmag = stepping * ratio
+    tpart = np.linalg.norm(np.random.uniform(shape=(3))) * tmag
+    rpart = np.linalg.norm(np.random.uniform(shape=(3))) * rmag
+    return np.concatenate((tpart, rpart))
+
