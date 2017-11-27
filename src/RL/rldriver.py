@@ -34,6 +34,7 @@ class RLDriver:
     init_state = None
     continuous_policy_loss = False
     VERIFICATION_DELTA = 0.0125 / 64
+    verbose_training = False
 
     '''
         models: files name of [model, robot], or [model], or [model, None]
@@ -380,23 +381,23 @@ class RLDriver:
                 r.state = nstate
                 if reaching_terminal:
                     break;
-            '''
-            end_at = r.state
-            r.state = start_at
-            policy_old, value_old, _, _ = self.evaluate(sess)
-            r.state = end_at
-            '''
+            if self.verbose_training:
+                end_at = r.state
+                r.state = start_at
+                policy_old, value_old, _, _ = self.evaluate(sess)
+                r.state = end_at
 
             self.apply_grads_a3c(sess, actions, states, rewards, values, reaching_terminal)
             sess.run(self.get_sync_from_master_op())
 
-            '''
-            policy_new, value_new, _, _ = self.evaluate(sess)
-            print('[{}] policy old {}'.format(self.worker_thread_index, policy_old))
-            print('[{}] policy new {}'.format(self.worker_thread_index, policy_new))
-            print('[{}] value old {}'.format(self.worker_thread_index, value_old))
-            print('[{}] value new {}'.format(self.worker_thread_index, value_new))
-            '''
+            if self.verbose_training:
+                policy_new, value_new, _, _ = self.evaluate(sess)
+                print('[{}] state {}'.format(self.worker_thread_index, start_at))
+                print('[{}] rewards {}'.format(self.worker_thread_index, rewards))
+                print('[{}] value old {}'.format(self.worker_thread_index, value_old))
+                print('[{}] value new {}'.format(self.worker_thread_index, value_new))
+                print('[{}] policy old {}'.format(self.worker_thread_index, policy_old))
+                print('[{}] policy new {}'.format(self.worker_thread_index, policy_new))
 
     def get_total_loss(self):
         if self.total_loss is not None:
@@ -511,10 +512,9 @@ class RLDriver:
             batch_a.append(a)
             batch_td.append(td)
             batch_V.append(V)
-        '''
-        print('[{}] batch_a[0] {}'.format(self.worker_thread_index, batch_a[0]))
-        print('[{}] batch_V {}'.format(self.worker_thread_index, batch_V))
-        '''
+        if self.verbose_training:
+            print('[{}] batch_a[0] {}'.format(self.worker_thread_index, batch_a[0]))
+            print('[{}] batch_V {}'.format(self.worker_thread_index, batch_R))
         '''
         TODO: reverse batch_* if using LSTM
         '''
