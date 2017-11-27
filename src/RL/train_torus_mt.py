@@ -10,6 +10,7 @@ import config
 import threading
 import time
 import util
+import random
 from rmsprop_applier import RMSPropApplier
 from datetime import datetime
 
@@ -47,9 +48,10 @@ device = "/gpu:0"
 MODELS = ['../res/simple/FullTorus.obj', '../res/simple/robot.obj']
 init_state = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0], dtype=np.float32)
 view_config = [(30.0, 12), (-30.0, 12), (0, 4), (90, 1), (-90, 1)]
-ckpt_dir = './ttorus/ckpt-mt-5/'
+ckpt_dir = './ttorus/ckpt-mt-6/'
 ckpt_prefix = 'torus-vs-ring-ckpt'
-THREAD = 4
+THREAD = 1
+POLICIES = [0.2, 0.4, 0.5, 0.6, 0.8]
 
 graph_completes = [threading.Event() for i in range(THREAD)]
 init_done = threading.Event()
@@ -92,20 +94,29 @@ def torus_worker(index, dpy, glctx, masterdriver, tfgraph, grad_applier, lrtenso
         last_time = time.time()
         # FIXME: ttorus/ckpt-mt-5 are not loading global_step into epoch
         epoch = 0
+        driver.verbose_training = True
         while epoch < 100 * 1000:
         #while epoch < 2 * 1000:
+            driver.epsilon = random.choice(POLICIES)
             driver.train_a3c(sess)
             epoch += 1
             sess.run(increment_global_step)
-            if index != 0:
-                continue
-            if time.time() - last_time >= 60 * 10:
+            if index == 0 and time.time() - last_time >= 60 * 10:
                 print("Saving checkpoint")
                 fn = saver.save(sess, ckpt_dir+ckpt_prefix, global_step=global_step)
                 print("Saved checkpoint to {}".format(fn))
                 last_time = time.time()
-            print("Epoch {}".format(epoch))
-            driver.restart_epoch()
+            print("[{}] Epoch {}, global_step {}".format(index, epoch, sess.run(global_step)))
+            if index == 0:
+                sess.run(driver.get_sync_from_master_op())
+                driver.renderer.state = init_state
+                _, value, _, _ = driver.evaluate(sess)
+                print("Master Driver V for init_state {}".format(value))
+                # Choose some random initial conf for better training
+                if random.random() > driver.epsilon:
+                    driver.restart_epoch()
+            else:
+                driver.restart_epoch()
 
 def torus_master():
     pyosr.init()
@@ -131,13 +142,6 @@ def torus_master():
                 use_rgb=True)
         saver = tf.train.Saver(masterdriver.get_nn_args() + [global_step])
         with tf.Session() as sess:
-            ckpt = tf.train.get_checkpoint_state(checkpoint_dir=ckpt_dir)
-            print('ckpt {}'.format(ckpt))
-            epoch = 0
-            if ckpt and ckpt.model_checkpoint_path:
-                saver.restore(sess, ckpt.model_checkpoint_path)
-                epoch = sess.run(global_step)
-                print('Restored!, global_step {}'.format(epoch))
             threads = []
             for i in range(THREAD):
                 thread_args = (i, dpy, glctx, masterdriver, g, grad_applier,
@@ -147,7 +151,18 @@ def torus_master():
                 thread.start()
                 graph_completes[i].wait()
                 threads.append(thread)
+            '''
+            We need to run the initializer because only master's variables are stored.
+            '''
             sess.run(tf.global_variables_initializer())
+            ckpt = tf.train.get_checkpoint_state(checkpoint_dir=ckpt_dir)
+            print('ckpt {}'.format(ckpt))
+            epoch = 0
+            if ckpt and ckpt.model_checkpoint_path:
+                saver.restore(sess, ckpt.model_checkpoint_path)
+                epoch = sess.run(global_step)
+                print('Restored!, global_step {}'.format(epoch))
+
             init_done.set()
             for thread in threads:
                 thread.join()
