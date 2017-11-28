@@ -32,6 +32,7 @@ class RLDriver:
     epsilon = 0.8 # argument for epsilon-greedy policy
     worker_thread_index = -1
     init_state = None
+    continuous_policy_loss = False
 
     '''
         models: files name of [model, robot], or [model], or [model, None]
@@ -46,18 +47,23 @@ class RLDriver:
             view_config,
             svconfdict,
             mvconfdict,
-            output_number = 3 * 2 * 2, # For RL: X,Y,Z * (rotate,translate) * (pos,neg)
+            # output_number should be
+            # For discrete action RL: X,Y,Z * (rotate,translate) * (pos,neg)
+            # For continuous action RL: (X,Y,Z).(AA-X,AA-Y,AA-Z)
+            output_number = 3 * 2 * 2,
             sv_sqfeatnum = 16,
             mv_featnum = 256,
             input_tensor = None,
             use_rgb = False,
             master_driver = None,
             grads_applier = None,
-            worker_thread_index = -1):
+            worker_thread_index = -1,
+            continuous_policy_loss = False):
         self.init_state = init_state
         self.worker_thread_index = worker_thread_index
         self.grads_applier = grads_applier
         self.action_size = output_number
+        self.continuous_policy_loss = continuous_policy_loss
         self.renderer = pyosr.Renderer()
         r = self.renderer
         r.pbufferWidth = config.DEFAULT_RES
@@ -196,10 +202,20 @@ class RLDriver:
         # return np.linalg.norm(state[0:3]) > 1.0
         return self.renderer.is_disentangled(state)
 
+    @staticmethod
+    def get_action_magnitude(action):
+        return np.linalg.norm(action[0:3]) + 0.5 * np.linalg.norm(action[3:6])
+
     def get_reward(self, action):
         r = self.renderer
-        nstate, done, ratio = r.transit_state(r.state, action,
-                config.MAGNITUDES, config.STATE_CHECK_DELTAS)
+        if self.continuous_policy_loss:
+            nstate, done, ratio = r.transit_state_by(r.state,
+                    action[0:3],
+                    action[3:6],
+                    config.STATE_CHECK_DELTAS)
+        else:
+            nstate, done, ratio = r.transit_state(r.state, action,
+                    config.MAGNITUDES, config.STATE_CHECK_DELTAS)
         reward = 0.0
         '''
         if not done and ratio > 0.0:
@@ -208,7 +224,10 @@ class RLDriver:
             reward = -0.002
         '''
         if ratio == 0.0:
-            reward = -0.002
+            if self.continuous_policy_loss:
+                reward = -get_action_magnitude(action)
+            else:
+                reward = -0.002
         reaching_end = self.is_end(nstate)
         reward = 1.0 if reaching_end else reward
         return nstate, reward, reaching_end
@@ -224,12 +243,14 @@ class RLDriver:
         if greedy < self.epsilon:
             '''
             Based on policy output
-            return np.argmax(policy)
             '''
+            if self.continuous_policy_loss:
+                return policy
+            else:
+                return np.argmax(policy)
 
             '''
             Based on value output
-            '''
             r = self.renderer
             state_backup = r.state
             max_value = 0.0
@@ -244,23 +265,34 @@ class RLDriver:
                     max_value = value
             r.state = state_backup
             return action_pick
+            '''
         else:
-            return random.randrange(len(policy))
+            if self.continuous_policy_loss:
+                return uw_random.random_continuous_action(self.stepping_size)
+            else:
+                return random.randrange(len(policy))
 
-    def evaluate(self, sess, targets=None, keep_images=True):
-        if targets is None:
-            targets = [self.final, self.value]
-        r = self.renderer
+    def osrender(self):
         if self.sv_rgb_net:
             r.render_mvrgbd()
             img = r.mvrgb.reshape(self.sv_rgb_shape)
             # print('img shape {}'.format(img.shape))
             dep = r.mvdepth.reshape(self.sv_depth_shape)
-            input_dict = {self.sv_rgb_net.input_tensor : img,
-                    self.sv_depth_net.input_tensor : dep }
         else:
             img = None
             dep = r.render_mvdepth_to_buffer().reshape(self.sv_depth_shape)
+
+        return [img, dep]
+
+    def evaluate(self, sess, targets=None, keep_images=True):
+        if targets is None:
+            targets = [self.final, self.value]
+        r = self.renderer
+        [img, dep] = self.osrender()
+        if self.sv_rgb_net:
+            input_dict = {self.sv_rgb_net.input_tensor : img,
+                    self.sv_depth_net.input_tensor : dep }
+        else:
             input_dict = { self.sv_depth_net.input_tensor : dep }
         if keep_images:
             return sess.run(targets, feed_dict=input_dict) + [img, dep]
@@ -275,6 +307,45 @@ class RLDriver:
             policy = policy.reshape(self.action_size)
             action = self.make_decision(policy, sess)
             nstate,reward,reaching_terminal = self.get_reward(action)
+
+    def train_from_gt(self, sess, keys, cont_tr, cont_rot, gtvalues):
+        '''
+        Train the NN according to the known ground truth.
+        '''
+        r = self.renderer
+
+        epsilon_bak = self.epsilon # Disable exploration when training from GT
+        r.state = r.translate_to_unit_state(keys[0])
+        nactions = cont_tr.shape[0]
+        sess.run(self.get_sync_from_master_op())
+
+        states = []
+        actions = []
+        rewards = []
+        values = []
+
+        for i in range(nactions):
+            states.append(self.osrender())
+            actions.append(np.concatenate((cont_tr[i], cont_rot[i])))
+            values.append(gtvalues[i])
+            nstate,reward,reaching_terminal = self.get_reward(action)
+            rewards.append(reward)
+            r.state = nstate
+            if reaching_terminal:
+                break
+
+        for base in range(0, nactions, self.a3c_local_t):
+            end = min(nactions, base + a3c_local_t)
+            self.apply_grads_a3c(sess,
+                    actions[base:end],
+                    states[base:end],
+                    rewards[base:end],
+                    values[base:end],
+                    reaching_terminal)
+
+        sess.run(self.get_sync_from_master_op())
+        self.epsilon = epsilon_bak # Enable exploration again
+        raise NotImplemented()
 
     def train_a3c(self, sess):
         r = self.renderer
@@ -332,14 +403,21 @@ class RLDriver:
         self.a3c_batch_td_tensor = tf.placeholder(tf.float32, shape=[None])
 
         # Log policy, clipped to prevent NaN
-        log_policy = tf.log(tf.clip_by_value(self.final, 1e-20, 1.0))
-        entropy = -tf.reduce_sum(self.final * log_policy, reduction_indices=[1])
-        policy_loss = -tf.reduce_sum( tf.reduce_sum(tf.multiply(log_policy,
-            self.a3c_batch_a_tensor), reduction_indices=1) * self.a3c_batch_td_tensor + entropy
-            * self.a3c_entropy_beta)
+        if not self.continuous_policy_loss:
+            log_policy = tf.log(tf.clip_by_value(self.final, 1e-20, 1.0))
+            entropy = -tf.reduce_sum(self.final * log_policy, reduction_indices=[1])
+            policy_loss = -tf.reduce_sum(tf.reduce_sum(tf.multiply(log_policy,
+                self.a3c_batch_a_tensor), reduction_indices=1) * self.a3c_batch_td_tensor + entropy
+                * self.a3c_entropy_beta)
+        else:
+            '''
+            diff = self.a3c_batch_a_tensor - self.final
+            policy_loss = -tf.reduce_sum(tf.reduce_sum(diff * diff, axis=1) * self.a3c_batch_td_tensor))
+            '''
+            policy_loss = tf.nn.l2_loss(self.final, self.a3c_batch_a_tensor)
 
-        self.a3c_batch_R_tensor = tf.placeholder(tf.float32, shape=[None])
-        value_loss = 0.5 * tf.nn.l2_loss(self.a3c_batch_R_tensor - self.value)
+        self.a3c_batch_V_tensor = tf.placeholder(tf.float32, shape=[None])
+        value_loss = tf.nn.l2_loss(self.a3c_batch_V_tensor - self.value)
         self.total_loss = policy_loss + value_loss
         return self.total_loss
 
@@ -408,8 +486,12 @@ class RLDriver:
         print('[{}] R start with {}'.format(self.worker_thread_index, R))
         '''
         for (ai, ri, si, Vi) in zip(actions, rewards, states, values):
-            R = ri + self.a3c_gamma * R
-            td = R - Vi
+            if self.continuous_policy_loss:
+                # Linear decay
+                V = min(Vi, -ri + V)
+            else:
+                V = ri + self.a3c_gamma * V
+            td = V - Vi
             a = np.zeros([self.action_size], dtype=np.float32)
             a[ai] = 1
 
@@ -424,10 +506,10 @@ class RLDriver:
             batch_depth.append(dep)
             batch_a.append(a)
             batch_td.append(td)
-            batch_R.append(R)
+            batch_V.append(V)
         '''
         print('[{}] batch_a[0] {}'.format(self.worker_thread_index, batch_a[0]))
-        print('[{}] batch_R {}'.format(self.worker_thread_index, batch_R))
+        print('[{}] batch_V {}'.format(self.worker_thread_index, batch_V))
         '''
         '''
         TODO: reverse batch_* if using LSTM
@@ -441,7 +523,7 @@ class RLDriver:
                     self.sv_depth_net.input_tensor: batch_depth,
                     self.a3c_batch_a_tensor: batch_a,
                     self.a3c_batch_td_tensor: batch_td,
-                    self.a3c_batch_R_tensor: batch_R,
+                    self.a3c_batch_V_tensor: batch_V,
                     self.learning_rate_input: cur_learning_rate} )
         else:
             sess.run(grads_applier,
@@ -449,5 +531,5 @@ class RLDriver:
                     self.sv_depth_net.input_tensor: batch_depth,
                     self.a3c_batch_a_tensor: batch_a,
                     self.a3c_batch_td_tensor: batch_td,
-                    self.a3c_batch_R_tensor: batch_R,
+                    self.a3c_batch_V_tensor: batch_V,
                     self.learning_rate_input: cur_learning_rate} )
