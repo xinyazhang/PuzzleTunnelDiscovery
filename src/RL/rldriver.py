@@ -333,6 +333,11 @@ class RLDriver:
             actions.append(action)
             values.append(gtvalues[i])
             nstate,reward,reaching_terminal = self.get_reward(action)
+            if self.verbose_training:
+                print('current state: {}'.format(r.state))
+                print('next state: {}'.format(nstate))
+                print('\tReaching terminal?: {}'.format(reaching_terminal))
+                print('\tDisentangled?: {}'.format(r.is_disentangled(nstate)))
             rewards.append(reward)
             r.state = nstate
             if reaching_terminal:

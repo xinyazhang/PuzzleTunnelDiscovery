@@ -4,6 +4,7 @@
 #include <iostream>
 #include <glm/gtx/io.hpp>
 #include <atomic>
+#include <stdexcept> 
 
 namespace osr {
 
@@ -45,11 +46,16 @@ UnitWorld::copyFrom(const UnitWorld* other)
 {
 	shared_ = true;
 	scene_.reset(new Scene(other->scene_));
+	cd_scene_.reset(new CDModel(*scene_));
 	if (other->robot_) {
 		robot_.reset(new Scene(other->robot_));
+		cd_robot_.reset(new CDModel(*robot_));
 	} else {
 		robot_.reset();
 	}
+	scene_scale_ = other->scene_scale_;
+	calib_mat_ = glm2Eigen(scene_->getCalibrationTransform());
+	inv_calib_mat_ = calib_mat_.inverse();
 }
 
 void
@@ -169,8 +175,10 @@ UnitWorld::isValid(const StateVector& state) const
 
 bool UnitWorld::isDisentangled(const StateVector& state) const
 {
-	if (!cd_scene_ || !cd_robot_)
+	if (!cd_scene_ || !cd_robot_) {
+		throw std::runtime_error("Pain in the ass: models not loaded");
 		return true;
+	}
 	Transform envTf;
 	Transform robTf;
 #if 1
@@ -280,7 +288,7 @@ UnitWorld::transitStateTo(const StateVector& from,
 {
 	double dist = distance(from, to);
 	int nseg = int(std::ceil(std::max(1.0, dist/verify_delta)));
-	std::cerr << "\t\tNSeg: " << nseg << std::endl;
+	// std::cerr << "\t\tNSeg: " << nseg << std::endl;
 	double rate = 1.0 / double(nseg);
 	StateVector last_free = from;
 	Eigen::VectorXi valid;
