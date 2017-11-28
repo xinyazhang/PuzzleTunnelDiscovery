@@ -1,9 +1,5 @@
 import pyosr
 import numpy as np
-import matplotlib.pyplot as plt
-from PIL import Image
-from scipy.misc import imsave
-import vision
 import tensorflow as tf
 import rldriver
 import config
@@ -13,6 +9,7 @@ import util
 from rmsprop_applier import RMSPropApplier
 from datetime import datetime
 import aniconf12 as aniconf
+import argparse
 
 class _LoggerHook(tf.train.SessionRunHook):
     """Logs loss and runtime."""
@@ -57,7 +54,7 @@ def aa_train_main(args):
     dpy = pyosr.create_display()
     glctx = pyosr.create_gl_context(dpy)
     g = tf.Graph()
-    util.mkdir_p(args.ckpt_dir)
+    util.mkdir_p(ckpt_dir)
     with g.as_default():
         learning_rate_input = tf.placeholder(tf.float32)
         grad_applier = RMSPropApplier(learning_rate=learning_rate_input,
@@ -73,7 +70,7 @@ def aa_train_main(args):
                 config.MV_VISCFG,
                 output_number = AA_OUTPUT_NUMBER,
                 use_rgb=True,
-                continuous_policy_loss=False)
+                continuous_policy_loss=True)
         driver = rldriver.RLDriver(MODELS,
                     init_state,
                     view_config,
@@ -83,7 +80,7 @@ def aa_train_main(args):
                     use_rgb=True,
                     master_driver=masterdriver,
                     grads_applier=grad_applier,
-                    continuous_policy_loss=False)
+                    continuous_policy_loss=True)
         driver.get_sync_from_master_op()
         driver.get_apply_grads_op()
         driver.learning_rate_input = learning_rate_input

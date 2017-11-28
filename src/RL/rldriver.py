@@ -33,6 +33,7 @@ class RLDriver:
     worker_thread_index = -1
     init_state = None
     continuous_policy_loss = False
+    VERIFICATION_DELTA = 0.0125 / 64
 
     '''
         models: files name of [model, robot], or [model], or [model, None]
@@ -212,7 +213,7 @@ class RLDriver:
             nstate, done, ratio = r.transit_state_by(r.state,
                     action[0:3],
                     action[3:6],
-                    config.STATE_CHECK_DELTAS)
+                    self.VERIFICATION_DELTA)
         else:
             nstate, done, ratio = r.transit_state(r.state, action,
                     config.MAGNITUDES, config.STATE_CHECK_DELTAS)
@@ -273,6 +274,7 @@ class RLDriver:
                 return random.randrange(len(policy))
 
     def osrender(self):
+        r = self.renderer
         if self.sv_rgb_net:
             r.render_mvrgbd()
             img = r.mvrgb.reshape(self.sv_rgb_shape)
@@ -326,7 +328,8 @@ class RLDriver:
 
         for i in range(nactions):
             states.append(self.osrender())
-            actions.append(np.concatenate((cont_tr[i], cont_rot[i])))
+            action = np.concatenate((cont_tr[i], cont_rot[i]))
+            actions.append(action)
             values.append(gtvalues[i])
             nstate,reward,reaching_terminal = self.get_reward(action)
             rewards.append(reward)
@@ -334,8 +337,11 @@ class RLDriver:
             if reaching_terminal:
                 break
 
-        for base in range(0, nactions, self.a3c_local_t):
-            end = min(nactions, base + a3c_local_t)
+        # print(len(states))
+        nstates = len(states)
+        for base in range(0, nstates, self.a3c_local_t):
+            end = min(nstates, base + self.a3c_local_t)
+            print("{}:{}".format(base, end))
             self.apply_grads_a3c(sess,
                     actions[base:end],
                     states[base:end],
@@ -345,7 +351,6 @@ class RLDriver:
 
         sess.run(self.get_sync_from_master_op())
         self.epsilon = epsilon_bak # Enable exploration again
-        raise NotImplemented()
 
     def train_a3c(self, sess):
         r = self.renderer
@@ -414,7 +419,7 @@ class RLDriver:
             diff = self.a3c_batch_a_tensor - self.final
             policy_loss = -tf.reduce_sum(tf.reduce_sum(diff * diff, axis=1) * self.a3c_batch_td_tensor))
             '''
-            policy_loss = tf.nn.l2_loss(self.final, self.a3c_batch_a_tensor)
+            policy_loss = tf.nn.l2_loss(self.final - self.a3c_batch_a_tensor)
 
         self.a3c_batch_V_tensor = tf.placeholder(tf.float32, shape=[None])
         value_loss = tf.nn.l2_loss(self.a3c_batch_V_tensor - self.value)
@@ -465,9 +470,9 @@ class RLDriver:
         Note: please ensure self.renderer.state is the last state, otherwise R
               would be incorrect.
         '''
-        R = 0.0
+        V = 0.0
         if not reaching_terminal:
-            R = np.asscalar(self.evaluate(sess, targets=[self.value])[0])
+            V = np.asscalar(self.evaluate(sess, targets=[self.value])[0])
 
         states.reverse()
         actions.reverse()
@@ -478,7 +483,7 @@ class RLDriver:
         batch_depth = []
         batch_a = []
         batch_td = []
-        batch_R = []
+        batch_V = []
         '''
         Calculate the per-step "true" value for current iteration
         '''
@@ -492,8 +497,7 @@ class RLDriver:
             else:
                 V = ri + self.a3c_gamma * V
             td = V - Vi
-            a = np.zeros([self.action_size], dtype=np.float32)
-            a[ai] = 1
+            a = ai
 
             if self.sv_rgb_net:
                 img = np.squeeze(si[0], [0])
