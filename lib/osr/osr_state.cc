@@ -32,6 +32,24 @@ interpolate(const StateVector& pkey,
 	return ret;
 }
 
+std::tuple<StateTrans, StateQuat>
+decompose(const StateVector& state)
+{
+	StateQuat rot(state(3), state(4), state(5), state(6));
+	StateTrans trans(state(0), state(1), state(2));
+	return std::make_tuple(trans, rot);
+}
+
+StateVector
+compose(const StateTrans& base, const StateQuat& rot)
+{
+	StateVector ret;
+	ret << base(0), base(1), base(2),
+	       rot.w(), rot.x(),
+	       rot.y(), rot.z();
+	return ret;
+}
+
 double distance(const StateVector& lhv, const StateVector& rhv)
 {
 	double trdist = (lhv.segment<3>(0) - rhv.segment<3>(0)).norm();

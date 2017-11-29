@@ -79,6 +79,7 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("loadRobotFromFile", &UnitWorld::loadRobotFromFile)
 		.def("scaleToUnit", &UnitWorld::scaleToUnit)
 		.def("angleModel", &UnitWorld::angleModel)
+		.def("set_perturbation", &UnitWorld::setPerturbation)
 		.def_property("state", &UnitWorld::getRobotState, &UnitWorld::setRobotState)
 		.def("is_valid_state", &UnitWorld::isValid)
 		.def("is_disentangled", &UnitWorld::isDisentangled)

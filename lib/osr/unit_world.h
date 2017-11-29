@@ -22,6 +22,7 @@ public:
 	virtual void loadRobotFromFile(const std::string& fn);
 	void scaleToUnit();
 	void angleModel(float latitude, float longitude);
+	void setPerturbation(const StateVector& pert);
 
 	/*
 	 * Accessors of Robot State. For rigid bodies, the state vector is:
@@ -84,6 +85,8 @@ public:
 	 */
 	StateVector translateToUnitState(const StateVector& state);
 	StateVector translateFromUnitState(const StateVector& state);
+	StateVector applyPertubation(const StateVector& state);
+	StateVector unapplyPertubation(const StateVector& state);
 protected:
 	bool shared_ = false;
 
@@ -96,6 +99,8 @@ protected:
 	StateVector robot_state_;
 	glm::mat4 the_world_;
 	Eigen::Matrix4d calib_mat_, inv_calib_mat_;
+	StateVector perturbate_;
+	Transform perturbate_tf_;
 	Eigen::Vector3d world_rebase_;
 	float scene_scale_ = 1.0f;
 };

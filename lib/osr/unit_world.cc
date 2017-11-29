@@ -35,6 +35,9 @@ auto glm2Eigen(const glm::mat4& m)
 
 UnitWorld::UnitWorld()
 {
+	perturbate_.setZero();
+	perturbate_(3) = 1.0;
+	perturbate_tf_.setIdentity();
 }
 
 UnitWorld::~UnitWorld()
@@ -56,6 +59,7 @@ UnitWorld::copyFrom(const UnitWorld* other)
 	scene_scale_ = other->scene_scale_;
 	calib_mat_ = glm2Eigen(scene_->getCalibrationTransform());
 	inv_calib_mat_ = calib_mat_.inverse();
+	perturbate_ = other->perturbate_;
 }
 
 void
@@ -76,6 +80,7 @@ UnitWorld::loadRobotFromFile(const std::string& fn)
 	robot_state_(3) = 1.0; // Quaternion for no rotation
 }
 
+
 void
 UnitWorld::scaleToUnit()
 {
@@ -85,6 +90,7 @@ UnitWorld::scaleToUnit()
 		robot_span =  robot_->getBoundingBox().span();
 	scene_scale_ = 1.0 / std::max(scene_span, robot_span);
 }
+
 
 void
 UnitWorld::angleModel(float latitude, float longitude)
@@ -106,6 +112,14 @@ UnitWorld::angleModel(float latitude, float longitude)
 		robot_->rotate(glm::radians(longitude), 0, 1, 0);     // longitude
 		cd_robot_.reset(new CDModel(*robot_));
 	}
+}
+
+
+void
+UnitWorld::setPerturbation(const StateVector& pert)
+{
+	perturbate_ = pert;
+	perturbate_tf_ = translate_state_to_transform(pert);
 }
 
 
@@ -132,7 +146,8 @@ UnitWorld::getCDTransforms(const StateVector& state) const
 	robTf = translate_state_to_transform(state);
 	robTf = robTf * getRobotMatrix();
 #else
-	envTf.setIdentity();
+	// envTf.setIdentity();
+	envTf = translate_state_to_transform(perturbate_); // state already contains perturbation.
 	robTf = translate_state_to_transform(state);
 #endif
 	return std::make_tuple(envTf, robTf);
@@ -360,12 +375,29 @@ UnitWorld::getRobotMatrix() const
 	return glm2Eigen(robot_->getCalibrationTransform());
 }
 
+
 StateVector
 UnitWorld::translateToUnitState(const StateVector& state)
 {
 #if 1
 	Eigen::Vector4d t(state(0), state(1), state(2), 1.0f);
 	Eigen::Vector4d nt = calib_mat_ * t;
+	StateVector ret;
+	ret << nt(0), nt(1), nt(2),
+               state(3), state(4), state(5), state(6);
+	return applyPertubation(ret);
+#else
+	return state;
+#endif
+}
+
+StateVector
+UnitWorld::translateFromUnitState(const StateVector& pstate)
+{
+#if 1
+	auto state = unapplyPertubation(pstate);
+	Eigen::Vector4d t(state(0), state(1), state(2), 1.0f);
+	Eigen::Vector4d nt = inv_calib_mat_ * t;
 	StateVector ret;
 	ret << nt(0), nt(1), nt(2),
                state(3), state(4), state(5), state(6);
@@ -376,18 +408,30 @@ UnitWorld::translateToUnitState(const StateVector& state)
 }
 
 StateVector
-UnitWorld::translateFromUnitState(const StateVector& state)
+UnitWorld::applyPertubation(const StateVector& state)
 {
-#if 1
-	Eigen::Vector4d t(state(0), state(1), state(2), 1.0f);
-	Eigen::Vector4d nt = inv_calib_mat_ * t;
-	StateVector ret;
-	ret << nt(0), nt(1), nt(2),
-               state(3), state(4), state(5), state(6);
-	return ret;
-#else
-	return state;
-#endif
+	StateQuat rot, prot;
+	StateTrans trans, ptrans;
+	std::tie(trans, rot) = decompose(state);
+	std::tie(ptrans, prot) = decompose(perturbate_);
+
+	StateQuat qret = prot * rot;
+	StateTrans tret = ptrans + prot.toRotationMatrix() * trans;
+	return compose(tret, qret);
+}
+
+StateVector
+UnitWorld::unapplyPertubation(const StateVector& state)
+{
+	StateQuat rot, prot;
+	StateTrans trans, ptrans;
+	std::tie(trans, rot) = decompose(state);
+	std::tie(ptrans, prot) = decompose(perturbate_);
+
+	StateQuat qret = prot.inverse();
+	StateTrans tret = qret.toRotationMatrix() * (-ptrans + trans);
+	qret *= rot;
+	return compose(tret, qret);
 }
 
 }

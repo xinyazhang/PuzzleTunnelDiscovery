@@ -33,6 +33,8 @@ osr::Transform translate_state_to_transform(const StateVector& state);
 StateVector interpolate(const StateVector& pkey,
 	                const StateVector& nkey,
 	                StateScalar tau);
+std::tuple<StateTrans, StateQuat> decompose(const StateVector&);
+StateVector compose(const StateTrans&, const StateQuat&);
 double distance(const StateVector& lhv, const StateVector& rhv);
 
 std::tuple<StateTrans, AngleAxisVector>

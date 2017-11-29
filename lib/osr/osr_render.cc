@@ -340,6 +340,7 @@ void Renderer::render_depth()
 
 void Renderer::render_rgbd()
 {
+	glm::mat4 perturbation_mat = translate_state_to_matrix(perturbate_);
 	Camera camera = setup_camera();
 	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 #if 0
@@ -366,7 +367,7 @@ void Renderer::render_rgbd()
 	CHECK_GL_ERROR(glClear(GL_DEPTH_BUFFER_BIT));
 
 	CHECK_GL_ERROR(glUseProgram(rgbdShaderProgram));
-	scene_renderer_->render(rgbdShaderProgram, camera, glm::mat4());
+	scene_renderer_->render(rgbdShaderProgram, camera, perturbation_mat);
 	if (robot_) {
 		auto mat = translate_state_to_matrix(robot_state_);
 		robot_renderer_->render(rgbdShaderProgram, camera, mat);
