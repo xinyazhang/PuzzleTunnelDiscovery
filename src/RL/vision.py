@@ -8,6 +8,8 @@ class VisionLayerConfig:
     ch_in = -1                      # -1 means all channels from previous layer
     ch_out = None                   # Undefined by default
     padding = 'SAME'
+    weight = None
+    bias = None
 
     def __init__(self, ch_out, strides=[1, 2, 2, 1], kernel_size=[3,3], padding = 'SAME'):
         self.ch_out = ch_out
@@ -16,6 +18,8 @@ class VisionLayerConfig:
         self.padding = padding
 
     def create_kernel(self, prev_ch_out):
+        if self.weight is not None:
+            return self.weight, self.bias
         ch_in = self.ch_in if self.ch_in > 0 else int(prev_ch_out)
         ch_out = self.ch_out
         [w, h] = self.kernel_size[0:2]
@@ -26,14 +30,18 @@ class VisionLayerConfig:
         # print('d {}'.format(d))
         weight = tf.Variable(tf.random_uniform(weight_shape, minval=-d, maxval=d))
         bias   = tf.Variable(tf.random_uniform(bias_shape,   minval=-d, maxval=d))
+        self.weight = weight
+        self.bias = bias
         return weight, bias
 
     def apply_layer(self, prev_layer):
+        print('prev {}'.format(prev_layer.shape))
         prev_ch_out = int(prev_layer.shape[-1])
         w,b = self.create_kernel(prev_ch_out)
         strides = [1] + self.strides
         conv = tf.nn.conv3d(prev_layer, w, strides, self.padding)
         out = tf.nn.relu(conv + b)
+        print('after CNN {}'.format(out.shape))
         return w,b,out
 
     @staticmethod
@@ -52,11 +60,15 @@ class VisionLayerConfig:
 class FCLayerConfig:
     ch_in = -1
     ch_out = None
+    weight = None
+    bias = None
 
     def __init__(self, ch_out):
         self.ch_out = ch_out
 
     def create_kernel(self, prev_shape):
+        if self.weight is not None:
+            return self.weight, self.bias
         ch_in = self.ch_in if self.ch_in > 0 else int(prev_shape)
         ch_out = self.ch_out
         weight_shape = [ch_in, ch_out]
@@ -64,12 +76,17 @@ class FCLayerConfig:
         d = 1.0 / np.sqrt(ch_in)
         weight = tf.Variable(tf.random_uniform(weight_shape, minval=-d, maxval=d))
         bias   = tf.Variable(tf.random_uniform(bias_shape,   minval=-d, maxval=d))
+        self.weight, self.bias = weight, bias
         return weight, bias
 
+    # FIXME: ACCEPT 2D TENSOR [None, N]
     def apply_layer(self, prev):
         # Dim 0 is BATCH
         print('prev {}'.format(prev.shape))
-        flatten = tf.reshape(prev, [-1, prev.shape[1].value, reduce(mul, prev.shape[2:].as_list(), 1)])
+        if len(prev.shape.as_list()) > 2:
+            flatten = tf.reshape(prev, [-1, prev.shape[1].value, reduce(mul, prev.shape[2:].as_list(), 1)])
+        else:
+            flatten = prev
         print('flatten {}'.format(flatten.shape))
         w,b = self.create_kernel(flatten.shape[-1])
         print('w,b {} {}'.format(w.get_shape(), b.get_shape()))
@@ -121,10 +138,9 @@ class VisionNetwork:
 
     features = property(get_output_tensors)
 
-    def infer(self):
+    def infer(self, alternative_input_tensor=None):
         self.nn_layers = [self.input_tensor]
         self.nn_args = []
-        self.nn_filters = []
         for conf in self.layer_configs:
             prev_layer = self.nn_layers[-1]
             print("prev shape {}".format(prev_layer.shape))
@@ -157,3 +173,129 @@ class VisionNetwork:
         '''
         return list(sum(self.nn_args, ()))
 
+
+def createViewArrayFromConfig(view_config):
+    view_array = []
+    for angle,ncam in view_config:
+        view_array += [ [angle,float(i)] for i in np.arange(0.0, 360.0, 360.0/float(ncam)) ]
+    return view_array
+
+def ExtractPerViewFeatures(input_shape,
+        input_tensor,
+        confdict,
+        viewnum,
+        featnum_sqroot,
+        post_process=True):
+    '''
+    Create Per-View NN from given configuration
+
+        input_shape: list to specify [B, V, W, H, C]
+            * Batch, View, Width, Height, Channel
+        input_tensor: tensor as the input of this NN
+            * Shape must be [B, V, W, H, C]
+            * only one of input_shape and input_tensor is required
+        svconfdict: NN configuration dict, see config.SV_VISCFG for example
+
+        RETURN
+        Per-View Feature Vector in [B, 1, W, H, V]
+    '''
+    featnum = featnum_sqroot ** 2
+    vision_net = VisionNetwork(input_shape,
+            VisionLayerConfig.createFromDict(confdict),
+            0, # TODO: multi-threading
+            featnum,
+            input_tensor)
+    if not post_process:
+        return vision_net, vision_net.features
+    # print('sv_net.featvec.shape = {}'.format(sv_net.features.shape))
+
+    # Reshape to [B,V,f,f,1], where F = f*f
+    # So we can apply CNN to [f,f,V] images by treating V as channels.
+    sq_featvec = tf.reshape(vision_net.features, [-1, viewnum, featnum_sqroot, featnum_sqroot, 1])
+    # print('sq_svfeatvec.shape = {}'.format(sq_svfeatvec.shape))
+    # Transpose BVff1 to B1ffV
+    featvec = tf.transpose(sq_featvec, [0,4,2,3,1])
+    return vision_net, featvec
+
+
+def ExtractAllViewFeatures(
+        rgb_tensor,
+        depth_tensor,
+        view_config,
+        svconfdict,
+        mvconfdict,
+        intermediate_featnum_sqroot,
+        final_featnum):
+    w = int(rgb.tensor.get_shape()[2])
+    h = int(rgb.tensor.get_shape()[3])
+    view_num = len(view_array)
+    sv_rgb_net, sv_rgb_featvec = ExtractPerViewFeatures(rgb_tensor, None,
+            view_num, intermediate_featnum_sqroot)
+    sv_depth_net, sv_depth_featvec = ExtractPerViewFeatures(depth_tensor, None,
+            view_num, intermediate_featnum_sqroot)
+    sv_featvec = tf.concat([sv_depth_featvec, sv_rgb_featvec], 4)
+    mv_net, mv_featvec = ExtractPerViewFeatures(sv_featvec, None, 1,
+            featnum_sqroot, post_process=False)
+    params = []
+    params.append(sv_depth_net.get_nn_args())
+    params.append(sv_rgb_net.get_nn_args())
+    params.append(mv_net.get_nn_args())
+    return sum(params,[]), mv_featvec
+
+class ConvApplier:
+    layer_configs = []
+
+    def __init__(self,
+            confdict,
+            featnums):
+        if confdict is not None:
+            self.layer_configs = VisionLayerConfig.createFromDict(confdict)
+        for featnum in featnums:
+            self.layer_configs.append(FCLayerConfig(featnum))
+
+    def infer(self, input_tensor):
+        nn_layer_tensor = [input_tensor]
+        nn_args = []
+        for conf in self.layer_configs:
+            prev_layer_tensor = nn_layer_tensor[-1]
+            prev_ch = prev_layer_tensor[-1]
+            w,b,out = conf.apply_layer(prev_layer_tensor)
+            nn_layer_tensor.append(out)
+            nn_args.append((w,b))
+        return nn_args, nn_layer_tensor[-1]
+
+def GetFeatureSquare(featvec):
+    shape = featvec.shape.as_list()
+    view_num = int(shape[1])
+    featnum = reduce(mul, shape[2:], 1)
+    featnum_sqroot = int(np.sqrt(featnum))
+    sq_featvec = tf.reshape(featvec, [-1, view_num, featnum_sqroot, featnum_sqroot, 1])
+    return tf.transpose(sq_featvec, [0,4,2,3,1])
+
+def GetCombineFeatureSquare(rgb_featvec, depth_featvec):
+    rgb_featsq = GetFeatureSquare(rgb_featvec)
+    depth_featsq = GetFeatureSquare(depth_featvec)
+    combine_featsq = tf.concat([rgb_featsq, depth_featsq], 4)
+    return combine_featsq
+
+class FeatureExtractor:
+    view_array = None
+    rgb_conv_applier = None
+    depth_conv_applier = None
+    combine_conv_applier = None
+
+    def __init__(self,
+            svconfdict,
+            mvconfdict,
+            intermediate_featnum,
+            final_featnum):
+        self.rgb_conv_applier = ConvApplier(svconfdict, [intermediate_featnum])
+        self.depth_conv_applier = ConvApplier(svconfdict, [intermediate_featnum])
+        # self.mv_shape = [None, 1, intermediate_featnum_sqroot, intermediate_featnum_sqroot, view_num]
+        self.combine_conv_applier = ConvApplier(mvconfdict, [final_featnum])
+
+    def infer(self, rgb_input, depth_input):
+        rgb_nn_params, rgb_nn_featvec = self.rgb_conv_applier.infer(rgb_input)
+        depth_nn_params, depth_nn_featvec = self.depth_conv_applier.infer(depth_input)
+        combine_featsq = GetCombineFeatureSquare(rgb_nn_featvec, depth_nn_featvec)
+        return self.combine_conv_applier.infer(combine_featsq)
