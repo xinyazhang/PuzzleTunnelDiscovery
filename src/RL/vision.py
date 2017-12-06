@@ -10,6 +10,7 @@ class VisionLayerConfig:
     padding = 'SAME'
     weight = None
     bias = None
+    naming = None
 
     def __init__(self, ch_out, strides=[1, 2, 2, 1], kernel_size=[3,3], padding = 'SAME'):
         self.ch_out = ch_out
@@ -28,8 +29,15 @@ class VisionLayerConfig:
         bias_shape = [self.ch_out]
         # print('weight_shape {}'.format(weight_shape))
         # print('d {}'.format(d))
-        weight = tf.Variable(tf.random_uniform(weight_shape, minval=-d, maxval=d))
-        bias   = tf.Variable(tf.random_uniform(bias_shape,   minval=-d, maxval=d))
+        if self.naming is None:
+            weight = tf.Variable(tf.random_uniform(weight_shape, minval=-d, maxval=d))
+            bias   = tf.Variable(tf.random_uniform(bias_shape,   minval=-d, maxval=d))
+        else:
+            with tf.variable_scope(self.naming):
+                weight = tf.get_variable("weight", weight_shape, tf.float32,
+                        tf.random_uniform_initializer(-d, d))
+                bias   = tf.get_variable("bias", bias_shape, tf.float32,
+                        tf.random_uniform_initializer(-d, d))
         self.weight = weight
         self.bias = bias
         return weight, bias
@@ -62,6 +70,7 @@ class FCLayerConfig:
     ch_out = None
     weight = None
     bias = None
+    naming = None
 
     def __init__(self, ch_out):
         self.ch_out = ch_out
@@ -74,8 +83,15 @@ class FCLayerConfig:
         weight_shape = [ch_in, ch_out]
         bias_shape = [ch_out]
         d = 1.0 / np.sqrt(ch_in)
-        weight = tf.Variable(tf.random_uniform(weight_shape, minval=-d, maxval=d))
-        bias   = tf.Variable(tf.random_uniform(bias_shape,   minval=-d, maxval=d))
+        if self.naming is None:
+            weight = tf.Variable(tf.random_uniform(weight_shape, minval=-d, maxval=d))
+            bias   = tf.Variable(tf.random_uniform(bias_shape,   minval=-d, maxval=d))
+        else:
+            with tf.variable_scope(self.naming):
+                weight = tf.get_variable("weight", weight_shape, tf.float32,
+                        tf.random_uniform_initializer(-d, d))
+                bias   = tf.get_variable("bias", bias_shape, tf.float32,
+                        tf.random_uniform_initializer(-d, d))
         self.weight, self.bias = weight, bias
         return weight, bias
 
@@ -109,17 +125,22 @@ class VisionNetwork:
     layer_configs = None
     view_number = 0
     feature_number = -1
-    nn_layers = [] # 0 is input, -1 is output
-    nn_args = []
-    nn_filters = []
+    nn_layers = None # 0 is input, -1 is output
+    nn_args = None
+    nn_filters = None
     nn_featvec = None
+    naming = None
 
     def __init__(self,
             input_shape,
             layer_configs,
             thread_index,
             feature_number = -1,
-            input_tensor = None):
+            input_tensor = None,
+            naming = None):
+        nn_layers = [] # 0 is input, -1 is output
+        nn_args = []
+        nn_filters = []
         net = "vis_tidx_{}".format(thread_index)
         self.thread_index = thread_index
         self.layer_configs = layer_configs
@@ -130,6 +151,7 @@ class VisionNetwork:
             self.input_tensor = input_tensor
             input_shape = input_tensor.shape
         self.view_number = int(input_shape[1])
+        self.naming = naming
 
     def get_output_tensors(self):
         if not self.nn_layers:
@@ -139,6 +161,13 @@ class VisionNetwork:
     features = property(get_output_tensors)
 
     def infer(self, alternative_input_tensor=None):
+        if self.naming is None:
+            infer_impl(self, alternative_input_tensor)
+        else:
+            with tf.variable_scope(self.naming):
+                infer_impl(self, alternative_input_tensor)
+
+    def infer_impl(self, alternative_input_tensor):
         self.nn_layers = [self.input_tensor]
         self.nn_args = []
         for conf in self.layer_configs:
@@ -243,20 +272,38 @@ def ExtractAllViewFeatures(
     return sum(params,[]), mv_featvec
 
 class ConvApplier:
-    layer_configs = []
+    layer_configs = None
+    naming = None
 
     def __init__(self,
             confdict,
-            featnums):
+            featnums,
+            naming=None):
+        self.layer_configs = []
         if confdict is not None:
             self.layer_configs = VisionLayerConfig.createFromDict(confdict)
         for featnum in featnums:
             self.layer_configs.append(FCLayerConfig(featnum))
+        self.naming = naming
+        # print("== Init Len of layer_configs {}, confdict {}, featnums {}".format(len(self.layer_configs), confdict, featnums))
 
     def infer(self, input_tensor):
+        if self.naming is None:
+            return self.infer_impl(input_tensor)
+        else:
+            with tf.variable_scope(self.naming):
+                return self.infer_impl(input_tensor)
+
+    def infer_impl(self, input_tensor):
         nn_layer_tensor = [input_tensor]
         nn_args = []
+        index = 0
+        # print("== Len of layer_configs {}".format(len(self.layer_configs)))
         for conf in self.layer_configs:
+            if self.naming is not None:
+                # print("== Index {}".format(index))
+                conf.naming = "Layer_{}".format(index)
+                index += 1
             prev_layer_tensor = nn_layer_tensor[-1]
             prev_ch = prev_layer_tensor[-1]
             w,b,out = conf.apply_layer(prev_layer_tensor)
@@ -283,19 +330,26 @@ class FeatureExtractor:
     rgb_conv_applier = None
     depth_conv_applier = None
     combine_conv_applier = None
+    naming = None
+    reuse = False
 
     def __init__(self,
             svconfdict,
             mvconfdict,
             intermediate_featnum,
-            final_featnum):
-        self.rgb_conv_applier = ConvApplier(svconfdict, [intermediate_featnum])
-        self.depth_conv_applier = ConvApplier(svconfdict, [intermediate_featnum])
+            final_featnum,
+            naming):
+        self.rgb_conv_applier = ConvApplier(svconfdict, [intermediate_featnum], 'PerViewRGB')
+        self.depth_conv_applier = ConvApplier(svconfdict, [intermediate_featnum], 'PerViewDepth')
         # self.mv_shape = [None, 1, intermediate_featnum_sqroot, intermediate_featnum_sqroot, view_num]
-        self.combine_conv_applier = ConvApplier(mvconfdict, [final_featnum])
+        self.combine_conv_applier = ConvApplier(mvconfdict, [final_featnum], 'CombineViewRGBD')
+        self.naming = naming
 
     def infer(self, rgb_input, depth_input):
-        rgb_nn_params, rgb_nn_featvec = self.rgb_conv_applier.infer(rgb_input)
-        depth_nn_params, depth_nn_featvec = self.depth_conv_applier.infer(depth_input)
-        combine_featsq = GetCombineFeatureSquare(rgb_nn_featvec, depth_nn_featvec)
-        return self.combine_conv_applier.infer(combine_featsq)
+        with tf.variable_scope(self.naming, reuse=self.reuse) as scope:
+            rgb_nn_params, rgb_nn_featvec = self.rgb_conv_applier.infer(rgb_input)
+            depth_nn_params, depth_nn_featvec = self.depth_conv_applier.infer(depth_input)
+            combine_featsq = GetCombineFeatureSquare(rgb_nn_featvec, depth_nn_featvec)
+            combine_params, combine_out = self.combine_conv_applier.infer(combine_featsq)
+        self.reuse = True
+        return rgb_nn_params + depth_nn_params + combine_params, combine_out
