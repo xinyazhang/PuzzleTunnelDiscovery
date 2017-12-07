@@ -70,7 +70,9 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("getName", &Pet::getName);
 #endif
 	m.def("distance", &osr::distance,
-	      "Calculate the distance between to unit states");
+	      "Calculate the distance between two unit states");
+	m.def("differential", &osr::differential,
+	      "Calculate the action from one unit state to another");
 	using osr::UnitWorld;
 	py::class_<UnitWorld>(m, "UnitWorld")
 		.def(py::init<>())

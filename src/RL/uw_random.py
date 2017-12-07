@@ -1,5 +1,6 @@
 import pyosr
 import numpy as np
+import random
 from math import sqrt,pi,sin,cos
 
 def random_state(scale=1.0):
@@ -22,12 +23,48 @@ def gen_init_state(uw):
             break
     return uw.translate_from_unit_state(state)
 
-def random_continuous_action(max_stepping):
+def random_unit_vector(size):
+    mag = 0.0
+    while mag == 0.0:
+        vec = np.random.uniform(size=size)
+        mag = np.linalg.norm(vec)
+    return vec / mag
+
+def random_continuous_action_2(max_stepping):
     stepping = max_stepping * random.random()
-    rratio = random.random()
+    ratio = random.random()
     tmag = stepping * (1-ratio)
     rmag = stepping * ratio
-    tpart = np.linalg.norm(np.random.uniform(shape=(3))) * tmag
-    rpart = np.linalg.norm(np.random.uniform(shape=(3))) * rmag
+    tpart = (random_unit_vector(size=(3)) - 0.5) * tmag * 2
+    rpart = (random_unit_vector(size=(3)) - 0.5) * rmag * 2
+    # print('tpart {}'.format(tpart))
+    return tpart, rpart
+
+def random_continuous_action(max_stepping):
+    tpart, rpart = random_continuous_action_2(max_stepping)
     return np.concatenate((tpart, rpart))
+
+def random_path(uw, max_stepping, node_num):
+    state = uw.translate_to_unit_state(gen_init_state(uw))
+    keys = [state]
+    ratio = 0.0
+    actions = []
+    for i in range(node_num - 1):
+        done = False
+        while not done:
+            if ratio < 1.0:
+                '''
+                Only re-generate direction after hitting things
+                '''
+                tpart, rpart = random_continuous_action_2(max_stepping)
+            nstate, done, ratio = uw.transit_state_by(keys[-1],
+                    tpart,
+                    rpart,
+                    max_stepping / 32)
+        # print(tpart, rpart, ratio)
+        keys.append(nstate)
+        # print(np.concatenate((tpart, rpart)))
+        actions.append(np.concatenate((tpart, rpart)))
+        # print(pyosr.differential(keys[-2], keys[-1]))
+    return keys, actions
 

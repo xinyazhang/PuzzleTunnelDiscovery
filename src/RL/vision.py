@@ -203,7 +203,7 @@ class VisionNetwork:
         return list(sum(self.nn_args, ()))
 
 
-def createViewArrayFromConfig(view_config):
+def create_view_array_from_config(view_config):
     view_array = []
     for angle,ncam in view_config:
         view_array += [ [angle,float(i)] for i in np.arange(0.0, 360.0, 360.0/float(ncam)) ]

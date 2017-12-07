@@ -69,9 +69,14 @@ class IntrinsicCuriosityModule:
 
     def get_nn_params(self):
         ret = [self.cur_nn_params]
-        params, _ = get_inverse_model()
+        params, _ = self.get_inverse_model()
         ret.append(params)
-        params, _ = get_forward_model()
+        params, _ = self.get_forward_model()
         ret.append(params)
         return sum(ret, [])
 
+    def get_inverse_loss(self):
+        _, out = self.get_inverse_model()
+        print('inv loss out.shape {}'.format(out.shape))
+        print('inv loss action.shape {}'.format(out.shape))
+        return tf.norm(out - self.action_tensor)
