@@ -72,7 +72,7 @@ PYBIND11_PLUGIN(pyosr) {
 	m.def("distance", &osr::distance,
 	      "Calculate the distance between two unit states");
 	m.def("differential", &osr::differential,
-	      "Calculate the action from one unit state to another");
+	      "Calculate the action from one unit state to another", py::call_guard<py::gil_scoped_release>());
 	using osr::UnitWorld;
 	py::class_<UnitWorld>(m, "UnitWorld")
 		.def(py::init<>())

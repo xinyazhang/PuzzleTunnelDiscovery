@@ -64,8 +64,11 @@ def random_path(uw, max_stepping, node_num):
         # print(tpart, rpart, ratio)
         keys.append(nstate)
         # print(np.concatenate((tpart, rpart)))
-        # actions.append(np.concatenate((tpart, rpart)))
-        actions.append(pyosr.differential(keys[-2], keys[-1]))
+        '''
+        Actual T,R
+        '''
+        tpart, rpart = pyosr.differential(keys[-2], keys[-1])
+        actions.append(np.concatenate((tpart, rpart)))
         # print(pyosr.differential(keys[-2], keys[-1]))
     return keys, actions
 
