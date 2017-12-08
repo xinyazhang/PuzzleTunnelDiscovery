@@ -214,7 +214,12 @@ def pretrain_main(args):
         all_params += [global_step]
         # print(all_params)
         optimizer = tf.train.AdamOptimizer()
-        train_op = optimizer.minimize(model.get_inverse_loss(), global_step)
+        loss = model.get_inverse_loss()
+        train_op = optimizer.minimize(loss, global_step)
+
+        tf.summary.scalar('loss', loss)
+        summary_op = tf.summary.merge_all()
+        train_writer = tf.summary.FileWriter(ckpt_dir + '/summary', g)
 
         saver = tf.train.Saver() # Save everything
         last_time = time.time()
@@ -225,11 +230,13 @@ def pretrain_main(args):
             epoch = 0
             if ckpt and ckpt.model_checkpoint_path:
                 saver.restore(sess, ckpt.model_checkpoint_path)
-                epoch = sess.run(global_step)
-                print('Restored!, global_step {}'.format(epoch))
+                accum_epoch = sess.run(global_step)
+                print('Restored!, global_step {}'.format(accum_epoch))
+            else:
+                accum_epoch = 0
             total_epoch = args.iter * args.threads
+            period_loss = 0.0
             while epoch < total_epoch:
-                epoch += 1
                 gt = syncQ.get()
                 dic = {
                         action : gt.actions,
@@ -238,15 +245,23 @@ def pretrain_main(args):
                         dep_1 : gt.dep[:-1],
                         dep_2 : gt.dep[1:]
                       }
-                print("[{}] Start training".format(epoch))
-                sess.run(train_op, feed_dict=dic)
+                # print("[{}] Start training".format(epoch))
+                summary, current_loss, _ = sess.run([summary_op, loss, train_op], feed_dict=dic)
+                period_loss += current_loss
+                train_writer.add_summary(summary, accum_epoch)
                 syncQ.task_done()
-                if epoch % 1000 == 0 or time.time() - last_time >= 10 * 60 or epoch + 1 == total_epoch:
+                if (epoch + 1) % 1000 == 0 or time.time() - last_time >= 10 * 60 or epoch + 1 == total_epoch:
                     print("Saving checkpoint")
                     fn = saver.save(sess, ckpt_dir+ckpt_prefix, global_step=global_step)
                     print("Saved checkpoint to {}".format(fn))
                     last_time = time.time()
-                print("Epoch {}".format(epoch))
+                if epoch % 10 == 0:
+                    print("Progress {}/{}".format(epoch, total_epoch))
+                    print("Average loss during last 10 iterations: {}".format(period_loss / 10))
+                    period_loss = 0
+                # print("Epoch {} (Total {}) Done".format(epoch, accum_epoch))
+                epoch += 1
+                accum_epoch += 1
     for thread in threads:
         thread.join()
 
