@@ -27,15 +27,17 @@ class IntrinsicCuriosityModule:
             next_depth_tensor,
             svconfdict,
             mvconfdict,
-            featnum):
+            featnum,
+            elu):
         self.action_tensor = action_tensor
         self.rgb_tensor = rgb_tensor
         self.depth_tensor = depth_tensor
         self.next_rgb_tensor = next_rgb_tensor
         self.next_depth_tensor = next_depth_tensor
-        self.feature_extractor = vision.FeatureExtractor(svconfdict, mvconfdict, featnum, featnum, 'VisionNet')
+        self.feature_extractor = vision.FeatureExtractor(svconfdict, mvconfdict, featnum, featnum, 'VisionNet', elu)
         self.cur_nn_params, self.cur_featvec = self.feature_extractor.infer(rgb_tensor, depth_tensor)
         self.next_nn_params, self.next_featvec = self.feature_extractor.infer(next_rgb_tensor, next_depth_tensor)
+        self.elu = elu
 
     def get_inverse_model(self):
         if self.inverse_output_tensor is not None:
@@ -44,7 +46,7 @@ class IntrinsicCuriosityModule:
         print('inverse_model input {}'.format(input_featvec))
         featnums = [config.INVERSE_MODEL_HIDDEN_LAYER, int(self.action_tensor.shape[-1])]
         print('inverse_model featnums {}'.format(featnums))
-        self.inverse_fc_applier = vision.ConvApplier(None, featnums, 'InverseModelNet')
+        self.inverse_fc_applier = vision.ConvApplier(None, featnums, 'InverseModelNet', self.elu)
         params, out = self.inverse_fc_applier.infer(input_featvec)
         self.inverse_model_params = params
         self.inverse_output_tensor = out
@@ -61,7 +63,7 @@ class IntrinsicCuriosityModule:
         action3 = tf.stack([self.action_tensor], axis=1)
         input_featvec = tf.concat([action3, self.cur_featvec], 2)
         featnums = list(config.FORWARD_MODEL_HIDDEN_LAYERS) + [int(self.action_tensor.shape[-1])]
-        self.forward_fc_applier = vision.ConvApplier(None, featnums, 'ForwardModelNet')
+        self.forward_fc_applier = vision.ConvApplier(None, featnums, 'ForwardModelNet', self.elu)
         params, out = self.forward_fc_applier.infer(input_featvec)
         self.forward_model_params = params
         self.forward_output_tensor = out

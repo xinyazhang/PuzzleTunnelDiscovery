@@ -11,6 +11,7 @@ class VisionLayerConfig:
     weight = None
     bias = None
     naming = None
+    elu = False
 
     def __init__(self, ch_out, strides=[1, 2, 2, 1], kernel_size=[3,3], padding = 'SAME'):
         self.ch_out = ch_out
@@ -36,7 +37,8 @@ class VisionLayerConfig:
             with tf.variable_scope(self.naming):
                 weight = tf.get_variable("weight", weight_shape, tf.float32,
                         tf.random_uniform_initializer(-d, d))
-                bias   = tf.get_variable("bias", bias_shape, tf.float32,
+                bias_name = "bias_elu" if self.elu else "bias"
+                bias   = tf.get_variable(bias_name, bias_shape, tf.float32,
                         tf.random_uniform_initializer(-d, d))
         self.weight = weight
         self.bias = bias
@@ -48,7 +50,8 @@ class VisionLayerConfig:
         w,b = self.create_kernel(prev_ch_out)
         strides = [1] + self.strides
         conv = tf.nn.conv3d(prev_layer, w, strides, self.padding)
-        out = tf.nn.relu(conv + b)
+        # out = tf.nn.relu(conv + b)
+        out = tf.nn.elu(conv + b) if self.elu else tf.nn.relu(conv + b)
         print('after CNN {}'.format(out.shape))
         return w,b,out
 
@@ -71,6 +74,7 @@ class FCLayerConfig:
     weight = None
     bias = None
     naming = None
+    elu = False
 
     def __init__(self, ch_out):
         self.ch_out = ch_out
@@ -90,7 +94,8 @@ class FCLayerConfig:
             with tf.variable_scope(self.naming):
                 weight = tf.get_variable("weight", weight_shape, tf.float32,
                         tf.random_uniform_initializer(-d, d))
-                bias   = tf.get_variable("bias", bias_shape, tf.float32,
+                bias_name = "bias_elu" if self.elu else "bias"
+                bias   = tf.get_variable(bias_name, bias_shape, tf.float32,
                         tf.random_uniform_initializer(-d, d))
         self.weight, self.bias = weight, bias
         return weight, bias
@@ -110,7 +115,8 @@ class FCLayerConfig:
         print('tdshape {}'.format(td.get_shape()))
         td.set_shape([None, prev.shape[1].value, self.ch_out])
         print('tdshape set to {}'.format(td.get_shape()))
-        return w,b,tf.nn.relu(td + b)
+        out = tf.nn.elu(td + b) if self.elu else tf.nn.relu(td + b)
+        return w,b,out
 
 class VisionNetwork:
     '''
@@ -274,12 +280,15 @@ def ExtractAllViewFeatures(
 class ConvApplier:
     layer_configs = None
     naming = None
+    elu = False
 
     def __init__(self,
             confdict,
             featnums,
-            naming=None):
+            naming=None,
+            elu=False):
         self.layer_configs = []
+        self.elu = elu
         if confdict is not None:
             self.layer_configs = VisionLayerConfig.createFromDict(confdict)
         for featnum in featnums:
@@ -295,6 +304,8 @@ class ConvApplier:
                 return self.infer_impl(input_tensor)
 
     def infer_impl(self, input_tensor):
+        for layer in self.layer_configs:
+            layer.elu = self.elu
         nn_layer_tensor = [input_tensor]
         nn_args = []
         index = 0
@@ -338,11 +349,12 @@ class FeatureExtractor:
             mvconfdict,
             intermediate_featnum,
             final_featnum,
-            naming):
-        self.rgb_conv_applier = ConvApplier(svconfdict, [intermediate_featnum], 'PerViewRGB')
-        self.depth_conv_applier = ConvApplier(svconfdict, [intermediate_featnum], 'PerViewDepth')
+            naming,
+            elu):
+        self.rgb_conv_applier = ConvApplier(svconfdict, [intermediate_featnum], 'PerViewRGB', elu)
+        self.depth_conv_applier = ConvApplier(svconfdict, [intermediate_featnum], 'PerViewDepth', elu)
         # self.mv_shape = [None, 1, intermediate_featnum_sqroot, intermediate_featnum_sqroot, view_num]
-        self.combine_conv_applier = ConvApplier(mvconfdict, [final_featnum], 'CombineViewRGBD')
+        self.combine_conv_applier = ConvApplier(mvconfdict, [final_featnum], 'CombineViewRGBD', elu)
         self.naming = naming
 
     def infer(self, rgb_input, depth_input):

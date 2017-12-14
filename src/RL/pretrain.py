@@ -208,12 +208,13 @@ def pretrain_main(args):
                 rgb_2, dep_2,
                 config.SV_VISCFG,
                 config.MV_VISCFG,
-                256)
+                256,
+                args.elu)
         model.get_inverse_model() # Create model.inverse_model_{params,tensor}
         all_params = model.cur_nn_params + model.next_nn_params + model.inverse_model_params
         all_params += [global_step]
         # print(all_params)
-        optimizer = tf.train.AdamOptimizer()
+        optimizer = tf.train.AdamOptimizer(learning_rate=1e-4)
         loss = model.get_inverse_loss()
         train_op = optimizer.minimize(loss, global_step)
 
@@ -290,6 +291,9 @@ if __name__ == '__main__':
             action='store_true')
     parser.add_argument('--dryrun2',
             help='Visualize the generated GT without training anything (MT version)',
+            action='store_true')
+    parser.add_argument('--elu',
+            help='Use ELU instead of ReLU after each NN layer',
             action='store_true')
 
     args = parser.parse_args()
