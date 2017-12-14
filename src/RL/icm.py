@@ -60,8 +60,7 @@ class IntrinsicCuriosityModule:
 
         Note: 3D tensor unifies per-view variables and combined-view variables.
         '''
-        action3 = tf.stack([self.action_tensor], axis=1)
-        input_featvec = tf.concat([action3, self.cur_featvec], 2)
+        input_featvec = tf.concat([self.action_tensor, self.cur_featvec], 2)
         featnums = list(config.FORWARD_MODEL_HIDDEN_LAYERS) + [int(self.action_tensor.shape[-1])]
         self.forward_fc_applier = vision.ConvApplier(None, featnums, 'ForwardModelNet', self.elu)
         params, out = self.forward_fc_applier.infer(input_featvec)
@@ -77,8 +76,14 @@ class IntrinsicCuriosityModule:
         ret.append(params)
         return sum(ret, [])
 
-    def get_inverse_loss(self):
+    def get_inverse_loss(self, discrete=False):
         _, out = self.get_inverse_model()
         print('inv loss out.shape {}'.format(out.shape))
         print('inv loss action.shape {}'.format(out.shape))
-        return tf.norm(out - self.action_tensor)
+        if not discrete:
+            return tf.norm(out - self.action_tensor)
+        ret = tf.nn.softmax_cross_entropy_with_logits(
+            labels=self.action_tensor,
+            logits=out)
+        print('inv loss ret shape {}'.format(ret.shape))
+        return tf.reduce_mean(ret)

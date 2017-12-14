@@ -72,3 +72,29 @@ def random_path(uw, max_stepping, node_num):
         # print(pyosr.differential(keys[-2], keys[-1]))
     return keys, actions
 
+DISCRETE_ACTION_NUMBER = 6
+
+def random_discrete_path(uw, action_magnitude, verify_magnitude, node_num):
+    state = uw.translate_to_unit_state(gen_init_state(uw))
+    keys = [state]
+    ratio = 0.0
+    actions = []
+    for i in range(node_num - 1):
+        done = False
+        while not done:
+            if ratio < 1.0:
+                '''
+                Only re-generate direction after hitting things
+                '''
+                action = random.randrange(DISCRETE_ACTION_NUMBER)
+            nstate, done, ratio = uw.transit_state(keys[-1],
+                    action,
+                    action_magnitude,
+                    verify_magnitude)
+        # print(tpart, rpart, ratio)
+        keys.append(nstate)
+        # print(np.concatenate((tpart, rpart)))
+        actions.append(action)
+        # print(pyosr.differential(keys[-2], keys[-1]))
+    return keys, actions
+
