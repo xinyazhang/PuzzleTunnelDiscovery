@@ -282,6 +282,13 @@ class ConvApplier:
     naming = None
     elu = False
 
+    '''
+    Input: [B, V, W, H, C]
+        - Batch, View, Width, Height, Channel
+    Output: [B, V, F]
+        - F: featnums
+    '''
+
     def __init__(self,
             confdict,
             featnums,
@@ -336,6 +343,16 @@ def GetCombineFeatureSquare(rgb_featvec, depth_featvec):
     combine_featsq = tf.concat([rgb_featsq, depth_featsq], 4)
     return combine_featsq
 
+
+'''
+Basic Feature Extractor
+Arch:
+    CNN := (FC * CNN^k)
+    SVFE := cat(CNN(rgb), CNN(dep))
+    MVIN := reshape(shape=(m,m), cat(SVFE_0, SVFE_1, ... , SVFE_k-1))
+    FE := CNN(MVIN)
+    output = FE(rgb, dep)
+'''
 class FeatureExtractor:
     view_array = None
     rgb_conv_applier = None
@@ -365,3 +382,79 @@ class FeatureExtractor:
             combine_params, combine_out = self.combine_conv_applier.infer(combine_featsq)
         self.reuse = True
         return rgb_nn_params + depth_nn_params + combine_params, combine_out
+
+
+'''
+Feature Extractor Rev. 2
+Arch:
+    CNN := (FC^n * CNN^m)
+    SVFE(rgb,dep) := cat(CNN(rgb), CNN(dep))
+    FE := FC^K * SVFE
+    output = FE(rgb, dep)
+'''
+class FeatureExtractorRev2:
+    naming = None
+    reuse = None
+
+    def __init__(self,
+            svconfdict,
+            intermediate_featnum,
+            final_featnums,
+            naming,
+            elu):
+        '''
+        Note: we have two FCs rather than one
+        '''
+        self.rgb_conv_applier = ConvApplier(svconfdict, [intermediate_featnum, intermediate_featnum], 'PerViewRGB', elu)
+        self.depth_conv_applier = ConvApplier(svconfdict, [intermediate_featnum, intermediate_featnum], 'PerViewDepth', elu)
+        self.mv_fc_applier = ConvApplier(None, final_featnums, "CombineViewRGBDFC", elu)
+
+        self.naming = naming
+
+    def infer(self, rgb_input, depth_input):
+        with tf.variable_scope(self.naming, reuse=self.reuse) as scope:
+            rgb_nn_params, rgb_nn_featvec = self.rgb_conv_applier.infer(rgb_input)
+            depth_nn_params, depth_nn_featvec = self.depth_conv_applier.infer(depth_input)
+            combine_in = tf.concat([rgb_nn_featvec, depth_featvec], axis=-1)
+            combine_params, combine_out = self.mv_fc_applier.infer(combine_in)
+        self.reuse = True
+        return rgb_nn_params + depth_nn_params + combine_params, combine_out
+
+
+'''
+Feature Extractor Rev. 3
+Arch:
+    CNN := (FC^n * CNN^m)
+    SVFE(rgb,dep) := CNN(cat(rgb,dep))
+    FE := FC^K * SVFE
+    output = FE(rgb, dep)
+'''
+class FeatureExtractorRev3:
+    naming = None
+    reuse = None
+
+    def __init__(self,
+            svconfdict,
+            intermediate_featnum,
+            final_featnums,
+            naming,
+            elu):
+        '''
+        Note: we have two FCs rather than one
+        '''
+        self.rgbd_conv_applier = ConvApplier(svconfdict, [intermediate_featnum, intermediate_featnum], 'PerViewRGBD', elu)
+        '''
+        RGBDCombineViewFC:
+            We put RGBD at the beginning because we combine RGB and D firstly.
+        '''
+        self.mv_fc_applier = ConvApplier(None, final_featnums, "RGBDCombineViewFC", elu)
+
+        self.naming = naming
+
+    def infer(self, rgb_input, depth_input):
+        with tf.variable_scope(self.naming, reuse=self.reuse) as scope:
+            rgbd_input = tf.concat([rgb_input, depth_input], axis=-1)
+            rgbd_nn_params, rgbd_nn_featvec = self.rgbd_conv_applier.infer(rgbd_input)
+            combine_params, combine_out = self.mv_fc_applier.infer(rgbd_nn_params)
+        self.reuse = True
+        return rgbd_nn_params + combine_params, combine_out
