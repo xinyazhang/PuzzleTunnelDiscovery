@@ -8,6 +8,8 @@
 
 namespace osr {
 
+using std::tie;
+
 auto glm2Eigen(const glm::mat4& m)
 {
 	StateMatrix ret;
@@ -217,7 +219,7 @@ UnitWorld::transitState(const StateVector& state,
 	Eigen::Vector2f deltas;
 	deltas << verify_delta, verify_delta * 2;
 
-	int magidx = action < kActionPerTransformType ? 0 : 1;
+	int action_type = action < kActionPerTransformType ? 0 : 1;
 	if (action >= kTotalNumberOfActions) {
 		/*
 		 * Invalid action, return the initial state.
@@ -230,32 +232,56 @@ UnitWorld::transitState(const StateVector& state,
 		 */
 		return std::make_tuple(state, false, 0.0f);
 	}
-	auto magnitude = magnitudes(magidx);
-	auto deltacap = deltas(magidx);
-	auto accum = 0.0f;
-	StateQuat rot(state(3), state(4), state(5), state(6));
-	StateTrans trans(state(0), state(1), state(2));
+	auto magnitude = magnitudes(action_type);
+	auto deltacap = deltas(action_type);
 	float sym = action % 2 == 0 ? 1.0f : -1.0f;
-	/*
-	 * Normalize the quaternion to prevent instability.
-	 */
-	rot.normalize();
 	/*
 	 * action (0-11) to XYZ (0-2)
 	 * X: 0,1 or 6,7
 	 * Y: 2,3 or 8,9
 	 * Z: 4,5 or 10,11
 	 */
-	int axis_id = (action - kActionPerTransformType * magidx) / 2;
+	int axis_id = (action - kActionPerTransformType * action_type) / 2;
 	StateQuat deltarot;
 	StateTrans tfvec { StateTrans::Zero() };
 	tfvec(axis_id) = 1.0f;
+#if 1
+	StateTrans trans;
+	StateQuat rot;
+	tie(trans, rot) = decompose(state);
+	if (action_type == 0) {
+		trans += deltacap * tfvec;
+	} else {
+		Eigen::AngleAxis<StateScalar> aa(deltacap * sym, tfvec);
+		rot = aa * rot;
+	}
+	StateVector to_state;
+	to_state = compose(trans, rot);
+
+	auto current_verify_delta = verify_delta;
+	while (true) {
+		StateVector free_state;
+		bool done;
+		float prog;
+		tie(free_state, done, prog) = transitStateTo(state, to_state, current_verify_delta);
+		if (prog > 0.0)
+			return std::make_tuple(free_state, done, prog);
+		/*
+		 * A free state must be locally free, prog == 0.0 implies
+		 * current verify delta is too large.
+		 */
+		current_verify_delta /= 2;
+	}
+#else
 	/*
 	 * Post condition:
 	 *      tfvec or aa presents the delta action
 	 */
 	std::function<void(float)> applier;
-	if (magidx == 0) {
+	/* rot and trans are accumulators that would be initialized later */
+	StateQuat rot;
+	StateTrans trans;
+	if (action_type == 0) {
 		applier = [&rot, &trans, &tfvec](float delta) {
 			trans += delta * tfvec;
 		};
@@ -266,33 +292,41 @@ UnitWorld::transitState(const StateVector& state,
 			rot.normalize();
 		};
 	}
-	StateVector nstate, freestate(state);
-	bool done = true;
 	while (true) {
-		float delta = std::min(deltacap, magnitude - accum);
-		float naccum = accum + delta;
-		applier(delta);
-		nstate << trans(0), trans(1), trans(2),
-		          rot.w(), rot.x(),
-		          rot.y(), rot.z();
-		/*
-		 * Verify the new state at accum + delta
-		 */
-		if (!isValid(nstate)) {
-			done = false;
-			break;
+		StateVector nstate, freestate(state);
+		bool done = true;
+		auto accum = 0.0f;
+		tie(trans, rot) = decompose(state);
+		while (true) {
+			float delta = std::min(deltacap, magnitude - accum);
+			float naccum = accum + delta;
+			applier(delta);
+			nstate = compose(trans, rot);
+			/*
+			 * Verify the new state at accum + delta
+			 */
+			if (!isValid(nstate)) {
+				done = false;
+				break;
+			}
+			freestate = nstate;
+			/*
+			 * naccum is valid, proceed.
+			 */
+			accum = naccum;
+			/* Exit when reaches last iteration */
+			if (accum == magnitude)
+				break;
 		}
-		freestate = nstate;
-		/*
-		 * naccum is valid, proceed.
-		 */
-		accum = naccum;
-		/* Exit when reaches last iteration */
-		if (accum == magnitude)
+		if (accum > 0.0)
 			break;
+		/*
+		 * Otherwise we need to reduce deltacap
+		 */
 	}
 	float prog = accum / magnitude;
 	return std::make_tuple(freestate, done, prog);
+#endif
 }
 
 

@@ -55,9 +55,6 @@ public:
 	 *      is final: indicate if the return state finished the expected action.
 	 *      progress: 0.0 - 1.0, the ratio b/w the finished action and the
 	 *                expected action. progress < 1.0 implies is final == False
-	 * 
-	 * TODO: change deltas to double, to align with distance defined in
-	 * GTGenerator (or MTBlender)
 	 */
 	std::tuple<StateVector, bool, float>
 	transitState(const StateVector& state,

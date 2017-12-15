@@ -37,13 +37,16 @@ decompose(const StateVector& state)
 {
 	StateQuat rot(state(3), state(4), state(5), state(6));
 	StateTrans trans(state(0), state(1), state(2));
+	rot.normalize();
 	return std::make_tuple(trans, rot);
 }
 
 StateVector
-compose(const StateTrans& base, const StateQuat& rot)
+compose(const StateTrans& base, const StateQuat& irot)
 {
 	StateVector ret;
+	StateQuat rot(irot);
+	rot.normalize();
 	ret << base(0), base(1), base(2),
 	       rot.w(), rot.x(),
 	       rot.y(), rot.z();
