@@ -258,19 +258,22 @@ UnitWorld::transitState(const StateVector& state,
 	StateVector to_state;
 	to_state = compose(trans, rot);
 
-	auto current_verify_delta = verify_delta;
+	float current_verify_delta = verify_delta;
+	// std::cerr << "> Init V Mag " << verify_delta << std::endl;
 	while (true) {
 		StateVector free_state;
 		bool done;
 		float prog;
 		tie(free_state, done, prog) = transitStateTo(state, to_state, current_verify_delta);
-		if (prog > 0.0)
+		if (prog > 0.0 or current_verify_delta == 0.0)
+			/* Sometimes vmag vanishes */
 			return std::make_tuple(free_state, done, prog);
 		/*
 		 * A free state must be locally free, prog == 0.0 implies
 		 * current verify delta is too large.
 		 */
-		current_verify_delta /= 2;
+		current_verify_delta /= 2.0;
+		// std::cerr << "> V Mag shrink to " << current_verify_delta << std::endl;
 	}
 #else
 	/*

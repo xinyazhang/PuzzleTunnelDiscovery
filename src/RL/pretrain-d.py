@@ -155,6 +155,7 @@ def collector(syncQ, sample_num, batch_size, tid, amag, vmag):
             cur_time = time.time()
             print("!GT generation speed: {} samples/sec".format(10/(cur_time - last_time)))
             last_time = cur_time
+    print("> GT Thread {} Exits".format(tid))
 
 def spawn_gt_collector_thread(args):
     syncQ = queue.Queue(args.queuemax)
