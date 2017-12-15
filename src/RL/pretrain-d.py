@@ -250,7 +250,7 @@ def pretrain_main(args):
             total_epoch = args.iter * args.threads
             period_loss = 0.0
             while epoch < total_epoch:
-                gt = syncQ.get()
+                gt = syncQ.get(timeout=60)
                 dic = {
                         action : gt.actions,
                         rgb_1 : gt.rgb[:-1],
