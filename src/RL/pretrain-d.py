@@ -23,7 +23,8 @@ import icm
 import threading
 import Queue as queue # Python 2, rename to import queue as queue for python 3
 
-MT_VERBOSE = True
+MT_VERBOSE = False
+# MT_VERBOSE = True
 
 def create_renderer():
     view_array = vision.create_view_array_from_config(config.VIEW_CFG)
@@ -116,6 +117,8 @@ def collector(syncQ, sample_num, batch_size, tid, amag, vmag):
     print(r)
     rgb_shape = (len(r.views), r.pbufferWidth, r.pbufferHeight, 3)
     dep_shape = (len(r.views), r.pbufferWidth, r.pbufferHeight, 1)
+    if tid == 0:
+        last_time = time.time()
     for i in range(sample_num):
         rgbq = []
         depq = []
@@ -148,6 +151,10 @@ def collector(syncQ, sample_num, batch_size, tid, amag, vmag):
         syncQ.put(gt)
         if MT_VERBOSE:
             print("!GT by thread {} was put into Q".format(tid))
+        if tid == 0 and (i+1) % 10 == 0:
+            cur_time = time.time()
+            print("!GT generation speed: {} samples/sec".format(10/(cur_time - last_time)))
+            last_time = cur_time
 
 def spawn_gt_collector_thread(args):
     syncQ = queue.Queue(args.queuemax)
@@ -295,7 +302,7 @@ if __name__ == '__main__':
             type=float, default=0.0125)
     parser.add_argument('--vmag', metavar='REAL NUMBER',
             help='Magnitude of verifying action',
-            type=float, default=0.0125 / 16)
+            type=float, default=0.0125 / 8)
     parser.add_argument('-n', '--dryrun',
             help='Visualize the generated GT without training anything',
             action='store_true')
