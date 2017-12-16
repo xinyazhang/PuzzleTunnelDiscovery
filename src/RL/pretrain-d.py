@@ -25,9 +25,15 @@ import Queue as queue # Python 2, rename to import queue as queue for python 3
 
 MT_VERBOSE = False
 # MT_VERBOSE = True
+VIEW_CFG = config.VIEW_CFG
+
+def setup_global_variable(args):
+    if args.ferev != 1:
+        global VIEW_CFG
+        VIEW_CFG = config.VIEW_CFG_REV2
 
 def create_renderer():
-    view_array = vision.create_view_array_from_config(config.VIEW_CFG)
+    view_array = vision.create_view_array_from_config(VIEW_CFG)
     view_num = len(view_array)
     w = h = config.DEFAULT_RES
 
@@ -190,7 +196,7 @@ def pretrain_main(args):
             plt.show()
             return
 
-    view_array = vision.create_view_array_from_config(config.VIEW_CFG)
+    view_array = vision.create_view_array_from_config(VIEW_CFG)
     view_num = len(view_array)
     w = h = config.DEFAULT_RES
 
@@ -221,7 +227,8 @@ def pretrain_main(args):
                 config.SV_VISCFG,
                 config.MV_VISCFG2,
                 256,
-                args.elu)
+                args.elu,
+                args.ferev)
         model.get_inverse_model() # Create model.inverse_model_{params,tensor}
         all_params = model.cur_nn_params + model.next_nn_params + model.inverse_model_params
         all_params += [global_step]
@@ -258,8 +265,10 @@ def pretrain_main(args):
                         dep_1 : gt.dep[:-1],
                         dep_2 : gt.dep[1:]
                       }
-                # print("[{}] Start training".format(epoch))
-                summary, current_loss, _ = sess.run([summary_op, loss, train_op], feed_dict=dic)
+                summary, current_loss = sess.run([summary_op, loss], feed_dict=dic)
+                print("[{}] Start training".format(epoch))
+                sess.run(train_op, feed_dict=dic)
+                print("[{}] End training".format(epoch))
                 period_loss += current_loss
                 train_writer.add_summary(summary, accum_epoch)
                 syncQ.task_done()
@@ -279,7 +288,7 @@ def pretrain_main(args):
         thread.join()
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser = argparse.ArgumentParser(description='Process some integers.', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--ckptdir', help='Path for checkpoint files',
             default='ckpt/pretrain-d/')
     parser.add_argument('--ckptprefix', help='Prefix of checkpoint files',
@@ -313,6 +322,11 @@ if __name__ == '__main__':
     parser.add_argument('--elu',
             help='Use ELU instead of ReLU after each NN layer',
             action='store_true')
+    parser.add_argument('--ferev',
+            help='Reversion of Feature Extractor',
+            choices=range(1,3+1),
+            type=int, default=1)
 
     args = parser.parse_args()
+    setup_global_variable(args)
     pretrain_main(args)

@@ -27,6 +27,7 @@ class Config:
     # TODO: singleton object.
 
 VIEW_CFG = [(30.0, 12), (-30.0, 12), (0, 4), (90, 1), (-90, 1)]
+VIEW_CFG_REV2 = [(45.0, 8), (-45.0, 8), (0, 4), (90, 1), (-90, 1)]
 SV_VISCFG = [ { 'ch_out' : 32, 'strides' : None, 'kernel_size' : None},
         { 'ch_out' : 32, 'strides' : [1,3,3,1], 'kernel_size' : [5,5]},
         { 'ch_out' : 64, 'strides' : None, 'kernel_size' : None},

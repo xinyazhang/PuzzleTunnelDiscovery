@@ -384,6 +384,17 @@ class FeatureExtractor:
         return rgb_nn_params + depth_nn_params + combine_params, combine_out
 
 
+def MergeSVFeatVec(tensor):
+    '''
+    Input: [B, V, F]
+    Output: [B, 1, V*F]
+
+    B may be -1
+    '''
+    V,F = int(tensor.shape[1]), int(tensor.shape[2])
+    # print("V,F {} {}".format(V, F))
+    return tf.reshape(tensor, shape=[-1, 1, V*F])
+
 '''
 Feature Extractor Rev. 2
 Arch:
@@ -415,7 +426,8 @@ class FeatureExtractorRev2:
         with tf.variable_scope(self.naming, reuse=self.reuse) as scope:
             rgb_nn_params, rgb_nn_featvec = self.rgb_conv_applier.infer(rgb_input)
             depth_nn_params, depth_nn_featvec = self.depth_conv_applier.infer(depth_input)
-            combine_in = tf.concat([rgb_nn_featvec, depth_featvec], axis=-1)
+            combine_in = MergeSVFeatVec(tf.concat([rgb_nn_featvec, depth_nn_featvec], axis=-1))
+            print("combine_in shape {}".format(combine_in.shape))
             combine_params, combine_out = self.mv_fc_applier.infer(combine_in)
         self.reuse = True
         return rgb_nn_params + depth_nn_params + combine_params, combine_out
@@ -455,6 +467,6 @@ class FeatureExtractorRev3:
         with tf.variable_scope(self.naming, reuse=self.reuse) as scope:
             rgbd_input = tf.concat([rgb_input, depth_input], axis=-1)
             rgbd_nn_params, rgbd_nn_featvec = self.rgbd_conv_applier.infer(rgbd_input)
-            combine_params, combine_out = self.mv_fc_applier.infer(rgbd_nn_params)
+            combine_params, combine_out = self.mv_fc_applier.infer(MergeSVFeatVec(rgbd_nn_featvec))
         self.reuse = True
         return rgbd_nn_params + combine_params, combine_out

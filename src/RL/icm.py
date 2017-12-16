@@ -28,13 +28,21 @@ class IntrinsicCuriosityModule:
             svconfdict,
             mvconfdict,
             featnum,
-            elu):
+            elu,
+            ferev=1):
         self.action_tensor = action_tensor
         self.rgb_tensor = rgb_tensor
         self.depth_tensor = depth_tensor
         self.next_rgb_tensor = next_rgb_tensor
         self.next_depth_tensor = next_depth_tensor
-        self.feature_extractor = vision.FeatureExtractor(svconfdict, mvconfdict, featnum, featnum, 'VisionNet', elu)
+        if ferev == 1:
+            self.feature_extractor = vision.FeatureExtractor(svconfdict, mvconfdict, featnum, featnum, 'VisionNet', elu)
+        elif ferev == 2:
+            self.feature_extractor = vision.FeatureExtractorRev2(svconfdict,
+                    128, [featnum * 2, featnum], 'VisionNetRev2', elu)
+        else:
+            self.feature_extractor = vision.FeatureExtractorRev3(svconfdict,
+                    128, [featnum * 2, featnum], 'VisionNetRev3', elu)
         self.cur_nn_params, self.cur_featvec = self.feature_extractor.infer(rgb_tensor, depth_tensor)
         self.next_nn_params, self.next_featvec = self.feature_extractor.infer(next_rgb_tensor, next_depth_tensor)
         self.elu = elu
