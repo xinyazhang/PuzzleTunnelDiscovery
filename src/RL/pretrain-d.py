@@ -233,7 +233,8 @@ def pretrain_main(args):
         all_params = model.cur_nn_params + model.next_nn_params + model.inverse_model_params
         all_params += [global_step]
         # print(all_params)
-        optimizer = tf.train.AdamOptimizer(learning_rate=1e-4)
+        optimizer = tf.train.AdamOptimizer(learning_rate=1e-3)
+        _, predicts = model.get_inverse_model()
         loss = model.get_inverse_loss(discrete=True)
         train_op = optimizer.minimize(loss, global_step)
 
@@ -256,6 +257,8 @@ def pretrain_main(args):
                 accum_epoch = 0
             total_epoch = args.iter * args.threads
             period_loss = 0.0
+            period_correct = 0
+            total_correct = 0
             while epoch < total_epoch:
                 gt = syncQ.get(timeout=60)
                 dic = {
@@ -265,14 +268,25 @@ def pretrain_main(args):
                         dep_1 : gt.dep[:-1],
                         dep_2 : gt.dep[1:]
                       }
-                summary, current_loss = sess.run([summary_op, loss], feed_dict=dic)
-                print("[{}] Start training".format(epoch))
-                sess.run(train_op, feed_dict=dic)
-                print("[{}] End training".format(epoch))
+                # print("[{}] Start training".format(epoch))
+                if not args.eval:
+                    summary, current_loss, _ = sess.run([summary_op, loss, train_op], feed_dict=dic)
+                    train_writer.add_summary(summary, accum_epoch)
+                else:
+                    current_loss, pred = sess.run([loss, predicts], feed_dict=dic)
+                    # print(pred)
+                    # print(pred.shape)
+                    pred_index = np.argmax(pred, axis=2)
+                    gt_index = np.argmax(gt.actions, axis=2)
+                    for i in range(pred_index.shape[0]):
+                        period_correct += 1 if pred_index[i, 0] == gt_index[i, 0] else 0
+                        # print('pred {} gt {}'.format(pred_index[i,0], gt_index[i,0]))
+                        # print('preds {} gts {}'.format(pred[i,0], gt.actions[i,0]))
+                    # print('loss {}'.format(current_loss))
+                # print("[{}] End training".format(epoch))
                 period_loss += current_loss
-                train_writer.add_summary(summary, accum_epoch)
                 syncQ.task_done()
-                if (epoch + 1) % 1000 == 0 or time.time() - last_time >= 10 * 60 or epoch + 1 == total_epoch:
+                if (not args.eval) and ((epoch + 1) % 1000 == 0 or time.time() - last_time >= 10 * 60 or epoch + 1 == total_epoch):
                     print("Saving checkpoint")
                     fn = saver.save(sess, ckpt_dir+ckpt_prefix, global_step=global_step)
                     print("Saved checkpoint to {}".format(fn))
@@ -280,6 +294,12 @@ def pretrain_main(args):
                 if (epoch + 1) % 10 == 0:
                     print("Progress {}/{}".format(epoch, total_epoch))
                     print("Average loss during last 10 iterations: {}".format(period_loss / 10))
+                    if args.eval:
+                        total_correct += period_correct
+                        p_correct_ratio = period_correct / (10 * pred_index.shape[0]) * 100.0
+                        total_correct_ratio = total_correct / (epoch * pred_index.shape[0]) * 100.0
+                        print("Average currectness during last 10 iterations: {}%. Total: {}%".format(p_correct_ratio, total_correct_ratio))
+                        period_correct = 0
                     period_loss = 0
                 # print("Epoch {} (Total {}) Done".format(epoch, accum_epoch))
                 epoch += 1
@@ -321,6 +341,9 @@ if __name__ == '__main__':
             action='store_true')
     parser.add_argument('--elu',
             help='Use ELU instead of ReLU after each NN layer',
+            action='store_true')
+    parser.add_argument('--eval',
+            help='Evaluate the network, rather than training',
             action='store_true')
     parser.add_argument('--ferev',
             help='Reversion of Feature Extractor',
