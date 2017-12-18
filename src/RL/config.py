@@ -33,6 +33,13 @@ SV_VISCFG = [ { 'ch_out' : 32, 'strides' : None, 'kernel_size' : None},
         { 'ch_out' : 64, 'strides' : None, 'kernel_size' : None},
         { 'ch_out' : 128, 'strides' : None, 'kernel_size' : None} ]
 
+SV_SHARED = [ { 'ch_out' : 32, 'strides' : None, 'kernel_size' : None},
+        { 'ch_out' : 32, 'strides' : [1,3,3,1], 'kernel_size' : [5,5]},
+        { 'ch_out' : 64, 'strides' : None, 'kernel_size' : None}]
+
+SV_NON_SHARED = [ { 'ch_out' : 128, 'strides' : None, 'kernel_size' : None},
+        { 'ch_out' : 256, 'strides' : [1,3,3,1], 'kernel_size' : [5,5]}]
+
 MV_VISCFG = [ { 'ch_out' : 128, 'strides' : None, 'kernel_size' : None},
         { 'ch_out' : 256, 'strides' : None, 'kernel_size' : None},
         { 'ch_out' : 256, 'strides' : None, 'kernel_size' : None},

@@ -40,9 +40,16 @@ class IntrinsicCuriosityModule:
         elif ferev == 2:
             self.feature_extractor = vision.FeatureExtractorRev2(svconfdict,
                     128, [featnum * 2, featnum], 'VisionNetRev2', elu)
-        else:
+        elif ferev == 3:
             self.feature_extractor = vision.FeatureExtractorRev3(svconfdict,
                     128, [featnum * 2, featnum], 'VisionNetRev3', elu)
+        elif ferev == 4:
+            self.feature_extractor = vision.FeatureExtractorRev4(
+                    config.SV_SHARED,
+                    config.SV_NON_SHARED,
+                    int(rgb_tensor.shape[1]),
+                    [128, 128],
+                    [featnum * 2, featnum], 'VisionNetRev4', elu)
         self.cur_nn_params, self.cur_featvec = self.feature_extractor.infer(rgb_tensor, depth_tensor)
         self.next_nn_params, self.next_featvec = self.feature_extractor.infer(next_rgb_tensor, next_depth_tensor)
         self.elu = elu

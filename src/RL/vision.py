@@ -298,8 +298,9 @@ class ConvApplier:
         self.elu = elu
         if confdict is not None:
             self.layer_configs = VisionLayerConfig.createFromDict(confdict)
-        for featnum in featnums:
-            self.layer_configs.append(FCLayerConfig(featnum))
+        if featnums is not None:
+            for featnum in featnums:
+                self.layer_configs.append(FCLayerConfig(featnum))
         self.naming = naming
         # print("== Init Len of layer_configs {}, confdict {}, featnums {}".format(len(self.layer_configs), confdict, featnums))
 
@@ -470,3 +471,52 @@ class FeatureExtractorRev3:
             combine_params, combine_out = self.mv_fc_applier.infer(MergeSVFeatVec(rgbd_nn_featvec))
         self.reuse = True
         return rgbd_nn_params + combine_params, combine_out
+
+'''
+Feature Extractor Rev. 4
+Arch:
+    SVCNN(rgb,dep) := (CNN^m) (cat(rgb,dep))
+    FE := FC^N * stack * FC^K * SVFE
+    output = FE(rgb, dep)
+'''
+class FeatureExtractorRev4:
+    naming = None
+    reuse = None
+    sv_non_shared = None
+    viewnum = 0
+
+    def __init__(self,
+            sv_shared_conf,
+            sv_nonshared_conf,
+            viewnum,
+            sv_featnums,
+            mv_featnums,
+            naming,
+            elu):
+        self.sv_shared = ConvApplier(sv_shared_conf, None, "PerViewSharedRGBD", elu)
+        self.sv_non_shared = []
+        for i in range(viewnum):
+            self.sv_non_shared.append(ConvApplier(sv_nonshared_conf,
+                sv_featnums, "View{}_NonSharedRGBD".format(i), elu))
+        self.mv_fc_applier = ConvApplier(None, mv_featnums, "RGBDCombineViewFC", elu)
+
+        self.viewnum = viewnum
+        self.naming = naming
+
+    def infer(self, rgb_input, depth_input):
+        with tf.variable_scope(self.naming, reuse=self.reuse) as scope:
+            rgbd_input = tf.concat([rgb_input, depth_input], axis=-1)
+            rgbd_shared_params, rgbd_shared_featvec = self.sv_shared.infer(rgbd_input)
+            perview_intermediates = tf.split(rgbd_input, [1 for i in range(self.viewnum)], axis=1)
+            perview_params = []
+            perview_featvec = []
+            for i in range(self.viewnum):
+                params, featvec = self.sv_non_shared[i].infer(perview_intermediates[i])
+                perview_params.append(params)
+                perview_featvec.append(featvec)
+            print("> perview featvec shape {}".format(perview_featvec[-1].shape))
+            combine_in = tf.concat(perview_featvec, axis=2)
+            combine_params, combine_out = self.mv_fc_applier.infer(combine_in)
+        self.reuse = True
+        return rgbd_shared_params + perview_params + combine_params, combine_out
+
