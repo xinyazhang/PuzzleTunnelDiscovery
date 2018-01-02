@@ -74,7 +74,29 @@ def random_path(uw, max_stepping, node_num):
 
 DISCRETE_ACTION_NUMBER = 12
 
-def random_discrete_path(uw, action_magnitude, verify_magnitude, node_num):
+def random_discrete_path_v0(uw, action_magnitude, verify_magnitude, node_num):
+    state = uw.translate_to_unit_state(gen_init_state(uw))
+    node_num = 2
+    keys = [state]
+    ratio = 0.0
+    actions = []
+    banned_actions = np.zeros(DISCRETE_ACTION_NUMBER, dtype=np.int32)
+    for i in range(node_num - 1):
+        done = False
+        action = random.randrange(2)
+        nstate, done, ratio = uw.transit_state(keys[-1],
+                action,
+                action_magnitude,
+                verify_magnitude)
+        # print(tpart, rpart, ratio)
+        keys.append(nstate)
+        # print('> VERBOSE: action {} next state: {} ratio: {}'.format(action, nstate, ratio))
+        # print(np.concatenate((tpart, rpart)))
+        actions.append(action)
+        # print(pyosr.differential(keys[-2], keys[-1]))
+    return keys, actions
+
+def random_discrete_path_v1(uw, action_magnitude, verify_magnitude, node_num):
     state = uw.translate_to_unit_state(gen_init_state(uw))
     keys = [state]
     ratio = 0.0
@@ -116,5 +138,58 @@ def random_discrete_path(uw, action_magnitude, verify_magnitude, node_num):
         # print(np.concatenate((tpart, rpart)))
         actions.append(action)
         # print(pyosr.differential(keys[-2], keys[-1]))
+    return keys, actions
+
+def random_discrete_path(uw, action_magnitude, verify_magnitude, node_num):
+    state = uw.translate_to_unit_state(gen_init_state(uw))
+    keys = [state]
+    ratio = 0.0
+    actions = []
+    banned_actions = np.zeros(DISCRETE_ACTION_NUMBER, dtype=np.int32)
+    for i in range(node_num - 1):
+        done = False
+        '''
+        random walking
+        '''
+        while not done:
+            action = random.randrange(2)
+            nstate, done, ratio = uw.transit_state(keys[-1],
+                    action,
+                    action_magnitude,
+                    verify_magnitude)
+        # print(tpart, rpart, ratio)
+        keys.append(nstate)
+        # print('> VERBOSE: action {} next state: {} ratio: {}'.format(action, nstate, ratio))
+        # print(np.concatenate((tpart, rpart)))
+        actions.append(action)
+        # print(pyosr.differential(keys[-2], keys[-1]))
+    return keys, actions
+
+def random_discrete_path_action_set(uw, action_magnitude, verify_magnitude, node_num, action_set):
+    while True:
+        state = uw.translate_to_unit_state(gen_init_state(uw))
+        keys = [state]
+        ratio = 0.0
+        actions = []
+        banned_actions = np.zeros(DISCRETE_ACTION_NUMBER, dtype=np.int32)
+        success = True
+        for i in range(node_num - 1):
+            done = False
+            action = random.choice(action_set)
+            nstate, done, ratio = uw.transit_state(keys[-1],
+                    action,
+                    action_magnitude,
+                    verify_magnitude)
+            if not done:
+                success = False
+                break
+            # print(tpart, rpart, ratio)
+            keys.append(nstate)
+            # print('> VERBOSE: action {} next state: {} ratio: {}'.format(action, nstate, ratio))
+            # print(np.concatenate((tpart, rpart)))
+            actions.append(action)
+            # print(pyosr.differential(keys[-2], keys[-1]))
+        if success:
+            break
     return keys, actions
 

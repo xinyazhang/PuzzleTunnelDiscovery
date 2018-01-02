@@ -3,8 +3,8 @@ import numpy as np
 from operator import mul
 
 class VisionLayerConfig:
-    strides = [1, 2, 2, 1]
-    kernel_size = [3, 3]
+    strides = None
+    kernel_size = None
     ch_in = -1                      # -1 means all channels from previous layer
     ch_out = None                   # Undefined by default
     padding = 'SAME'
@@ -302,6 +302,11 @@ class ConvApplier:
             for featnum in featnums:
                 self.layer_configs.append(FCLayerConfig(featnum))
         self.naming = naming
+        if self.naming is not None:
+            index = 0
+            for conf in self.layer_configs:
+                conf.naming = "Layer_{}".format(index)
+                index += 1
         # print("== Init Len of layer_configs {}, confdict {}, featnums {}".format(len(self.layer_configs), confdict, featnums))
 
     def infer(self, input_tensor):
@@ -316,15 +321,9 @@ class ConvApplier:
             layer.elu = self.elu
         nn_layer_tensor = [input_tensor]
         nn_args = []
-        index = 0
         # print("== Len of layer_configs {}".format(len(self.layer_configs)))
         for conf in self.layer_configs:
-            if self.naming is not None:
-                # print("== Index {}".format(index))
-                conf.naming = "Layer_{}".format(index)
-                index += 1
             prev_layer_tensor = nn_layer_tensor[-1]
-            prev_ch = prev_layer_tensor[-1]
             w,b,out = conf.apply_layer(prev_layer_tensor)
             nn_layer_tensor.append(out)
             nn_args.append((w,b))
@@ -520,3 +519,29 @@ class FeatureExtractorRev4:
         self.reuse = True
         return rgbd_shared_params + perview_params + combine_params, combine_out
 
+'''
+Feature Extractor Rev. 5
+Arch:
+    AlexNet
+'''
+class FeatureExtractorRev5:
+    naming = None
+    reuse = None
+
+    def __init__(self,
+            cnnconf,
+            featnums,
+            naming,
+            elu):
+        self.alexrgbd = ConvApplier(cnnconf, featnums, "AlexRGBD", elu)
+
+        self.naming = naming
+
+    def infer(self, rgb_input, depth_input):
+        with tf.variable_scope(self.naming, reuse=self.reuse) as scope:
+        #with tf.variable_scope(self.naming, reuse=tf.AUTO_REUSE) as scope:
+            rgbd_input = tf.concat([rgb_input, depth_input], axis=-1)
+            params, featvec = self.alexrgbd.infer(rgbd_input)
+            print("> Rev5 {}".format(featvec.shape))
+        self.reuse = True
+        return params, featvec

@@ -50,6 +50,10 @@ class IntrinsicCuriosityModule:
                     int(rgb_tensor.shape[1]),
                     [128, 128],
                     [featnum * 2, featnum], 'VisionNetRev4', elu)
+        elif ferev == 5:
+            self.feature_extractor = vision.FeatureExtractorRev5(
+                    config.SV_NAIVE,
+                    [1024, 1024, featnum], 'VisionNetRev5', elu)
         self.cur_nn_params, self.cur_featvec = self.feature_extractor.infer(rgb_tensor, depth_tensor)
         self.next_nn_params, self.next_featvec = self.feature_extractor.infer(next_rgb_tensor, next_depth_tensor)
         self.elu = elu
@@ -97,8 +101,21 @@ class IntrinsicCuriosityModule:
         print('inv loss action.shape {}'.format(out.shape))
         if not discrete:
             return tf.norm(out - self.action_tensor)
+        # TODO: with tf.squeeze ?
+        '''
         ret = tf.nn.softmax_cross_entropy_with_logits(
             labels=self.action_tensor,
             logits=out)
+        '''
+        labels = tf.reshape(self.action_tensor, [-1, 12])
+        logits = tf.reshape(out, [-1, 12])
+        ret = tf.losses.softmax_cross_entropy(
+            onehot_labels=labels,
+            logits=logits)
+        '''
+        ret = tf.losses.sigmoid_cross_entropy(
+            multi_class_labels=labels,
+            logits=logits)
+        '''
         print('inv loss ret shape {}'.format(ret.shape))
-        return tf.reduce_mean(ret)
+        return ret

@@ -28,13 +28,14 @@ class Config:
 
 VIEW_CFG = [(30.0, 12), (-30.0, 12), (0, 4), (90, 1), (-90, 1)]
 VIEW_CFG_REV2 = [(45.0, 8), (-45.0, 8), (0, 4), (90, 1), (-90, 1)]
+#VIEW_CFG_REV4 = [(45.0, 4), (-45.0, 4), (0, 4), (90, 1), (-90, 1)]
+VIEW_CFG_REV4 = [(30.0, 1)]
 SV_VISCFG = [ { 'ch_out' : 32, 'strides' : None, 'kernel_size' : None},
         { 'ch_out' : 32, 'strides' : [1,3,3,1], 'kernel_size' : [5,5]},
         { 'ch_out' : 64, 'strides' : None, 'kernel_size' : None},
         { 'ch_out' : 128, 'strides' : None, 'kernel_size' : None} ]
 
 SV_SHARED = [ { 'ch_out' : 32, 'strides' : None, 'kernel_size' : None},
-        { 'ch_out' : 32, 'strides' : [1,3,3,1], 'kernel_size' : [5,5]},
         { 'ch_out' : 64, 'strides' : None, 'kernel_size' : None}]
 
 SV_NON_SHARED = [ { 'ch_out' : 128, 'strides' : None, 'kernel_size' : None},
@@ -50,6 +51,13 @@ MV_VISCFG2 = [
         { 'ch_out' : 256, 'strides' : [1,3,3,1], 'kernel_size' : [5,5]},
         { 'ch_out' : 256, 'strides' : [1,3,3,1], 'kernel_size' : [5,5]},
         { 'ch_out' : 512, 'strides' : [1,3,3,1], 'kernel_size' : [5,5]} ]
+
+SV_NAIVE =  [ { 'ch_out' : 32, 'strides' : None, 'kernel_size' : None},
+        { 'ch_out' : 64, 'strides' : None, 'kernel_size' : None},
+        { 'ch_out' : 128, 'strides' : None, 'kernel_size' : None},
+        { 'ch_out' : 256, 'strides' : None, 'kernel_size' : [5,5]},
+        { 'ch_out' : 512, 'strides' : None, 'kernel_size' : [5,5]},
+        ]
 
 MAX_STEPS = 1000000
 #DEFAULT_RES = 224
