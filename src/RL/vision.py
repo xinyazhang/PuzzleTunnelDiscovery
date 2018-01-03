@@ -12,6 +12,7 @@ class VisionLayerConfig:
     bias = None
     naming = None
     elu = False
+    hole = None
 
     def __init__(self, ch_out, strides=[1, 2, 2, 1], kernel_size=[3,3], padding = 'SAME'):
         self.ch_out = ch_out
@@ -48,8 +49,17 @@ class VisionLayerConfig:
         print('prev {}'.format(prev_layer.shape))
         prev_ch_out = int(prev_layer.shape[-1])
         w,b = self.create_kernel(prev_ch_out)
-        strides = [1] + self.strides
-        conv = tf.nn.conv3d(prev_layer, w, strides, self.padding)
+        if self.hole is not None:
+            strides = [1, self.strides[1], self.strides[2]]
+            conv = tf.nn.convolution(prev_layer,
+                    w,
+                    padding=self.padding,
+                    strides=strides,
+                    dilation_rate=self.hole,
+                    data_format='NDHWC')
+        else:
+            strides = [1] + self.strides
+            conv = tf.nn.conv3d(prev_layer, w, strides, self.padding)
         # out = tf.nn.relu(conv + b)
         out = tf.nn.elu(conv + b) if self.elu else tf.nn.relu(conv + b)
         print('after CNN {}'.format(out.shape))
@@ -65,6 +75,11 @@ class VisionLayerConfig:
                 viscfg.strides = visdesc['strides']
             if visdesc['kernel_size'] is not None:
                 viscfg.kernel_size = visdesc['kernel_size']
+            if 'hole' in visdesc:
+                # FIXME: More general
+                rate = visdesc['hole']+1
+                # Note: no hole in view dimension
+                viscfg.hole = [1, rate, rate]
             viscfg_array.append(viscfg)
         return viscfg_array
 
@@ -545,3 +560,31 @@ class FeatureExtractorRev5:
             print("> Rev5 {}".format(featvec.shape))
         self.reuse = True
         return params, featvec
+
+'''
+Feature Extractor Rev. 6
+Arch:
+    Dilated convolution
+'''
+class FeatureExtractorRev6:
+    naming = None
+    reuse = None
+
+    def __init__(self,
+            cnnconf,
+            featnums,
+            naming,
+            elu):
+        self.alexrgbd = ConvApplier(cnnconf, featnums, "HoleRGBD", elu)
+
+        self.naming = naming
+
+    def infer(self, rgb_input, depth_input):
+        with tf.variable_scope(self.naming, reuse=self.reuse) as scope:
+        #with tf.variable_scope(self.naming, reuse=tf.AUTO_REUSE) as scope:
+            rgbd_input = tf.concat([rgb_input, depth_input], axis=-1)
+            params, featvec = self.alexrgbd.infer(rgbd_input)
+            print("> Rev6 {}".format(featvec.shape))
+        self.reuse = True
+        return params, featvec
+

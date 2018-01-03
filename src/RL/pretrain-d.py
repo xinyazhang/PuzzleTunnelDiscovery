@@ -30,7 +30,7 @@ VIEW_CFG = config.VIEW_CFG
 
 def setup_global_variable(args):
     global VIEW_CFG
-    if args.ferev in [4,5]:
+    if args.ferev in [4,5,6,7,8]:
         VIEW_CFG = config.VIEW_CFG_REV4
     elif args.ferev != 1:
         VIEW_CFG = config.VIEW_CFG_REV2
@@ -425,7 +425,7 @@ if __name__ == '__main__':
             action='store_true')
     parser.add_argument('--ferev',
             help='Reversion of Feature Extractor',
-            choices=range(1,5+1),
+            choices=range(1,8+1),
             type=int, default=1)
     parser.add_argument('--capture',
             help='Capture input image to summary',

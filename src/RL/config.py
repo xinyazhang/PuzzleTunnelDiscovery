@@ -59,6 +59,45 @@ SV_NAIVE =  [ { 'ch_out' : 32, 'strides' : None, 'kernel_size' : None},
         { 'ch_out' : 512, 'strides' : None, 'kernel_size' : [5,5]},
         ]
 
+SV_HOLE_LOWRES = [
+        { 'ch_out' : 32, 'strides' : [1,1,1,1], 'kernel_size' : None},
+        { 'ch_out' : 32, 'strides' : [1,1,1,1], 'kernel_size' : None},
+        { 'ch_out' : 32, 'strides' : [1,1,1,1], 'kernel_size' : None, 'hole' : 1},
+        { 'ch_out' : 64, 'strides' : [1,2,2,1], 'kernel_size' : None},
+        { 'ch_out' : 64, 'strides' : [1,1,1,1], 'kernel_size' : None},
+        { 'ch_out' : 64, 'strides' : [1,1,1,1], 'kernel_size' : None, 'hole' : 1},
+        { 'ch_out' : 128, 'strides' : [1,2,2,1], 'kernel_size' : None},
+        { 'ch_out' : 128, 'strides' : [1,1,1,1], 'kernel_size' : None},
+        { 'ch_out' : 128, 'strides' : [1,1,1,1], 'kernel_size' : None, 'hole' : 1},
+        { 'ch_out' : 256, 'strides' : [1,2,2,1], 'kernel_size' : None},
+        { 'ch_out' : 256, 'strides' : [1,1,1,1], 'kernel_size' : None},
+        { 'ch_out' : 256, 'strides' : [1,1,1,1], 'kernel_size' : None, 'hole' : 1},
+        { 'ch_out' : 512, 'strides' : [1,2,2,1], 'kernel_size' : None},
+        ]
+
+SV_HOLE_MIDRES = [
+        { 'ch_out' : 32, 'strides' : [1,1,1,1], 'kernel_size' : None},
+        { 'ch_out' : 32, 'strides' : [1,1,1,1], 'kernel_size' : None},
+        { 'ch_out' : 32, 'strides' : [1,1,1,1], 'kernel_size' : None, 'hole' : 1},
+        { 'ch_out' : 64, 'strides' : [1,2,2,1], 'kernel_size' : None},
+        { 'ch_out' : 64, 'strides' : [1,1,1,1], 'kernel_size' : None},
+        { 'ch_out' : 64, 'strides' : [1,1,1,1], 'kernel_size' : None, 'hole' : 1},
+        { 'ch_out' : 128, 'strides' : [1,2,2,1], 'kernel_size' : None},
+        { 'ch_out' : 128, 'strides' : [1,1,1,1], 'kernel_size' : None},
+        { 'ch_out' : 128, 'strides' : [1,1,1,1], 'kernel_size' : None, 'hole' : 1},
+        { 'ch_out' : 256, 'strides' : [1,2,2,1], 'kernel_size' : None},
+        ]
+
+SV_HOLE_HIGHRES = [
+        { 'ch_out' : 64, 'strides' : [1,1,1,1], 'kernel_size' : None},
+        { 'ch_out' : 64, 'strides' : [1,1,1,1], 'kernel_size' : None},
+        { 'ch_out' : 64, 'strides' : [1,1,1,1], 'kernel_size' : None, 'hole' : 1},
+        { 'ch_out' : 64, 'strides' : [1,2,2,1], 'kernel_size' : None},
+        { 'ch_out' : 64, 'strides' : [1,1,1,1], 'kernel_size' : None},
+        { 'ch_out' : 64, 'strides' : [1,1,1,1], 'kernel_size' : None, 'hole' : 1},
+        { 'ch_out' : 64, 'strides' : [1,2,2,1], 'kernel_size' : None},
+        ]
+
 MAX_STEPS = 1000000
 #DEFAULT_RES = 224
 DEFAULT_RES = 112
