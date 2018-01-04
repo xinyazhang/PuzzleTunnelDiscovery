@@ -38,9 +38,7 @@ def setup_global_variable(args):
 def _get_action_set(args):
     if args.uniqueaction > 0:
         return [args.uniqueaction]
-    if not args.actionset:
-        return args.actionset
-    return []
+    return args.actionset
 
 def create_renderer():
     view_array = vision.create_view_array_from_config(VIEW_CFG)
@@ -141,7 +139,7 @@ def collector(syncQ, sample_num, batch_size, tid, amag, vmag, action_set):
         if MT_VERBOSE:
             print("!Generating Path #{} by thread {}".format(i, tid))
         if len(action_set) > 0:
-            keys, actions = uw_random.random_discrete_path_unique_action(r,
+            keys, actions = uw_random.random_discrete_path_action_set(r,
                     amag, vmag, batch_size, action_set)
         else:
             keys, actions = uw_random.random_discrete_path(r, amag, vmag, batch_size)
@@ -181,6 +179,8 @@ def spawn_gt_collector_thread(args):
     syncQ = queue.Queue(args.queuemax)
     threads = []
     for i in range(args.threads):
+        if MT_VERBOSE:
+            print("> action set: {}".format(_get_action_set(args)))
         dic = { 'syncQ' : syncQ, 'sample_num' : args.iter, 'batch_size' :
                 args.batch, 'tid' : i, 'amag' : args.amag, 'vmag' : args.vmag,
                 'action_set' : _get_action_set(args) }
@@ -385,6 +385,7 @@ if __name__ == '__main__':
             type=int, default=-1)
     parser.add_argument('--actionset', nargs='+',
             help='Set to sample actions within',
+            type=int,
             default=[])
     parser.add_argument('--ckptprefix', help='Prefix of checkpoint files',
             default='pretrain-d-ckpt')
@@ -433,4 +434,6 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     setup_global_variable(args)
+    if MT_VERBOSE:
+        print("Action set {}".format(args.actionset))
     pretrain_main(args)

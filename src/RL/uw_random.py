@@ -171,7 +171,6 @@ def random_discrete_path_action_set(uw, action_magnitude, verify_magnitude, node
         keys = [state]
         ratio = 0.0
         actions = []
-        banned_actions = np.zeros(DISCRETE_ACTION_NUMBER, dtype=np.int32)
         success = True
         for i in range(node_num - 1):
             done = False
@@ -180,12 +179,12 @@ def random_discrete_path_action_set(uw, action_magnitude, verify_magnitude, node
                     action,
                     action_magnitude,
                     verify_magnitude)
+            # print('> VERBOSE: action {} next state: {} ratio: {}'.format(action, nstate, ratio))
             if not done:
                 success = False
                 break
             # print(tpart, rpart, ratio)
             keys.append(nstate)
-            # print('> VERBOSE: action {} next state: {} ratio: {}'.format(action, nstate, ratio))
             # print(np.concatenate((tpart, rpart)))
             actions.append(action)
             # print(pyosr.differential(keys[-2], keys[-1]))
