@@ -189,13 +189,59 @@ def spawn_gt_collector_thread(args):
         threads.append(thread)
     return threads, syncQ
 
+def gt_aggregrate(batching):
+    ret = GroundTruth()
+    ret.actions = np.concatenate([gt.actions for gt in batching])
+    ret.rgb_1 = np.concatenate([gt.rgb[:-1] for gt in batching])
+    ret.rgb_2 = np.concatenate([gt.rgb[1:] for gt in batching])
+    ret.dep_1 = np.concatenate([gt.dep[:-1] for gt in batching])
+    ret.dep_2 = np.concatenate([gt.dep[1:] for gt in batching])
+    return ret
+
+def gt_reader(syncQ, args):
+    batching = []
+    for epoch in range(args.total_sample):
+        if args.sampletouse > 0:
+            idx = epoch % args.sampletouse
+        else:
+            idx = epoch
+        fn = '{}/sample-{}.npz'.format(args.samplein, idx + args.samplebase)
+        d = np.load(fn)
+        gt = GroundTruth()
+        gt.actions = d['A']
+        gt.rgb = d['RGB']
+        gt.dep = d['DEP']
+        if MT_VERBOSE:
+            print("!GT File {} was read".format(fn))
+        if args.samplebatching == 1:
+            syncQ.put(gt)
+        else:
+            batching.append(gt)
+            if len(batching) >= args.samplebatching:
+                gt = gt_aggregrate(batching)
+                syncQ.put(gt)
+                print("!GT RGB_1 {} was queued".format(gt.rgb_1.shape))
+                batching = []
+
+def spawn_gt_reader_thread(args):
+    syncQ = queue.Queue(args.queuemax)
+    dic = {
+            'syncQ' : syncQ,
+            'args' : args
+          }
+    thread = threading.Thread(target=gt_reader, kwargs=dic)
+    thread.start()
+    threads = [thread]
+    return threads, syncQ
+
 def pretrain_main(args):
     '''
     CAVEAT: WE MUST CREATE RENDERER BEFORE CALLING ANY TF ROUTINE
     '''
     pyosr.init()
     threads = []
-    total_epoch = args.iter * args.threads
+    #total_epoch = args.iter * args.threads
+    total_epoch = args.total_epoch
 
     if args.dryrun:
         r = create_renderer()
@@ -221,6 +267,8 @@ def pretrain_main(args):
                     np.savez(fn, A=gt.actions, RGB=gt.rgb, DEP=gt.dep)
                     imsave(imfn, gt.rgb[0][0])
             return
+    else:
+        threads, syncQ = spawn_gt_reader_thread(args)
 
     view_array = vision.create_view_array_from_config(VIEW_CFG)
     view_num = len(view_array)
@@ -274,7 +322,6 @@ def pretrain_main(args):
 
         saver = tf.train.Saver() # Save everything
         last_time = time.time()
-        batch_size = args.batch - 1
         with tf.Session(config=session_config) as sess:
             sess.run(tf.global_variables_initializer())
             ckpt = tf.train.get_checkpoint_state(checkpoint_dir=ckpt_dir)
@@ -287,29 +334,29 @@ def pretrain_main(args):
             else:
                 accum_epoch = 0
             period_loss = 0.0
-            period_correct = 0
-            total_correct = 0
+            period_accuracy = 0
+            total_accuracy = 0
             while epoch < total_epoch:
-                if not args.samplein:
-                    gt = syncQ.get(timeout=60)
+                gt = syncQ.get(timeout=60)
+                if args.samplebatching > 1:
+                    dic = {
+                            action: gt.actions,
+                            rgb_1: gt.rgb_1,
+                            rgb_2: gt.rgb_2,
+                            dep_1: gt.dep_1,
+                            dep_2: gt.dep_2
+                          }
+                    if MT_VERBOSE:
+                        print('train with rgb_1 {}'.format(gt.rgb_1.shape))
                 else:
-                    if args.sampletouse > 0:
-                        idx = epoch % args.sampletouse
-                    else:
-                        idx = epoch
-                    fn = '{}/sample-{}.npz'.format(args.samplein, idx + args.samplebase)
-                    d = np.load(fn)
-                    gt = GroundTruth()
-                    gt.actions = d['A']
-                    gt.rgb = d['RGB']
-                    gt.dep = d['DEP']
-                dic = {
-                        action : gt.actions,
-                        rgb_1 : gt.rgb[:-1],
-                        rgb_2 : gt.rgb[1:],
-                        dep_1 : gt.dep[:-1],
-                        dep_2 : gt.dep[1:]
-                      }
+                    dic = {
+                            action : gt.actions,
+                            rgb_1 : gt.rgb[:-1],
+                            rgb_2 : gt.rgb[1:],
+                            dep_1 : gt.dep[:-1],
+                            dep_2 : gt.dep[1:]
+                          }
+                batch_size = gt.actions.shape[0]
 
                 if args.sampleout:
                     fn = '{}/sample-{}'.format(args.sampleout, epoch + args.samplebase)
@@ -322,7 +369,7 @@ def pretrain_main(args):
                     pred_index = np.argmax(pred, axis=2)
                     gt_index = np.argmax(gt.actions, axis=2)
                     for i in range(gt.actions.shape[0]):
-                        period_correct += 1 if pred_index[i, 0] == gt_index[i, 0] else 0
+                        period_accuracy += 1 if pred_index[i, 0] == gt_index[i, 0] else 0
                         # print('current preds {} gts {}'.format(pred[i,0], gt.actions[i,0]))
                     train_writer.add_summary(summary, accum_epoch)
                 else:
@@ -332,7 +379,7 @@ def pretrain_main(args):
                     pred_index = np.argmax(pred, axis=2)
                     gt_index = np.argmax(gt.actions, axis=2)
                     for i in range(pred_index.shape[0]):
-                        period_correct += 1 if pred_index[i, 0] == gt_index[i, 0] else 0
+                        period_accuracy += 1 if pred_index[i, 0] == gt_index[i, 0] else 0
                         # print('pred {} gt {}'.format(pred_index[i,0], gt_index[i,0]))
                         # print('preds {} gts {}'.format(pred[i,0], gt.actions[i,0]))
                     # print('loss {}'.format(current_loss))
@@ -350,19 +397,19 @@ def pretrain_main(args):
                     print("Average loss during last 10 iterations: {}".format(period_loss / 10))
                     print("Prediction sample: {}".format(pred[0,0]))
                     print("Action sample: {}".format(gt.actions[0,0]))
-                    total_correct += period_correct
-                    p_correct_ratio = period_correct / (10.0 * batch_size) * 100.0
-                    total_correct_ratio = total_correct / ((epoch+1.0) * batch_size) * 100.0
-                    print("Average currectness during last 10 iterations: {}%. Total: {}%".format(
-                        p_correct_ratio, total_correct_ratio))
-                    period_correct = 0
+                    total_accuracy += period_accuracy
+                    p_accuracy_ratio = period_accuracy / (10.0 * batch_size) * 100.0
+                    total_accuracy_ratio = total_accuracy / ((epoch+1.0) * batch_size) * 100.0
+                    print("Average accuracy during last 10 iterations: {}%. Total: {}%".format(
+                        p_accuracy_ratio, total_accuracy_ratio))
+                    period_accuracy = 0
                     period_loss = 0
                 # print("Epoch {} (Total {}) Done".format(epoch, accum_epoch))
                 epoch += 1
                 accum_epoch += 1
-    total_correct += period_correct
-    total_correct_ratio = total_correct / ((epoch+1.0) * batch_size) * 100.0
-    print("Final Correctness {}%".format(total_correct_ratio))
+    total_accuracy += period_accuracy
+    total_accuracy_ratio = total_accuracy / ((epoch+1.0) * batch_size) * 100.0
+    print("Final Accuracy {}%".format(total_accuracy_ratio))
     for thread in threads:
         thread.join()
 
@@ -394,6 +441,9 @@ if __name__ == '__main__':
     parser.add_argument('--batch', metavar='NUMBER',
             help='Batch size of each iteration in training',
             type=int, default=32)
+    parser.add_argument('--samplebatching', metavar='NUMBER',
+            help='Number of samples to aggregrate in training',
+            type=int, default=1)
     parser.add_argument('--queuemax', metavar='NUMBER',
             help='Capacity of the synchronized queue to store generated GT',
             type=int, default=32)
@@ -436,4 +486,6 @@ if __name__ == '__main__':
     setup_global_variable(args)
     if MT_VERBOSE:
         print("Action set {}".format(args.actionset))
+    args.total_sample = args.iter * args.threads
+    args.total_epoch = args.total_sample / args.samplebatching
     pretrain_main(args)
