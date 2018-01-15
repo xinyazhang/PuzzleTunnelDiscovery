@@ -166,8 +166,10 @@ class IntrinsicCuriosityModuleCommittee:
         self.perview_rgbs_2 = tf.split(next_rgb_tensor, self.view_num, axis=1)
         self.perview_deps_2 = tf.split(next_depth_tensor, self.view_num, axis=1)
         self.action_tensor = action_tensor
+        cur_nn_paramss = []
+        next_nn_paramss = []
         for i in range(self.view_num):
-            with tf.variable_scope(scope_name(i)):
+            with tf.variable_scope(IntrinsicCuriosityModuleCommittee.scope_name(i)):
                 self.icms.append(IntrinsicCuriosityModule(
                     action_tensor,
                     self.perview_rgbs_1[i],
@@ -178,6 +180,10 @@ class IntrinsicCuriosityModuleCommittee:
                     mvconfdict,
                     elu,
                     ferev))
+                cur_nn_paramss.append(self.icms[-1].cur_nn_params)
+                next_nn_paramss.append(self.icms[-1].next_nn_params)
+        self.cur_nn_params = sum(cur_nn_paramss, [])
+        self.next_nn_params = sum(next_nn_paramss, [])
 
     def get_inverse_model(self):
         if self.inverse_output_tensor is not None:
@@ -186,12 +192,12 @@ class IntrinsicCuriosityModuleCommittee:
         outs = []
         for i in range(self.view_num):
             icm = self.icms[i]
-            with tf.variable_scope(scope_name(i)):
+            with tf.variable_scope(IntrinsicCuriosityModuleCommittee.scope_name(i)):
                 params, out = icm.get_inverse_model()
                 paramss.append(params)
                 outs.append(out)
         self.inverse_model_params = sum(paramss, [])
-        self.inverse_output_tensor = tf.accumulate_n(outs)
+        self.inverse_output_tensor = tf.add_n(outs)
         return self.inverse_model_params, self.inverse_output_tensor
 
     def get_forward_model(self):
@@ -199,7 +205,8 @@ class IntrinsicCuriosityModuleCommittee:
             return self.forward_model_params, self.forward_output_tensor
         pass
 
-    def get_inverse_loss(self):
+    def get_inverse_loss(self, discrete=True):
+        assert discrete == True
         _, out = self.get_inverse_model()
         print('> inv loss out.shape {}'.format(out.shape))
         print('> inv loss action.shape {}'.format(out.shape))
