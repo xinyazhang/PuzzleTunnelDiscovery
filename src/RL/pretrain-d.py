@@ -200,6 +200,7 @@ def gt_aggregrate(batching):
 
 def gt_reader(syncQ, args):
     batching = []
+    r = None
     for epoch in range(args.total_sample):
         if args.sampletouse > 0:
             idx = epoch % args.sampletouse
@@ -209,8 +210,28 @@ def gt_reader(syncQ, args):
         d = np.load(fn)
         gt = GroundTruth()
         gt.actions = d['A']
-        gt.rgb = d['RGB']
-        gt.dep = d['DEP']
+        if 'RGB' not in d:
+            rgbq = []
+            depq = []
+            if r is None:
+                r = create_renderer()
+                rgb_shape = (len(r.views), r.pbufferWidth, r.pbufferHeight, 3)
+                dep_shape = (len(r.views), r.pbufferWidth, r.pbufferHeight, 1)
+            keys = d['K']
+            nkeys = keys.shape[0]
+            for index in range(nkeys):
+                r.state = keys[index]
+                r.render_mvrgbd()
+                rgb = r.mvrgb.reshape(rgb_shape)
+                dep = r.mvdepth.reshape(dep_shape)
+                rgbq.append(np.copy(rgb))
+                depq.append(np.copy(dep))
+            gt.rgb = np.array(rgbq)
+            gt.dep = np.array(depq)
+            gt.keys = keys
+        else:
+            gt.rgb = d['RGB']
+            gt.dep = d['DEP']
         if MT_VERBOSE:
             print("!GT File {} was read".format(fn))
         if args.samplebatching == 1:
@@ -233,6 +254,15 @@ def spawn_gt_reader_thread(args):
     thread.start()
     threads = [thread]
     return threads, syncQ
+
+def save_gt_file(args, gt, epoch):
+    fn = '{}/sample-{}'.format(args.sampleout, epoch + args.samplebase)
+    imfn = fn+'-peek.png'
+    if args.norgbd:
+        np.savez(fn, A=gt.actions, K=gt.keys)
+    else:
+        np.savez(fn, A=gt.actions, RGB=gt.rgb, DEP=gt.dep, K=gt.keys)
+    imsave(imfn, gt.rgb[0][0])
 
 def pretrain_main(args):
     '''
@@ -262,10 +292,7 @@ def pretrain_main(args):
             if args.sampleout:
                 for epoch in range(total_epoch):
                     gt = syncQ.get(timeout=60)
-                    fn = '{}/sample-{}'.format(args.sampleout, epoch + args.samplebase)
-                    imfn = fn+'-peek.png'
-                    np.savez(fn, A=gt.actions, RGB=gt.rgb, DEP=gt.dep)
-                    imsave(imfn, gt.rgb[0][0])
+                    save_gt_file(args, gt, epoch)
             return
     else:
         threads, syncQ = spawn_gt_reader_thread(args)
@@ -369,10 +396,7 @@ def pretrain_main(args):
                 batch_size = gt.actions.shape[0]
 
                 if args.sampleout:
-                    fn = '{}/sample-{}'.format(args.sampleout, epoch + args.samplebase)
-                    imfn = fn+'-peek.png'
-                    np.savez(fn, A=gt.actions, RGB=gt.rgb, DEP=gt.dep)
-                    imsave(imfn, gt.rgb[0][0])
+                    save_gt_file(args, gt, epoch)
                 # print("[{}] Start training".format(epoch))
                 if not args.eval:
                     pred, summary, current_loss, _ = sess.run([predicts, summary_op, loss, train_op], feed_dict=dic)
@@ -484,6 +508,9 @@ if __name__ == '__main__':
             action='store_true')
     parser.add_argument('--committee',
             help='Employ a committee of NNs with different weights to extract features/make decisions from different views',
+            action='store_true')
+    parser.add_argument('--norgbd',
+            help='Do not store RGB/D images in storing the sample, to save disk spaces',
             action='store_true')
 
     args = parser.parse_args()
