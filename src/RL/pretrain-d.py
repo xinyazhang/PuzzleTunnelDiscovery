@@ -295,14 +295,24 @@ def pretrain_main(args):
         rgb_2 = tf.placeholder(tf.float32, shape=[None, view_num, w, h, 3])
         dep_1 = tf.placeholder(tf.float32, shape=[None, view_num, w, h, 1])
         dep_2 = tf.placeholder(tf.float32, shape=[None, view_num, w, h, 1])
-        model = icm.IntrinsicCuriosityModule(action,
-                rgb_1, dep_1,
-                rgb_2, dep_2,
-                config.SV_VISCFG,
-                config.MV_VISCFG2,
-                256,
-                args.elu,
-                args.ferev)
+        if not args.committee:
+            model = icm.IntrinsicCuriosityModule(action,
+                    rgb_1, dep_1,
+                    rgb_2, dep_2,
+                    config.SV_VISCFG,
+                    config.MV_VISCFG2,
+                    256,
+                    args.elu,
+                    args.ferev)
+        else:
+            model = icm.IntrinsicCuriosityModuleCommittee(action,
+                    rgb_1, dep_1,
+                    rgb_2, dep_2,
+                    config.SV_VISCFG,
+                    config.MV_VISCFG2,
+                    256,
+                    args.elu,
+                    args.ferev)
         model.get_inverse_model() # Create model.inverse_model_{params,tensor}
         all_params = model.cur_nn_params + model.next_nn_params + model.inverse_model_params
         all_params += [global_step]
@@ -480,6 +490,9 @@ if __name__ == '__main__':
             type=int, default=1)
     parser.add_argument('--capture',
             help='Capture input image to summary',
+            action='store_true')
+    parser.add_argument('--committee',
+            help='Employ a committee of NNs with different weights to extract features/make decisions from different views',
             action='store_true')
 
     args = parser.parse_args()

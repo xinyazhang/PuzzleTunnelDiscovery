@@ -131,3 +131,82 @@ class IntrinsicCuriosityModule:
         '''
         print('inv loss ret shape {}'.format(ret.shape))
         return ret
+
+'''
+IntrinsicCuriosityModuleCommittee:
+    ICM Committe, each NN for one view
+    Inverse model: accumulating prediction from views as multi-view prediction.
+    Forward model: TODO
+'''
+class IntrinsicCuriosityModuleCommittee:
+    icms = None
+    view_num = 0
+    inverse_output_tensor = None
+    forward_output_tensor = None
+
+    @staticmethod
+    def scope_name(i):
+        return 'ICM_View{}'.format(i)
+
+    def __init__(self,
+            action_tensor,
+            rgb_tensor,
+            depth_tensor,
+            next_rgb_tensor,
+            next_depth_tensor,
+            svconfdict,
+            mvconfdict,
+            featnum,
+            elu,
+            ferev=1):
+        self.icms = []
+        self.view_num = int(rgb_tensor.shape[1])
+        self.perview_rgbs_1 = tf.split(rgb_tensor, self.view_num, axis=1)
+        self.perview_deps_1 = tf.split(depth_tensor, self.view_num, axis=1)
+        self.perview_rgbs_2 = tf.split(next_rgb_tensor, self.view_num, axis=1)
+        self.perview_deps_2 = tf.split(next_depth_tensor, self.view_num, axis=1)
+        self.action_tensor = action_tensor
+        for i in range(self.view_num):
+            with tf.variable_scope(scope_name(i)):
+                self.icms.append(IntrinsicCuriosityModule(
+                    action_tensor,
+                    self.perview_rgbs_1[i],
+                    self.perview_deps_1[i],
+                    self.perview_rgbs_2[i],
+                    self.perview_deps_2[i],
+                    svconfdict,
+                    mvconfdict,
+                    elu,
+                    ferev))
+
+    def get_inverse_model(self):
+        if self.inverse_output_tensor is not None:
+            return self.inverse_model_params, self.inverse_output_tensor
+        paramss = []
+        outs = []
+        for i in range(self.view_num):
+            icm = self.icms[i]
+            with tf.variable_scope(scope_name(i)):
+                params, out = icm.get_inverse_model()
+                paramss.append(params)
+                outs.append(out)
+        self.inverse_model_params = sum(paramss, [])
+        self.inverse_output_tensor = tf.accumulate_n(outs)
+        return self.inverse_model_params, self.inverse_output_tensor
+
+    def get_forward_model(self):
+        if self.forward_output_tensor is not None:
+            return self.forward_model_params, self.forward_output_tensor
+        pass
+
+    def get_inverse_loss(self):
+        _, out = self.get_inverse_model()
+        print('> inv loss out.shape {}'.format(out.shape))
+        print('> inv loss action.shape {}'.format(out.shape))
+        labels = tf.reshape(self.action_tensor, [-1, 12])
+        logits = tf.reshape(out, [-1, 12])
+        ret = tf.losses.softmax_cross_entropy(
+            onehot_labels=labels,
+            logits=logits)
+        print('inv loss ret shape {}'.format(ret.shape))
+        return ret
