@@ -376,23 +376,14 @@ def pretrain_main(args):
                 # print("[{}] Start training".format(epoch))
                 if not args.eval:
                     pred, summary, current_loss, _ = sess.run([predicts, summary_op, loss, train_op], feed_dict=dic)
-                    pred_index = np.argmax(pred, axis=2)
-                    gt_index = np.argmax(gt.actions, axis=2)
-                    for i in range(gt.actions.shape[0]):
-                        period_accuracy += 1 if pred_index[i, 0] == gt_index[i, 0] else 0
-                        # print('current preds {} gts {}'.format(pred[i,0], gt.actions[i,0]))
                     train_writer.add_summary(summary, accum_epoch)
                 else:
                     current_loss, pred = sess.run([loss, predicts], feed_dict=dic)
-                    # print(pred)
-                    # print(pred.shape)
-                    pred_index = np.argmax(pred, axis=2)
-                    gt_index = np.argmax(gt.actions, axis=2)
-                    for i in range(pred_index.shape[0]):
-                        period_accuracy += 1 if pred_index[i, 0] == gt_index[i, 0] else 0
-                        # print('pred {} gt {}'.format(pred_index[i,0], gt_index[i,0]))
-                        # print('preds {} gts {}'.format(pred[i,0], gt.actions[i,0]))
-                    # print('loss {}'.format(current_loss))
+                pred_index = np.argmax(pred, axis=2)
+                gt_index = np.argmax(gt.actions, axis=2)
+                for i in range(gt.actions.shape[0]):
+                    period_accuracy += 1 if pred_index[i, 0] == gt_index[i, 0] else 0
+                    # print('current preds {} gts {}'.format(pred[i,0], gt.actions[i,0]))
                 # print("[{}] End training".format(epoch))
                 period_loss += current_loss
                 if not args.samplein:
