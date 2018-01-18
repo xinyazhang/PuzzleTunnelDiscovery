@@ -40,9 +40,12 @@ def _get_action_set(args):
         return [args.uniqueaction]
     return args.actionset
 
-def create_renderer():
+def create_renderer(args):
     view_array = vision.create_view_array_from_config(VIEW_CFG)
-    view_num = len(view_array)
+    if args.view >= 0:
+        view_num = 1
+    else:
+        view_num = len(view_array)
     w = h = config.DEFAULT_RES
 
     dpy = pyosr.create_display()
@@ -56,7 +59,10 @@ def create_renderer():
     r.scaleToUnit()
     r.angleModel(0.0, 0.0)
     r.default_depth = 0.0
-    r.views = np.array(view_array, dtype=np.float32)
+    if args.view >= 0:
+        r.views = np.array([view_array[args.view]], dtype=np.float32)
+    else:
+        r.views = np.array(view_array, dtype=np.float32)
     return r
 
 class Animator(object):
@@ -126,8 +132,8 @@ class Animator(object):
 class GroundTruth:
     pass
 
-def collector(syncQ, sample_num, batch_size, tid, amag, vmag, action_set):
-    r = create_renderer()
+def collector(syncQ, sample_num, batch_size, tid, amag, vmag, action_set, args):
+    r = create_renderer(args)
     print(r)
     rgb_shape = (len(r.views), r.pbufferWidth, r.pbufferHeight, 3)
     dep_shape = (len(r.views), r.pbufferWidth, r.pbufferHeight, 1)
@@ -183,7 +189,8 @@ def spawn_gt_collector_thread(args):
             print("> action set: {}".format(_get_action_set(args)))
         dic = { 'syncQ' : syncQ, 'sample_num' : args.iter, 'batch_size' :
                 args.batch, 'tid' : i, 'amag' : args.amag, 'vmag' : args.vmag,
-                'action_set' : _get_action_set(args) }
+                'action_set' : _get_action_set(args),
+                'args' : args }
         thread = threading.Thread(target=collector, kwargs=dic)
         thread.start()
         threads.append(thread)
@@ -210,11 +217,14 @@ def gt_reader(syncQ, args):
         d = np.load(fn)
         gt = GroundTruth()
         gt.actions = d['A']
-        if 'RGB' not in d:
+        if 'RGB' not in d or args.view >= 0:
+            '''
+            Render if RGB not present, or a different view is chosen
+            '''
             rgbq = []
             depq = []
             if r is None:
-                r = create_renderer()
+                r = create_renderer(args)
                 rgb_shape = (len(r.views), r.pbufferWidth, r.pbufferHeight, 3)
                 dep_shape = (len(r.views), r.pbufferWidth, r.pbufferHeight, 1)
             keys = d['K']
@@ -274,7 +284,7 @@ def pretrain_main(args):
     total_epoch = args.total_epoch
 
     if args.dryrun:
-        r = create_renderer()
+        r = create_renderer(args)
         fig = plt.figure()
         ra = Animator(r, args.batch)
         ani = animation.FuncAnimation(fig, ra.perform)
@@ -298,7 +308,10 @@ def pretrain_main(args):
         threads, syncQ = spawn_gt_reader_thread(args)
 
     view_array = vision.create_view_array_from_config(VIEW_CFG)
-    view_num = len(view_array)
+    if args.view >= 0:
+        view_num = 1
+    else:
+        view_num = len(view_array)
     w = h = config.DEFAULT_RES
 
     ckpt_dir = args.ckptdir
@@ -323,14 +336,26 @@ def pretrain_main(args):
         dep_1 = tf.placeholder(tf.float32, shape=[None, view_num, w, h, 1])
         dep_2 = tf.placeholder(tf.float32, shape=[None, view_num, w, h, 1])
         if not args.committee:
-            model = icm.IntrinsicCuriosityModule(action,
-                    rgb_1, dep_1,
-                    rgb_2, dep_2,
-                    config.SV_VISCFG,
-                    config.MV_VISCFG2,
-                    256,
-                    args.elu,
-                    args.ferev)
+            if args.view >= 0:
+                with tf.variable_scope(icm.view_scope_name(args.view)):
+                    model = icm.IntrinsicCuriosityModule(action,
+                            rgb_1, dep_1,
+                            rgb_2, dep_2,
+                            config.SV_VISCFG,
+                            config.MV_VISCFG2,
+                            256,
+                            args.elu,
+                            args.ferev)
+                    model.get_inverse_model() # Inverse model also creates variables.
+            else:
+                model = icm.IntrinsicCuriosityModule(action,
+                        rgb_1, dep_1,
+                        rgb_2, dep_2,
+                        config.SV_VISCFG,
+                        config.MV_VISCFG2,
+                        256,
+                        args.elu,
+                        args.ferev)
         else:
             model = icm.IntrinsicCuriosityModuleCommittee(action,
                     rgb_1, dep_1,
@@ -341,7 +366,11 @@ def pretrain_main(args):
                     args.elu,
                     args.ferev)
         model.get_inverse_model() # Create model.inverse_model_{params,tensor}
-        all_params = model.cur_nn_params + model.next_nn_params + model.inverse_model_params
+        if args.view >= 0:
+            all_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
+                    scope=icm.view_scope_name(args.view))
+        else:
+            all_params = model.cur_nn_params + model.next_nn_params + model.inverse_model_params
         all_params += [global_step]
         # print(all_params)
         optimizer = tf.train.AdamOptimizer(learning_rate=1e-5)
@@ -512,6 +541,9 @@ if __name__ == '__main__':
     parser.add_argument('--norgbd',
             help='Do not store RGB/D images in storing the sample, to save disk spaces',
             action='store_true')
+    parser.add_argument('--view',
+            help='Pickup one view to train',
+            type=int, default=-1)
 
     args = parser.parse_args()
     setup_global_variable(args)

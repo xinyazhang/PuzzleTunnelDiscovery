@@ -226,8 +226,13 @@ class VisionNetwork:
 
 def create_view_array_from_config(view_config):
     view_array = []
-    for angle,ncam in view_config:
-        view_array += [ [angle,float(i)] for i in np.arange(0.0, 360.0, 360.0/float(ncam)) ]
+    for tup in view_config:
+        angle,ncam = tup[0:2]
+        if len(tup) >= 3:
+            base = tup[2]
+        else:
+            base = 0
+        view_array += [ [angle,float(i)+base] for i in np.arange(0.0, 360.0, 360.0/float(ncam)) ]
     return view_array
 
 def ExtractPerViewFeatures(input_shape,

@@ -35,6 +35,7 @@ class IntrinsicCuriosityModule:
         self.depth_tensor = depth_tensor
         self.next_rgb_tensor = next_rgb_tensor
         self.next_depth_tensor = next_depth_tensor
+
         if ferev == 1:
             self.feature_extractor = vision.FeatureExtractor(svconfdict, mvconfdict, featnum, featnum, 'VisionNet', elu)
         elif ferev == 2:
@@ -132,6 +133,9 @@ class IntrinsicCuriosityModule:
         print('inv loss ret shape {}'.format(ret.shape))
         return ret
 
+def view_scope_name(i):
+    return 'ICM_View{}'.format(i)
+
 '''
 IntrinsicCuriosityModuleCommittee:
     ICM Committe, each NN for one view
@@ -143,10 +147,6 @@ class IntrinsicCuriosityModuleCommittee:
     view_num = 0
     inverse_output_tensor = None
     forward_output_tensor = None
-
-    @staticmethod
-    def scope_name(i):
-        return 'ICM_View{}'.format(i)
 
     def __init__(self,
             action_tensor,
@@ -169,7 +169,7 @@ class IntrinsicCuriosityModuleCommittee:
         cur_nn_paramss = []
         next_nn_paramss = []
         for i in range(self.view_num):
-            with tf.variable_scope(IntrinsicCuriosityModuleCommittee.scope_name(i)):
+            with tf.variable_scope(view_scope_name(i)):
                 self.icms.append(IntrinsicCuriosityModule(
                     action_tensor,
                     self.perview_rgbs_1[i],
@@ -192,7 +192,7 @@ class IntrinsicCuriosityModuleCommittee:
         outs = []
         for i in range(self.view_num):
             icm = self.icms[i]
-            with tf.variable_scope(IntrinsicCuriosityModuleCommittee.scope_name(i)):
+            with tf.variable_scope(view_scope_name(i)):
                 params, out = icm.get_inverse_model()
                 paramss.append(params)
                 outs.append(out)
