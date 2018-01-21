@@ -217,3 +217,88 @@ class IntrinsicCuriosityModuleCommittee:
             logits=logits)
         print('inv loss ret shape {}'.format(ret.shape))
         return ret
+
+class IntrinsicCuriosityModuleIndependentCommittee:
+    '''
+    TODO: A wrapper class to handle multiple ICMs
+    Note: this class is slightly different from
+          IntrinsicCuriosityModuleCommittee. It does not train multiple ICMs simultaneously.
+    '''
+    icms = None
+    savers = None
+    view_num = 0
+    inverse_output_tensor = None
+    forward_output_tensor = None
+
+    def __init__(self,
+            action_tensor,
+            rgb_tensor,
+            depth_tensor,
+            next_rgb_tensor,
+            next_depth_tensor,
+            svconfdict,
+            mvconfdict,
+            featnum,
+            elu,
+            ferev=1):
+        self.icms = []
+        self.savers = []
+        self.view_num = int(rgb_tensor.shape[1])
+        self.perview_rgbs_1 = tf.split(rgb_tensor, self.view_num, axis=1)
+        self.perview_deps_1 = tf.split(depth_tensor, self.view_num, axis=1)
+        self.perview_rgbs_2 = tf.split(next_rgb_tensor, self.view_num, axis=1)
+        self.perview_deps_2 = tf.split(next_depth_tensor, self.view_num, axis=1)
+        self.action_tensor = action_tensor
+        for i in range(self.view_num):
+            with tf.variable_scope(view_scope_name(i)):
+                self.icms.append(IntrinsicCuriosityModule(
+                    action_tensor,
+                    self.perview_rgbs_1[i],
+                    self.perview_deps_1[i],
+                    self.perview_rgbs_2[i],
+                    self.perview_deps_2[i],
+                    svconfdict,
+                    mvconfdict,
+                    elu,
+                    ferev))
+                self.icms[-1].get_inverse_model()
+            allvars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=view_scope_name(i))
+            self.savers.append(tf.train.Saver(allvars))
+            self.savers[-1].view = i
+
+    def restore(self, sess, ckpts):
+        for ckpt_dir, saver in zip(ckpts, self.savers):
+            ckpt = tf.train.get_checkpoint_state(checkpoint_dir=ckpt_dir)
+            if not ckpt or not ckpt.model_checkpoint_path:
+                print('! PANIC: View {} was not restored by checkpoint in {}'.format(saver.view, ckpt_dir))
+                return False
+            print('Restore View {} from {}'.format(saver.view, ckpt.model_checkpoint_path))
+            saver.restore(sess, ckpt.model_checkpoint_path)
+        return True
+
+    def get_inverse_model(self):
+        '''
+        Predicts action according to the predictions from multile ICM
+        '''
+        if self.inverse_output_tensor is not None:
+            '''
+            ICM IC does not return params
+            '''
+            return [], self.inverse_output_tensor
+        '''
+        Method 1:
+            softmax(\sum_{v}softmax(pred_v))
+        '''
+        preds = []
+        for icm in self.icms:
+            _, pred = icm.get_inverse_model()
+            preds.append(tf.nn.softmax(pred))
+        self.inverse_output_tensor = tf.nn.softmax(tf.add_n(preds))
+        return [], self.inverse_output_tensor
+
+    def get_inverse_loss(self, discrete=True):
+        '''
+        Independent Committee is not supposed to return a valid loss operator
+         - At least for now
+        '''
+        return None
