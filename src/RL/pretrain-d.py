@@ -249,6 +249,10 @@ def gt_reader(syncQ, args):
         if MT_VERBOSE:
             print("!GT File {} was read".format(fn))
         if args.samplebatching == 1:
+            gt.rgb_1 = gt.rgb[:-1]
+            gt.rgb_2 = gt.rgb[1:]
+            gt.dep_1 = gt.dep[:-1]
+            gt.dep_2 = gt.dep[1:]
             syncQ.put(gt)
         else:
             batching.append(gt)
@@ -323,8 +327,10 @@ def pretrain_main(args):
     device = args.device
 
     if 'gpu' in device:
-        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.9)
-        session_config = tf.ConfigProto(gpu_options=gpu_options)
+        #gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.9)
+        # session_config = tf.ConfigProto(gpu_options=gpu_options)
+        session_config = tf.ConfigProto()
+        session_config.gpu_options.allow_growth = True
     else:
         session_config = None
 
@@ -392,9 +398,9 @@ def pretrain_main(args):
         _, predicts = model.get_inverse_model()
         predicts = tf.nn.softmax(predicts)
         loss = model.get_inverse_loss(discrete=True)
-        train_op = optimizer.minimize(loss, global_step)
-
-        tf.summary.scalar('loss', loss)
+        if not args.eval:
+            train_op = optimizer.minimize(loss, global_step)
+            tf.summary.scalar('loss', loss)
         if args.capture:
             tf.summary.image('input', tf.reshape(tf.slice(rgb_1, [0,0,0,0,0], [1, 1, w, h, 3]), [1, w, h, 3]), 1)
             tf.summary.tensor_summary('predicts', predicts)
@@ -557,7 +563,7 @@ if __name__ == '__main__':
             nargs='*', default=[])
 
     args = parser.parse_args()
-    if (not args.eval) and (not args.viewinitckpt):
+    if (not args.eval) and len(args.viewinitckpt) > 0:
         print('--eval must be set when viewinitckpt is given')
         exit()
     setup_global_variable(args)

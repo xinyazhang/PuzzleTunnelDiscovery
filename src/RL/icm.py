@@ -30,6 +30,7 @@ class IntrinsicCuriosityModule:
             featnum,
             elu,
             ferev=1):
+        print('! ICM FEREV {}'.format(ferev))
         self.action_tensor = action_tensor
         self.rgb_tensor = rgb_tensor
         self.depth_tensor = depth_tensor
@@ -178,8 +179,9 @@ class IntrinsicCuriosityModuleCommittee:
                     self.perview_deps_2[i],
                     svconfdict,
                     mvconfdict,
-                    elu,
-                    ferev))
+                    featnum=featnum,
+                    elu=elu,
+                    ferev=ferev))
                 cur_nn_paramss.append(self.icms[-1].cur_nn_params)
                 next_nn_paramss.append(self.icms[-1].next_nn_params)
         self.cur_nn_params = sum(cur_nn_paramss, [])
@@ -240,7 +242,7 @@ class IntrinsicCuriosityModuleIndependentCommittee:
             mvconfdict,
             featnum,
             elu,
-            ferev=1):
+            ferev):
         self.icms = []
         self.savers = []
         self.view_num = int(rgb_tensor.shape[1])
@@ -249,18 +251,20 @@ class IntrinsicCuriosityModuleIndependentCommittee:
         self.perview_rgbs_2 = tf.split(next_rgb_tensor, self.view_num, axis=1)
         self.perview_deps_2 = tf.split(next_depth_tensor, self.view_num, axis=1)
         self.action_tensor = action_tensor
+        print('! ICM IC FEREV {}'.format(ferev))
         for i in range(self.view_num):
             with tf.variable_scope(view_scope_name(i)):
                 self.icms.append(IntrinsicCuriosityModule(
-                    action_tensor,
-                    self.perview_rgbs_1[i],
-                    self.perview_deps_1[i],
-                    self.perview_rgbs_2[i],
-                    self.perview_deps_2[i],
-                    svconfdict,
-                    mvconfdict,
-                    elu,
-                    ferev))
+                    action_tensor=action_tensor,
+                    rgb_tensor=self.perview_rgbs_1[i],
+                    depth_tensor=self.perview_deps_1[i],
+                    next_rgb_tensor=self.perview_rgbs_2[i],
+                    next_depth_tensor=self.perview_deps_2[i],
+                    svconfdict=svconfdict,
+                    mvconfdict=mvconfdict,
+                    featnum=featnum,
+                    elu=elu,
+                    ferev=ferev))
                 self.icms[-1].get_inverse_model()
             allvars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=view_scope_name(i))
             self.savers.append(tf.train.Saver(allvars))
@@ -301,4 +305,4 @@ class IntrinsicCuriosityModuleIndependentCommittee:
         Independent Committee is not supposed to return a valid loss operator
          - At least for now
         '''
-        return None
+        return tf.constant(-1, tf.float32, [1])
