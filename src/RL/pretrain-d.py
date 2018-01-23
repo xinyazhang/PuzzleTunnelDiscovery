@@ -169,6 +169,8 @@ def collector(syncQ, sample_num, batch_size, tid, amag, vmag, action_set, args):
             gt.actions[i, 0, actions[i]] = 1.0
         gt_rgb = np.array(rgbq)
         gt_dep = np.array(depq)
+        gt.rgb = gt_rgb
+        gt.dep = gt_dep
         gt.rgb_1 = gt_rgb[:-1]
         gt.rgb_2 = gt_rgb[1:]
         gt.dep_1 = gt_dep[:-1]
@@ -280,7 +282,7 @@ def save_gt_file(args, gt, epoch):
         np.savez(fn, A=gt.actions, K=gt.keys)
     else:
         np.savez(fn, A=gt.actions, RGB=gt.rgb, DEP=gt.dep, K=gt.keys)
-    imsave(imfn, gt.rgb[0][0])
+    imsave(imfn, gt.rgb_1[0][0])
 
 def pretrain_main(args):
     '''
@@ -499,7 +501,7 @@ if __name__ == '__main__':
             help='Only generate a specific action when sampling actions',
             type=int, default=-1)
     parser.add_argument('--actionset', nargs='+',
-            help='Set to sample actions within',
+            help='Set to sample actions within, -1 means all actions (0-11)',
             type=int,
             default=[])
     parser.add_argument('--ckptprefix', help='Prefix of checkpoint files',
@@ -567,6 +569,8 @@ if __name__ == '__main__':
         print('--eval must be set when viewinitckpt is given')
         exit()
     setup_global_variable(args)
+    if -1 in args.actionset:
+        args.actionset = [i for i in range(12)]
     if MT_VERBOSE:
         print("Action set {}".format(args.actionset))
     args.total_sample = args.iter * args.threads
