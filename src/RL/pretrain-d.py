@@ -353,7 +353,7 @@ def pretrain_main(args):
                     rgb_2, dep_2,
                     config.SV_VISCFG,
                     config.MV_VISCFG2,
-                    256,
+                    args.featnum,
                     args.elu,
                     args.ferev)
         elif not args.committee:
@@ -364,7 +364,7 @@ def pretrain_main(args):
                             rgb_2, dep_2,
                             config.SV_VISCFG,
                             config.MV_VISCFG2,
-                            256,
+                            args.featnum,
                             args.elu,
                             args.ferev)
                     model.get_inverse_model() # Inverse model also creates variables.
@@ -374,7 +374,7 @@ def pretrain_main(args):
                         rgb_2, dep_2,
                         config.SV_VISCFG,
                         config.MV_VISCFG2,
-                        256,
+                        args.featnum,
                         args.elu,
                         args.ferev)
         else:
@@ -383,7 +383,7 @@ def pretrain_main(args):
                     rgb_2, dep_2,
                     config.SV_VISCFG,
                     config.MV_VISCFG2,
-                    256,
+                    args.featnum,
                     args.elu,
                     args.ferev)
         model.get_inverse_model() # Create model.inverse_model_{params,tensor}
@@ -541,6 +541,9 @@ if __name__ == '__main__':
     parser.add_argument('--elu',
             help='Use ELU instead of ReLU after each NN layer',
             action='store_true')
+    parser.add_argument('--featnum',
+            help='Size of the feature vector (aka number of features)',
+            type=int, default=256)
     parser.add_argument('--eval',
             help='Evaluate the network, rather than training',
             action='store_true')
