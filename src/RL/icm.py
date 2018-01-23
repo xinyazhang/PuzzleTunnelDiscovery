@@ -68,6 +68,10 @@ class IntrinsicCuriosityModule:
             self.feature_extractor = vision.FeatureExtractorRev6(
                     config.SV_HOLE_HIGHRES,
                     [1024, 1024, featnum], 'VisionNetRev8', elu)
+        elif ferev == 9:
+            self.feature_extractor = vision.FeatureExtractorRev5(
+                    config.SV_VGG16_STRIDES,
+                    [1024, 1024, featnum], 'VisionNetRev5', elu)
         self.cur_nn_params, self.cur_featvec = self.feature_extractor.infer(rgb_tensor, depth_tensor)
         self.next_nn_params, self.next_featvec = self.feature_extractor.infer(next_rgb_tensor, next_depth_tensor)
         self.elu = elu
