@@ -427,6 +427,9 @@ def pretrain_main(args):
                     saver.restore(sess, ckpt.model_checkpoint_path)
                     accum_epoch = sess.run(global_step)
                     print('Restored!, global_step {}'.format(accum_epoch))
+                    if args.continuetrain:
+                        accum_epoch += 1
+                        epoch = accum_epoch
             period_loss = 0.0
             period_accuracy = 0
             total_accuracy = 0
@@ -553,6 +556,9 @@ if __name__ == '__main__':
     parser.add_argument('--eval',
             help='Evaluate the network, rather than training',
             action='store_true')
+    parser.add_argument('--continuetrain',
+            help='Continue an interrputed training from checkpoint. This basically loads epoch from the checkpoint. WARNING: THIS IS INCOMPATIBLE WITH --samplein',
+            action='store_true')
     parser.add_argument('--ferev',
             help='Reversion of Feature Extractor',
             choices=range(1,9+1),
@@ -578,6 +584,13 @@ if __name__ == '__main__':
         print('--eval must be set when viewinitckpt is given')
         exit()
     setup_global_variable(args)
+    if args.continuetrain:
+        if args.samplein:
+            print('--continuetrain is incompatible with --samplein')
+            exit()
+        if args.batching
+            print('--continuetrain is incompatible with --batching')
+            exit()
     if -1 in args.actionset:
         args.actionset = [i for i in range(12)]
     if MT_VERBOSE:
