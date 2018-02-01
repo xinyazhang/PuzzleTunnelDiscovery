@@ -430,6 +430,10 @@ def pretrain_main(args):
                     if args.continuetrain:
                         accum_epoch += 1
                         epoch = accum_epoch
+                else:
+                    if args.eval:
+                        print('PANIC: --eval is set but checkpoint does not exits')
+                        return
             period_loss = 0.0
             period_accuracy = 0
             total_accuracy = 0
@@ -588,7 +592,7 @@ if __name__ == '__main__':
         if args.samplein:
             print('--continuetrain is incompatible with --samplein')
             exit()
-        if args.batching
+        if args.batching:
             print('--continuetrain is incompatible with --batching')
             exit()
     if -1 in args.actionset:
