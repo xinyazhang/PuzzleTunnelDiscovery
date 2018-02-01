@@ -355,7 +355,8 @@ def pretrain_main(args):
                     config.MV_VISCFG2,
                     args.featnum,
                     args.elu,
-                    args.ferev)
+                    args.ferev,
+                    args.imhidden)
         elif not args.committee:
             if args.view >= 0:
                 with tf.variable_scope(icm.view_scope_name(args.view)):
@@ -366,7 +367,8 @@ def pretrain_main(args):
                             config.MV_VISCFG2,
                             args.featnum,
                             args.elu,
-                            args.ferev)
+                            args.ferev,
+                            args.imhidden)
                     model.get_inverse_model() # Inverse model also creates variables.
             else:
                 model = icm.IntrinsicCuriosityModule(action,
@@ -376,7 +378,8 @@ def pretrain_main(args):
                         config.MV_VISCFG2,
                         args.featnum,
                         args.elu,
-                        args.ferev)
+                        args.ferev,
+                        args.imhidden)
         else:
             model = icm.IntrinsicCuriosityModuleCommittee(action,
                     rgb_1, dep_1,
@@ -544,6 +547,9 @@ if __name__ == '__main__':
     parser.add_argument('--featnum',
             help='Size of the feature vector (aka number of features)',
             type=int, default=256)
+    parser.add_argument('--imhidden',
+            help='Size of the feature vector (aka number of features)',
+            nargs='*', type=int, default=[])
     parser.add_argument('--eval',
             help='Evaluate the network, rather than training',
             action='store_true')

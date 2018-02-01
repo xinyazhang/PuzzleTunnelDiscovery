@@ -15,6 +15,7 @@ class IntrinsicCuriosityModule:
     inverse_output_tensor = None
     forward_model_params = None
     forward_output_tensor = None
+    imhidden_params = None
 
     '''
     Persumably these tensors shall be placeholders
@@ -29,13 +30,18 @@ class IntrinsicCuriosityModule:
             mvconfdict,
             featnum,
             elu,
-            ferev=1):
+            ferev=1,
+            imhidden=[]):
         print('! ICM FEREV {}'.format(ferev))
         self.action_tensor = action_tensor
         self.rgb_tensor = rgb_tensor
         self.depth_tensor = depth_tensor
         self.next_rgb_tensor = next_rgb_tensor
         self.next_depth_tensor = next_depth_tensor
+        if not imhidden:
+            self.imhidden_params = list(config.INVERSE_MODEL_HIDDEN_LAYER)
+        else:
+            self.imhidden_params = list(imhidden)
 
         if ferev == 1:
             self.feature_extractor = vision.FeatureExtractor(svconfdict, mvconfdict, featnum, featnum, 'VisionNet', elu)
@@ -81,7 +87,9 @@ class IntrinsicCuriosityModule:
             return self.inverse_model_params, self.inverse_output_tensor
         input_featvec = tf.concat([self.cur_featvec, self.next_featvec], 2)
         print('inverse_model input {}'.format(input_featvec))
-        featnums = [config.INVERSE_MODEL_HIDDEN_LAYER, int(self.action_tensor.shape[-1])]
+        # featnums = [config.INVERSE_MODEL_HIDDEN_LAYER, int(self.action_tensor.shape[-1])]
+        # featnums = config.INVERSE_MODEL_HIDDEN_LAYER + [int(self.action_tensor.shape[-1])]
+        featnums = self.imhidden_params + [int(self.action_tensor.shape[-1])]
         print('inverse_model featnums {}'.format(featnums))
         self.inverse_fc_applier = vision.ConvApplier(None, featnums, 'InverseModelNet', self.elu)
         params, out = self.inverse_fc_applier.infer(input_featvec)
@@ -246,7 +254,8 @@ class IntrinsicCuriosityModuleIndependentCommittee:
             mvconfdict,
             featnum,
             elu,
-            ferev):
+            ferev,
+            imhidden):
         self.icms = []
         self.savers = []
         self.view_num = int(rgb_tensor.shape[1])
@@ -268,7 +277,8 @@ class IntrinsicCuriosityModuleIndependentCommittee:
                     mvconfdict=mvconfdict,
                     featnum=featnum,
                     elu=elu,
-                    ferev=ferev))
+                    ferev=ferev,
+                    imhidden=imhidden))
                 self.icms[-1].get_inverse_model()
             allvars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=view_scope_name(i))
             self.savers.append(tf.train.Saver(allvars))
