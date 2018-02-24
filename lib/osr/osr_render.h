@@ -61,6 +61,7 @@ public:
 	int pbufferWidth = 224;
 	int pbufferHeight = 224;
 	float default_depth = 5.0f;
+	GLboolean avi = false; // AdVanced Illumination
 
 	/*
 	 * Set this variable to use multple view rendering.

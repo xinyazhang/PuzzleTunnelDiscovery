@@ -76,6 +76,12 @@ MeshRenderer::bindAttributes()
 					     sizeof(Vertex),
 					     offset));  // vertex color
 	CHECK_GL_ERROR(glEnableVertexAttribArray(1));
+
+	offset = (void*)offsetof(Vertex, normal);
+	CHECK_GL_ERROR(glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE,
+					     sizeof(Vertex),
+					     offset));  // vertex color
+	CHECK_GL_ERROR(glEnableVertexAttribArray(2));
 	CHECK_GL_ERROR(glBindBuffer(GL_ARRAY_BUFFER, 0));
 
 	CHECK_GL_ERROR(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_));

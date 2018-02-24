@@ -17,6 +17,7 @@ def reanimate(gtfn, pathfn):
     dpy = pyosr.create_display()
     glctx = pyosr.create_gl_context(dpy)
     r = pyosr.Renderer()
+    r.avi = True
     r.setup()
     r.loadModelFromFile(aniconf.env_fn)
     r.loadRobotFromFile(aniconf.rob_fn)
