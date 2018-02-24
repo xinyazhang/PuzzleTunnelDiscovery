@@ -76,7 +76,7 @@ static const EGLint pbuffer_attribs[] = {
  * Request OpenGL 3.3
  */
 static const EGLint ctx_attribs[] = {
-	EGL_CONTEXT_MAJOR_VERSION, 3,
+	EGL_CONTEXT_MAJOR_VERSION, 4,
 	EGL_CONTEXT_MINOR_VERSION, 3,
 	EGL_NONE
 };

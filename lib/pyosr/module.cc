@@ -7,7 +7,6 @@
 #include <pybind11/eigen.h>
 #include <iostream>
 #include <stdint.h>
-
 namespace py = pybind11;
 
 #if GPU_ENABLED
@@ -109,7 +108,8 @@ PYBIND11_PLUGIN(pyosr) {
 		.def_readwrite("default_depth", &Renderer::default_depth)
 		.def_readwrite("mvrgb", &Renderer::mvrgb)
 		.def_readwrite("mvdepth", &Renderer::mvdepth)
-		.def_readwrite("views", &Renderer::views);
+		.def_readwrite("views", &Renderer::views)
+		.def_readwrite("avi", &Renderer::avi);
 #endif // GPU_ENABLED
 	using osr::GTGenerator;
 	py::class_<GTGenerator>(m, "GTGenerator")

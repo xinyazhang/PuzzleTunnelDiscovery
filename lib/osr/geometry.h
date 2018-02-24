@@ -9,6 +9,15 @@ namespace osr {
 struct Vertex {
     glm::vec3 position;
     glm::vec3 color;
+    glm::vec3 normal;
+    Vertex(const glm::vec3& p, const glm::vec3& c)
+	    :position(p), color(c)
+    {
+    }
+    Vertex(const glm::vec3& p, const glm::vec3& c, const glm::vec3& n)
+	    :position(p), color(c), normal(n)
+    {
+    }
 };
 }
 

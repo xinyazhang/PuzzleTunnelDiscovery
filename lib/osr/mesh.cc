@@ -2,6 +2,7 @@
 #include "cdmodel.h"
 #include <algorithm>
 #include <fcl/collision.h>
+#include <glm/gtx/io.hpp>
 
 namespace osr {
 
@@ -19,9 +20,12 @@ Mesh::Mesh(aiMesh* mesh, glm::vec3 color)
 	:shared_from_(nullptr)
 {
 	for (size_t i = 0; i < mesh->mNumVertices; i++) {
-		vertices_.push_back(
-		        {to_glm_vec3(mesh->mVertices[i]),  // position
-		         color});
+		vertices_.emplace_back(
+		        to_glm_vec3(mesh->mVertices[i]),  // position
+		        color,
+		        to_glm_vec3(mesh->mNormals[i])  // normal
+		        );
+		// std::cerr << "Mesh Normal: " << to_glm_vec3(mesh->mNormals[i]) << '\n';
 	}
 	for (size_t i = 0; i < mesh->mNumFaces; i++) {
 		aiFace& face = mesh->mFaces[i];

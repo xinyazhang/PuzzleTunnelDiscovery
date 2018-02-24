@@ -9,57 +9,16 @@
 
 namespace {
 const char* vertShaderSrc =
-R"zzz(
-#version 330
-uniform mat4 model;
-uniform mat4 view;
-uniform mat4 proj;
-layout(location = 0) in vec3 inPosition;
-layout(location = 1) in vec3 inColor;
-out vec3 fragColor;
-out gl_PerVertex {
-    vec4 gl_Position;
-};
-out float linearZ;
-void main() {
-    vec4 vm = view * model * vec4(inPosition, 1.0);
-    gl_Position = proj * vm;
-    linearZ = length(vec3(vm));
-    fragColor = inColor;
-}
-)zzz";
+#include "shader/default.vert"
+;
 
 const char* fragShaderSrc =
-R"zzz(
-#version 330
-in vec3 fragColor;
-in float linearZ;
-// layout(location=0) out vec4 outColor;
-layout(location=0) out float outDepth;
-out vec4 outColor;
-const float far = 20.0;
-const float near = 1.0;
-void main() {
-    // gl_FragDepth = (1.0 / gl_FragCoord.w - near) / (far - near);
-    // outColor = vec4(fragColor, 1.0);
-    outDepth = linearZ;
-}
-)zzz";
+#include "shader/depth.frag"
+;
 
 const char* rgbdFragShaderSrc =
-R"zzz(
-#version 330
-in vec3 fragColor;
-in float linearZ;
-layout(location=0) out float outDepth;
-layout(location=1) out vec4 outColor;
-const float far = 20.0;
-const float near = 1.0;
-void main() {
-    outColor = vec4(fragColor, 1.0);
-    outDepth = linearZ;
-}
-)zzz";
+#include "shader/rgb.frag"
+;
 
 const GLenum drawBuffers[1] = { GL_COLOR_ATTACHMENT0 };
 const GLenum rgbdDrawBuffers[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
@@ -191,13 +150,19 @@ void Renderer::setupNonSharedObjects()
 	CHECK_GL_ERROR(glGenFramebuffers(1, &rgbdFramebuffer));
 	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, rgbdFramebuffer));
 	CHECK_GL_ERROR(glGenTextures(1, &rgbTarget));
-	CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D, rgbTarget));
-	CHECK_GL_ERROR(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, pbufferWidth, pbufferHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, 0));
-	CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
-	CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+	if (false /* No MSAA for now */) {
+		CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, rgbTarget));
+		CHECK_GL_ERROR(glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, 4, GL_RGB8, pbufferWidth, pbufferHeight, false));
+		CHECK_GL_ERROR(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D_MULTISAMPLE, rgbTarget, 0));
+	} else {
+		CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D, rgbTarget));
+		CHECK_GL_ERROR(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, pbufferWidth, pbufferHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, 0));
+		CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
+		CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+		CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, rgbTarget, 0));
+	}
 	CHECK_GL_ERROR(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthbufferID));
 	CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, renderTarget, 0));
-	CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, rgbTarget, 0));
 	CHECK_GL_ERROR(glDrawBuffers(2, rgbdDrawBuffers));
 
 	/*
@@ -367,6 +332,8 @@ void Renderer::render_rgbd()
 	CHECK_GL_ERROR(glClear(GL_DEPTH_BUFFER_BIT));
 
 	CHECK_GL_ERROR(glUseProgram(rgbdShaderProgram));
+	CHECK_GL_ERROR(glUniform1i(16, avi));
+
 	scene_renderer_->render(rgbdShaderProgram, camera, perturbation_mat);
 	if (robot_) {
 		auto mat = translate_state_to_matrix(robot_state_);
