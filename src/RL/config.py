@@ -59,6 +59,14 @@ SV_NAIVE =  [ { 'ch_out' : 32, 'strides' : None, 'kernel_size' : None},
         { 'ch_out' : 512, 'strides' : None, 'kernel_size' : [5,5]},
         ]
 
+SV_NAIVE_224 =  [ { 'ch_out' : 32, 'strides' : None, 'kernel_size' : None},
+        { 'ch_out' : 64, 'strides' : None, 'kernel_size' : None},
+        { 'ch_out' : 128, 'strides' : None, 'kernel_size' : None},
+        { 'ch_out' : 256, 'strides' : None, 'kernel_size' : [5,5]},
+        { 'ch_out' : 512, 'strides' : None, 'kernel_size' : [5,5]},
+        { 'ch_out' : 512, 'strides' : None, 'kernel_size' : [5,5]},
+        ]
+
 # VGG16 variant: use strides instead of max polling
 SV_VGG16_STRIDES = [
         { 'ch_out' : 64, 'strides' : [1,1,1,1], 'kernel_size' : None},

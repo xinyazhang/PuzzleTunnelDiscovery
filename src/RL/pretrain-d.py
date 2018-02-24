@@ -46,7 +46,7 @@ def create_renderer(args):
         view_num = 1
     else:
         view_num = len(view_array)
-    w = h = config.DEFAULT_RES
+    w = h = args.res
 
     dpy = pyosr.create_display()
     glctx = pyosr.create_gl_context(dpy)
@@ -322,7 +322,7 @@ def pretrain_main(args):
         view_num = 1
     else:
         view_num = len(view_array)
-    w = h = config.DEFAULT_RES
+    w = h = args.res
 
     ckpt_dir = args.ckptdir
     ckpt_prefix = args.ckptprefix
@@ -357,7 +357,8 @@ def pretrain_main(args):
                     args.elu,
                     args.ferev,
                     args.imhidden,
-                    args.fehidden)
+                    args.fehidden,
+                    singlesoftmax=args.singlesoftmax)
         elif not args.committee:
             if args.view >= 0:
                 with tf.variable_scope(icm.view_scope_name(args.view)):
@@ -464,7 +465,21 @@ def pretrain_main(args):
                 pred_index = np.argmax(pred, axis=2)
                 gt_index = np.argmax(gt.actions, axis=2)
                 for i in range(gt.actions.shape[0]):
-                    period_accuracy += 1 if pred_index[i, 0] == gt_index[i, 0] else 0
+                    delta_accuracy = 1 if pred_index[i, 0] == gt_index[i, 0] else 0
+                    period_accuracy += delta_accuracy
+                    if delta_accuracy == 0 and args.mispout:
+                        samid = epoch + args.samplebase
+                        predfn = os.path.join(args.mispout, 'Pred-At-{:07d}'.format(samid))
+                        np.savez(predfn, P=pred[i])
+                        for V in range(gt.rgb_1.shape[1]):
+                            s1 = gt.rgb_1[i,V].reshape(w, h, 3)
+                            s2 = gt.rgb_2[i,V].reshape(w, h, 3)
+                            s1fn = os.path.join(args.mispout, '{:07d}-IB{:03d}-V{:02d}-1.png'.format(samid, i, V))
+                            s2fn = os.path.join(args.mispout, '{:07d}-IB{:03d}-V{:02d}-2.png'.format(samid, i, V))
+                            imsave(s1fn, s1)
+                            imsave(s2fn, s2)
+                        with open(os.path.join(args.mispout, 'Action-At-{:07d}'.format(samid)), 'w') as f:
+                            f.write('Action is {}\n'.format(gt_index[i,0]))
                     # print('current preds {} gts {}'.format(pred[i,0], gt.actions[i,0]))
                 # print("[{}] End training".format(epoch))
                 period_loss += current_loss
@@ -501,6 +516,8 @@ if __name__ == '__main__':
     parser.add_argument('--ckptdir', help='Path for checkpoint files',
             default='ckpt/pretrain-d/')
     parser.add_argument('--sampleout', help='Path to store generated samples',
+            default='')
+    parser.add_argument('--mispout', help='Path to store mispredicted samples',
             default='')
     parser.add_argument('--samplein', help='Path to load generated samples',
             default='')
@@ -554,6 +571,9 @@ if __name__ == '__main__':
     parser.add_argument('--elu',
             help='Use ELU instead of ReLU after each NN layer',
             action='store_true')
+    parser.add_argument('--singlesoftmax',
+            help='Do not apply softmax over member of committee. Hence only one softmax is used to finalize the prediction',
+            action='store_true')
     parser.add_argument('--featnum',
             help='Size of the feature vector (aka number of features)',
             type=int, default=256)
@@ -571,7 +591,7 @@ if __name__ == '__main__':
             action='store_true')
     parser.add_argument('--ferev',
             help='Reversion of Feature Extractor',
-            choices=range(1,9+1),
+            choices=range(1,10+1),
             type=int, default=1)
     parser.add_argument('--capture',
             help='Capture input image to summary',
@@ -588,6 +608,9 @@ if __name__ == '__main__':
     parser.add_argument('--viewinitckpt',
             help='Initialize independent views in sequence with given checkpoints. --eval must present if viewinitckpt is given',
             nargs='*', default=[])
+    parser.add_argument('--res',
+            help='Resolution',
+            type=int, default=config.DEFAULT_RES)
 
     args = parser.parse_args()
     if (not args.eval) and len(args.viewinitckpt) > 0:
@@ -607,4 +630,5 @@ if __name__ == '__main__':
         print("Action set {}".format(args.actionset))
     args.total_sample = args.iter * args.threads
     args.total_epoch = args.total_sample / args.samplebatching
+    print(args)
     pretrain_main(args)

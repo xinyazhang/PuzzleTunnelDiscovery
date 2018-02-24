@@ -16,6 +16,7 @@ class IntrinsicCuriosityModule:
     forward_model_params = None
     forward_output_tensor = None
     imhidden_params = None
+    fwhidden_params = None
 
     '''
     Persumably these tensors shall be placeholders
@@ -32,7 +33,8 @@ class IntrinsicCuriosityModule:
             elu,
             ferev=1,
             imhidden=[],
-            fehidden=[1024,1024]):
+            fehidden=[1024,1024],
+            fwhidden=[]):
         print('! ICM FEREV {}'.format(ferev))
         self.action_tensor = action_tensor
         self.rgb_tensor = rgb_tensor
@@ -43,6 +45,10 @@ class IntrinsicCuriosityModule:
             self.imhidden_params = list(config.INVERSE_MODEL_HIDDEN_LAYER)
         else:
             self.imhidden_params = list(imhidden)
+        if not fwhidden:
+            self.fwhidden_params =list(config.FORWARD_MODEL_HIDDEN_LAYERS)
+        else:
+            self.fwhidden_params =list(fwhidden)
 
         if ferev == 1:
             self.feature_extractor = vision.FeatureExtractor(svconfdict, mvconfdict, featnum, featnum, 'VisionNet', elu)
@@ -78,7 +84,11 @@ class IntrinsicCuriosityModule:
         elif ferev == 9:
             self.feature_extractor = vision.FeatureExtractorRev5(
                     config.SV_VGG16_STRIDES,
-                    fehidden + [featnum], 'VisionNetRev5', elu)
+                    fehidden + [featnum], 'VisionNetRev9', elu)
+        elif ferev == 10:
+            self.feature_extractor = vision.FeatureExtractorRev5(
+                    config.SV_NAIVE_224,
+                    fehidden + [featnum], 'VisionNetRev10', elu)
         self.cur_nn_params, self.cur_featvec = self.feature_extractor.infer(rgb_tensor, depth_tensor)
         self.next_nn_params, self.next_featvec = self.feature_extractor.infer(next_rgb_tensor, next_depth_tensor)
         self.elu = elu
@@ -102,12 +112,11 @@ class IntrinsicCuriosityModule:
         if self.forward_output_tensor is not None:
             return self.forward_model_params, self.forward_output_tensor
         '''
-        action_tensor has shape [None, N], but our pipeline usually use [None, 1, N]
-
-        Note: 3D tensor unifies per-view variables and combined-view variables.
+        our pipeline use [None, 1, N] feature vector
+        3D tensor unifies per-view tensors and combined-view tensors.
         '''
         input_featvec = tf.concat([self.action_tensor, self.cur_featvec], 2)
-        featnums = list(config.FORWARD_MODEL_HIDDEN_LAYERS) + [int(self.action_tensor.shape[-1])]
+        featnums = self.fwhidden_params + [int(self.cur_featvec.shape[-1])]
         self.forward_fc_applier = vision.ConvApplier(None, featnums, 'ForwardModelNet', self.elu)
         params, out = self.forward_fc_applier.infer(input_featvec)
         self.forward_model_params = params
@@ -146,6 +155,15 @@ class IntrinsicCuriosityModule:
         '''
         print('inv loss ret shape {}'.format(ret.shape))
         return ret
+
+    def get_forward_loss(self, discrete=True):
+        assert discrete == True
+        _, pred = self.get_forward_model()
+        error = pred - self.next_featvec
+        loss = tf.nn.l2_loss(error)
+        print('forward err shape {}'.format(error.shape))
+        print('forward loss shape {}'.format(loss.shape))
+        return loss
 
 def view_scope_name(i):
     return 'ICM_View{}'.format(i)
@@ -244,6 +262,9 @@ class IntrinsicCuriosityModuleIndependentCommittee:
     view_num = 0
     inverse_output_tensor = None
     forward_output_tensor = None
+    forward_model_params = None
+    forward_loss = None
+    singlesoftmax = False
 
     def __init__(self,
             action_tensor,
@@ -256,7 +277,9 @@ class IntrinsicCuriosityModuleIndependentCommittee:
             featnum,
             elu,
             ferev,
-            imhidden):
+            imhidden,
+            fehidden,
+            singlesoftmax=False):
         self.icms = []
         self.savers = []
         self.view_num = int(rgb_tensor.shape[1])
@@ -279,11 +302,13 @@ class IntrinsicCuriosityModuleIndependentCommittee:
                     featnum=featnum,
                     elu=elu,
                     ferev=ferev,
-                    imhidden=imhidden))
+                    imhidden=imhidden,
+                    fehidden=fehidden))
                 self.icms[-1].get_inverse_model()
             allvars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=view_scope_name(i))
             self.savers.append(tf.train.Saver(allvars))
             self.savers[-1].view = i
+        self.singlesoftmax = singlesoftmax
 
     def restore(self, sess, ckpts):
         for ckpt_dir, saver in zip(ckpts, self.savers):
@@ -311,7 +336,10 @@ class IntrinsicCuriosityModuleIndependentCommittee:
         preds = []
         for icm in self.icms:
             _, pred = icm.get_inverse_model()
-            preds.append(tf.nn.softmax(pred))
+            if self.singlesoftmax:
+                preds.append(pred)
+            else:
+                preds.append(tf.nn.softmax(pred))
         self.inverse_output_tensor = tf.nn.softmax(tf.add_n(preds))
         return [], self.inverse_output_tensor
 
@@ -321,3 +349,29 @@ class IntrinsicCuriosityModuleIndependentCommittee:
          - At least for now
         '''
         return tf.constant(-1, tf.float32, [1])
+
+    def get_forward_model(self):
+        if self.forward_output_tensor is not None:
+            return self.forward_model_params, self.forward_output_tensor
+        paramss = []
+        outs = []
+        for i in range(self.view_num):
+            icm = self.icms[i]
+            with tf.variable_scope(view_scope_name(i)):
+                params, out = icm.get_forward_model()
+                paramss.append(params)
+                outs.append(out)
+        self.forward_model_params = sum(paramss, [])
+        self.forward_output_tensor = tf.concat(outs, axis=1)
+        return self.forward_model_params, self.forward_output_tensor
+
+    def get_forward_loss(self, discrete=True):
+        assert discrete == True
+        if self.forward_loss is not None:
+            return self.forward_loss
+        fwd_losses = []
+        for i in range(self.view_num):
+            icm = self.icms[i]
+            fwd_losses.append(icm.get_forward_loss())
+        self.forward_loss = tf.add_n(fwd_losses)
+        return self.forward_loss
