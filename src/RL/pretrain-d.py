@@ -51,6 +51,8 @@ def create_renderer(args):
     dpy = pyosr.create_display()
     glctx = pyosr.create_gl_context(dpy)
     r = pyosr.Renderer()
+    if args.avi:
+        r.avi = True
     r.pbufferWidth = w
     r.pbufferHeight = h
     r.setup()
@@ -470,16 +472,15 @@ def pretrain_main(args):
                     if delta_accuracy == 0 and args.mispout:
                         samid = epoch + args.samplebase
                         predfn = os.path.join(args.mispout, 'Pred-At-{:07d}'.format(samid))
-                        np.savez(predfn, P=pred[i])
-                        for V in range(gt.rgb_1.shape[1]):
-                            s1 = gt.rgb_1[i,V].reshape(w, h, 3)
-                            s2 = gt.rgb_2[i,V].reshape(w, h, 3)
-                            s1fn = os.path.join(args.mispout, '{:07d}-IB{:03d}-V{:02d}-1.png'.format(samid, i, V))
-                            s2fn = os.path.join(args.mispout, '{:07d}-IB{:03d}-V{:02d}-2.png'.format(samid, i, V))
-                            imsave(s1fn, s1)
-                            imsave(s2fn, s2)
-                        with open(os.path.join(args.mispout, 'Action-At-{:07d}'.format(samid)), 'w') as f:
-                            f.write('Action is {}\n'.format(gt_index[i,0]))
+                        np.savez(predfn, P=pred[i], A=gt_index[i,0])
+                        if not args.norgbd:
+                            for V in range(gt.rgb_1.shape[1]):
+                                s1 = gt.rgb_1[i,V].reshape(w, h, 3)
+                                s2 = gt.rgb_2[i,V].reshape(w, h, 3)
+                                s1fn = os.path.join(args.mispout, '{:07d}-IB{:03d}-V{:02d}-1.png'.format(samid, i, V))
+                                s2fn = os.path.join(args.mispout, '{:07d}-IB{:03d}-V{:02d}-2.png'.format(samid, i, V))
+                                imsave(s1fn, s1)
+                                imsave(s2fn, s2)
                     # print('current preds {} gts {}'.format(pred[i,0], gt.actions[i,0]))
                 # print("[{}] End training".format(epoch))
                 period_loss += current_loss
@@ -597,7 +598,7 @@ if __name__ == '__main__':
             help='Capture input image to summary',
             action='store_true')
     parser.add_argument('--committee',
-            help='Employ a committee of NNs with different weights to extract features/make decisions from different views',
+            help='(deprecated by --viewinitckpt) Employ a committee of NNs with different weights to extract features/make decisions from different views',
             action='store_true')
     parser.add_argument('--norgbd',
             help='Do not store RGB/D images in storing the sample, to save disk spaces',
@@ -611,6 +612,9 @@ if __name__ == '__main__':
     parser.add_argument('--res',
             help='Resolution',
             type=int, default=config.DEFAULT_RES)
+    parser.add_argument('--avi',
+            help='Enable AdVanced Illumination mode',
+            action='store_true')
 
     args = parser.parse_args()
     if (not args.eval) and len(args.viewinitckpt) > 0:
