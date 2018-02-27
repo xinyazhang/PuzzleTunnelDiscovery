@@ -2,6 +2,11 @@ import tensorflow as tf
 import numpy as np
 from operator import mul
 
+RESIDUAL_NONE = 0
+RESIDUAL_FORK = 1
+RESIDUAL_PASS = 2
+RESIDUAL_JOIN = 3
+
 class VisionLayerConfig:
     strides = None
     kernel_size = None
@@ -13,6 +18,9 @@ class VisionLayerConfig:
     naming = None
     elu = False
     hole = None
+    max_pooling_kernel_size = None  # Or integer
+    max_pooling_strides = None      # Or integer
+    res_type = RESIDUAL_NONE        # No residual
 
     def __init__(self, ch_out, strides=[1, 2, 2, 1], kernel_size=[3,3], padding = 'SAME'):
         self.ch_out = ch_out
@@ -43,9 +51,19 @@ class VisionLayerConfig:
                         tf.random_uniform_initializer(-d, d))
         self.weight = weight
         self.bias = bias
+        if self.res_type != RESIDUAL_NONE and (ch_in != ch_out or self.strides[1:3] != [1,1]):
+            with tf.variable_scope(self.naming):
+                d = 1.0 / np.sqrt(ch_in) # w = h = 1
+                ''' 1x1 conv '''
+                res_proj = tf.get_variable("res_proj", [1,1,1] + [ch_in, ch_out],
+                        tf.float32,
+                        tf.random_uniform_initializer(-d, d))
+            self.res_proj = res_proj
+        else:
+            self.res_proj = None
         return weight, bias
 
-    def apply_layer(self, prev_layer):
+    def apply_layer(self, prev_layer, residual):
         print('prev {}'.format(prev_layer.shape))
         prev_ch_out = int(prev_layer.shape[-1])
         w,b = self.create_kernel(prev_ch_out)
@@ -61,9 +79,32 @@ class VisionLayerConfig:
             strides = [1] + self.strides
             conv = tf.nn.conv3d(prev_layer, w, strides, self.padding)
         # out = tf.nn.relu(conv + b)
+        residual_out = None
+        res_proj = None
+        if self.res_type == RESIDUAL_JOIN:
+            conv = conv + residual
+            residual_out = None
+        elif self.res_type == RESIDUAL_FORK:
+            residual_out = prev_layer
+        elif self.res_type == RESIDUAL_PASS:
+            residual_out = residual
         out = tf.nn.elu(conv + b) if self.elu else tf.nn.relu(conv + b)
-        print('after CNN {}'.format(out.shape))
-        return w,b,out
+        if self.max_pooling_kernel_size is not None:
+            ksize = [1, 1] + self.max_pooling_kernel_size + [1]
+            strides = [1, 1] + self.max_pooling_strides + [1]
+            out = tf.nn.max_pool3d(input=out,
+                    ksize=ksize,
+                    strides=strides,
+                    padding=self.padding)
+        print('after CNN {} res_type: {}'.format(out.shape, self.res_type))
+        if self.res_proj is not None:
+            residual_out = tf.nn.conv3d(residual_out,
+                    self.res_proj,
+                    [1,1]+self.strides[1:3]+[1], # Same strides as the conv
+                    self.padding)
+        if residual_out is not None:
+            print('after CNN residual {}'.format(residual_out.shape))
+        return w,b,out,residual_out,res_proj
 
     @staticmethod
     def createFromDict(visdict):
@@ -80,6 +121,19 @@ class VisionLayerConfig:
                 rate = visdesc['hole']+1
                 # Note: no hole in view dimension
                 viscfg.hole = [1, rate, rate]
+            if 'res' in visdesc:
+                res_type = visdesc['res']
+                if res_type == 'join':
+                    viscfg.res_type = RESIDUAL_JOIN
+                elif res_type == 'fork':
+                    viscfg.res_type = RESIDUAL_FORK
+                elif res_type == 'pass':
+                    viscfg.res_type = RESIDUAL_PASS
+                else:
+                    raise NameError('Unknow residual string {}'.format(res_type))
+            if 'max_pool' in visdesc:
+                viscfg.max_pooling_kernel_size = visdesc['max_pool']['kernel_size']
+                viscfg.max_pooling_strides = visdesc['max_pool']['strides']
             viscfg_array.append(viscfg)
         return viscfg_array
 
@@ -116,7 +170,7 @@ class FCLayerConfig:
         return weight, bias
 
     # FIXME: ACCEPT 2D TENSOR [None, N]
-    def apply_layer(self, prev):
+    def apply_layer(self, prev, _):
         # Dim 0 is BATCH
         print('prev {}'.format(prev.shape))
         if len(prev.shape.as_list()) > 2:
@@ -131,7 +185,7 @@ class FCLayerConfig:
         td.set_shape([None, prev.shape[1].value, self.ch_out])
         print('tdshape set to {}'.format(td.get_shape()))
         out = tf.nn.elu(td + b) if self.elu else tf.nn.relu(td + b)
-        return w,b,out
+        return w,b,out,None,None
 
 class VisionNetwork:
     '''
@@ -341,12 +395,16 @@ class ConvApplier:
             layer.elu = self.elu
         nn_layer_tensor = [input_tensor]
         nn_args = []
+        residual = None
         # print("== Len of layer_configs {}".format(len(self.layer_configs)))
         for conf in self.layer_configs:
             prev_layer_tensor = nn_layer_tensor[-1]
-            w,b,out = conf.apply_layer(prev_layer_tensor)
+            w,b,out,residual,res_proj = conf.apply_layer(prev_layer_tensor, residual)
             nn_layer_tensor.append(out)
-            nn_args.append((w,b))
+            if res_proj is None:
+                nn_args.append((w,b))
+            else:
+                nn_args.append((w,b,res_proj))
         return nn_args, nn_layer_tensor[-1]
 
 def GetFeatureSquare(featvec):
@@ -590,6 +648,34 @@ class FeatureExtractorRev6:
             rgbd_input = tf.concat([rgb_input, depth_input], axis=-1)
             params, featvec = self.alexrgbd.infer(rgbd_input)
             print("> Rev6 {}".format(featvec.shape))
+        self.reuse = True
+        return params, featvec
+
+
+'''
+Feature Extractor ResNet
+Arch:
+    ResNet18
+'''
+class FeatureExtractorResNet:
+    naming = None
+    reuse = None
+
+    def __init__(self,
+            cnnconf,
+            featnums,
+            naming,
+            elu):
+        self.resnetrgbd = ConvApplier(cnnconf, featnums, "ResNet18RGBD", elu)
+
+        self.naming = naming
+
+    def infer(self, rgb_input, depth_input):
+        with tf.variable_scope(self.naming, reuse=self.reuse) as scope:
+        #with tf.variable_scope(self.naming, reuse=tf.AUTO_REUSE) as scope:
+            rgbd_input = tf.concat([rgb_input, depth_input], axis=-1)
+            params, featvec = self.resnetrgbd.infer(rgbd_input)
+            print("> Rev11 {}".format(featvec.shape))
         self.reuse = True
         return params, featvec
 

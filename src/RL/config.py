@@ -89,6 +89,30 @@ SV_VGG16_STRIDES = [
         { 'ch_out' : 512, 'strides' : [1,3,3,1], 'kernel_size' : None},
         ]
 
+SV_RESNET18 =  [
+        # conv1 in the paper, with max pooling moved from conv2
+        { 'ch_out' : 32, 'strides' : None, 'kernel_size' : [7,7], 'max_pool': {'kernel_size':[3,3], 'strides':[2,2] } },
+        # conv2, note: default kernel_size is 3x3
+        { 'ch_out' : 64, 'strides' : [1,1,1,1], 'kernel_size' : None, 'res': 'fork'},
+        { 'ch_out' : 64, 'strides' : [1,1,1,1], 'kernel_size' : None, 'res': 'join'},
+        { 'ch_out' : 64, 'strides' : [1,1,1,1], 'kernel_size' : None, 'res': 'fork'},
+        { 'ch_out' : 64, 'strides' : [1,1,1,1], 'kernel_size' : None, 'res': 'join'},
+        # conv3
+        { 'ch_out' : 128, 'strides' : None, 'kernel_size' : None, 'res': 'fork'},
+        { 'ch_out' : 128, 'strides' : [1,1,1,1], 'kernel_size' : None, 'res': 'join'},
+        { 'ch_out' : 128, 'strides' : [1,1,1,1], 'kernel_size' : None, 'res': 'fork'},
+        { 'ch_out' : 128, 'strides' : [1,1,1,1], 'kernel_size' : None, 'res': 'join'},
+        # conv4
+        { 'ch_out' : 256, 'strides' : None, 'kernel_size' : None, 'res': 'fork'},
+        { 'ch_out' : 256, 'strides' : [1,1,1,1], 'kernel_size' : None, 'res': 'join'},
+        { 'ch_out' : 256, 'strides' : [1,1,1,1], 'kernel_size' : None, 'res': 'fork'},
+        { 'ch_out' : 256, 'strides' : [1,1,1,1], 'kernel_size' : None, 'res': 'join'},
+        # conv5
+        { 'ch_out' : 512, 'strides' : None, 'kernel_size' : None, 'res': 'fork'},
+        { 'ch_out' : 512, 'strides' : [1,1,1,1], 'kernel_size' : None, 'res': 'join'},
+        { 'ch_out' : 512, 'strides' : [1,1,1,1], 'kernel_size' : None, 'res': 'fork'},
+        { 'ch_out' : 512, 'strides' : [1,1,1,1], 'kernel_size' : None, 'res': 'join'},
+        ]
 
 SV_HOLE_LOWRES = [
         { 'ch_out' : 32, 'strides' : [1,1,1,1], 'kernel_size' : None},
