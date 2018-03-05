@@ -471,7 +471,7 @@ def pretrain_main(args):
                     period_accuracy += delta_accuracy
                     if delta_accuracy == 0 and args.mispout:
                         samid = epoch + args.samplebase
-                        predfn = os.path.join(args.mispout, 'Pred-At-{:07d}'.format(samid))
+                        predfn = os.path.join(args.mispout, 'Pred-At-{:07d}-IB{:03d}'.format(samid, i))
                         np.savez(predfn, P=pred[i], A=gt_index[i,0])
                         if not args.norgbd:
                             for V in range(gt.rgb_1.shape[1]):
