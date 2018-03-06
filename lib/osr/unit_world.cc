@@ -250,7 +250,7 @@ UnitWorld::transitState(const StateVector& state,
 	StateQuat rot;
 	tie(trans, rot) = decompose(state);
 	if (action_type == 0) {
-		trans += deltacap * tfvec;
+		trans += deltacap * tfvec * sym;
 	} else {
 		Eigen::AngleAxis<StateScalar> aa(deltacap * sym, tfvec);
 		rot = aa * rot;
