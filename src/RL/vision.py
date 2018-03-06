@@ -7,6 +7,8 @@ RESIDUAL_FORK = 1
 RESIDUAL_PASS = 2
 RESIDUAL_JOIN = 3
 
+GRADBIAS_ELEMENTS_PER_CHANNEL = 3
+
 class VisionLayerConfig:
     strides = None
     kernel_size = None
@@ -21,6 +23,7 @@ class VisionLayerConfig:
     max_pooling_kernel_size = None  # Or integer
     max_pooling_strides = None      # Or integer
     res_type = RESIDUAL_NONE        # No residual
+    gradb = False                   # bias with gradients
 
     def __init__(self, ch_out, strides=[1, 2, 2, 1], kernel_size=[3,3], padding = 'SAME'):
         self.ch_out = ch_out
@@ -29,6 +32,13 @@ class VisionLayerConfig:
         self.padding = padding
 
     def create_kernel(self, prev_ch_out):
+        '''
+        Returns w,b
+            w: a TENSOR of kernel
+            b: a TENSOR of bias
+
+            Note: with gradb, the returned b is a TENSOR rather than VARIABLE
+        '''
         if self.weight is not None:
             return self.weight, self.bias
         ch_in = self.ch_in if self.ch_in > 0 else int(prev_ch_out)
@@ -36,7 +46,10 @@ class VisionLayerConfig:
         [w, h] = self.kernel_size[0:2]
         d = 1.0 / np.sqrt(ch_in * w * h)
         weight_shape = [1, w, h, ch_in, ch_out]
-        bias_shape = [self.ch_out]
+        if not self.gradb:
+            bias_shape = [self.ch_out]
+        else:
+            bias_shape = [self.ch_out, 3]
         # print('weight_shape {}'.format(weight_shape))
         # print('d {}'.format(d))
         if self.naming is None:
@@ -47,7 +60,9 @@ class VisionLayerConfig:
                 weight = tf.get_variable("weight", weight_shape, tf.float32,
                         tf.random_uniform_initializer(-d, d))
                 bias_name = "bias_elu" if self.elu else "bias"
-                bias   = tf.get_variable(bias_name, bias_shape, tf.float32,
+                if self.gradb:
+                    bias_name += "_gradb"
+                bias = tf.get_variable(bias_name, bias_shape, tf.float32,
                         tf.random_uniform_initializer(-d, d))
         self.weight = weight
         self.bias = bias
@@ -63,9 +78,26 @@ class VisionLayerConfig:
             self.res_proj = None
         return weight, bias
 
+    def calc_gradb_tensor(self, bias, this_w, this_h):
+        if not self.gradb:
+            return None
+        ch_out = self.ch_out
+        ls_w = tf.linspace(0.0, this_w - 1.0, this_w)
+        ls_h = tf.linspace(0.0, this_h - 1.0, this_h)
+        ls_c = tf.linspace(1.0, 1.0, 1)
+        X,Y,Z = tf.meshgrid(ls_w, ls_h, ls_c, indexing='ij')
+        base, dx, dy = tf.split(bias, 3, axis=1)
+        base_1 = tf.reshape(base, shape=[1,1,ch_out])
+        dx_1 = tf.reshape(dx, shape=[1,1,ch_out])
+        dy_1 = tf.reshape(dy, shape=[1,1,ch_out])
+        bias = base_1 * Z + dx_1 * X + dy_1 * Y
+        print('Grad bias shape {}'.format(bias.shape))
+        return bias
+
     def apply_layer(self, prev_layer, residual):
         print('prev {}'.format(prev_layer.shape))
         prev_ch_out = int(prev_layer.shape[-1])
+        prev_w, prev_h = int(prev_layer.shape[-3]),int(prev_layer.shape[-2])
         w,b = self.create_kernel(prev_ch_out)
         if self.hole is not None:
             strides = [1, self.strides[1], self.strides[2]]
@@ -88,6 +120,9 @@ class VisionLayerConfig:
             residual_out = prev_layer
         elif self.res_type == RESIDUAL_PASS:
             residual_out = residual
+        if self.gradb:
+            b = self.calc_gradb_tensor(b, int(conv.shape[-3]), int(conv.shape[-2]))
+            print('CNN out shape {}'.format(conv.shape))
         out = tf.nn.elu(conv + b) if self.elu else tf.nn.relu(conv + b)
         if self.max_pooling_kernel_size is not None:
             ksize = [1, 1] + self.max_pooling_kernel_size + [1]
@@ -104,7 +139,10 @@ class VisionLayerConfig:
                     self.padding)
         if residual_out is not None:
             print('after CNN residual {}'.format(residual_out.shape))
-        return w,b,out,residual_out,res_proj
+        '''
+        NOTE: Must return self.bias rather than b. b might be a tensor while self.bias store the variable.
+        '''
+        return w,self.bias,out,residual_out,res_proj
 
     @staticmethod
     def createFromDict(visdict):
@@ -355,6 +393,7 @@ class ConvApplier:
     layer_configs = None
     naming = None
     elu = False
+    gradb = False
 
     '''
     Input: [B, V, W, H, C]
@@ -367,9 +406,11 @@ class ConvApplier:
             confdict,
             featnums,
             naming=None,
-            elu=False):
+            elu=False,
+            gradb=False):
         self.layer_configs = []
         self.elu = elu
+        self.gradb = gradb
         if confdict is not None:
             self.layer_configs = VisionLayerConfig.createFromDict(confdict)
         if featnums is not None:
@@ -393,6 +434,7 @@ class ConvApplier:
     def infer_impl(self, input_tensor):
         for layer in self.layer_configs:
             layer.elu = self.elu
+            layer.gradb = self.gradb
         nn_layer_tensor = [input_tensor]
         nn_args = []
         residual = None
@@ -665,8 +707,9 @@ class FeatureExtractorResNet:
             cnnconf,
             featnums,
             naming,
-            elu):
-        self.resnetrgbd = ConvApplier(cnnconf, featnums, "ResNet18RGBD", elu)
+            elu,
+            gradb=False):
+        self.resnetrgbd = ConvApplier(cnnconf, featnums, "ResNet18RGBD", elu, gradb)
 
         self.naming = naming
 

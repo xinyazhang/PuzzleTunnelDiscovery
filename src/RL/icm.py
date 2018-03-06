@@ -93,6 +93,10 @@ class IntrinsicCuriosityModule:
             self.feature_extractor = vision.FeatureExtractorResNet(
                     config.SV_RESNET18,
                     fehidden + [featnum], 'VisionNetRev11', elu)
+        elif ferev == 12:
+            self.feature_extractor = vision.FeatureExtractorResNet(
+                    config.SV_RESNET18,
+                    fehidden + [featnum], 'VisionNetRev12', elu, gradb=True)
         self.cur_nn_params, self.cur_featvec = self.feature_extractor.infer(rgb_tensor, depth_tensor)
         self.next_nn_params, self.next_featvec = self.feature_extractor.infer(next_rgb_tensor, next_depth_tensor)
         self.elu = elu

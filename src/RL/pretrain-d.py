@@ -592,7 +592,7 @@ if __name__ == '__main__':
             action='store_true')
     parser.add_argument('--ferev',
             help='Reversion of Feature Extractor',
-            choices=range(1,11+1),
+            choices=range(1,12+1),
             type=int, default=1)
     parser.add_argument('--capture',
             help='Capture input image to summary',
