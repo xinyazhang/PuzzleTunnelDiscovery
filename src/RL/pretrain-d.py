@@ -279,12 +279,13 @@ def spawn_gt_reader_thread(args):
 
 def save_gt_file(args, gt, epoch):
     fn = '{}/sample-{}'.format(args.sampleout, epoch + args.samplebase)
-    imfn = fn+'-peek.png'
     if args.norgbd:
         np.savez(fn, A=gt.actions, K=gt.keys)
     else:
         np.savez(fn, A=gt.actions, RGB=gt.rgb, DEP=gt.dep, K=gt.keys)
-    imsave(imfn, gt.rgb_1[0][0])
+    if not args.nosamplepreview:
+        imfn = fn+'-peek.png'
+        imsave(imfn, gt.rgb_1[0][0])
 
 def pretrain_main(args):
     '''
@@ -602,6 +603,9 @@ if __name__ == '__main__':
             action='store_true')
     parser.add_argument('--norgbd',
             help='Do not store RGB/D images in storing the sample, to save disk spaces',
+            action='store_true')
+    parser.add_argument('--nosamplepreview',
+            help='Do not store preview RGB images from generated samples, to save disk spaces',
             action='store_true')
     parser.add_argument('--view',
             help='Pickup one view to train',
