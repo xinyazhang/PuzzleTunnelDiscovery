@@ -1,11 +1,11 @@
 TOTEST=524288
 
 #ResNet 18
-OUT=evaluation/Resnet-View-0-of-14-A12-Rev-11-MISP/
+OUT=evaluation/Resnet-View-0-of-14-A12-Rev-11-MISP-retrain/
 mkdir -p $OUT
 
 ./pretrain-d.sh --ferev 11 --elu \
-	--ckptdir ackpt/Resnet-View-0-of-14-Action12-Rev-11-Feat-2048-524288 \
+	--ckptdir ackpt/Resnet-View-0-of-14-Action12-Rev-11-Feat-2048-524288-retrain \
 	--ckptprefix working-try11 \
 	--batch 2 --queuemax 64 --threads 1 \
 	--avi \
@@ -20,7 +20,7 @@ mkdir -p $OUT
 	--samplein sample/batch2-view14-norgbd-T6-R6-2M/ \
 	--sampletouse $TOTEST \
 	--samplebatching 64 \
-	--samplebase 1048576 > evaluation/Resnet-View-0-of-14-Rev-11-Feat-2048-524288.out
+	--samplebase 1048576 > evaluation/Resnet-View-0-of-14-Rev-11-Feat-2048-524288-retrain.out
 
 exit
 # Evaluate naive rev 5
