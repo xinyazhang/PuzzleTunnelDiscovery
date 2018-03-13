@@ -5,7 +5,7 @@ OUT=evaluation/Resnet-View-0-of-14-A12-Rev-11-MISP-retrain/
 mkdir -p $OUT
 
 ./pretrain-d.sh --ferev 11 --elu \
-	--ckptdir ackpt/Resnet-View-0-of-14-Action12-Rev-11-Feat-2048-524288-retrain \
+	--ckptdir ackpt/Resnet-View-0-of-14-Action12-Rev-11-Feat-2048-524288-retrain/ \
 	--ckptprefix working-try11 \
 	--batch 2 --queuemax 64 --threads 1 \
 	--avi \
