@@ -30,9 +30,11 @@ VIEW_CFG = config.VIEW_CFG
 
 def setup_global_variable(args):
     global VIEW_CFG
-    if args.ferev in [4,5,6,7,8]:
+    if args.viewset == 'cube':
+        VIEW_CFG = [(0, 4), (90, 1), (-90, 1)]
+    elif args.viewset == '14' or args.ferev >= 4:
         VIEW_CFG = config.VIEW_CFG_REV4
-    elif args.ferev != 1:
+    elif args.viewset == '22' or args.ferev != 1:
         VIEW_CFG = config.VIEW_CFG_REV2
 
 def _get_action_set(args):
@@ -619,6 +621,10 @@ if __name__ == '__main__':
     parser.add_argument('--avi',
             help='Enable AdVanced Illumination mode',
             action='store_true')
+    parser.add_argument('--viewset',
+            help='Choose set of views',
+            choices=['cube', '14', '22'],
+            default='')
 
     args = parser.parse_args()
     if (not args.eval) and len(args.viewinitckpt) > 0:
