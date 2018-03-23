@@ -41,6 +41,7 @@ class IntrinsicCuriosityModule:
         self.depth_tensor = depth_tensor
         self.next_rgb_tensor = next_rgb_tensor
         self.next_depth_tensor = next_depth_tensor
+        self.pretrain_saver = None
         if not imhidden:
             self.imhidden_params = list(config.INVERSE_MODEL_HIDDEN_LAYER)
         else:
@@ -97,9 +98,30 @@ class IntrinsicCuriosityModule:
             self.feature_extractor = vision.FeatureExtractorResNet(
                     config.SV_RESNET18,
                     fehidden + [featnum], 'VisionNetRev12', elu, gradb=True)
+        '''
+        featvec: shape [BATCH, VIEW, N]
+        '''
         self.cur_nn_params, self.cur_featvec = self.feature_extractor.infer(rgb_tensor, depth_tensor)
         self.next_nn_params, self.next_featvec = self.feature_extractor.infer(next_rgb_tensor, next_depth_tensor)
         self.elu = elu
+
+        self.featnum = featnum
+        self.lstmsize = featnum
+        self.lstm_dic = {}
+
+    def load_pretrain(self, sess, ckpt_dir):
+        if self.pretrain_saver is None:
+            self.get_inverse_model()
+            ''' Note: cur nn and next nn share params '''
+            params = self.cur_nn_params + self.inverse_model_params
+            self.pretrain_saver = tf.train.Saver(params)
+        ckpt = tf.train.get_checkpoint_state(checkpoint_dir=ckpt_dir)
+        if not ckpt or not ckpt.model_checkpoint_path:
+            print('! PANIC: View {} was not restored by checkpoint in {}'.format(saver.view, ckpt_dir))
+            return False
+        print('Restore View {} from {}'.format(saver.view, ckpt.model_checkpoint_path))
+        saver.restore(sess, ckpt.model_checkpoint_path)
+        return True
 
     def get_inverse_model(self):
         if self.inverse_output_tensor is not None:
@@ -126,9 +148,13 @@ class IntrinsicCuriosityModule:
         input_featvec = tf.concat([self.action_tensor, self.cur_featvec], 2)
         featnums = self.fwhidden_params + [int(self.cur_featvec.shape[-1])]
         self.forward_fc_applier = vision.ConvApplier(None, featnums, 'ForwardModelNet', self.elu)
+        # FIXME: ConvApplier.infer returns tuples, which is unsuitable for Optimizer
         params, out = self.forward_fc_applier.infer(input_featvec)
         self.forward_model_params = params
         self.forward_output_tensor = out
+        print('FWD Params {}'.format(params))
+        params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='ForwardModelNet')
+        print('FWD Collected Params {}'.format(params))
         return params, out
 
     def get_nn_params(self):
@@ -173,10 +199,57 @@ class IntrinsicCuriosityModule:
         print('forward loss shape {}'.format(loss.shape))
         return loss
 
+    class LSTMCache:
+        pass
+
+    def create_somenet_from_feature(self, hidden, netname, elu, lstm):
+        featvec = self.cur_featvec
+        if lstm is True:
+            featvec = get_lstm_featvec('LSTM', featvec)
+        net = vision.ConvApplier(None, hidden, netname, elu)
+        _, out = net.infer(featvec)
+        '''
+        TODO: Check if this returns LSTM as well (probably not)
+        '''
+        params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=netname)
+        return out, params, [net]
+
+    '''
+    Return the tensor of the feature vector, shape [TIME, VIEW (as BATCH), feature]
+    Note: we need lstm.states_in in feed_dict if lstm=True
+    '''
+    def get_lstm_featvec(self, netname, fv):
+        if netname in self.lstm_dic:
+            return self.lstm_dic[netname].outs
+        with tf.variable_scope(netname) as scope:
+            lstm = LSTMCache()
+            lstm.cell = tf.contrib.rnn.BasicLSTMCell(self.lstmsize, state_is_tuple=True)
+            lstm.cell_state_in = tf.placeholder(tf.float32, [None, self.lstmsize], name='LSTMCellInPh')
+            lstm.hidden_state_in = tf.placeholder(tf.float32, [None, self.lstmsize], name='LSTMHiddenInPh')
+            lstm.states_in = tf.contrib.rnn.LSTMStateTuple(lstm.cell_in, lstm.hidden_state_in)
+            lstm.seq_length_in = tf.placeholder(tf.int32, [None], name='LSTMLenInPh')
+            lstm.outs, lstm.states_out = tf.nn.dynamic_rnn(lstm.cell,
+                    fv,
+                    initial_state = lstm.states_in,
+                    sequence_length = lstm.seq_length_in,
+                    time_major=True,
+                    scope=scope)
+        self.lstm_dic[netname] = lstm
+        return lstm.outs
+
+    '''
+    Must be called AFTER get_lstm_featvec
+    '''
+    def acquire_lstm_io(self, netname):
+        lstm = self.lstm_dic[netname]
+        return lstm.states_in, lstm.seq_length_in, lstm.states_out
+
 def view_scope_name(i):
     return 'ICM_View{}'.format(i)
 
 '''
+XXX: THIS CLASS IS SUBJECT TO UPGRADES
+
 IntrinsicCuriosityModuleCommittee:
     ICM Committe, each NN for one view
     Inverse model: accumulating prediction from views as multi-view prediction.
@@ -317,6 +390,8 @@ class IntrinsicCuriosityModuleIndependentCommittee:
             self.savers.append(tf.train.Saver(allvars))
             self.savers[-1].view = i
         self.singlesoftmax = singlesoftmax
+        self.cur_featvec_cache = None
+        self.next_featvec_cache = None
 
     def restore(self, sess, ckpts):
         for ckpt_dir, saver in zip(ckpts, self.savers):
@@ -383,3 +458,40 @@ class IntrinsicCuriosityModuleIndependentCommittee:
             fwd_losses.append(icm.get_forward_loss())
         self.forward_loss = tf.add_n(fwd_losses)
         return self.forward_loss
+
+    def create_somenet_from_feature(self, hidden, netname):
+        outs = []
+        nets = []
+        paramss = []
+        for i in range(self.view_num):
+            icm = self.icms[i]
+            with tf.variable_scope(netname):
+                vsn = 'View_{}'.format(i)
+                featvec = icm.cur_featvec
+                nets.append(vision.ConvApplier(None, hidden, vsn, elu))
+                _, out = nets[-1].infer(featvec)
+                outs.append(tf.nn.softmax(out))
+                paramss.append()
+        out = tf.add_n(outs)
+        params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=netname)
+        return out, params, nets
+
+    @property
+    def cur_featvec(self):
+        if self.cur_featvec_cache is not None:
+            return self.cur_featvec_cache
+        fvs = []
+        for icm in self.icms:
+            fvs.append(icm.cur_featvec)
+        self.cur_featvec_cache = tf.concat(fvs, axis=1)
+        return self.cur_featvec_cache
+
+    @property
+    def next_featvec(self):
+        if self.next_featvec_cache is not None:
+            return self.next_featvec_cache
+        fvs = []
+        for icm in self.icms:
+            fvs.append(icm.next_featvec)
+        self.next_featvec_cache = tf.concat(fvs, axis=1)
+        return self.next_featvec_cache
