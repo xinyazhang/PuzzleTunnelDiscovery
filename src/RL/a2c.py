@@ -81,7 +81,7 @@ class A2CTrainer:
         actions = []
         rewards = []
         values = []
-        lstm_begin = advcore.lstm_state
+        lstm_begin = advcore.get_lstm()
         for i in range(tmax):
             policy, value = advcore.evaluate_current(envir, sess, [advcore.policy, advcore.value])
             '''
@@ -90,7 +90,7 @@ class A2CTrainer:
             print('pol {} shape {}; val {} shape {}'.format(policy, policy.shape, value, value.shape))
             policy = policy[0][0]
             value = value[0][0][0]
-            lstm_next = advcore.lstm_next
+            lstm_next = advcore.get_lstm()
             action = advcore.make_decision(policy)
             states.append(envir.vstate)
             '''
@@ -107,11 +107,11 @@ class A2CTrainer:
             rewards.append(reward)
             if reaching_terminal:
                 break
-            advcore.lstm_state = lstm_next # AdvCore next frame
+            advcore.set_lstm(lstm_next) # AdvCore next frame
             envir.qstate = nstate # Envir Next frame
-        advcore.lstm_state = lstm_begin
+        advcore.set_lstm(lstm_begin)
         self.a2c(sess, actions, states, rewards, values, reaching_terminal)
-        advcore.lstm_state = lstm_next
+        advcore.set_lstm(lstm_next)
 
     '''
     Private function that performs the training
@@ -173,6 +173,12 @@ class A2CTrainer:
                 self.TD_tensor: batch_td,
                 self.V_tensor: batch_V
               }
+        if advcore.using_lstm:
+            dic.update({
+                advcore.lstm_states_in.c : advcore.current_lstm.c,
+                advcore.lstm_states_in.h : advcore.current_lstm.h,
+                advcore.lstm_len : len(batch_rgb[:-1])
+                       })
         print('batch_td {}'.format(batch_td))
         print('batch_V {}'.format(batch_V))
         sess.run(self.train_op, feed_dict=dic)

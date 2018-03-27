@@ -189,9 +189,11 @@ class CuriosityRL(rlenv.IAdvantageCore):
         self.using_lstm = args.lstm
         if args.lstm:
             self.lstm_states_in, self.lstm_len, self.lstm_states_out = self.model.acquire_lstm_io('LSTM')
+            # batching is madantory, although our batch size is 1
             self.current_lstm = tf.contrib.rnn.LSTMStateTuple(
-                    np.zeros([self.model.lstmsize], dtype=np.float32),
-                    np.zeros([self.model.lstmsize], dtype=np.float32))
+                    np.zeros([1, self.model.lstmsize], dtype=np.float32),
+                    np.zeros([1, self.model.lstmsize], dtype=np.float32))
+            print("[LSTM] {}".format(self.lstm_states_in.c))
         self.optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
         self.refine_vision_and_memory_op = self.optimizer.minimize(self.inverse_loss + self.curiosity,
                 var_list = self.curiosity_params)
@@ -256,14 +258,17 @@ class CuriosityRL(rlenv.IAdvantageCore):
             dic.update(additional_dict)
         if not self.using_lstm:
             return sess.run(tensors, feed_dict=dic)
+        # print(self.lstm_states_in.c)
+        # print(self.current_lstm)
         dic.update({
-            self.lstm_states_in : self.lstm_state,
+            self.lstm_states_in.c : self.current_lstm.c,
+            self.lstm_states_in.h : self.current_lstm.h,
             self.lstm_len : 1
                    })
         # FIXME: verify ret[-1] is a tuple
-        ret = sess.run(tensors + model.lstm_states_out, feed_dict=dic)
+        ret = sess.run(tensors + [self.lstm_states_out], feed_dict=dic)
         self.lstm_cache = ret[-1]
-        return ret[0:-1][0]
+        return ret[:-1]
 
     def make_decision(self, policy_dist):
         return np.argmax(policy_dist, axis=-1)
@@ -307,8 +312,6 @@ class CuriosityRL(rlenv.IAdvantageCore):
         if self.using_lstm:
             return self.current_lstm
         return 0
-
-    lstm_state = property(get_lstm, set_lstm)
 
     def load_pretrain(self, sess, viewinitckpt):
         if view_num > 1:

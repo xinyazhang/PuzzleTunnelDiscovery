@@ -205,13 +205,15 @@ class IntrinsicCuriosityModule:
     def create_somenet_from_feature(self, hidden, netname, elu, lstm):
         featvec = self.cur_featvec
         if lstm is True:
-            featvec = get_lstm_featvec('LSTM', featvec)
+            featvec = self.get_lstm_featvec('LSTM', featvec)
         net = vision.ConvApplier(None, hidden, netname, elu)
         _, out = net.infer(featvec)
         '''
         TODO: Check if this returns LSTM as well (probably not)
         '''
         params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=netname)
+        print('Params {}'.format(params))
+        print('LSTM Params {}'.format(self.acquire_lstm_params()))
         return out, params, [net]
 
     '''
@@ -222,16 +224,20 @@ class IntrinsicCuriosityModule:
         if netname in self.lstm_dic:
             return self.lstm_dic[netname].outs
         with tf.variable_scope(netname) as scope:
-            lstm = LSTMCache()
+            print('[LSTM] fv shape {}'.format(fv.shape))
+            lstmin = tf.reshape(fv, [1, -1, self.featnum])
+            print('[LSTM] lstmin shape {}'.format(lstmin.shape))
+            lstm = self.LSTMCache()
             lstm.cell = tf.contrib.rnn.BasicLSTMCell(self.lstmsize, state_is_tuple=True)
-            lstm.cell_state_in = tf.placeholder(tf.float32, [None, self.lstmsize], name='LSTMCellInPh')
-            lstm.hidden_state_in = tf.placeholder(tf.float32, [None, self.lstmsize], name='LSTMHiddenInPh')
-            lstm.states_in = tf.contrib.rnn.LSTMStateTuple(lstm.cell_in, lstm.hidden_state_in)
-            lstm.seq_length_in = tf.placeholder(tf.int32, [None], name='LSTMLenInPh')
-            lstm.outs, lstm.states_out = tf.nn.dynamic_rnn(lstm.cell,
-                    fv,
-                    initial_state = lstm.states_in,
-                    sequence_length = lstm.seq_length_in,
+            lstm.cell_state_in = tf.placeholder(tf.float32, [1, self.lstmsize], name='LSTMCellInPh')
+            lstm.hidden_state_in = tf.placeholder(tf.float32, [1, self.lstmsize], name='LSTMHiddenInPh')
+            lstm.init_states_in = tf.contrib.rnn.LSTMStateTuple(lstm.cell_state_in, lstm.hidden_state_in)
+            lstm.seq_length_in = tf.placeholder(tf.int32, name='LSTMLenInPh')
+            lstm.outs, lstm.states_out = tf.nn.dynamic_rnn(
+                    cell=lstm.cell,
+                    inputs=fv,
+                    initial_state=lstm.init_states_in,
+                    sequence_length=lstm.seq_length_in,
                     time_major=True,
                     scope=scope)
         self.lstm_dic[netname] = lstm
@@ -242,7 +248,10 @@ class IntrinsicCuriosityModule:
     '''
     def acquire_lstm_io(self, netname):
         lstm = self.lstm_dic[netname]
-        return lstm.states_in, lstm.seq_length_in, lstm.states_out
+        return lstm.init_states_in, lstm.seq_length_in, lstm.states_out
+
+    def acquire_lstm_params(self):
+        return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='LSTM')
 
 def view_scope_name(i):
     return 'ICM_View{}'.format(i)

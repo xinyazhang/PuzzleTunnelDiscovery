@@ -179,5 +179,3 @@ class IAdvantageCore(object):
     @abstractmethod
     def get_lstm(self):
         pass
-
-    lstm_state = abstractproperty(get_lstm, set_lstm)
