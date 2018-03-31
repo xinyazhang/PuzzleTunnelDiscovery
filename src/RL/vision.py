@@ -444,9 +444,9 @@ class ConvApplier:
             w,b,out,residual,res_proj = conf.apply_layer(prev_layer_tensor, residual)
             nn_layer_tensor.append(out)
             if res_proj is None:
-                nn_args.append((w,b))
+                nn_args += [w,b]
             else:
-                nn_args.append((w,b,res_proj))
+                nn_args += [w,b,res_proj]
         return nn_args, nn_layer_tensor[-1]
 
 def GetFeatureSquare(featvec):

@@ -144,16 +144,16 @@ class CuriosityRL(rlenv.IAdvantageCore):
 
     def __init__(self, learning_rate, args):
         super(CuriosityRL, self).__init__()
-        view_num, _ = _get_view_cfg(args)
+        self.view_num, _ = _get_view_cfg(args)
         w = h = args.res
 
         self.action_tensor = tf.placeholder(tf.float32, shape=[None, 1, uw_random.DISCRETE_ACTION_NUMBER], name='ActionPh')
-        self.rgb_1_tensor = tf.placeholder(tf.float32, shape=[None, view_num, w, h, 3], name='Rgb1Ph')
-        self.rgb_2_tensor = tf.placeholder(tf.float32, shape=[None, view_num, w, h, 3], name='Rgb2Ph')
-        self.dep_1_tensor = tf.placeholder(tf.float32, shape=[None, view_num, w, h, 1], name='Dep1Ph')
-        self.dep_2_tensor = tf.placeholder(tf.float32, shape=[None, view_num, w, h, 1], name='Dep2Ph')
+        self.rgb_1_tensor = tf.placeholder(tf.float32, shape=[None, self.view_num, w, h, 3], name='Rgb1Ph')
+        self.rgb_2_tensor = tf.placeholder(tf.float32, shape=[None, self.view_num, w, h, 3], name='Rgb2Ph')
+        self.dep_1_tensor = tf.placeholder(tf.float32, shape=[None, self.view_num, w, h, 1], name='Dep1Ph')
+        self.dep_2_tensor = tf.placeholder(tf.float32, shape=[None, self.view_num, w, h, 1], name='Dep2Ph')
 
-        if view_num > 1:
+        if self.view_num > 1:
             self.model = icm.IntrinsicCuriosityModuleIndependentCommittee(self.action_tensor,
                     self.rgb_1_tensor, self.dep_1_tensor,
                     self.rgb_2_tensor, self.dep_2_tensor,
@@ -177,8 +177,8 @@ class CuriosityRL(rlenv.IAdvantageCore):
                         imhidden=args.imhidden,
                         fehidden=args.fehidden,
                         fwhidden=args.fwhidden)
+                self.model.get_inverse_model()
 
-        self.model.get_inverse_model()
         self.inverse_loss = self.model.get_inverse_loss(discrete=True)
 
         self.polout, self.polparams, self.polnets = self.create_polnet(args)
@@ -287,6 +287,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
               }
         ret = sess.run(self.curiosity, feed_dict=dic)
         print("AR {}".format(ret))
+        print("AR Input adist {} vs1 {} {} vs2 {} {}".format(adist, vs1[0].shape, vs1[1].shape, vs2[0].shape, vs2[1].shape))
         return ret
 
     def train(self, sess, rgb, dep, actions):
@@ -314,7 +315,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
         return 0
 
     def load_pretrain(self, sess, viewinitckpt):
-        if view_num > 1:
+        if self.view_num > 1:
             self.model.load_pretrain(sess, viewinitckpt)
         else:
             self.model.load_pretrain(sess, viewinitckpt[0])

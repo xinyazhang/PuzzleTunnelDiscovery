@@ -114,13 +114,15 @@ class IntrinsicCuriosityModule:
             self.get_inverse_model()
             ''' Note: cur nn and next nn share params '''
             params = self.cur_nn_params + self.inverse_model_params
+            print('+*+ params: {}'.format(params))
             self.pretrain_saver = tf.train.Saver(params)
+        saver = self.pretrain_saver
         ckpt = tf.train.get_checkpoint_state(checkpoint_dir=ckpt_dir)
         if not ckpt or not ckpt.model_checkpoint_path:
             print('! PANIC: View {} was not restored by checkpoint in {}'.format(saver.view, ckpt_dir))
             return False
-        print('Restore View {} from {}'.format(saver.view, ckpt.model_checkpoint_path))
         saver.restore(sess, ckpt.model_checkpoint_path)
+        print('Restored Pretrained Weights from {}'.format(ckpt.model_checkpoint_path))
         return True
 
     def get_inverse_model(self):

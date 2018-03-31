@@ -92,6 +92,7 @@ class A2CTrainer:
             value = value[0][0][0]
             lstm_next = advcore.get_lstm()
             action = advcore.make_decision(policy)
+            print('Action chosen {}'.format(action))
             states.append(envir.vstate)
             '''
             FIXME: Wait, shouldn't be policy?
@@ -99,7 +100,9 @@ class A2CTrainer:
             actions.append(action)
             values.append(value)
 
+            print("Peeking action")
             nstate,reward,reaching_terminal = envir.peek_act(action)
+            print("action peeked {} terminal? {}".format(nstate, reaching_terminal))
             adist = np.zeros(shape=(self.action_space_dimension),
                     dtype=np.float32)
             adist[action] = 1.0
