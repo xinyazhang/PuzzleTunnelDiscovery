@@ -1,10 +1,59 @@
 TRY=try11
 
+# First of 14 Views on 12 Actions with 2048 FV
+# 512K training samples, *8 iterations
+# Baseline, with correct camera
+NACTION=12
+SAMPLEDIR=sample/batch2-view14-norgbd-T6-R6-2M/
+OUTDIR=nsample-idmv-action$NACTION
+TOTALVIEW=14
+echo "mkdir -p $OUTDIR"
+
+BASE=0
+for END in 524288
+do
+	NSAMPLE=$((END - BASE))
+	for REV in 5
+	do
+		for FEATNUM in 512 1024 2048
+		do
+		for VIEW in 0 #`seq 0 1 $((TOTALVIEW -1))`
+		do
+			CKPT_DIR=pretrain-d-elu-view-$VIEW-of-$TOTALVIEW-rev-$REV-action$NACTION-Feat-$FEATNUM-fixcam-working
+			echo -e "\nmkdir -p ckpt/$CKPT_DIR"
+			PREFIX=working-$TRY
+			ITER=$((NSAMPLE * 8))
+
+			echo "
+	./pretrain-d.sh --ferev $REV --elu \\
+		--ckptdir ckpt/$CKPT_DIR/ --ckptprefix $PREFIX \\
+		--batch 2 --queuemax 64 --threads 1 \\
+		--iter $ITER \\
+		--view $VIEW \\
+		--viewset cube \\
+		--featnum $FEATNUM \\
+		--imhidden $FEATNUM $FEATNUM \\
+		--samplein $SAMPLEDIR \\
+		--sampletouse $NSAMPLE \\
+		--samplebatching 64 \\
+		--samplebase $BASE > nsample-idmv-action$NACTION/View-$VIEW-of-$TOTALVIEW-Rev-$REV-Feat-$FEATNUM-$END-fixcam.out
+			"
+			ARCHIVED_CKPT=View-$VIEW-of-$TOTALVIEW-Action$NACTION-Rev-$REV-Feat-$FEATNUM-$END-fixcam
+			echo -e "cp -a ckpt/$CKPT_DIR ackpt/$ARCHIVED_CKPT\n"
+		done
+		done
+	done
+	BASE=$END
+done
+
+exit
+
 # 14 Views on 12 Actions with 2048 FV
 # 512K training samples, *32 iterations
 # AdVanced Illumination
 # Res: 224 * 224
 # Rev: 12 (ResNet, with gradb)
+# CAVEAT: THIS ONE USES INCORRECT CAMERA CONF.
 NACTION=12
 SAMPLEDIR=sample/batch2-view14-norgbd-T6-R6-2M/
 OUTDIR=nsample-idmv-action$NACTION
