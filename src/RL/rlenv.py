@@ -49,6 +49,12 @@ class IEnvironment(object):
     def peek_act(self, action):
         pass
 
+    '''
+    Reset to initial state
+    '''
+    @abstractmethod
+    def reset(self):
+        pass
 
 '''
 Overall design idea:

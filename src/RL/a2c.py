@@ -116,6 +116,9 @@ class A2CTrainer:
         self.a2c(sess, actions, states, rewards, values, reaching_terminal)
         advcore.set_lstm(lstm_next)
 
+        if reaching_terminal:
+            envir.reset()
+
     '''
     Private function that performs the training
     '''

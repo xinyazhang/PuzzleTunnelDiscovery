@@ -25,6 +25,7 @@ import rlenv
 import Queue as queue # Python 2, rename to import queue as queue for python 3
 import rlargs
 import a2c
+from cachetools import LRUCache
 
 MT_VERBOSE = False
 # MT_VERBOSE = True
@@ -83,12 +84,13 @@ class AlphaPuzzle(rlenv.IEnvironment):
         self.fb_cache = None
         self.fb_dirty = True
         r = self.r = create_renderer(args)
-        r.state = np.array(r.translate_to_unit_state(args.istateraw),
-            dtype=np.float32)
+        self.istate = np.array(r.translate_to_unit_state(args.istateraw), dtype=np.float32)
+        r.state = self.istate
         self.rgb_shape = (len(r.views), r.pbufferWidth, r.pbufferHeight, 3)
         self.dep_shape = (len(r.views), r.pbufferWidth, r.pbufferHeight, 1)
         self.action_magnitude = args.amag
         self.verify_magnitude = args.vmag
+        self.collision_cache = LRUCache(maxsize = 128)
 
     def qstate_setter(self, state):
         # print('old {}'.format(self.r.state))
@@ -121,16 +123,31 @@ class AlphaPuzzle(rlenv.IEnvironment):
 
     def peek_act(self, action):
         r = self.r
-        nstate, done, ratio = r.transit_state(r.state,
-                action,
-                self.action_magnitude,
-                self.verify_magnitude)
+        colkey = tuple(r.state.tolist() + [action])
+        if colkey in self.collision_cache:
+            nstate, done, ratio = self.collision_cache[colkey]
+        else:
+            nstate, done, ratio = r.transit_state(r.state,
+                    action,
+                    self.action_magnitude,
+                    self.verify_magnitude)
+        sa = (colkey, (nstate, done, ratio))
         reaching_terminal = r.is_disentangled(nstate)
-        reward = 100.0 if reaching_terminal is True else 0.0
+        reward = 0.0
+        reward += 1e7 if reaching_terminal is True else 0.0 # Large Mag for solution
+        if ratio == 0.0:
+            '''
+            Special handling of collision
+            '''
+            reward = -1e5 # Negative rewards
+            self.collision_cache.update([sa])
         rgb_1, dep_1 = self.vstate
         self.state = nstate
         rgb_2, dep_2 = self.vstate
         return nstate, reward, reaching_terminal
+
+    def reset(self):
+        self.qstate = self.istate
 
 class CuriosityRL(rlenv.IAdvantageCore):
     rgb_shape = None
