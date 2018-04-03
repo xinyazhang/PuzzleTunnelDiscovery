@@ -102,7 +102,7 @@ class A2CTrainer:
 
             print("Peeking action")
             nstate,reward,reaching_terminal = envir.peek_act(action)
-            print("action peeked {} terminal? {}".format(nstate, reaching_terminal))
+            # print("action peeked {} ratio {} terminal? {}".format(nstate, ratio, reaching_terminal))
             adist = np.zeros(shape=(self.action_space_dimension),
                     dtype=np.float32)
             adist[action] = 1.0

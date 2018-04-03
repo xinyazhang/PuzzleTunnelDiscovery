@@ -127,6 +127,9 @@ def get_parser():
             help='Choose set of views',
             choices=['cube', '14', '22'],
             default='')
+    parser.add_argument('--egreedy',
+            help='Epsilon Greedy Policy'
+            default=0.2)
 
     return parser
 

@@ -25,6 +25,7 @@ import rlenv
 import Queue as queue # Python 2, rename to import queue as queue for python 3
 import rlargs
 import a2c
+import random
 from cachetools import LRUCache
 
 MT_VERBOSE = False
@@ -133,13 +134,14 @@ class AlphaPuzzle(rlenv.IEnvironment):
                     self.verify_magnitude)
         sa = (colkey, (nstate, done, ratio))
         reaching_terminal = r.is_disentangled(nstate)
+        print("New state {} ratio {} terminal {}".format(nstate, ratio, reaching_terminal))
         reward = 0.0
         reward += 1e7 if reaching_terminal is True else 0.0 # Large Mag for solution
-        if ratio == 0.0:
+        if not done:
             '''
             Special handling of collision
             '''
-            reward = -1e5 # Negative rewards
+            reward = -1e5 * (1 - ratio)  # Negative rewards
             self.collision_cache.update([sa])
         rgb_1, dep_1 = self.vstate
         self.state = nstate
@@ -163,6 +165,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
         super(CuriosityRL, self).__init__()
         self.view_num, _ = _get_view_cfg(args)
         w = h = args.res
+        self.egreedy = args.egreedy
 
         self.action_tensor = tf.placeholder(tf.float32, shape=[None, 1, uw_random.DISCRETE_ACTION_NUMBER], name='ActionPh')
         self.rgb_1_tensor = tf.placeholder(tf.float32, shape=[None, self.view_num, w, h, 3], name='Rgb1Ph')
@@ -288,6 +291,8 @@ class CuriosityRL(rlenv.IAdvantageCore):
         return ret[:-1]
 
     def make_decision(self, policy_dist):
+        if random.random() < self.egreedy:
+            return random.randrange(uw_random.DISCRETE_ACTION_NUMBER)
         return np.argmax(policy_dist, axis=-1)
 
     def get_artificial_reward(self, envir, sess, state_1, adist, state_2):
