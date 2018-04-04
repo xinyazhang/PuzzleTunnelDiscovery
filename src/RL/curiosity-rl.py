@@ -223,11 +223,17 @@ class CuriosityRL(rlenv.IAdvantageCore):
 
     def create_polnet(self, args):
         hidden = args.polhidden + [int(self.action_tensor.shape[-1])]
-        return self.model.create_somenet_from_feature(hidden, 'PolNet', elu=args.elu, lstm=args.lstm)
+        return self.model.create_somenet_from_feature(hidden, 'PolNet',
+                elu=args.elu,
+                lstm=args.lstm,
+                initialized_as_zero=True)
 
     def create_valnet(self, args):
         hidden = args.valhidden + [1]
-        return self.model.create_somenet_from_feature(hidden, 'ValNet', elu=args.elu, lstm=args.lstm)
+        return self.model.create_somenet_from_feature(hidden, 'ValNet',
+                elu=args.elu,
+                lstm=args.lstm,
+                initialized_as_zero=True)
 
     def create_curiosity_net(self, args):
         fwd_params, fwd_feat = self.model.get_forward_model()

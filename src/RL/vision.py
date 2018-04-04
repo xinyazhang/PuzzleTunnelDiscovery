@@ -24,6 +24,7 @@ class VisionLayerConfig:
     max_pooling_strides = None      # Or integer
     res_type = RESIDUAL_NONE        # No residual
     gradb = False                   # bias with gradients
+    initialized_as_zero = False     # Zero initial weights rather than randomized values
 
     def __init__(self, ch_out, strides=[1, 2, 2, 1], kernel_size=[3,3], padding = 'SAME'):
         self.ch_out = ch_out
@@ -53,26 +54,38 @@ class VisionLayerConfig:
         # print('weight_shape {}'.format(weight_shape))
         # print('d {}'.format(d))
         if self.naming is None:
-            weight = tf.Variable(tf.random_uniform(weight_shape, minval=-d, maxval=d))
-            bias   = tf.Variable(tf.random_uniform(bias_shape,   minval=-d, maxval=d))
+            if self.initialized_as_zero:
+                weight = tf.Variable(tf.zeros(weight_shape))
+                bias   = tf.Variable(tf.zeros(bias_shape))
+            else:
+                weight = tf.Variable(tf.random_uniform(weight_shape, minval=-d, maxval=d))
+                bias   = tf.Variable(tf.random_uniform(bias_shape,   minval=-d, maxval=d))
         else:
+            if self.initialized_as_zero:
+                initializer = tf.zeros_initializer()
+            else:
+                initializer = tf.random_uniform_initializer(-d, d)
             with tf.variable_scope(self.naming):
                 weight = tf.get_variable("weight", weight_shape, tf.float32,
-                        tf.random_uniform_initializer(-d, d))
+                        initializer)
                 bias_name = "bias_elu" if self.elu else "bias"
                 if self.gradb:
                     bias_name += "_gradb"
                 bias = tf.get_variable(bias_name, bias_shape, tf.float32,
-                        tf.random_uniform_initializer(-d, d))
+                        initializer)
         self.weight = weight
         self.bias = bias
         if self.res_type != RESIDUAL_NONE and (ch_in != ch_out or self.strides[1:3] != [1,1]):
             with tf.variable_scope(self.naming):
                 d = 1.0 / np.sqrt(ch_in) # w = h = 1
+                if self.initialized_as_zero:
+                    initializer = tf.zeros_initializer()
+                else:
+                    initializer = tf.random_uniform_initializer(-d, d)
                 ''' 1x1 conv '''
                 res_proj = tf.get_variable("res_proj", [1,1,1] + [ch_in, ch_out],
                         tf.float32,
-                        tf.random_uniform_initializer(-d, d))
+                        initializer)
             self.res_proj = res_proj
         else:
             self.res_proj = None
@@ -182,6 +195,8 @@ class FCLayerConfig:
     bias = None
     naming = None
     elu = False
+    gradb = False
+    initialized_as_zero = False
 
     def __init__(self, ch_out):
         self.ch_out = ch_out
@@ -195,15 +210,23 @@ class FCLayerConfig:
         bias_shape = [ch_out]
         d = 1.0 / np.sqrt(ch_in)
         if self.naming is None:
-            weight = tf.Variable(tf.random_uniform(weight_shape, minval=-d, maxval=d))
-            bias   = tf.Variable(tf.random_uniform(bias_shape,   minval=-d, maxval=d))
+            if self.initialized_as_zero:
+                weight = tf.Variable(tf.zeros(weight_shape))
+                bias   = tf.Variable(tf.zeros(bias_shape))
+            else:
+                weight = tf.Variable(tf.random_uniform(weight_shape, minval=-d, maxval=d))
+                bias   = tf.Variable(tf.random_uniform(bias_shape,   minval=-d, maxval=d))
         else:
+            if self.initialized_as_zero:
+                initializer = tf.zeros_initializer()
+            else:
+                initializer = tf.random_uniform_initializer(-d, d)
             with tf.variable_scope(self.naming):
                 weight = tf.get_variable("weight", weight_shape, tf.float32,
-                        tf.random_uniform_initializer(-d, d))
+                        initializer)
                 bias_name = "bias_elu" if self.elu else "bias"
                 bias   = tf.get_variable(bias_name, bias_shape, tf.float32,
-                        tf.random_uniform_initializer(-d, d))
+                        initializer)
         self.weight, self.bias = weight, bias
         return weight, bias
 
@@ -407,10 +430,12 @@ class ConvApplier:
             featnums,
             naming=None,
             elu=False,
-            gradb=False):
+            gradb=False,
+            initialized_as_zero=False):
         self.layer_configs = []
         self.elu = elu
         self.gradb = gradb
+        self.initialized_as_zero = initialized_as_zero
         if confdict is not None:
             self.layer_configs = VisionLayerConfig.createFromDict(confdict)
         if featnums is not None:
@@ -435,6 +460,7 @@ class ConvApplier:
         for layer in self.layer_configs:
             layer.elu = self.elu
             layer.gradb = self.gradb
+            layer.initialized_as_zero = self.initialized_as_zero
         nn_layer_tensor = [input_tensor]
         nn_args = []
         residual = None

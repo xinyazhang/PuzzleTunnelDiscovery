@@ -204,11 +204,11 @@ class IntrinsicCuriosityModule:
     class LSTMCache:
         pass
 
-    def create_somenet_from_feature(self, hidden, netname, elu, lstm):
+    def create_somenet_from_feature(self, hidden, netname, elu, lstm, initialized_as_zero=False):
         featvec = self.cur_featvec
         if lstm is True:
             featvec = self.get_lstm_featvec('LSTM', featvec)
-        net = vision.ConvApplier(None, hidden, netname, elu)
+        net = vision.ConvApplier(None, hidden, netname, elu, initialized_as_zero=initialized_as_zero)
         _, out = net.infer(featvec)
         '''
         TODO: Check if this returns LSTM as well (probably not)
