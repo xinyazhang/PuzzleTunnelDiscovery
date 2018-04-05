@@ -128,7 +128,8 @@ def get_parser():
             choices=['cube', '14', '22'],
             default='')
     parser.add_argument('--egreedy',
-            help='Epsilon Greedy Policy'
+            help='Epsilon Greedy Policy',
+            type=float,
             default=0.2)
 
     return parser

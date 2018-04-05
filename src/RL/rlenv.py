@@ -1,4 +1,6 @@
 from abc import ABCMeta, abstractmethod, abstractproperty
+import tensorflow as tf
+
 '''
 Note: Python2 code?
 '''
@@ -111,6 +113,10 @@ class IAdvantageCore(object):
     @abstractproperty
     def policy(self):
         pass
+
+    @property
+    def softmax_policy(self):
+        return tf.nn.softmax(logits=self.policy)
 
     '''
     Value tensor (Q function value)

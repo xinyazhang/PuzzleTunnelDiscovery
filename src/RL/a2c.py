@@ -53,16 +53,23 @@ class A2CTrainer:
         self.TD_tensor = tf.placeholder(tf.float32, shape=[None], name='TDPh')
         self.V_tensor = tf.placeholder(tf.float32, shape=[None], name='VPh')
 
-        policy = tf.nn.softmax(logits=advcore.policy)
+        policy = advcore.softmax_policy
         log_policy = tf.log(tf.clip_by_value(policy, 1e-20, 1.0))
         # cond_prob = tf.reduce_sum(policy * self.Adist_tensor, axis=1)
+        rindices = [i for i in range(1, len(log_policy.shape))]
+        print('rindices {}'.format(rindices))
         action_entropy = tf.reduce_sum(tf.multiply(log_policy, self.Adist_tensor),
-                reduction_indices=[1,2])
-        entropy = -tf.reduce_sum(policy * log_policy, reduction_indices=[1,2])
+                reduction_indices=rindices)
+        entropy = -tf.reduce_sum(policy * log_policy, reduction_indices=rindices)
+        print('action_entropy shape {}'.format(action_entropy.shape))
 
-        policy_loss_per_step = tf.reduce_sum(action_entropy * self.TD_tensor) + entropy * self.entropy_beta
-        policy_loss = tf.reduce_sum(policy_loss_per_step)
-        value_loss = tf.nn.l2_loss(self.V_tensor - advcore.value)
+        # Why do we add entropy to our loss?
+        # policy_loss_per_step = tf.reduce_sum(action_entropy * self.TD_tensor) + entropy * self.entropy_beta
+        policy_loss_per_step = tf.reduce_sum(action_entropy * self.TD_tensor)
+        policy_loss = -tf.reduce_sum(policy_loss_per_step)
+        flattened_value = tf.reshape(advcore.value, [-1])
+        value_loss = tf.nn.l2_loss(self.V_tensor - flattened_value)
+        print("V_tensor {} AdvCore.value {}".format(self.V_tensor.shape, flattened_value.shape))
         self.loss = policy_loss+value_loss
         return self.loss
 
@@ -83,16 +90,15 @@ class A2CTrainer:
         values = []
         lstm_begin = advcore.get_lstm()
         for i in range(tmax):
-            policy, value = advcore.evaluate_current(envir, sess, [advcore.policy, advcore.value])
+            policy, value = advcore.evaluate_current(envir, sess, [advcore.softmax_policy, advcore.value])
             '''
             Pick up the only frame
             '''
             print('pol {} shape {}; val {} shape {}'.format(policy, policy.shape, value, value.shape))
             policy = policy[0][0]
-            value = value[0][0][0]
+            value = np.asscalar(value) # value[0][0][0]
             lstm_next = advcore.get_lstm()
             action = advcore.make_decision(policy)
-            print('Action chosen {}'.format(action))
             states.append(envir.vstate)
             '''
             FIXME: Wait, shouldn't be policy?

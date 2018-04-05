@@ -32,6 +32,8 @@ MT_VERBOSE = False
 # MT_VERBOSE = True
 VIEW_CFG = config.VIEW_CFG
 
+COLLIDE_PEN_MAG = 1e3
+
 def setup_global_variable(args):
     global VIEW_CFG
     if args.viewset == 'cube':
@@ -79,6 +81,8 @@ class GroundTruth:
     pass
 
 class AlphaPuzzle(rlenv.IEnvironment):
+    collision_pen_mag = COLLIDE_PEN_MAG
+    solved_award_mag = 1e7
 
     def __init__(self, args):
         super(AlphaPuzzle, self).__init__()
@@ -126,26 +130,34 @@ class AlphaPuzzle(rlenv.IEnvironment):
         r = self.r
         colkey = tuple(r.state.tolist() + [action])
         if colkey in self.collision_cache:
+            print("Cache Hit {}".format(colkey))
             nstate, done, ratio = self.collision_cache[colkey]
         else:
             nstate, done, ratio = r.transit_state(r.state,
                     action,
                     self.action_magnitude,
                     self.verify_magnitude)
+            if ratio < 1e-4:
+                '''
+                Disable moving forward if ratio is too small.
+                '''
+                ratio = 0
+                nstate = np.copy(r.state)
         sa = (colkey, (nstate, done, ratio))
         reaching_terminal = r.is_disentangled(nstate)
-        print("New state {} ratio {} terminal {}".format(nstate, ratio, reaching_terminal))
         reward = 0.0
-        reward += 1e7 if reaching_terminal is True else 0.0 # Large Mag for solution
+        reward += self.solved_award_mag if reaching_terminal is True else 0.0 # Large Reward for solution
         if not done:
             '''
             Special handling of collision
             '''
-            reward = -1e5 * (1 - ratio)  # Negative rewards
+            if ratio == 0.0:
+                reward = -self.collision_pen_mag
             self.collision_cache.update([sa])
         rgb_1, dep_1 = self.vstate
         self.state = nstate
         rgb_2, dep_2 = self.vstate
+        print("New state {} ratio {} terminal {} reward {}".format(nstate, ratio, reaching_terminal, reward))
         return nstate, reward, reaching_terminal
 
     def reset(self):
@@ -203,6 +215,10 @@ class CuriosityRL(rlenv.IAdvantageCore):
 
         self.polout, self.polparams, self.polnets = self.create_polnet(args)
         self.valout, self.valparams, self.valnets = self.create_valnet(args)
+        '''
+        valout ranges from -2 COLLIDE_PEN_MAG to + inf
+        '''
+        self.valout = self.valout * (COLLIDE_PEN_MAG * 2.0)
         self.curiosity, self.curiosity_params = self.create_curiosity_net(args)
         print('Curiosity Params: {}'.format(self.curiosity_params))
 
@@ -297,9 +313,13 @@ class CuriosityRL(rlenv.IAdvantageCore):
         return ret[:-1]
 
     def make_decision(self, policy_dist):
+        best = np.argmax(policy_dist, axis=-1)
         if random.random() < self.egreedy:
-            return random.randrange(uw_random.DISCRETE_ACTION_NUMBER)
-        return np.argmax(policy_dist, axis=-1)
+            ret = random.randrange(uw_random.DISCRETE_ACTION_NUMBER)
+        else:
+            ret = best
+        print('Action best {} chosen {}'.format(best, ret))
+        return ret
 
     def get_artificial_reward(self, envir, sess, state_1, adist, state_2):
         envir.qstate = state_1
@@ -378,12 +398,12 @@ def curiosity_main(args):
         increment_global_step = tf.assign_add(global_step, 1, name='increment_global_step')
 
         envir = AlphaPuzzle(args)
-        advcore = CuriosityRL(learning_rate=1e-5, args=args)
+        advcore = CuriosityRL(learning_rate=1e-3, args=args)
         trainer = a2c.A2CTrainer(envir=envir,
                 advcore=advcore,
                 tmax=args.batch,
                 gamma=config.GAMMA,
-                learning_rate=1e-5,
+                learning_rate=1e-3,
                 global_step=global_step)
 
         # TODO: Summaries
