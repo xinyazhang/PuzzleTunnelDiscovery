@@ -4,6 +4,7 @@
     Pre-Train the VisionNet and Inverse Model
 '''
 
+from __future__ import print_function
 import tensorflow as tf
 import numpy as np
 import math
@@ -26,7 +27,9 @@ import Queue as queue # Python 2, rename to import queue as queue for python 3
 import rlargs
 import a2c
 import random
+import threading
 from cachetools import LRUCache
+from six.moves import queue
 
 MT_VERBOSE = False
 # MT_VERBOSE = True
@@ -96,6 +99,7 @@ class AlphaPuzzle(rlenv.IEnvironment):
         self.action_magnitude = args.amag
         self.verify_magnitude = args.vmag
         self.collision_cache = LRUCache(maxsize = 128)
+        self.egreedy = args.egreedy # e-greedy is an agent-specific variable
 
     def qstate_setter(self, state):
         # print('old {}'.format(self.r.state))
@@ -126,7 +130,7 @@ class AlphaPuzzle(rlenv.IEnvironment):
     def vstatedim(self):
         return self.rgb_shape[0:3]
 
-    def peek_act(self, action):
+    def peek_act(self, action, pprefix=""):
         r = self.r
         colkey = tuple(r.state.tolist() + [action])
         if colkey in self.collision_cache:
@@ -157,7 +161,7 @@ class AlphaPuzzle(rlenv.IEnvironment):
         rgb_1, dep_1 = self.vstate
         self.state = nstate
         rgb_2, dep_2 = self.vstate
-        print("New state {} ratio {} terminal {} reward {}".format(nstate, ratio, reaching_terminal, reward))
+        print(pprefix, "New state {} ratio {} terminal {} reward {}".format(nstate, ratio, reaching_terminal, reward))
         return nstate, reward, reaching_terminal
 
     def reset(self):
@@ -177,7 +181,6 @@ class CuriosityRL(rlenv.IAdvantageCore):
         super(CuriosityRL, self).__init__()
         self.view_num, _ = _get_view_cfg(args)
         w = h = args.res
-        self.egreedy = args.egreedy
 
         self.action_tensor = tf.placeholder(tf.float32, shape=[None, 1, uw_random.DISCRETE_ACTION_NUMBER], name='ActionPh')
         self.rgb_1_tensor = tf.placeholder(tf.float32, shape=[None, self.view_num, w, h, 3], name='Rgb1Ph')
@@ -312,16 +315,16 @@ class CuriosityRL(rlenv.IAdvantageCore):
         self.lstm_cache = ret[-1]
         return ret[:-1]
 
-    def make_decision(self, policy_dist):
+    def make_decision(self, envir, policy_dist, pprefix=''):
         best = np.argmax(policy_dist, axis=-1)
-        if random.random() < self.egreedy:
+        if random.random() < envir.egreedy:
             ret = random.randrange(uw_random.DISCRETE_ACTION_NUMBER)
         else:
             ret = best
-        print('Action best {} chosen {}'.format(best, ret))
+        print(pprefix, 'Action best {} chosen {}'.format(best, ret))
         return ret
 
-    def get_artificial_reward(self, envir, sess, state_1, adist, state_2):
+    def get_artificial_reward(self, envir, sess, state_1, adist, state_2, pprefix=""):
         envir.qstate = state_1
         vs1 = envir.vstate
         envir.qstate = state_2
@@ -334,8 +337,8 @@ class CuriosityRL(rlenv.IAdvantageCore):
                 self.dep_2 : [vs2[1]],
               }
         ret = sess.run(self.curiosity, feed_dict=dic)
-        print("AR {}".format(ret))
-        print("AR Input adist {} vs1 {} {} vs2 {} {}".format(adist, vs1[0].shape, vs1[1].shape, vs2[0].shape, vs2[1].shape))
+        print(pprefix, "AR {}".format(ret))
+        print(pprefix, "AR Input adist {} vs1 {} {} vs2 {} {}".format(adist, vs1[0].shape, vs1[1].shape, vs2[0].shape, vs2[1].shape))
         return ret
 
     def train(self, sess, rgb, dep, actions):
@@ -368,13 +371,66 @@ class CuriosityRL(rlenv.IAdvantageCore):
         else:
             self.model.load_pretrain(sess, viewinitckpt[0])
 
+class TrainerMT:
+    kAsyncTask = 1
+    kSyncTask = 2
+    kExitTask = -1
+
+    def __init__(self, args, g, global_step):
+        self.args = args
+        self.advcore = CuriosityRL(learning_rate=1e-3, args=args)
+        self.tfgraph = g
+        self.threads = []
+        self.taskQ = queue.Queue(args.queuemax)
+        self.sessQ = queue.Queue(args.queuemax)
+        self.reportQ = queue.Queue(args.queuemax)
+        self.trainer = a2c.A2CTrainer(
+                advcore=self.advcore,
+                tmax=args.batch,
+                gamma=config.GAMMA,
+                learning_rate=1e-3,
+                global_step=global_step)
+        for i in range(args.threads):
+            thread = threading.Thread(target=self.run_worker, args=(i,g))
+            thread.start()
+            self.threads.append(thread)
+
+    def run_worker(self, tid, g):
+        '''
+        IEnvironment is pre-thread object, mainly due to OpenGL context
+        '''
+        with g.as_default():
+            args = self.args
+            envir = AlphaPuzzle(args)
+            while True:
+                task = self.taskQ.get()
+                if task == self.kExitTask:
+                    return 0
+                sess = self.sessQ.get()
+                self.trainer.train(envir, sess, tid)
+                if task == self.kSyncTask:
+                    self.reportQ.put(1)
+
+    def train(self, sess, is_async=True):
+        self.sessQ.put(sess)
+        if is_async:
+            self.taskQ.put(self.kAsyncTask)
+        else:
+            self.taskQ.put(self.kSyncTask)
+            done = self.reportQ.get()
+
+    def stop(self):
+        for t in self.threads:
+            self.taskQ.put(self.kExitTask)
+        for t in self.threads:
+            t.join()
+
+
 def curiosity_main(args):
     '''
     CAVEAT: WITHOUT ALLOW_GRWTH, WE MUST CREATE RENDERER BEFORE CALLING ANY TF ROUTINE
     '''
     pyosr.init()
-    threads = []
-    #total_epoch = args.iter * args.threads
     total_epoch = args.total_epoch
 
     view_num, view_array = _get_view_cfg(args)
@@ -397,6 +453,7 @@ def curiosity_main(args):
         global_step = tf.contrib.framework.get_or_create_global_step()
         increment_global_step = tf.assign_add(global_step, 1, name='increment_global_step')
 
+        '''
         envir = AlphaPuzzle(args)
         advcore = CuriosityRL(learning_rate=1e-3, args=args)
         trainer = a2c.A2CTrainer(envir=envir,
@@ -405,6 +462,8 @@ def curiosity_main(args):
                 gamma=config.GAMMA,
                 learning_rate=1e-3,
                 global_step=global_step)
+        '''
+        trainer = TrainerMT(args, g, global_step)
 
         # TODO: Summaries
 
@@ -433,6 +492,7 @@ def curiosity_main(args):
             period_loss = 0.0
             period_accuracy = 0
             total_accuracy = 0
+            g.finalize() # Prevent accidental changes
             while epoch < total_epoch:
                 trainer.train(sess)
                 if (not args.eval) and ((epoch + 1) % 1000 == 0 or time.time() - last_time >= 10 * 60 or epoch + 1 == total_epoch):
@@ -445,11 +505,7 @@ def curiosity_main(args):
                 # print("Epoch {} (Total {}) Done".format(epoch, accum_epoch))
                 epoch += 1
                 accum_epoch += 1
-    total_accuracy += period_accuracy
-    total_accuracy_ratio = total_accuracy / ((epoch+1.0) * batch_size) * 100.0
-    print("Final Accuracy {}%".format(total_accuracy_ratio))
-    for thread in threads:
-        thread.join()
+            trainer.stop() # Must stop before session becomes invalid
 
 if __name__ == '__main__':
     parser = rlargs.get_parser()

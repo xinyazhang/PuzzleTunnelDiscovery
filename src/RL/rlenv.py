@@ -158,9 +158,10 @@ class IAdvantageCore(object):
     Return the index of decided action from a policy distribution
     Note: due to the interface of cross entropy loss,
           the input was not filtered by softmax
+    Note2: we need envir because we want to store agent specific data to envir
     '''
     @abstractmethod
-    def make_decision(self, policy_dist):
+    def make_decision(self, envir, policy_dist):
         pass
 
     '''

@@ -1,3 +1,4 @@
+from __future__ import print_function
 import tensorflow as tf
 import rlenv
 import numpy as np
@@ -76,9 +77,13 @@ class A2CTrainer:
 
     This method interacts with RLEnv object to collect truths
     '''
-    def train(self, envir, sess, tmax=-1):
+    def train(self, envir, sess, tid=None, tmax=-1):
         if tmax < 0:
             tmax = self.a2c_tmax
+        if tid is None:
+            pprefix = ""
+        else:
+            pprefix = "[{}] ".format(tid)
         advcore = self.advcore
         reaching_terminal = False
         states = []
@@ -91,11 +96,11 @@ class A2CTrainer:
             '''
             Pick up the only frame
             '''
-            print('pol {} shape {}; val {} shape {}'.format(policy, policy.shape, value, value.shape))
+            print(pprefix, 'pol {} shape {}; val {} shape {}'.format(policy, policy.shape, value, value.shape))
             policy = policy[0][0]
             value = np.asscalar(value) # value[0][0][0]
             lstm_next = advcore.get_lstm()
-            action = advcore.make_decision(envir, policy)
+            action = advcore.make_decision(envir, policy, pprefix)
             states.append(envir.vstate)
             '''
             FIXME: Wait, shouldn't be policy?
@@ -103,20 +108,20 @@ class A2CTrainer:
             actions.append(action)
             values.append(value)
 
-            print("Peeking action")
-            nstate,reward,reaching_terminal = envir.peek_act(action)
+            print(pprefix, "Peeking action")
+            nstate,reward,reaching_terminal = envir.peek_act(action, pprefix=pprefix)
             # print("action peeked {} ratio {} terminal? {}".format(nstate, ratio, reaching_terminal))
             adist = np.zeros(shape=(self.action_space_dimension),
                     dtype=np.float32)
             adist[action] = 1.0
-            reward += advcore.get_artificial_reward(envir, sess, envir.qstate, adist, nstate)
+            reward += advcore.get_artificial_reward(envir, sess, envir.qstate, adist, nstate, pprefix)
             rewards.append(reward)
             if reaching_terminal:
                 break
             advcore.set_lstm(lstm_next) # AdvCore next frame
             envir.qstate = nstate # Envir Next frame
         advcore.set_lstm(lstm_begin)
-        self.a2c(envir, sess, actions, states, rewards, values, reaching_terminal)
+        self.a2c(envir, sess, actions, states, rewards, values, reaching_terminal, pprefix)
         advcore.set_lstm(lstm_next)
 
         if reaching_terminal:
@@ -125,7 +130,7 @@ class A2CTrainer:
     '''
     Private function that performs the training
     '''
-    def a2c(self, envir, sess, actions, states, rewards, values, reaching_terminal):
+    def a2c(self, envir, sess, actions, states, rewards, values, reaching_terminal, pprefix=""):
         advcore = self.advcore
         V = 0.0
         if not reaching_terminal:
@@ -150,7 +155,7 @@ class A2CTrainer:
         for (ai, ri, si, Vi) in zip(actions, rewards, states, values):
             V = ri + self.gamma * V
             td = V - Vi
-            print("V {} Vi {}".format(V, Vi))
+            print(pprefix, "V {} Vi {}".format(V, Vi))
             adist = np.zeros(shape=(1, self.action_space_dimension),
                     dtype=np.float32)
             adist[0, ai] = 1.0
@@ -164,8 +169,8 @@ class A2CTrainer:
         batch_rgb.append(envir.vstate[0])
         batch_dep.append(envir.vstate[1])
         if self.verbose_training:
-            print('[{}] batch_a[0] {}'.format(self.worker_thread_index, batch_adist[0]))
-            print('[{}] batch_V {}'.format(self.worker_thread_index, batch_R))
+            print(pprefix, '[{}] batch_a[0] {}'.format(self.worker_thread_index, batch_adist[0]))
+            print(pprefix, '[{}] batch_V {}'.format(self.worker_thread_index, batch_R))
         '''
         Always reverse, the RLEnv need this sequential info for training.
         '''
@@ -187,7 +192,7 @@ class A2CTrainer:
                 advcore.lstm_states_in.h : advcore.current_lstm.h,
                 advcore.lstm_len : len(batch_rgb[:-1])
                        })
-        print('batch_td {}'.format(batch_td))
-        print('batch_V {}'.format(batch_V))
+        print(pprefix, 'batch_td {}'.format(batch_td))
+        print(pprefix, 'batch_V {}'.format(batch_V))
         sess.run(self.train_op, feed_dict=dic)
         advcore.train(sess, batch_rgb, batch_dep, batch_adist)
