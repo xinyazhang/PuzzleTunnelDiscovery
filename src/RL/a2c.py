@@ -9,7 +9,6 @@ class A2CTrainer:
     verbose_training = False
 
     def __init__(self,
-            envir,
             advcore,
             tmax,
             gamma,
@@ -17,7 +16,6 @@ class A2CTrainer:
             global_step=None,
             entropy_beta=0.01
             ):
-        self.envir = envir
         self.advcore = advcore
         self.a2c_tmax = tmax
         self.gamma = gamma
@@ -78,10 +76,9 @@ class A2CTrainer:
 
     This method interacts with RLEnv object to collect truths
     '''
-    def train(self, sess, tmax=-1):
+    def train(self, envir, sess, tmax=-1):
         if tmax < 0:
             tmax = self.a2c_tmax
-        envir = self.envir
         advcore = self.advcore
         reaching_terminal = False
         states = []
@@ -98,7 +95,7 @@ class A2CTrainer:
             policy = policy[0][0]
             value = np.asscalar(value) # value[0][0][0]
             lstm_next = advcore.get_lstm()
-            action = advcore.make_decision(policy)
+            action = advcore.make_decision(envir, policy)
             states.append(envir.vstate)
             '''
             FIXME: Wait, shouldn't be policy?
@@ -119,7 +116,7 @@ class A2CTrainer:
             advcore.set_lstm(lstm_next) # AdvCore next frame
             envir.qstate = nstate # Envir Next frame
         advcore.set_lstm(lstm_begin)
-        self.a2c(sess, actions, states, rewards, values, reaching_terminal)
+        self.a2c(envir, sess, actions, states, rewards, values, reaching_terminal)
         advcore.set_lstm(lstm_next)
 
         if reaching_terminal:
@@ -128,8 +125,7 @@ class A2CTrainer:
     '''
     Private function that performs the training
     '''
-    def a2c(self, sess, actions, states, rewards, values, reaching_terminal):
-        envir = self.envir
+    def a2c(self, envir, sess, actions, states, rewards, values, reaching_terminal):
         advcore = self.advcore
         V = 0.0
         if not reaching_terminal:
