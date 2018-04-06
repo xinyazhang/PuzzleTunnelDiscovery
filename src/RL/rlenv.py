@@ -71,6 +71,7 @@ class IAdvantageCore(object):
 
     def __init__(self):
         super(IAdvantageCore, self).__init__()
+        self._softmax_policy_tensor = None
 
     '''
     Input RGB for Current Frame
@@ -116,7 +117,9 @@ class IAdvantageCore(object):
 
     @property
     def softmax_policy(self):
-        return tf.nn.softmax(logits=self.policy)
+        if self._softmax_policy_tensor is None:
+            self._softmax_policy_tensor = tf.nn.softmax(logits=self.policy)
+        return self._softmax_policy_tensor
 
     '''
     Value tensor (Q function value)
