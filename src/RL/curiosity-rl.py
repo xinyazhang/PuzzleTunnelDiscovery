@@ -478,21 +478,22 @@ def curiosity_main(args):
             epoch = 0
             accum_epoch = 0
             if args.viewinitckpt:
-                advcore.load_pretrain(sess, args.viewinitckpt)
+                trainer.advcore.load_pretrain(sess, args.viewinitckpt)
+
+            ckpt = tf.train.get_checkpoint_state(checkpoint_dir=ckpt_dir)
+            print('ckpt {}'.format(ckpt))
+            if ckpt and ckpt.model_checkpoint_path:
+                saver.restore(sess, ckpt.model_checkpoint_path)
+                accum_epoch = sess.run(global_step)
+                print('Restored!, global_step {}'.format(accum_epoch))
+                if args.continuetrain:
+                    accum_epoch += 1
+                    epoch = accum_epoch
             else:
-                ckpt = tf.train.get_checkpoint_state(checkpoint_dir=ckpt_dir)
-                print('ckpt {}'.format(ckpt))
-                if ckpt and ckpt.model_checkpoint_path:
-                    saver.restore(sess, ckpt.model_checkpoint_path)
-                    accum_epoch = sess.run(global_step)
-                    print('Restored!, global_step {}'.format(accum_epoch))
-                    if args.continuetrain:
-                        accum_epoch += 1
-                        epoch = accum_epoch
-                else:
-                    if args.eval:
-                        print('PANIC: --eval is set but checkpoint does not exits')
-                        return
+                if args.eval:
+                    print('PANIC: --eval is set but checkpoint does not exits')
+                    return
+
             period_loss = 0.0
             period_accuracy = 0
             total_accuracy = 0
