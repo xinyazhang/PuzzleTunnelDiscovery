@@ -130,7 +130,8 @@ def get_parser():
     parser.add_argument('--egreedy',
             help='Epsilon Greedy Policy',
             type=float,
-            default=0.2)
+            nargs='*',
+            default=[0.2])
 
     return parser
 

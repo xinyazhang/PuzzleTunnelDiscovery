@@ -87,7 +87,7 @@ class AlphaPuzzle(rlenv.IEnvironment):
     collision_pen_mag = COLLIDE_PEN_MAG
     solved_award_mag = 1e7
 
-    def __init__(self, args):
+    def __init__(self, args, tid):
         super(AlphaPuzzle, self).__init__()
         self.fb_cache = None
         self.fb_dirty = True
@@ -99,7 +99,9 @@ class AlphaPuzzle(rlenv.IEnvironment):
         self.action_magnitude = args.amag
         self.verify_magnitude = args.vmag
         self.collision_cache = LRUCache(maxsize = 128)
-        self.egreedy = args.egreedy # e-greedy is an agent-specific variable
+        self.egreedy = args.egreedy[0] # e-greedy is an agent-specific variable
+        if len(args.egreedy) != 1:
+            self.egreedy = args.egreedy[tid]
 
     def qstate_setter(self, state):
         # print('old {}'.format(self.r.state))
@@ -377,6 +379,8 @@ class TrainerMT:
     kExitTask = -1
 
     def __init__(self, args, g, global_step):
+        if len(args.egreedy) != 1 and len(args.egreedy) != args.threads:
+            print("--egreedy should have only one argument, or match the number of threads")
         self.args = args
         self.advcore = CuriosityRL(learning_rate=1e-3, args=args)
         self.tfgraph = g
@@ -401,7 +405,7 @@ class TrainerMT:
         '''
         with g.as_default():
             args = self.args
-            envir = AlphaPuzzle(args)
+            envir = AlphaPuzzle(args, tid)
             while True:
                 task = self.taskQ.get()
                 if task == self.kExitTask:
