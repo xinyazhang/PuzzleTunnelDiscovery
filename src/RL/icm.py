@@ -109,13 +109,14 @@ class IntrinsicCuriosityModule:
         self.lstmsize = featnum
         self.lstm_dic = {}
 
-    def load_pretrain(self, sess, ckpt_dir):
+    def load_pretrain(self, sess, ckpt_dir, view=0):
         if self.pretrain_saver is None:
             self.get_inverse_model()
             ''' Note: cur nn and next nn share params '''
             params = self.cur_nn_params + self.inverse_model_params
             print('+*+ params: {}'.format(params))
             self.pretrain_saver = tf.train.Saver(params)
+            self.pretrain_saver.view = view
         saver = self.pretrain_saver
         ckpt = tf.train.get_checkpoint_state(checkpoint_dir=ckpt_dir)
         if not ckpt or not ckpt.model_checkpoint_path:
