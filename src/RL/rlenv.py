@@ -1,5 +1,8 @@
 from abc import ABCMeta, abstractmethod, abstractproperty
 import tensorflow as tf
+from collections import deque
+import itertools
+import random
 
 '''
 Note: Python2 code?
@@ -57,6 +60,51 @@ class IEnvironment(object):
     @abstractmethod
     def reset(self):
         pass
+
+class IExperienceReplayEnvironment(IEnvironment):
+
+    def __init__(self, tmax, erep_cap):
+        super(IExperienceReplayEnvironment, self).__init__()
+        self.tmax = tmax
+        self.erep_sample_cap = erep_cap * tmax
+        self.erep_actions = deque()
+        self.erep_states = deque()
+        self.erep_reward = deque()
+        self.erep_term = deque()
+        self.erep_all_deques = [self.erep_actions, self.erep_states,
+                self.erep_reward, self.erep_term]
+        '''
+        Actionn State Reward Queues
+        '''
+        self.erep_asr_deques = [self.erep_actions, self.erep_states, self.erep_reward]
+
+    '''
+    Store Experience REPlay
+    '''
+    def store_erep(self, action, state, reward, reaching_terminal):
+        if self.erep_sample_cap <= 0:
+            return
+        while len(self.erep_actions) >= self.erep_sample_cap:
+            [q.popleft() for q in self.erep_all_deques]
+        self.erep_actions.append(action)
+        self.erep_states.append(state)
+        self.erep_reward.append(reward)
+        self.erep_term.append(reaching_terminal)
+
+    def sample_in_erep(self, pprefix):
+        # FIXME: Handle terminal in the cache
+        cached_samples = len(self.erep_actions)
+        size = min(cached_samples, self.tmax)
+        start = random.randrange(-size + 1, cached_samples)
+        pick_start = max(start, 0)
+        pick_end = min(start + size, cached_samples)
+        a,s,r = [list(itertools.islice(q, pick_start, pick_end)) for q in self.erep_asr_deques]
+        '''
+        Number of actions = Number of States - 1
+        '''
+        a=a[:-1]
+        r=r[:-1]
+        return a,s,r,self.erep_term[pick_end-1]
 
 '''
 Overall design idea:
@@ -149,9 +197,10 @@ class IAdvantageCore(object):
 
     '''
     Evaluate the environment
+    vstates: List of vstate from IEnvironment
     '''
     @abstractmethod
-    def evaluate_current(self, envir, sess, tensors, additional_dict=None):
+    def evaluate(self, vstates, sess, tensors, additional_dict=None):
         pass
 
     '''
@@ -169,6 +218,13 @@ class IAdvantageCore(object):
     '''
     @abstractmethod
     def get_artificial_reward(self, envir, sess, state_1, adist, state_2):
+        pass
+
+    '''
+    Return the artificial reward
+    '''
+    @abstractmethod
+    def get_artificial_from_experience(self, sess, vstates, action_performed):
         pass
 
     '''

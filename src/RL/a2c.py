@@ -2,6 +2,8 @@ from __future__ import print_function
 import tensorflow as tf
 import rlenv
 import numpy as np
+from collections import deque
+import itertools
 
 class A2CTrainer:
     a2c_tmax = None
@@ -15,7 +17,8 @@ class A2CTrainer:
             gamma,
             learning_rate,
             global_step=None,
-            entropy_beta=0.01
+            entropy_beta=0.01,
+            erep_cap = -1
             ):
         self.advcore = advcore
         self.a2c_tmax = tmax
@@ -88,11 +91,12 @@ class A2CTrainer:
         reaching_terminal = False
         states = []
         actions = []
-        rewards = []
+        actual_rewards = []
+        combined_rewards = []
         values = []
         lstm_begin = advcore.get_lstm()
         for i in range(tmax):
-            policy, value = advcore.evaluate_current(envir, sess, [advcore.softmax_policy, advcore.value])
+            policy, value = advcore.evaluate([envir.vstate], sess, [advcore.softmax_policy, advcore.value])
             '''
             Pick up the only frame
             '''
@@ -110,12 +114,22 @@ class A2CTrainer:
 
             print(pprefix, "Peeking action")
             nstate,reward,reaching_terminal = envir.peek_act(action, pprefix=pprefix)
+            actual_rewards.append(reward)
             # print("action peeked {} ratio {} terminal? {}".format(nstate, ratio, reaching_terminal))
             adist = np.zeros(shape=(self.action_space_dimension),
                     dtype=np.float32)
             adist[action] = 1.0
             reward += advcore.get_artificial_reward(envir, sess, envir.qstate, adist, nstate, pprefix)
-            rewards.append(reward)
+            combined_rewards.append(reward)
+            '''
+            Store Exprience
+            '''
+            envir.store_erep(actions[-1], states[-1], actual_rewards[-1],
+                             reaching_terminal)
+            '''
+            Experience Replay
+            '''
+            self.a2c_erep(envir, sess, pprefix)
             if reaching_terminal:
                 break
             advcore.set_lstm(lstm_next) # AdvCore next frame
@@ -134,7 +148,8 @@ class A2CTrainer:
         advcore = self.advcore
         V = 0.0
         if not reaching_terminal:
-            V = np.asscalar(advcore.evaluate_current(envir, sess, tensors=[advcore.value])[0])
+            V = np.asscalar(advcore.evaluate([envir.vstate], sess, tensors=[advcore.value])[0])
+            print('> V from advcore.evaluate {}'.format(V))
 
         states.reverse()
         actions.reverse()
@@ -196,3 +211,30 @@ class A2CTrainer:
         print(pprefix, 'batch_V {}'.format(batch_V))
         sess.run(self.train_op, feed_dict=dic)
         advcore.train(sess, batch_rgb, batch_dep, batch_adist)
+
+    # FIXME: Handle LSTM for Experience Replay
+    def store_erep(self, action, state, reward, lstm, reaching_terminal):
+        self.erep_lstm.append(lstm)
+
+    '''
+    a2c_erep: A2C Training with Expreience REPlay
+    '''
+    def a2c_erep(self, envir, sess, pprefix):
+        actions, states, trewards, reaching_terminal = envir.sample_in_erep(pprefix)
+        if len(actions) == 0:
+            return
+        advcore = self.advcore
+        trimmed_states = states[:-1]
+        arewards = self.advcore.get_artificial_from_experience(sess, states, actions)
+        [values] = advcore.evaluate(trimmed_states, sess, [advcore.value])
+        print('> ARewards {}'.format(arewards))
+        print('> Values {}'.format(values))
+        arewards = np.reshape(arewards, newshape=(-1)).tolist()
+        values = np.reshape(values, newshape=(-1)).tolist()
+        print('> Values list {}'.format(values))
+        rewards = []
+        for (tr,ar) in zip(trewards, arewards):
+            rewards.append(tr+ar)
+        print('> Rewards {}'.format(rewards))
+        self.a2c(envir, sess, actions, states, rewards, values, reaching_terminal, pprefix)
+

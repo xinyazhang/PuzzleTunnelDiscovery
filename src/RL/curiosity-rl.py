@@ -83,12 +83,12 @@ def create_renderer(args):
 class GroundTruth:
     pass
 
-class AlphaPuzzle(rlenv.IEnvironment):
+class AlphaPuzzle(rlenv.IExperienceReplayEnvironment):
     collision_pen_mag = COLLIDE_PEN_MAG
     solved_award_mag = 1e7
 
     def __init__(self, args, tid):
-        super(AlphaPuzzle, self).__init__()
+        super(AlphaPuzzle, self).__init__(tmax=args.batch, erep_cap=2)
         self.fb_cache = None
         self.fb_dirty = True
         r = self.r = create_renderer(args)
@@ -184,7 +184,8 @@ class CuriosityRL(rlenv.IAdvantageCore):
         self.view_num, _ = _get_view_cfg(args)
         w = h = args.res
 
-        self.action_tensor = tf.placeholder(tf.float32, shape=[None, 1, uw_random.DISCRETE_ACTION_NUMBER], name='ActionPh')
+        self.action_space_dimension = uw_random.DISCRETE_ACTION_NUMBER
+        self.action_tensor = tf.placeholder(tf.float32, shape=[None, 1, self.action_space_dimension], name='ActionPh')
         self.rgb_1_tensor = tf.placeholder(tf.float32, shape=[None, self.view_num, w, h, 3], name='Rgb1Ph')
         self.rgb_2_tensor = tf.placeholder(tf.float32, shape=[None, self.view_num, w, h, 3], name='Rgb2Ph')
         self.dep_1_tensor = tf.placeholder(tf.float32, shape=[None, self.view_num, w, h, 1], name='Dep1Ph')
@@ -236,7 +237,9 @@ class CuriosityRL(rlenv.IAdvantageCore):
                     np.zeros([1, self.model.lstmsize], dtype=np.float32))
             print("[LSTM] {}".format(self.lstm_states_in.c))
         self.optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
-        self.refine_vision_and_memory_op = self.optimizer.minimize(self.inverse_loss + self.curiosity,
+        self.curiosity_loss = tf.reduce_sum(self.curiosity)
+        self.refine_vision_and_memory_op = self.optimizer.minimize(
+                self.inverse_loss + self.curiosity_loss,
                 var_list = self.curiosity_params)
 
     def load_pretrained(self, args):
@@ -261,7 +264,12 @@ class CuriosityRL(rlenv.IAdvantageCore):
         '''
         Note: we need to train the curiosity model as memory, so tf.losses is used.
         '''
-        curiosity = tf.losses.mean_squared_error(fwd_feat, self.model.next_featvec)
+        # curiosity = tf.metrics.mean_squared_error(fwd_feat, self.model.next_featvec)
+        curiosity = tf.reduce_mean(tf.squared_difference(fwd_feat, self.model.next_featvec),
+                                   axis=[1,2])
+        print(">> FWD_FEAT {}".format(fwd_feat.shape))
+        print(">> next_featvec {}".format(self.model.next_featvec.shape))
+        print(">> curiosity {}".format(curiosity.shape))
         return curiosity, fwd_params
 
     @property
@@ -294,12 +302,17 @@ class CuriosityRL(rlenv.IAdvantageCore):
             return []
         return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='LSTM')
 
-    def evaluate_current(self, envir, sess, tensors, additional_dict=None):
-        rgb,dep = envir.vstate
+    def evaluate(self, vstates, sess, tensors, additional_dict=None):
+        '''
+        Transpose the vstates from [(rgb0,dep0),(rgb1,dep1),...]
+        to ([rgb0, rgb1, ...],[dep0, dep1, ...])
+        '''
+        rgbs = [state[0] for state in vstates]
+        deps = [state[1] for state in vstates]
         # NOTE: all nets accepts multiple frames, so we use lists of 1 element for single frame
         dic = {
-                self.rgb_1 : [rgb],
-                self.dep_1 : [dep]
+                self.rgb_1 : rgbs,
+                self.dep_1 : deps
               }
         if additional_dict is not None:
             dic.update(additional_dict)
@@ -320,7 +333,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
     def make_decision(self, envir, policy_dist, pprefix=''):
         best = np.argmax(policy_dist, axis=-1)
         if random.random() < envir.egreedy:
-            ret = random.randrange(uw_random.DISCRETE_ACTION_NUMBER)
+            ret = random.randrange(self.action_space_dimension)
         else:
             ret = best
         print(pprefix, 'Action best {} chosen {}'.format(best, ret))
@@ -341,6 +354,26 @@ class CuriosityRL(rlenv.IAdvantageCore):
         ret = sess.run(self.curiosity, feed_dict=dic)
         print(pprefix, "AR {}".format(ret))
         print(pprefix, "AR Input adist {} vs1 {} {} vs2 {} {}".format(adist, vs1[0].shape, vs1[1].shape, vs2[0].shape, vs2[1].shape))
+        return ret
+
+    def get_artificial_from_experience(self, sess, vstates, actions):
+        adists_array = []
+        for ai in actions:
+            adist = np.zeros(shape=(1, self.action_space_dimension),
+                    dtype=np.float32)
+            adist[0, ai] = 1.0
+            adists_array.append(adist)
+        rgbs = [state[0] for state in vstates]
+        deps = [state[1] for state in vstates]
+        print('> RGBs {} len: {}'.format(rgbs[0].shape, len(rgbs)))
+        dic = {
+                self.action_tensor : adists_array,
+                self.rgb_1 : rgbs[:-1],
+                self.dep_1 : deps[:-1],
+                self.rgb_2 : rgbs[1:],
+                self.dep_2 : deps[1:],
+              }
+        ret = sess.run(self.curiosity, feed_dict=dic)
         return ret
 
     def train(self, sess, rgb, dep, actions):
@@ -394,6 +427,7 @@ class TrainerMT:
                 gamma=config.GAMMA,
                 learning_rate=1e-3,
                 global_step=global_step)
+        assert not (self.advcore.using_lstm and self.trainer.erep_sample_cap > 0), "CuriosityRL does not support Experience Replay with LSTM"
         for i in range(args.threads):
             thread = threading.Thread(target=self.run_worker, args=(i,g))
             thread.start()

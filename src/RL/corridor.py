@@ -113,8 +113,8 @@ class TabularRL(rlenv.IAdvantageCore):
     def lstm_params(self):
         return []
 
-    def evaluate_current(self, envir, sess, tensors, additional_dict=None):
-        rgb,dep = envir.vstate
+    def evaluate_current(self, vstate, sess, tensors, additional_dict=None):
+        rgb,dep = vstate
         dic = {
                 self.rgb_1 : [rgb],
         }
