@@ -135,7 +135,9 @@ class A2CTrainer:
             advcore.set_lstm(lstm_next) # AdvCore next frame
             envir.qstate = nstate # Envir Next frame
         advcore.set_lstm(lstm_begin)
-        self.a2c(envir, sess, actions, states, combined_rewards, values, reaching_terminal, pprefix)
+        # self.a2c(envir, sess, actions, states, combined_rewards, values, reaching_terminal, pprefix)
+        self.train_by_samples(envir, sess, actions, states, actual_rewards,
+                reaching_terminal, pprefix)
         advcore.set_lstm(lstm_next)
 
         if reaching_terminal:
@@ -216,16 +218,10 @@ class A2CTrainer:
     def store_erep(self, action, state, reward, lstm, reaching_terminal):
         self.erep_lstm.append(lstm)
 
-    '''
-    a2c_erep: A2C Training with Expreience REPlay
-    '''
-    def a2c_erep(self, envir, sess, pprefix):
-        actions, states, trewards, reaching_terminal = envir.sample_in_erep(pprefix)
-        if len(actions) == 0:
-            return
+    def train_by_samples(self, envir, sess, actions, stats, trewards, reaching_terminal, pprefix):
         advcore = self.advcore
         trimmed_states = states[:-1]
-        arewards = self.advcore.get_artificial_from_experience(sess, states, actions)
+        arewards = advcore.get_artificial_from_experience(sess, states, actions)
         [values] = advcore.evaluate(trimmed_states, sess, [advcore.value])
         print('> ARewards {}'.format(arewards))
         print('> Values {}'.format(values))
@@ -238,3 +234,12 @@ class A2CTrainer:
         print('> Rewards {}'.format(rewards))
         self.a2c(envir, sess, actions, states, rewards, values, reaching_terminal, pprefix)
 
+    '''
+    a2c_erep: A2C Training with Expreience REPlay
+    '''
+    def a2c_erep(self, envir, sess, pprefix):
+        actions, states, trewards, reaching_terminal = envir.sample_in_erep(pprefix)
+        if len(actions) == 0:
+            return
+        self.train_by_samples(sess, envir, sess, actions, stats, trewards,
+                reaching_terminal, pprefix)
