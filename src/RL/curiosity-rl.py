@@ -8,7 +8,6 @@ from __future__ import print_function
 import tensorflow as tf
 import numpy as np
 import math
-import aniconf12 as aniconf
 import matplotlib.pyplot as plt
 from scipy.misc import imsave
 import matplotlib.animation as animation
@@ -69,8 +68,8 @@ def create_renderer(args):
     r.pbufferWidth = w
     r.pbufferHeight = h
     r.setup()
-    r.loadModelFromFile(aniconf.env_fn)
-    r.loadRobotFromFile(aniconf.rob_fn)
+    r.loadModelFromFile(args.envgeo)
+    r.loadRobotFromFile(args.robgeo)
     r.scaleToUnit()
     r.angleModel(0.0, 0.0)
     r.default_depth = 0.0

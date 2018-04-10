@@ -59,8 +59,8 @@ def create_renderer(args):
     r.pbufferWidth = w
     r.pbufferHeight = h
     r.setup()
-    r.loadModelFromFile(aniconf.env_fn)
-    r.loadRobotFromFile(aniconf.rob_fn)
+    r.loadModelFromFile(args.envgeo)
+    r.loadRobotFromFile(args.robgeo)
     r.scaleToUnit()
     r.angleModel(0.0, 0.0)
     r.default_depth = 0.0
@@ -517,7 +517,7 @@ def pretrain_main(args):
         thread.join()
 
 if __name__ == '__main__':
-    parser = rlarg.get_parser()
+    parser = rlargs.get_parser()
 
     args = parser.parse_args()
     if (not args.eval) and len(args.viewinitckpt) > 0:

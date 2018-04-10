@@ -1,8 +1,13 @@
 import argparse
 import config
+import aniconf12 as aniconf
 
 def get_parser():
     parser = argparse.ArgumentParser(description='Process some integers.', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--envgeo', help='Path to environment geometry',
+            default=aniconf.env_fn)
+    parser.add_argument('--robgeo', help='Path to robot geometry',
+            default=aniconf.rob_fn)
     parser.add_argument('--ckptdir', help='Path for checkpoint files',
             default='ckpt/pretrain-d/')
     parser.add_argument('--sampleout', help='Path to store generated samples',
