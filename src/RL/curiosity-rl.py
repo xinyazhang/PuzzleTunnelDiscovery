@@ -88,7 +88,7 @@ class AlphaPuzzle(rlenv.IExperienceReplayEnvironment):
     solved_award_mag = 1e7
 
     def __init__(self, args, tid):
-        super(AlphaPuzzle, self).__init__(tmax=args.batch, erep_cap=2)
+        super(AlphaPuzzle, self).__init__(tmax=args.batch, erep_cap=args.ereplayratio)
         self.fb_cache = None
         self.fb_dirty = True
         r = self.r = create_renderer(args)
@@ -351,7 +351,10 @@ class CuriosityRL(rlenv.IAdvantageCore):
                 self.rgb_2 : [vs2[0]],
                 self.dep_2 : [vs2[1]],
               }
-        ret = sess.run(self.curiosity, feed_dict=dic)
+        '''
+        self.curiosity now becomes [None] tensor rather than scalar
+        '''
+        ret = sess.run(self.curiosity, feed_dict=dic)[0]
         print(pprefix, "AR {}".format(ret))
         print(pprefix, "AR Input adist {} vs1 {} {} vs2 {} {}".format(adist, vs1[0].shape, vs1[1].shape, vs2[0].shape, vs2[1].shape))
         return ret
@@ -564,4 +567,5 @@ if __name__ == '__main__':
         print("Action set {}".format(args.actionset))
     args.total_sample = args.iter * args.threads
     args.total_epoch = args.total_sample / args.samplebatching
+    print("> Arguments {}".format(args))
     curiosity_main(args)

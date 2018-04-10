@@ -34,6 +34,9 @@ def get_parser():
     parser.add_argument('--samplebatching', metavar='NUMBER',
             help='Number of samples to aggregrate in training',
             type=int, default=1)
+    parser.add_argument('--ereplayratio', metavar='N',
+            help='Set the experience replay buffer to N*batch samples. <=0 disables experience replay',
+            type=int, default=-1)
     parser.add_argument('--queuemax', metavar='NUMBER',
             help='Capacity of the synchronized queue to store generated GT',
             type=int, default=32)

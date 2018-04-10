@@ -135,7 +135,7 @@ class A2CTrainer:
             advcore.set_lstm(lstm_next) # AdvCore next frame
             envir.qstate = nstate # Envir Next frame
         advcore.set_lstm(lstm_begin)
-        self.a2c(envir, sess, actions, states, rewards, values, reaching_terminal, pprefix)
+        self.a2c(envir, sess, actions, states, combined_rewards, values, reaching_terminal, pprefix)
         advcore.set_lstm(lstm_next)
 
         if reaching_terminal:
