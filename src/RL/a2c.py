@@ -136,6 +136,9 @@ class A2CTrainer:
             envir.qstate = nstate # Envir Next frame
         advcore.set_lstm(lstm_begin)
         # self.a2c(envir, sess, actions, states, combined_rewards, values, reaching_terminal, pprefix)
+        # print("> states length {}, shape {}".format(len(states), states[0][0].shape))
+        # print("> actions length {}, tmax {}".format(len(actions), tmax))
+        states.append(envir.vstate)
         self.train_by_samples(envir, sess, actions, states, actual_rewards,
                 reaching_terminal, pprefix)
         advcore.set_lstm(lstm_next)
@@ -146,14 +149,13 @@ class A2CTrainer:
     '''
     Private function that performs the training
     '''
-    def a2c(self, envir, sess, actions, states, rewards, values, reaching_terminal, pprefix=""):
+    def a2c(self, envir, sess, actions, vstates, rewards, values, reaching_terminal, pprefix=""):
         advcore = self.advcore
         V = 0.0
         if not reaching_terminal:
             V = np.asscalar(advcore.evaluate([envir.vstate], sess, tensors=[advcore.value])[0])
             print('> V from advcore.evaluate {}'.format(V))
 
-        states.reverse()
         actions.reverse()
         rewards.reverse()
         values.reverse()
@@ -169,22 +171,19 @@ class A2CTrainer:
         '''
         print('[{}] R start with {}'.format(self.worker_thread_index, R))
         '''
-        for (ai, ri, si, Vi) in zip(actions, rewards, states, values):
+        for (ai, ri, Vi) in zip(actions, rewards, values):
             V = ri + self.gamma * V
             td = V - Vi
             print(pprefix, "V {} Vi {}".format(V, Vi))
             adist = np.zeros(shape=(1, self.action_space_dimension),
                     dtype=np.float32)
             adist[0, ai] = 1.0
-            [rgb,dep] = si
 
-            batch_rgb.append(rgb)
-            batch_dep.append(dep)
             batch_adist.append(adist)
             batch_td.append(td)
             batch_V.append(V)
-        batch_rgb.append(envir.vstate[0])
-        batch_dep.append(envir.vstate[1])
+        batch_rgb = [state[0] for state in vstates]
+        batch_dep = [state[1] for state in vstates]
         if self.verbose_training:
             print(pprefix, '[{}] batch_a[0] {}'.format(self.worker_thread_index, batch_adist[0]))
             print(pprefix, '[{}] batch_V {}'.format(self.worker_thread_index, batch_R))
@@ -218,9 +217,11 @@ class A2CTrainer:
     def store_erep(self, action, state, reward, lstm, reaching_terminal):
         self.erep_lstm.append(lstm)
 
-    def train_by_samples(self, envir, sess, actions, stats, trewards, reaching_terminal, pprefix):
+    def train_by_samples(self, envir, sess, actions, states, trewards, reaching_terminal, pprefix):
         advcore = self.advcore
         trimmed_states = states[:-1]
+        if len(trimmed_states) <= 0:
+            return
         arewards = advcore.get_artificial_from_experience(sess, states, actions)
         [values] = advcore.evaluate(trimmed_states, sess, [advcore.value])
         print('> ARewards {}'.format(arewards))
@@ -241,5 +242,5 @@ class A2CTrainer:
         actions, states, trewards, reaching_terminal = envir.sample_in_erep(pprefix)
         if len(actions) == 0:
             return
-        self.train_by_samples(sess, envir, sess, actions, stats, trewards,
+        self.train_by_samples(envir, sess, actions, states, trewards,
                 reaching_terminal, pprefix)
