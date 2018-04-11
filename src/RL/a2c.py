@@ -101,7 +101,7 @@ class A2CTrainer:
             Pick up the only frame
             '''
             print(pprefix, 'pol {} shape {}; val {} shape {}'.format(policy, policy.shape, value, value.shape))
-            policy = policy[0][0]
+            policy = policy[0][0] # Policy View from first qstate and first view
             value = np.asscalar(value) # value[0][0][0]
             lstm_next = advcore.get_lstm()
             action = advcore.make_decision(envir, policy, pprefix)

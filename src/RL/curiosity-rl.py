@@ -29,6 +29,7 @@ import random
 import threading
 from cachetools import LRUCache
 from six.moves import queue
+from rlreanimator import reanimate
 
 MT_VERBOSE = False
 # MT_VERBOSE = True
@@ -466,6 +467,39 @@ class TrainerMT:
         for t in self.threads:
             t.join()
 
+    def load_pretrain(self, sess, pretrained_ckpt):
+        self.advcore.load_pretrain(sess, pretrained_ckpt)
+
+class PolicyPlayer(object):
+    def __init__(self, args, g, global_step):
+        self.args = args
+        self.envir = AlphaPuzzle(args, 0)
+        self.envir.egreedy = 1 - 0.995
+        self.advcore = CuriosityRL(learning_rate=1e-3, args=args)
+        self.advcore.softmax_policy # Create the tensor
+
+    def attach(self, sess):
+        self.sess = sess
+
+    def __iter__(self):
+        envir = self.envir
+        sess = self.sess
+        advcore = self.advcore
+        reaching_terminal = False
+        pprefix = "[0] "
+        while True:
+            rgb,_ = envir.vstate
+            yield rgb[0] # First view
+            if reaching_terminal:
+                print("##########CONGRATS TERMINAL REACHED##########")
+                envir.reset()
+            policy = advcore.evaluate([envir.vstate], sess, [advcore.softmax_policy])
+            policy = policy[0][0]
+            action = advcore.make_decision(envir, policy, pprefix)
+            action = action[0]
+            print("PolicyPlayer Action {}".format(action))
+            nstate,reward,reaching_terminal = envir.peek_act(action, pprefix=pprefix)
+            envir.qstate = nstate
 
 def curiosity_main(args):
     '''
@@ -504,7 +538,10 @@ def curiosity_main(args):
                 learning_rate=1e-3,
                 global_step=global_step)
         '''
-        trainer = TrainerMT(args, g, global_step)
+        if not args.eval:
+            trainer = TrainerMT(args, g, global_step)
+        else:
+            player = PolicyPlayer(args, g, global_step)
 
         # TODO: Summaries
 
@@ -514,8 +551,8 @@ def curiosity_main(args):
             sess.run(tf.global_variables_initializer())
             epoch = 0
             accum_epoch = 0
-            if args.viewinitckpt:
-                trainer.advcore.load_pretrain(sess, args.viewinitckpt)
+            if args.viewinitckpt and not args.eval:
+                trainer.load_pretrain(sess, args.viewinitckpt)
 
             ckpt = tf.train.get_checkpoint_state(checkpoint_dir=ckpt_dir)
             print('ckpt {}'.format(ckpt))
@@ -528,13 +565,17 @@ def curiosity_main(args):
                     epoch = accum_epoch
             else:
                 if args.eval:
-                    print('PANIC: --eval is set but checkpoint does not exits')
+                    print('PANIC: --eval is set but checkpoint does not exist')
                     return
 
             period_loss = 0.0
             period_accuracy = 0
             total_accuracy = 0
             g.finalize() # Prevent accidental changes
+            if args.eval:
+                player.attach(sess)
+                reanimate(player)
+                return
             while epoch < total_epoch:
                 trainer.train(sess)
                 if (not args.eval) and ((epoch + 1) % 1000 == 0 or time.time() - last_time >= 10 * 60 or epoch + 1 == total_epoch):
