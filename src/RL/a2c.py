@@ -144,7 +144,13 @@ class A2CTrainer:
         advcore.set_lstm(lstm_next)
 
         if reaching_terminal:
+            '''
+            Train the experience in sample_cap iterations
+            '''
+            for i in range(envir.erep_sample_cap):
+                self.a2c_erep(envir, sess, pprefix)
             envir.reset()
+            assert len(envir.erep_actions) == 0, "Exp Rep is not cleared after reaching terminal"
 
     '''
     Private function that performs the training
@@ -212,10 +218,6 @@ class A2CTrainer:
         print(pprefix, 'batch_V {}'.format(batch_V))
         sess.run(self.train_op, feed_dict=dic)
         advcore.train(sess, batch_rgb, batch_dep, batch_adist)
-
-    # FIXME: Handle LSTM for Experience Replay
-    def store_erep(self, action, state, reward, lstm, reaching_terminal):
-        self.erep_lstm.append(lstm)
 
     def train_by_samples(self, envir, sess, actions, states, trewards, reaching_terminal, pprefix):
         advcore = self.advcore

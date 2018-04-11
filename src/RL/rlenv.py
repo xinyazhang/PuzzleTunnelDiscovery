@@ -106,6 +106,9 @@ class IExperienceReplayEnvironment(IEnvironment):
         r=r[:-1]
         return a,s,r,self.erep_term[pick_end-1]
 
+    def reset(self):
+            [q.clear() for q in self.erep_all_deques]
+
 '''
 Overall design idea:
     separate the TF inferencing network, training network, rendering, and TF session

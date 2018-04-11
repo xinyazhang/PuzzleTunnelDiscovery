@@ -166,6 +166,7 @@ class AlphaPuzzle(rlenv.IExperienceReplayEnvironment):
         return nstate, reward, reaching_terminal
 
     def reset(self):
+        super(AlphaPuzzle, self).reset()
         self.qstate = self.istate
 
 class CuriosityRL(rlenv.IAdvantageCore):
