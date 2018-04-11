@@ -336,7 +336,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
         if random.random() < envir.egreedy:
             ret = random.randrange(self.action_space_dimension)
         else:
-            ret = best
+            ret = np.asscalar(best)
         print(pprefix, 'Action best {} chosen {}'.format(best, ret))
         return ret
 
@@ -496,7 +496,7 @@ class PolicyPlayer(object):
             policy = advcore.evaluate([envir.vstate], sess, [advcore.softmax_policy])
             policy = policy[0][0]
             action = advcore.make_decision(envir, policy, pprefix)
-            action = action[0]
+            print("PolicyPlayer pol {}".format(policy))
             print("PolicyPlayer Action {}".format(action))
             nstate,reward,reaching_terminal = envir.peek_act(action, pprefix=pprefix)
             envir.qstate = nstate
