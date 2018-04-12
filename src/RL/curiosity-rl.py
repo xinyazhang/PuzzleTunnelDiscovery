@@ -30,6 +30,7 @@ import threading
 from cachetools import LRUCache
 from six.moves import queue
 from rlreanimator import reanimate
+import rlutil
 
 MT_VERBOSE = False
 # MT_VERBOSE = True
@@ -52,33 +53,10 @@ def _get_action_set(args):
     return args.actionset
 
 def _get_view_cfg(args):
-    view_array = vision.create_view_array_from_config(VIEW_CFG)
-    if args.view >= 0:
-        view_num = 1
-    else:
-        view_num = len(view_array)
-    return view_num, view_array
+    return rlutil.get_view_cfg(args)
 
 def create_renderer(args):
-    w = h = args.res
-    view_num, view_array = _get_view_cfg(args)
-
-    dpy = pyosr.create_display()
-    glctx = pyosr.create_gl_context(dpy)
-    r = pyosr.Renderer()
-    r.pbufferWidth = w
-    r.pbufferHeight = h
-    r.setup()
-    r.loadModelFromFile(args.envgeo)
-    r.loadRobotFromFile(args.robgeo)
-    r.scaleToUnit()
-    r.angleModel(0.0, 0.0)
-    r.default_depth = 0.0
-    if args.view >= 0:
-        r.views = np.array([view_array[args.view]], dtype=np.float32)
-    else:
-        r.views = np.array(view_array, dtype=np.float32)
-    return r
+    return rlutil.create_renderer(args)
 
 class GroundTruth:
     pass

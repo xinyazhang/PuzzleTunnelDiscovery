@@ -43,32 +43,11 @@ def _get_action_set(args):
         return [args.uniqueaction]
     return args.actionset
 
-def create_renderer(args):
-    view_array = vision.create_view_array_from_config(VIEW_CFG)
-    if args.view >= 0:
-        view_num = 1
-    else:
-        view_num = len(view_array)
-    w = h = args.res
+def _get_view_cfg(args):
+    return rlutil.get_view_cfg(args)
 
-    dpy = pyosr.create_display()
-    glctx = pyosr.create_gl_context(dpy)
-    r = pyosr.Renderer()
-    if args.avi:
-        r.avi = True
-    r.pbufferWidth = w
-    r.pbufferHeight = h
-    r.setup()
-    r.loadModelFromFile(args.envgeo)
-    r.loadRobotFromFile(args.robgeo)
-    r.scaleToUnit()
-    r.angleModel(0.0, 0.0)
-    r.default_depth = 0.0
-    if args.view >= 0:
-        r.views = np.array([view_array[args.view]], dtype=np.float32)
-    else:
-        r.views = np.array(view_array, dtype=np.float32)
-    return r
+def create_renderer(args):
+    return rlutil.create_renderer(args)
 
 class Animator(object):
     im = None
