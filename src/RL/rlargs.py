@@ -122,6 +122,9 @@ def get_parser():
     parser.add_argument('--view',
             help='Pickup one view to train',
             type=int, default=-1)
+    parser.add_argument('--obview',
+            help='The actual view used by renderer, defaults to --view but can be different for debugging purpose',
+            type=int, default=-1)
     parser.add_argument('--viewinitckpt',
             help='Initialize independent views in sequence with given checkpoints. --eval must present if viewinitckpt is given',
             nargs='*', default=[])

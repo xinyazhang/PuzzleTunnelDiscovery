@@ -35,8 +35,13 @@ def create_renderer(args):
     r.scaleToUnit()
     r.angleModel(0.0, 0.0)
     r.default_depth = 0.0
+
     if args.view >= 0:
-        r.views = np.array([view_array[args.view]], dtype=np.float32)
+        if args.obview >= 0:
+            va = [view_array[args.obview]]
+        else:
+            va = [view_array[args.view]]
     else:
-        r.views = np.array(view_array, dtype=np.float32)
+        va = view_array
+    r.views = np.array(va, dtype=np.float32)
     return r
