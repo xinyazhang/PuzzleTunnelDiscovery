@@ -34,7 +34,9 @@ class IntrinsicCuriosityModule:
             ferev=1,
             imhidden=[],
             fehidden=[1024,1024],
-            fwhidden=[]):
+            fwhidden=[],
+            permuation_matrix=None):
+        print('! IntrinsicCuriosityModule')
         print('! ICM FEREV {}'.format(ferev))
         self.action_tensor = action_tensor
         self.rgb_tensor = rgb_tensor
@@ -42,6 +44,13 @@ class IntrinsicCuriosityModule:
         self.next_rgb_tensor = next_rgb_tensor
         self.next_depth_tensor = next_depth_tensor
         self.pretrain_saver = None
+        self.pm = permuation_matrix
+        self.view_num = int(rgb_tensor.shape[1])
+        '''
+        pm_tensor: shape [VIEW, ACTION, ACTION]
+        '''
+        if self.pm is not None:
+            self.pm_tensor = tf.constant(permuation_matrix.transpose())
         if not imhidden:
             self.imhidden_params = list(config.INVERSE_MODEL_HIDDEN_LAYER)
         else:
@@ -102,6 +111,7 @@ class IntrinsicCuriosityModule:
         featvec: shape [BATCH, VIEW, N]
         '''
         self.cur_nn_params, self.cur_featvec = self.feature_extractor.infer(rgb_tensor, depth_tensor)
+        print('Feature shape {}'.format(self.cur_featvec.shape))
         self.next_nn_params, self.next_featvec = self.feature_extractor.infer(next_rgb_tensor, next_depth_tensor)
         self.elu = elu
 
@@ -126,6 +136,30 @@ class IntrinsicCuriosityModule:
         print('Restored Pretrained Weights from {}'.format(ckpt.model_checkpoint_path))
         return True
 
+    def vote(self, local_pred):
+        '''
+        local_pred: shape [BATCH, VIEW, N]
+        return world_pred: shape [BATCH, 1, N], pretending it's still single view.
+        '''
+        if self.pm is None:
+            assert self.view_num == 1
+            return local_pred
+        print("local pred {}".format(local_pred.shape))
+        local_preds = tf.unstack(local_pred, axis=1) # [BATCH, N] * VIEW
+        world_preds = []
+        for V in range(self.view_num):
+            '''
+            td = tf.tensordot(local_preds[V], self.pm_tensor[V],
+                              axes=[[1], [1]])
+            '''
+            td = tf.tensordot(local_preds[V], self.pm_tensor[V], axes=1)
+            world_preds.append(td)
+        st = tf.stack(world_preds, 1) # Pack VIEW predicts back to [B,V,N] shape
+        print("stacked world_preds {}".format(st.shape))
+        ret = tf.reduce_sum(st, axis=1, keepdims=True) # To [B,1,N]
+        print("voted world_preds {}".format(ret.shape))
+        return ret
+
     def get_inverse_model(self):
         if self.inverse_output_tensor is not None:
             return self.inverse_model_params, self.inverse_output_tensor
@@ -138,7 +172,7 @@ class IntrinsicCuriosityModule:
         self.inverse_fc_applier = vision.ConvApplier(None, featnums, 'InverseModelNet', self.elu)
         params, out = self.inverse_fc_applier.infer(input_featvec)
         self.inverse_model_params = params
-        self.inverse_output_tensor = out
+        self.inverse_output_tensor = self.vote(out)
         return params, out
 
     def get_forward_model(self):
@@ -148,6 +182,7 @@ class IntrinsicCuriosityModule:
         our pipeline use [None, 1, N] feature vector
         3D tensor unifies per-view tensors and combined-view tensors.
         '''
+        # FIXME: Multi View and world_to_local
         input_featvec = tf.concat([self.action_tensor, self.cur_featvec], 2)
         featnums = self.fwhidden_params + [int(self.cur_featvec.shape[-1])]
         self.forward_fc_applier = vision.ConvApplier(None, featnums, 'ForwardModelNet', self.elu)
@@ -284,6 +319,7 @@ class IntrinsicCuriosityModuleCommittee:
             featnum,
             elu,
             ferev=1):
+        print('! IntrinsicCuriosityModuleCommittee')
         self.icms = []
         self.view_num = int(rgb_tensor.shape[1])
         self.perview_rgbs_1 = tf.split(rgb_tensor, self.view_num, axis=1)
@@ -373,6 +409,7 @@ class IntrinsicCuriosityModuleIndependentCommittee:
             imhidden,
             fehidden,
             singlesoftmax=False):
+        print('! IntrinsicCuriosityModuleIndependentCommittee')
         self.icms = []
         self.savers = []
         self.view_num = int(rgb_tensor.shape[1])

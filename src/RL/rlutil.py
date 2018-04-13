@@ -7,9 +7,9 @@ def get_view_cfg(args):
     VIEW_CFG = config.VIEW_CFG
     if args.viewset == 'cube':
         VIEW_CFG = [(0, 4), (90, 1), (-90, 1)]
-    elif args.viewset == '14' or args.ferev >= 4:
+    elif args.viewset == '14' or (not args.viewset and args.ferev >= 4):
         VIEW_CFG = config.VIEW_CFG_REV4
-    elif args.viewset == '22' or args.ferev != 1:
+    elif args.viewset == '22' or (not args.viewset and args.ferev != 1):
         VIEW_CFG = config.VIEW_CFG_REV2
     view_array = vision.create_view_array_from_config(VIEW_CFG)
     if args.view >= 0:
@@ -18,12 +18,13 @@ def get_view_cfg(args):
         view_num = len(view_array)
     return view_num, view_array
 
-def create_renderer(args):
+def create_renderer(args, is_first_in_thread=True):
     view_num, view_array = get_view_cfg(args)
     w = h = args.res
 
-    dpy = pyosr.create_display()
-    glctx = pyosr.create_gl_context(dpy)
+    if is_first_in_thread:
+        dpy = pyosr.create_display()
+        glctx = pyosr.create_gl_context(dpy)
     r = pyosr.Renderer()
     if args.avi:
         r.avi = True

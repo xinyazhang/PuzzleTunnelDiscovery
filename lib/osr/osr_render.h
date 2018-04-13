@@ -71,6 +71,8 @@ public:
 	 *        Column 1: longitude
 	 */
 	Eigen::MatrixXf views;
+	
+	Eigen::MatrixXf getPermutationToWorld(int view);
 private:
 	void setupNonSharedObjects();
 

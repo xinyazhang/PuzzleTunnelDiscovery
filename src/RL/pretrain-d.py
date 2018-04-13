@@ -24,6 +24,7 @@ import icm
 import threading
 import Queue as queue # Python 2, rename to import queue as queue for python 3
 import rlargs
+import rlutil
 
 MT_VERBOSE = False
 # MT_VERBOSE = True
@@ -245,7 +246,8 @@ def gt_reader(syncQ, args):
             if len(batching) >= args.samplebatching:
                 gt = gt_aggregrate(batching)
                 syncQ.put(gt)
-                print("!GT RGB_1 {} was queued".format(gt.rgb_1.shape))
+                if MT_VERBOSE:
+                    print("!GT RGB_1 {} was queued".format(gt.rgb_1.shape))
                 batching = []
 
 def spawn_gt_reader_thread(args):
@@ -277,6 +279,7 @@ def pretrain_main(args):
     threads = []
     #total_epoch = args.iter * args.threads
     total_epoch = args.total_epoch
+    view_num, view_array = _get_view_cfg(args)
 
     if args.dryrun:
         r = create_renderer(args)
@@ -333,6 +336,7 @@ def pretrain_main(args):
         dep_1 = tf.placeholder(tf.float32, shape=[None, view_num, w, h, 1])
         dep_2 = tf.placeholder(tf.float32, shape=[None, view_num, w, h, 1])
         if args.viewinitckpt:
+            assert not args.sharedmultiview, "--viewinitckpt is incompatible with --sharedmultiview"
             model = icm.IntrinsicCuriosityModuleIndependentCommittee(action,
                     rgb_1, dep_1,
                     rgb_2, dep_2,
@@ -346,6 +350,7 @@ def pretrain_main(args):
                     singlesoftmax=args.singlesoftmax)
         elif not args.committee:
             if args.view >= 0:
+                assert not args.sharedmultiview, "--view is incompatible with --sharedmultiview"
                 with tf.variable_scope(icm.view_scope_name(args.view)):
                     model = icm.IntrinsicCuriosityModule(action,
                             rgb_1, dep_1,
@@ -359,17 +364,29 @@ def pretrain_main(args):
                             args.fehidden)
                     model.get_inverse_model() # Inverse model also creates variables.
             else:
-                model = icm.IntrinsicCuriosityModule(action,
-                        rgb_1, dep_1,
-                        rgb_2, dep_2,
-                        config.SV_VISCFG,
-                        config.MV_VISCFG2,
-                        args.featnum,
-                        args.elu,
-                        args.ferev,
-                        args.imhidden,
-                        args.fehidden)
+                assert args.sharedmultiview, "Train ICM without --view nor --sharedmultiview is obsoleted"
+                va = view_array
+                views = np.array(va, dtype=np.float32)
+                pm = [pyosr.get_permutation_to_world(views, i) for i in range(len(va))]
+                pm = np.array(pm)
+                '''
+                Keep using View 0 for the name so can reuse trained weights
+                '''
+                with tf.variable_scope(icm.view_scope_name('0')):
+                    model = icm.IntrinsicCuriosityModule(action,
+                            rgb_1, dep_1,
+                            rgb_2, dep_2,
+                            config.SV_VISCFG,
+                            config.MV_VISCFG2,
+                            featnum=args.featnum,
+                            elu=args.elu,
+                            ferev=args.ferev,
+                            imhidden=args.imhidden,
+                            fehidden=args.fehidden,
+                            permuation_matrix=pm)
+                    model.get_inverse_model()
         else:
+            assert not args.sharedmultiview, "--committee is incompatible with --sharedmultiview"
             model = icm.IntrinsicCuriosityModuleCommittee(action,
                     rgb_1, dep_1,
                     rgb_2, dep_2,
@@ -426,6 +443,7 @@ def pretrain_main(args):
             period_loss = 0.0
             period_accuracy = 0
             total_accuracy = 0
+            g.finalize() # Prevent accidental changes
             while epoch < total_epoch:
                 gt = syncQ.get(timeout=60)
                 dic = {

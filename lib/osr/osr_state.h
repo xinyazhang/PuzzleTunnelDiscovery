@@ -40,6 +40,9 @@ double distance(const StateVector& lhv, const StateVector& rhv);
 std::tuple<StateTrans, AngleAxisVector>
 differential(const StateVector& from, const StateVector& to);
 
+StateTrans action_to_axis(int action);
+Eigen::MatrixXf get_permutation_to_world(const Eigen::MatrixXf& views, int view);
+
 }
 
 #endif
