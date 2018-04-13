@@ -35,8 +35,14 @@ CDModel::CDModel(const Scene& scene)
 	uncern.translate(aabb.center());
 	std::cerr << "AABB center: " << aabb.center().transpose() << std::endl;
 	std::cerr << "AABB size: " << aabb.width() << ' ' << aabb.height() << ' ' << aabb.depth() << std::endl;
-	model_->bbox = std::make_unique<BBOX>(aabb.width()/2,
-			aabb.height()/2, aabb.depth()/2);
+	model_->bbox = std::make_unique<BBOX>(aabb.width(),
+			aabb.height(), aabb.depth());
+	// SAN CHECK
+	model_->bbox->computeLocalAABB();
+	const auto& scaabb = model_->bbox->aabb_local;
+	std::cerr << "SC AABB center: " << scaabb.center().transpose() << std::endl;
+	std::cerr << "SC AABB size: " << scaabb.width() << ' ' << scaabb.height() << ' ' << scaabb.depth() << std::endl;
+	std::cerr << "SC AABB's should match AABB's" << std::endl;
 }
 
 CDModel::~CDModel()
