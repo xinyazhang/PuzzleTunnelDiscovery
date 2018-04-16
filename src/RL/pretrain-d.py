@@ -443,6 +443,7 @@ def pretrain_main(args):
             period_loss = 0.0
             period_accuracy = 0
             total_accuracy = 0
+            obpm = None
             g.finalize() # Prevent accidental changes
             while epoch < total_epoch:
                 gt = syncQ.get(timeout=60)
@@ -465,10 +466,21 @@ def pretrain_main(args):
                     train_writer.add_summary(summary, accum_epoch)
                 else:
                     current_loss, pred = sess.run([loss, predicts], feed_dict=dic)
+                    if args.obview >= 0 and args.obview != args.view:
+                        '''
+                        Only apply permuation if --obview >= 0 and different from --view
+                        '''
+                        if obpm is None:
+                            views = np.array(view_array, dtype=np.float32)
+                            obpm = pyosr.get_permutation_to_world(views, args.obview)
+                            # obpm = obpm.transpose()
+                        pred = np.tensordot(pred[:,0,:], obpm, axes=1)
+                        pred = np.stack([pred], 1)
                 pred_index = np.argmax(pred, axis=2)
                 gt_index = np.argmax(gt.actions, axis=2)
                 for i in range(gt.actions.shape[0]):
                     delta_accuracy = 1 if pred_index[i, 0] == gt_index[i, 0] else 0
+                    # print("Should {} Pred {}".format(gt_index[i, 0], pred_index[i,0]))
                     period_accuracy += delta_accuracy
                     if delta_accuracy == 0 and args.mispout:
                         samid = epoch + args.samplebase
@@ -510,6 +522,7 @@ def pretrain_main(args):
     total_accuracy += period_accuracy
     total_accuracy_ratio = total_accuracy / ((epoch+1.0) * batch_size) * 100.0
     print("Final Accuracy {}%".format(total_accuracy_ratio))
+    print("Final Accuracy Number {}/{}".format(total_accuracy, args.total_sample))
     for thread in threads:
         thread.join()
 

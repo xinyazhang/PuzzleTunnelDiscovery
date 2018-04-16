@@ -50,7 +50,7 @@ class IntrinsicCuriosityModule:
         pm_tensor: shape [VIEW, ACTION, ACTION]
         '''
         if self.pm is not None:
-            self.pm_tensor = tf.constant(permuation_matrix.transpose())
+            self.pm_tensor = tf.constant(permuation_matrix)
         if not imhidden:
             self.imhidden_params = list(config.INVERSE_MODEL_HIDDEN_LAYER)
         else:
