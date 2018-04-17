@@ -51,6 +51,8 @@ class IntrinsicCuriosityModule:
         '''
         if self.pm is not None:
             self.pm_tensor = tf.constant(permuation_matrix)
+            ipm = np.array([m.transpose() for m in permuation_matrix])
+            self.ipm_tensor = tf.constant(ipm)
         if not imhidden:
             self.imhidden_params = list(config.INVERSE_MODEL_HIDDEN_LAYER)
         else:
@@ -160,6 +162,15 @@ class IntrinsicCuriosityModule:
         print("voted world_preds {}".format(ret.shape))
         return ret
 
+    def get_local_action(self, action_tensor):
+        if self.pm is None:
+            return action_tensor
+        local_actions = []
+        flat_action = action_tensor[:,0,:]
+        for V in range(self.view_num):
+            la = tf.tensordot(flat_action, self.ipm_tensor[V], axes=1)
+        return tf.stack(local_actions, 1)
+
     def get_inverse_model(self):
         if self.inverse_output_tensor is not None:
             return self.inverse_model_params, self.inverse_output_tensor
@@ -179,11 +190,11 @@ class IntrinsicCuriosityModule:
         if self.forward_output_tensor is not None:
             return self.forward_model_params, self.forward_output_tensor
         '''
-        our pipeline use [None, 1, N] feature vector
+        our pipeline use [None, V, N] feature vector
         3D tensor unifies per-view tensors and combined-view tensors.
         '''
-        # FIXME: Multi View and world_to_local
-        input_featvec = tf.concat([self.action_tensor, self.cur_featvec], 2)
+        atensor = self.get_local_action(self.action_tensor)
+        input_featvec = tf.concat([atensor, self.cur_featvec], 2)
         featnums = self.fwhidden_params + [int(self.cur_featvec.shape[-1])]
         self.forward_fc_applier = vision.ConvApplier(None, featnums, 'ForwardModelNet', self.elu)
         # FIXME: ConvApplier.infer returns tuples, which is unsuitable for Optimizer

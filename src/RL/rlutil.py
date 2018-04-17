@@ -46,3 +46,6 @@ def create_renderer(args, is_first_in_thread=True):
         va = view_array
     r.views = np.array(va, dtype=np.float32)
     return r
+
+SC_PRED_PERMUTATION = 1
+SC_ACTION_PERMUTATION = 2

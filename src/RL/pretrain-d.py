@@ -369,6 +369,21 @@ def pretrain_main(args):
                 views = np.array(va, dtype=np.float32)
                 pm = [pyosr.get_permutation_to_world(views, i) for i in range(len(va))]
                 pm = np.array(pm)
+                if rlutil.SC_PRED_PERMUTATION in args.sancheck:
+                    ipm = [np.linalg.inv(p) for p in pm]
+                    for i,o in zip(ipm,pm):
+                        print(i-o.transpose())
+                    return
+                # Exp shows transpose is inverse.
+                if rlutil.SC_ACTION_PERMUTATION in args.sancheck:
+                    ipm = np.array([m.transpose() for m in pm])
+                    laction = np.random.rand(3, uw_random.DISCRETE_ACTION_NUMBER)
+                    wactions = [np.tensordot(laction, pm[V], axes=1) for V in range(view_num)]
+                    lactions = [np.tensordot(wactions[V], ipm[V], axes=1) for V in range(view_num)]
+                    for V in range(view_num):
+                        print(lactions[V] - laction)
+                    print("Exiting")
+                    return
                 '''
                 Keep using View 0 for the name so can reuse trained weights
                 '''

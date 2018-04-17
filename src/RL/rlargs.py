@@ -146,6 +146,11 @@ def get_parser():
             type=float,
             nargs='*',
             default=[0.2])
+    parser.add_argument('--sancheck',
+            help='Different sanity check points',
+            type=int,
+            nargs='*',
+            default=[])
 
     return parser
 
