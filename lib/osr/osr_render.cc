@@ -333,6 +333,7 @@ void Renderer::render_rgbd()
 
 	CHECK_GL_ERROR(glUseProgram(rgbdShaderProgram));
 	CHECK_GL_ERROR(glUniform1i(16, avi));
+	CHECK_GL_ERROR(glUniform3fv(17, 1, light_position.data()));
 
 	scene_renderer_->render(rgbdShaderProgram, camera, perturbation_mat);
 	if (robot_) {

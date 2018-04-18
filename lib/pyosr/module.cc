@@ -110,7 +110,8 @@ PYBIND11_PLUGIN(pyosr) {
 		.def_readwrite("mvrgb", &Renderer::mvrgb)
 		.def_readwrite("mvdepth", &Renderer::mvdepth)
 		.def_readwrite("views", &Renderer::views)
-		.def_readwrite("avi", &Renderer::avi);
+		.def_readwrite("avi", &Renderer::avi)
+		.def_readwrite("light_position", &Renderer::light_position);
 #endif // GPU_ENABLED
 	using osr::GTGenerator;
 	py::class_<GTGenerator>(m, "GTGenerator")

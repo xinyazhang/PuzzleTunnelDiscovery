@@ -62,6 +62,7 @@ public:
 	int pbufferHeight = 224;
 	float default_depth = 5.0f;
 	GLboolean avi = false; // AdVanced Illumination
+	Eigen::Vector3f light_position = {0.0f, 5.0f, 0.0f};
 
 	/*
 	 * Set this variable to use multple view rendering.
