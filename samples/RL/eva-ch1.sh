@@ -1,3 +1,24 @@
+# Resnet-18 FV size 1024
+# 
+./pretrain-d.sh --ferev 11 --elu \
+	--ckptdir ackpt/Resnet-View-0-of-14-Action12-Rev-11-Feat-1024-524288-fixcam/ --ckptprefix working-try11 \
+	--batch 2 --queuemax 64 --threads 1 \
+	--avi \
+	--res 224 \
+	--iter 524288 \
+	--eval \
+	--mispout evaluation/Resnet-View-0-of-14-A12-Rev-11-MISP-1024/ \
+	--view 0 \
+	--viewset cube \
+	--featnum 1024 \
+	--imhidden 1024 1024 \
+	--samplein sample/batch2-view14-norgbd-T6-R6-2M/ \
+	--sampletouse 524288 \
+	--samplebatching 64 \
+	--samplebase 1048576 > evaluation/Resnet-View-0-of-14-Rev-11-Feat-1024-524288-fixcam.out
+
+exit
+
 # AVI
 
 ./pretrain-d.sh --ferev 5 --elu \
