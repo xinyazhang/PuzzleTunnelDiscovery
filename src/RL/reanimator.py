@@ -23,7 +23,8 @@ def reanimate():
     r.views = np.array([[15.0, 110.0]], dtype=np.float32)
     print(r.scene_matrix)
     print(r.robot_matrix)
-    r.set_perturbation(uw_random.random_state(0.00))
+    # r.set_perturbation(uw_random.random_state(0.00))
+    r.set_perturbation(uw_random.random_state(0.25))
     # r.set_perturbation(np.array([0,0.0,0,0.5,0.5,0.5,0.5],dtype=np.float32))
     # r.set_perturbation(np.array([0,0.0,0,0,0,1,0],dtype=np.float32))
     # return

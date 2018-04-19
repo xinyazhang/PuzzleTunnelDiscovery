@@ -12,7 +12,7 @@ kEnableActionCalculation = True
 def interpolate(pkey, nkey, tau):
     return pyosr.interpolate(pkey, nkey, tau)
 
-def reanimate(gtfn, pathfn):
+def reanimate(gtfn, pathfn, swap):
     pyosr.init()
     dpy = pyosr.create_display()
     glctx = pyosr.create_gl_context(dpy)
@@ -28,8 +28,10 @@ def reanimate(gtfn, pathfn):
     gt = pyosr.GTGenerator(r)
     # gt.rl_stepping_size = 0.0125 / 16
     # gt.verify_magnitude = 0.0125 / 16 / 8
-    gt.rl_stepping_size = 0.0125 / 16 / 1024
-    gt.verify_magnitude = 0.0125 / 16 / 1024 / 2
+    # gt.rl_stepping_size = 0.0125 / 16 / 1024
+    # gt.verify_magnitude = 0.0125 / 16 / 1024 / 2
+    gt.rl_stepping_size = 0.0125 * 4
+    gt.verify_magnitude = 0.0125 * 4 / 8
     # gt.rl_stepping_size = 0.0125 / 64
     # gt.verify_magnitude = 0.0125 / 64 / 8
     gtdata = np.load(gtfn)
@@ -65,6 +67,7 @@ def reanimate(gtfn, pathfn):
                 self.reaching_terminal = True
                 return
             r = self.renderer
+            # r.light_position = np.random.rand(3)
             '''
             from_state = r.translate_to_unit_state(keys[self.st_index])
             to_state =  r.translate_to_unit_state(keys[self.st_index + 1])
@@ -150,7 +153,8 @@ def reanimate(gtfn, pathfn):
 
     fig = plt.figure()
     keys = np.loadtxt(pathfn)
-    # keys[:, [3,4,5,6]] = keys[:,[6,3,4,5]]
+    if swap:
+        keys[:, [3,4,5,6]] = keys[:,[6,3,4,5]]
     ra = ExpandingReAnimator(r, gt, keys, 1024)
     ani = animation.FuncAnimation(fig, ra.perform)
     plt.show()
@@ -159,4 +163,5 @@ def usage():
     print("rl-reanimator.py <preprocessed ground truth file>")
 
 if __name__ == '__main__':
-    reanimate('blend-low.gt.npz', 'blend.path')
+    # reanimate('blend-low.gt.npz', 'blend.path', swap=False)
+    reanimate('blend-low.gt.npz', 'rrt.path', swap=True)

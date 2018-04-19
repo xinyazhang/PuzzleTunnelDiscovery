@@ -570,32 +570,43 @@ GTGenerator::castTrajectory(const StateVector& from,
 	auto unit_current = uw_.translateToUnitState(from);
 	while (actions.size() < max_steps or max_steps < 0) {
 		auto unit_distance = distance(unit_current, unit_to);
-		std::cerr << "CURRENT UNIT DISTANCE " << unit_distance << std::endl;
+		std::cerr << "CURRENT UNIT DISTANCE "
+			  << unit_distance
+			  << " VALID? " << uw_.isValid(unit_current)
+			  << std::endl;
 		if (unit_distance < rl_stepping_size)
 			break;
 		Eigen::VectorXd dists(kTotalNumberOfActions);
+		Eigen::VectorXd ratios(kTotalNumberOfActions);
+		// Eigen::VectorXi valids(kTotalNumberOfActions);
 		ArrayOfStates nexts;
 		nexts.resize(kTotalNumberOfActions, Eigen::NoChange);
 		{
-// #pragma omp parallel for
+#pragma omp parallel for
 		for (int i = 0; i < kTotalNumberOfActions; i++) {
 			auto tup = uw_.transitState(unit_current, i,
 						   rl_stepping_size,
 						   verify_magnitude);
-			if (std::get<2>(tup) == 0.0) {
+			ratios(i) = std::get<2>(tup);
+			// if (ratios(i) == 0.0) {
+			if (ratios(i) < 1e-5) {
 				dists(i) = 1000.0;
 				continue;
 			}
 			dists(i) = distance(std::get<0>(tup), unit_to);
 			nexts.row(i) = std::get<0>(tup);
+			// valids(i) = uw_.isValid(nexts.row(i));
 		}
 		}
 		int action;
 		dists.minCoeff(&action);
-		std::cerr << dists << std::endl;
+		std::cerr << "D: " << dists.transpose() << std::endl;
+		std::cerr << "R: " << ratios.transpose() << std::endl;
+		// std::cerr << "V: " << valids.transpose() << std::endl;
 		if (dists(action) > 100.0) {
 			std::cerr << "SAN CHECK 6/2D10: TRAPPED, EVERY ACTION FAILED\n";
 			std::cerr << dists << std::endl;
+			throw std::runtime_error("SAN CHECK FAILED: TRAPPED");
 		}
 		// if (distance(nexts.row(action), to) > distance(current, to)) {
 		if (dists(action) > unit_distance) {
