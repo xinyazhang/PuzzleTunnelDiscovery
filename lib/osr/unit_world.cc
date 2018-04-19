@@ -266,6 +266,8 @@ UnitWorld::transitState(const StateVector& state,
 		bool done;
 		float prog;
 		tie(free_state, done, prog) = transitStateTo(state, to_state, current_verify_delta);
+		if (!isValid(free_state))
+			throw std::runtime_error("SAN check failed, invalid state from transitStateTo");
 		if (prog > 0.0 or current_verify_delta == 0.0)
 			/* Sometimes vmag vanishes */
 			return std::make_tuple(free_state, done, prog);
@@ -340,11 +342,10 @@ UnitWorld::transitStateTo(const StateVector& from,
                           double verify_delta) const
 {
 	double dist = distance(from, to);
-	int nseg = int(std::ceil(std::max(1.0, dist/verify_delta)));
 	// std::cerr << "\t\tNSeg: " << nseg << std::endl;
-	double rate = 1.0 / double(nseg);
-	StateVector last_free = from;
 #if 0 // Parallel Version
+	int nseg = int(std::ceil(std::max(1.0, dist/verify_delta)));
+	double rate = 1.0 / double(nseg);
 	Eigen::VectorXi valid;
 	valid.setZero(nseg);
 	std::atomic<bool> hitInvalid(false);
@@ -375,13 +376,14 @@ UnitWorld::transitStateTo(const StateVector& from,
 		}
 	}
 #else
+	StateVector last_free = from;
 	double delta = verify_delta;
 	if (verify_delta >= dist) {
 		return std::make_tuple(from, false, 0.0);
 	}
 	double inv_dist = 1.0/dist;
 	double last_tau = 0.0;
-	while (delta < dist) {
+	while (delta <= dist) {
 		double tau = delta * inv_dist;
 		auto state = interpolate(from, to, tau);
 		if (!isValid(state)) {
@@ -389,10 +391,15 @@ UnitWorld::transitStateTo(const StateVector& from,
 		}
 		last_tau = tau;
 		last_free = state;
-		delta += verify_delta;
+		if (delta < dist) {
+			delta += verify_delta;
+			delta = std::min(dist, delta);
+		} else {
+			delta += verify_delta;
+		}
 	}
 #endif
-	return std::make_tuple(to, true, 1.0);
+	return std::make_tuple(last_free, delta > dist, last_tau);
 }
 
 
