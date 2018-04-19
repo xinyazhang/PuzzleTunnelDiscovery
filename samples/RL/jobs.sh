@@ -1,6 +1,59 @@
 TRY=try11
+SAMPLEDIR=sample/batch2-view14-norgbd-T6-R6-2M/
 
-# 14 Views on 12 Actions with 256-1024 FV
+# Joint training, single NN with pretubation
+# Named as Formula-1, contains
+# 1. Single Resnet 18
+# 2. Advanced Illumination
+# 3. 224 x 224
+# 4. Inverse model with two hidden layers
+# 5. Cube view
+# 6. Prediction from multiple views
+# 7. feature vector size: 256 (can be longer but limited by memory)
+# 
+# This part train it jointly on 1Mi samples, for 32x iterations.
+# 
+OUTDIR=vision-formula-1
+echo "mkdir -p $OUTDIR"
+BASE=0
+for END in 1048576
+do
+	NSAMPLE=$((END - BASE))
+	for REV in 11
+	do
+		for FEATNUM in 256 # 512 1024
+		do
+			CKPT_DIR=Vision-Formula-1-FEAT-$FEATNUM
+			echo -e "\nmkdir -p ckpt/$CKPT_DIR"
+			PREFIX=formula-1
+			ITER=$((NSAMPLE * 32))
+
+			echo "
+	./pretrain-d.sh --ferev $REV --elu \\
+		--ckptdir ckpt/$CKPT_DIR/ --ckptprefix $PREFIX \\
+		--batch 2 --queuemax 64 --threads 1 \\
+		--avi \\
+		--res 224 \\
+		--iter $ITER \\
+		--viewset cube \\
+		--sharedmultiview \\
+		--featnum $FEATNUM \\
+		--imhidden $FEATNUM $FEATNUM \\
+		--samplein $SAMPLEDIR \\
+		--sampletouse $NSAMPLE \\
+		--samplebatching 16 \\
+		--samplebase $BASE > vision-formula-1/Feat-$FEATNUM.out
+			"
+			ARCHIVED_CKPT=Vision-Formula-1-FEAT-$FEATNUM
+			echo -e "rsync -a ckpt/$CKPT_DIR/ ackpt/$ARCHIVED_CKPT/\n"
+		done
+	done
+	BASE=$END
+done
+
+exit
+
+# 6 Views on 12 Actions with 256-1024 FV
 # 512K training samples, *32 iterations
 # AdVanced Illumination
 # Res: 224 * 224
@@ -51,7 +104,7 @@ do
 done
 
 exit
-# First of 14 Views on 12 Actions with 256 - 2048 FV
+# First of 6 Views on 12 Actions with 256 - 2048 FV
 # 512K training samples, *8 iterations
 # Baseline, with correct camera
 NACTION=12
