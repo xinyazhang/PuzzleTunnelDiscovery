@@ -41,8 +41,8 @@ class PuzzlePlayer(object):
 
 def main():
     pyosr.init()
-    parser = rlargs.get_parser()
-    args = parser.parse_args()
+    args = rlargs.parse()
+    print(args)
     player = PuzzlePlayer(args)
     reanimate(player)
 

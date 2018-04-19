@@ -151,6 +151,24 @@ def get_parser():
             type=int,
             nargs='*',
             default=[])
+    parser.add_argument('--visionformula',
+            help='Load preset formulas for vision. Note this overrides other options',
+            type=int,
+            choices=[1],
+            default=0)
 
     return parser
 
+def parse():
+    parser = get_parser()
+    args = parser.parse_args()
+    if args.visionformula == 1:
+        args.elu = True
+        args.res = 224
+        args.avi = True
+        args.ferev = 11
+        args.viewset = 'cube'
+        args.sharedmultiview = True
+        args.featnum = 256
+        args.imhidden = [256, 256]
+    return args

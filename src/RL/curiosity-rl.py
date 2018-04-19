@@ -569,9 +569,7 @@ def curiosity_main(args):
             trainer.stop() # Must stop before session becomes invalid
 
 if __name__ == '__main__':
-    parser = rlargs.get_parser()
-
-    args = parser.parse_args()
+    args = rlargs.parse()
     setup_global_variable(args)
     if args.continuetrain:
         if args.samplein:

@@ -542,9 +542,7 @@ def pretrain_main(args):
         thread.join()
 
 if __name__ == '__main__':
-    parser = rlargs.get_parser()
-
-    args = parser.parse_args()
+    args = rlargs.parse()
     if (not args.eval) and len(args.viewinitckpt) > 0:
         print('--eval must be set when viewinitckpt is given')
         exit()
