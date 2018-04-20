@@ -14,6 +14,23 @@ def random_state(scale=1.0):
     part2 = np.array(quat, dtype=np.float32)
     return np.concatenate((part1, part2))
 
+def random_on_sphere(scale=1.0):
+    '''
+    x1,x2 in (-1,1)
+    '''
+    while True:
+        x1,x2 = 2.0 * (np.random.rand(2) - 0.5)
+        l2 = x1 * x1 + x2 * x2
+        if l2 < 1:
+            break
+    '''
+    Formula 9-11 in http://mathworld.wolfram.com/SpherePointPicking.html
+    '''
+    x = 2 * x1 * sqrt(1 - l2)
+    y = 2 * x2 * sqrt(1 - l2)
+    z = 1 - 2 * l2
+    return np.array([x,y,z]) * scale
+
 def gen_init_state(uw):
     while True:
         state = random_state()

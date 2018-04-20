@@ -421,12 +421,19 @@ class TrainerMT:
         '''
         with g.as_default():
             args = self.args
-            envir = AlphaPuzzle(args, tid)
+            thread_local_envirs = [AlphaPuzzle(args, tid) for i in range(args.agents)]
+            for e in thread_local_envirs:
+                e.r.set_perturbation(uw_random.random_state(args.permutemag))
+                e.r.light_position = uw_random.random_on_sphere(5.0)
             while True:
                 task = self.taskQ.get()
                 if task == self.kExitTask:
                     return 0
                 sess = self.sessQ.get()
+                '''
+                Pickup the envir stochasticly
+                '''
+                envir = random.choice(thread_local_envirs)
                 self.trainer.train(envir, sess, tid)
                 if task == self.kSyncTask:
                     self.reportQ.put(1)

@@ -156,6 +156,16 @@ def get_parser():
             type=int,
             choices=[1],
             default=0)
+    parser.add_argument('--agents',
+            metavar='NUMBER',
+            help='Use multiple agents PER-THREAD to generalize the model',
+            type=int,
+            default=-1)
+    parser.add_argument('--permutemag',
+            metavar='REAL',
+            help='Magnitude of translation in the randomized permutation',
+            type=int,
+            default=0.125)
 
     return parser
 
