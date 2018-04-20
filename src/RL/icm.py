@@ -114,6 +114,9 @@ class IntrinsicCuriosityModule:
         '''
         self.cur_nn_params, self.cur_featvec = self.feature_extractor.infer(rgb_tensor, depth_tensor)
         print('Feature shape {}'.format(self.cur_featvec.shape))
+        B,V,N = self.cur_featvec.shape
+        self.cur_mvfeatvec = tf.reshape(self.cur_featvec, [-1, 1, int(V)*int(N)])
+        print('MV Feature shape {}'.format(self.cur_mvfeatvec.shape))
         self.next_nn_params, self.next_featvec = self.feature_extractor.infer(next_rgb_tensor, next_depth_tensor)
         self.elu = elu
 
@@ -169,6 +172,7 @@ class IntrinsicCuriosityModule:
         flat_action = action_tensor[:,0,:]
         for V in range(self.view_num):
             la = tf.tensordot(flat_action, self.ipm_tensor[V], axes=1)
+            local_actions.append(la)
         return tf.stack(local_actions, 1)
 
     def get_inverse_model(self):
@@ -252,7 +256,11 @@ class IntrinsicCuriosityModule:
         pass
 
     def create_somenet_from_feature(self, hidden, netname, elu, lstm, initialized_as_zero=False):
-        featvec = self.cur_featvec
+        # featvec = self.cur_featvec
+        '''
+        Note flattened multi-view feature vector [B, 1, F*V] should be used
+        '''
+        featvec = self.cur_mvfeatvec
         if lstm is True:
             featvec = self.get_lstm_featvec('LSTM', featvec)
         net = vision.ConvApplier(None, hidden, netname, elu, initialized_as_zero=initialized_as_zero)

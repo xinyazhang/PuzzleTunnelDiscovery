@@ -160,7 +160,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
 
     def __init__(self, learning_rate, args):
         super(CuriosityRL, self).__init__()
-        self.view_num, _ = _get_view_cfg(args)
+        self.view_num, self.views = _get_view_cfg(args)
         w = h = args.res
 
         self.action_space_dimension = uw_random.DISCRETE_ACTION_NUMBER
@@ -170,7 +170,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
         self.dep_1_tensor = tf.placeholder(tf.float32, shape=[None, self.view_num, w, h, 1], name='Dep1Ph')
         self.dep_2_tensor = tf.placeholder(tf.float32, shape=[None, self.view_num, w, h, 1], name='Dep2Ph')
 
-        if self.view_num > 1:
+        if self.view_num > 1 and not args.sharedmultiview:
             self.model = icm.IntrinsicCuriosityModuleIndependentCommittee(self.action_tensor,
                     self.rgb_1_tensor, self.dep_1_tensor,
                     self.rgb_2_tensor, self.dep_2_tensor,
@@ -182,6 +182,8 @@ class CuriosityRL(rlenv.IAdvantageCore):
                     args.imhidden,
                     args.fehidden)
         else:
+            pm = [pyosr.get_permutation_to_world(self.views, i) for i in range(len(self.views))]
+            pm = np.array(pm)
             with tf.variable_scope(icm.view_scope_name(args.view)):
                 self.model = icm.IntrinsicCuriosityModule(self.action_tensor,
                         self.rgb_1, self.dep_1,
@@ -193,7 +195,8 @@ class CuriosityRL(rlenv.IAdvantageCore):
                         ferev=args.ferev,
                         imhidden=args.imhidden,
                         fehidden=args.fehidden,
-                        fwhidden=args.fwhidden)
+                        fwhidden=args.fwhidden,
+                        permuation_matrix=pm)
                 self.model.get_inverse_model()
 
         self.inverse_loss = self.model.get_inverse_loss(discrete=True)
