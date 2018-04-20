@@ -2,6 +2,7 @@ import vision
 import config
 import numpy as np
 import pyosr
+import threading
 
 def get_view_cfg(args):
     VIEW_CFG = config.VIEW_CFG
@@ -18,13 +19,18 @@ def get_view_cfg(args):
         view_num = len(view_array)
     return view_num, view_array
 
-def create_renderer(args, is_first_in_thread=True):
+_thread_local = threading.local()
+
+def create_renderer(args):
     view_num, view_array = get_view_cfg(args)
     w = h = args.res
 
-    if is_first_in_thread:
+    dpy = getattr(_thread_local, 'egl_dpy', None)
+    if dpy is None:
         dpy = pyosr.create_display()
         glctx = pyosr.create_gl_context(dpy)
+        _thread_local.egl_dpy = dpy
+        _thread_local.egl_ctx = glctx
     r = pyosr.Renderer()
     if args.avi:
         r.avi = True
