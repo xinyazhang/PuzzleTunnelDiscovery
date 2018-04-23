@@ -1,5 +1,24 @@
 # Resnet-18 FV size 256
 # 
+OUT=evaluation/Vision-Formula-1/
+mkdir -p $OUT
+
+./pretrain-d.sh --ferev 11 --elu \
+	--ckptdir ackpt/Vision-Formula-1-FEAT-256/ --ckptprefix formula-1 \
+	--batch 2 --queuemax 64 --threads 1 \
+	--iter 1048576 \
+	--eval \
+	--mispout $OUT \
+	--visionformula 1 \
+	--samplein sample/batch2-view14-norgbd-T6-R6-2M/ \
+	--sampletouse 1048576 \
+	--samplebatching 16 \
+	--samplebase 1048576 > evaluation/Vision-Formula-1.out
+
+exit
+
+# Resnet-18 FV size 256
+# 
 OUT=evaluation/Resnet-SMView-of-6-A12-Rev-11-MISP-256/ 
 mkdir -p $OUT
 
