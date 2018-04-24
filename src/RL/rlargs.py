@@ -165,7 +165,7 @@ def get_parser():
             metavar='REAL',
             help='Magnitude of translation in the randomized permutation',
             type=int,
-            default=0.125)
+            default=0.0)
 
     return parser
 
