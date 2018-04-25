@@ -164,7 +164,7 @@ def get_parser():
     parser.add_argument('--permutemag',
             metavar='REAL',
             help='Magnitude of translation in the randomized permutation',
-            type=int,
+            type=float,
             default=0.0)
 
     return parser

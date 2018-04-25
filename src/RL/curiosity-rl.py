@@ -55,8 +55,7 @@ def _get_action_set(args):
 def _get_view_cfg(args):
     return rlutil.get_view_cfg(args)
 
-def create_renderer(args):
-    return rlutil.create_renderer(args)
+create_renderer = rlutil.create_renderer
 
 class GroundTruth:
     pass
@@ -69,7 +68,7 @@ class AlphaPuzzle(rlenv.IExperienceReplayEnvironment):
         super(AlphaPuzzle, self).__init__(tmax=args.batch, erep_cap=args.ereplayratio)
         self.fb_cache = None
         self.fb_dirty = True
-        r = self.r = create_renderer(args)
+        r = self.r = create_renderer(args, creating_ctx=False)
         self.istate = np.array(r.translate_to_unit_state(args.istateraw), dtype=np.float32)
         r.state = self.istate
         self.rgb_shape = (len(r.views), r.pbufferWidth, r.pbufferHeight, 3)
@@ -162,6 +161,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
         super(CuriosityRL, self).__init__()
         self.view_num, self.views = _get_view_cfg(args)
         w = h = args.res
+        self.args = args
 
         self.action_space_dimension = uw_random.DISCRETE_ACTION_NUMBER
         self.action_tensor = tf.placeholder(tf.float32, shape=[None, 1, self.action_space_dimension], name='ActionPh')
@@ -184,7 +184,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
         else:
             pm = [pyosr.get_permutation_to_world(self.views, i) for i in range(len(self.views))]
             pm = np.array(pm)
-            with tf.variable_scope(icm.view_scope_name(args.view)):
+            with tf.variable_scope(icm.view_scope_name('0')):
                 self.model = icm.IntrinsicCuriosityModule(self.action_tensor,
                         self.rgb_1, self.dep_1,
                         self.rgb_2, self.dep_2,
@@ -220,6 +220,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
             print("[LSTM] {}".format(self.lstm_states_in.c))
         self.optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
         self.curiosity_loss = tf.reduce_sum(self.curiosity)
+        tf.summary.scalar('curiosity_loss', self.curiosity_loss)
         self.refine_vision_and_memory_op = self.optimizer.minimize(
                 self.inverse_loss + self.curiosity_loss,
                 var_list = self.curiosity_params)
@@ -386,10 +387,10 @@ class CuriosityRL(rlenv.IAdvantageCore):
         return 0
 
     def load_pretrain(self, sess, viewinitckpt):
-        if self.view_num > 1:
-            self.model.load_pretrain(sess, viewinitckpt)
-        else:
+        if self.view_num == 1 or self.args.sharedmultiview:
             self.model.load_pretrain(sess, viewinitckpt[0])
+        else:
+            self.model.load_pretrain(sess, viewinitckpt)
 
 class TrainerMT:
     kAsyncTask = 1
@@ -411,6 +412,7 @@ class TrainerMT:
                 tmax=args.batch,
                 gamma=config.GAMMA,
                 learning_rate=1e-3,
+                ckpt_dir=args.ckptdir,
                 global_step=global_step)
         assert not (self.advcore.using_lstm and self.trainer.erep_sample_cap > 0), "CuriosityRL does not support Experience Replay with LSTM"
         for i in range(args.threads):
@@ -422,6 +424,9 @@ class TrainerMT:
         '''
         IEnvironment is pre-thread object, mainly due to OpenGL context
         '''
+        dpy = pyosr.create_display()
+        glctx = pyosr.create_gl_context(dpy)
+
         with g.as_default():
             args = self.args
             thread_local_envirs = [AlphaPuzzle(args, tid) for i in range(args.agents)]
@@ -461,6 +466,8 @@ class TrainerMT:
 class PolicyPlayer(object):
     def __init__(self, args, g, global_step):
         self.args = args
+        self.dpy = pyosr.create_display()
+        self.ctx = pyosr.create_gl_context(self.dpy)
         self.envir = AlphaPuzzle(args, 0)
         self.envir.egreedy = 1 - 0.995
         self.advcore = CuriosityRL(learning_rate=1e-3, args=args)

@@ -16,6 +16,7 @@ class A2CTrainer:
             tmax,
             gamma,
             learning_rate,
+            ckpt_dir,
             global_step=None,
             entropy_beta=0.01,
             erep_cap = -1
@@ -30,12 +31,16 @@ class A2CTrainer:
         '''
         self.optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
         self.loss = self.build_loss(advcore)
+        tf.summary.scalar('a2c_loss', self.loss)
         '''
         Do not train Vision since we don't have reliable GT from RL procedure
         '''
         self.train_op = self.optimizer.minimize(self.loss,
                 global_step=global_step,
                 var_list=advcore.policy_params + advcore.value_params + advcore.lstm_params)
+        self.summary_op = tf.summary.merge_all()
+        self.train_writer = tf.summary.FileWriter(ckpt_dir + '/summary', tf.get_default_graph())
+        self.global_step = global_step
 
     '''
     Private: Return A2C Loss
@@ -218,6 +223,11 @@ class A2CTrainer:
         print(pprefix, 'batch_V {}'.format(batch_V))
         sess.run(self.train_op, feed_dict=dic)
         advcore.train(sess, batch_rgb, batch_dep, batch_adist)
+        # FIXME: Re-enable summary after joint the two losses.
+        '''
+        summary = sess.run(self.summary_op)
+        self.train_writer.add_summary(summary, self.global_step)
+        '''
 
     def train_by_samples(self, envir, sess, actions, states, trewards, reaching_terminal, pprefix):
         advcore = self.advcore
