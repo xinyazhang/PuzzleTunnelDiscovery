@@ -69,6 +69,7 @@ class AlphaPuzzle(rlenv.IExperienceReplayEnvironment):
         self.fb_cache = None
         self.fb_dirty = True
         r = self.r = create_renderer(args, creating_ctx=False)
+        self.istateraw = args.istateraw
         self.istate = np.array(r.translate_to_unit_state(args.istateraw), dtype=np.float32)
         r.state = self.istate
         self.rgb_shape = (len(r.views), r.pbufferWidth, r.pbufferHeight, 3)
@@ -79,6 +80,12 @@ class AlphaPuzzle(rlenv.IExperienceReplayEnvironment):
         self.egreedy = args.egreedy[0] # e-greedy is an agent-specific variable
         if len(args.egreedy) != 1:
             self.egreedy = args.egreedy[tid]
+        self.permutemag = args.permutemag
+        self.perturbation = False
+
+    def enable_perturbation(self):
+        self.perturbation = True
+        self.reset()
 
     def qstate_setter(self, state):
         # print('old {}'.format(self.r.state))
@@ -145,6 +152,13 @@ class AlphaPuzzle(rlenv.IExperienceReplayEnvironment):
 
     def reset(self):
         super(AlphaPuzzle, self).reset()
+        if self.perturbation:
+            r = self.r
+            r.set_perturbation(uw_random.random_state(self.permutemag))
+            '''
+            Different perturbation has different istate in unit world.
+            '''
+            self.istate = np.array(r.translate_to_unit_state(self.istateraw), dtype=np.float32)
         self.qstate = self.istate
 
 class CuriosityRL(rlenv.IAdvantageCore):
@@ -429,10 +443,18 @@ class TrainerMT:
 
         with g.as_default():
             args = self.args
-            thread_local_envirs = [AlphaPuzzle(args, tid) for i in range(args.agents)]
-            for e in thread_local_envirs:
-                e.r.set_perturbation(uw_random.random_state(args.permutemag))
-                e.r.light_position = uw_random.random_on_sphere(5.0)
+            '''
+            Disable permutation in TID 0
+            Completely disable randomized light source for now
+            '''
+            if tid != 0:
+                thread_local_envirs = [AlphaPuzzle(args, tid) for i in range(args.agents)]
+                for e in thread_local_envirs:
+                    e.enable_perturbation()
+            else:
+                thread_local_envirs = [AlphaPuzzle(args, tid)]
+                # Also disable randomized light position
+                # e.r.light_position = uw_random.random_on_sphere(5.0)
             while True:
                 task = self.taskQ.get()
                 if task == self.kExitTask:
