@@ -198,6 +198,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
         else:
             pm = [pyosr.get_permutation_to_world(self.views, i) for i in range(len(self.views))]
             pm = np.array(pm)
+            print(pm)
             with tf.variable_scope(icm.view_scope_name('0')):
                 self.model = icm.IntrinsicCuriosityModule(self.action_tensor,
                         self.rgb_1, self.dep_1,
@@ -494,6 +495,7 @@ class PolicyPlayer(object):
         self.envir.egreedy = 1 - 0.995
         self.advcore = CuriosityRL(learning_rate=1e-3, args=args)
         self.advcore.softmax_policy # Create the tensor
+        self.gview = 0 if args.obview < 0 else args.obview
 
     def attach(self, sess):
         self.sess = sess
@@ -506,7 +508,7 @@ class PolicyPlayer(object):
         pprefix = "[0] "
         while True:
             rgb,_ = envir.vstate
-            yield rgb[0] # First view
+            yield rgb[self.gview] # First view
             if reaching_terminal:
                 print("##########CONGRATS TERMINAL REACHED##########")
                 envir.reset()
