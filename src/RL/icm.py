@@ -198,19 +198,20 @@ class IntrinsicCuriosityModule:
         3D tensor unifies per-view tensors and combined-view tensors.
         '''
         if jointfw:
-            V=int(self.cur_featvec.shape(1))
-            N=int(self.cur_featvec.shape(2))
-            joint_featvec = tf.reshape(self.cur_featvec, [-1, 1, V*N])
+            V=int(self.cur_featvec.shape[1])
+            N=int(self.cur_featvec.shape[2])
+            input_featvec = tf.reshape(self.cur_featvec, [-1, 1, V*N])
             atensor = self.action_tensor
             name = 'JointForwardModelNet'
         else:
             atensor = self.get_local_action(self.action_tensor)
+            input_featvec = self.cur_featvec
             name = 'ForwardModelNet'
-        input_featvec = tf.concat([atensor, self.cur_featvec], 2)
-        featnums = self.fwhidden_params + [int(self.cur_featvec.shape[-1])]
-        self.forward_fc_applier = vision.ConvApplier(None, featnums, joint, self.elu)
+        featnums = self.fwhidden_params + [int(input_featvec.shape[-1])]
+        featvec_plus_action = tf.concat([atensor, input_featvec], 2)
+        self.forward_fc_applier = vision.ConvApplier(None, featnums, name, self.elu)
         # FIXME: ConvApplier.infer returns tuples, which is unsuitable for Optimizer
-        params, out = self.forward_fc_applier.infer(input_featvec)
+        params, out = self.forward_fc_applier.infer(featvec_plus_action)
         if jointfw:
             out = tf.reshape(out, [-1, V, N])
         self.forward_model_params = params
