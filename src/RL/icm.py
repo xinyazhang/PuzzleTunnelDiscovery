@@ -216,7 +216,7 @@ class IntrinsicCuriosityModule:
         self.forward_model_params = params
         self.forward_output_tensor = out
         print('FWD Params {}'.format(params))
-        params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='ForwardModelNet')
+        params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=name)
         print('FWD Collected Params {}'.format(params))
         return params, out
 
