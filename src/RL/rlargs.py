@@ -166,6 +166,9 @@ def get_parser():
             help='Magnitude of translation in the randomized permutation',
             type=float,
             default=0.0)
+    parser.add_argument('--jointfw',
+            help='Use the joint all views as the input of forward model',
+            action='store_true')
 
     return parser
 

@@ -190,19 +190,29 @@ class IntrinsicCuriosityModule:
         self.inverse_output_tensor = self.vote(out)
         return params, out
 
-    def get_forward_model(self):
+    def get_forward_model(self, jointfw=False):
         if self.forward_output_tensor is not None:
             return self.forward_model_params, self.forward_output_tensor
         '''
         our pipeline use [None, V, N] feature vector
         3D tensor unifies per-view tensors and combined-view tensors.
         '''
-        atensor = self.get_local_action(self.action_tensor)
+        if jointfw:
+            V=int(self.cur_featvec.shape(1))
+            N=int(self.cur_featvec.shape(2))
+            joint_featvec = tf.reshape(self.cur_featvec, [-1, 1, V*N])
+            atensor = self.action_tensor
+            name = 'JointForwardModelNet'
+        else:
+            atensor = self.get_local_action(self.action_tensor)
+            name = 'ForwardModelNet'
         input_featvec = tf.concat([atensor, self.cur_featvec], 2)
         featnums = self.fwhidden_params + [int(self.cur_featvec.shape[-1])]
-        self.forward_fc_applier = vision.ConvApplier(None, featnums, 'ForwardModelNet', self.elu)
+        self.forward_fc_applier = vision.ConvApplier(None, featnums, joint, self.elu)
         # FIXME: ConvApplier.infer returns tuples, which is unsuitable for Optimizer
         params, out = self.forward_fc_applier.infer(input_featvec)
+        if jointfw:
+            out = tf.reshape(out, [-1, V, N])
         self.forward_model_params = params
         self.forward_output_tensor = out
         print('FWD Params {}'.format(params))

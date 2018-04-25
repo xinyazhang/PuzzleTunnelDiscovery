@@ -258,7 +258,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
                 initialized_as_zero=True)
 
     def create_curiosity_net(self, args):
-        fwd_params, fwd_feat = self.model.get_forward_model()
+        fwd_params, fwd_feat = self.model.get_forward_model(args.jointfw)
         '''
         Note: we need to train the curiosity model as memory, so tf.losses is used.
         '''
