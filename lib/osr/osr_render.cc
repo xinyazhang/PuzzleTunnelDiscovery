@@ -76,8 +76,8 @@ void Renderer::setupNonSharedObjects()
 	glGetError(); // Clear GL Error
 	const GLubyte* renderer = glGetString(GL_RENDERER);  // get renderer string
 	const GLubyte* version = glGetString(GL_VERSION);    // version as a string
-	std::cout << "Renderer: " << renderer << "\n";
-	std::cout << "OpenGL version supported:" << version << "\n";
+	std::cout << "[" << __func__ <<  "] Renderer: " << renderer << "\n";
+	std::cout << "[" << __func__ <<  "] OpenGL version supported:" << version << "\n";
 
 	GLuint vertShader = 0;
 	GLuint fragShader = 0;
