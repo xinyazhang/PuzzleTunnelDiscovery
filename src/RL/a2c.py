@@ -4,6 +4,8 @@ import rlenv
 import numpy as np
 from collections import deque
 import itertools
+# imsave for Debug
+from scipy.misc import imsave
 
 class A2CTrainer:
     a2c_tmax = None
@@ -30,17 +32,24 @@ class A2CTrainer:
         Create the optimizers to train the AdvCore
         '''
         self.optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
-        self.loss = self.build_loss(advcore)
+        LAMBDA = 0.5
+        self.loss = LAMBDA * self.build_loss(advcore)
         tf.summary.scalar('a2c_loss', self.loss)
+        self.loss += advcore.build_loss()
         '''
-        Do not train Vision since we don't have reliable GT from RL procedure
-        '''
+        Approach 1: Do not train Vision since we don't have reliable GT from RL procedure
         self.train_op = self.optimizer.minimize(self.loss,
                 global_step=global_step,
                 var_list=advcore.policy_params + advcore.value_params + advcore.lstm_params)
+        '''
+        '''
+        Approach 2: Train everything
+        '''
+        self.train_op = self.optimizer.minimize(self.loss, global_step=global_step)
         self.summary_op = tf.summary.merge_all()
         self.train_writer = tf.summary.FileWriter(ckpt_dir + '/summary', tf.get_default_graph())
         self.global_step = global_step
+        self.dbg_sample_peek = 0
 
     '''
     Private: Return A2C Loss
@@ -54,9 +63,12 @@ class A2CTrainer:
         '''
         Input tensor of Ground Truth from Environment
         '''
+        '''
         self.Adist_tensor = tf.placeholder(tf.float32,
                 shape=[None, 1, self.action_space_dimension],
                 name='ADistPh')
+        '''
+        self.Adist_tensor = advcore.action_tensor
         self.TD_tensor = tf.placeholder(tf.float32, shape=[None], name='TDPh')
         self.V_tensor = tf.placeholder(tf.float32, shape=[None], name='VPh')
 
@@ -78,6 +90,10 @@ class A2CTrainer:
         value_loss = tf.nn.l2_loss(self.V_tensor - flattened_value)
         print("V_tensor {} AdvCore.value {}".format(self.V_tensor.shape, flattened_value.shape))
         self.loss = policy_loss+value_loss
+        '''
+        Debug: minimize w.r.t. value loss
+        '''
+        # self.loss = value_loss
         return self.loss
 
     '''
@@ -118,7 +134,7 @@ class A2CTrainer:
             values.append(value)
 
             print(pprefix, "Peeking action")
-            nstate,reward,reaching_terminal = envir.peek_act(action, pprefix=pprefix)
+            nstate,reward,reaching_terminal,ratio = envir.peek_act(action, pprefix=pprefix)
             actual_rewards.append(reward)
             # print("action peeked {} ratio {} terminal? {}".format(nstate, ratio, reaching_terminal))
             adist = np.zeros(shape=(self.action_space_dimension),
@@ -136,6 +152,11 @@ class A2CTrainer:
             '''
             self.a2c_erep(envir, sess, pprefix)
             if reaching_terminal:
+                break
+            '''
+            Leave for training because of collision
+            '''
+            if ratio == 0:
                 break
             advcore.set_lstm(lstm_next) # AdvCore next frame
             envir.qstate = nstate # Envir Next frame
@@ -185,7 +206,7 @@ class A2CTrainer:
         for (ai, ri, Vi) in zip(actions, rewards, values):
             V = ri + self.gamma * V
             td = V - Vi
-            print(pprefix, "V {} Vi {}".format(V, Vi))
+            print(pprefix, "V(env+ar) {} V(nn) {}".format(V, Vi))
             adist = np.zeros(shape=(1, self.action_space_dimension),
                     dtype=np.float32)
             adist[0, ai] = 1.0
@@ -196,8 +217,8 @@ class A2CTrainer:
         batch_rgb = [state[0] for state in vstates]
         batch_dep = [state[1] for state in vstates]
         if self.verbose_training:
-            print(pprefix, '[{}] batch_a[0] {}'.format(self.worker_thread_index, batch_adist[0]))
-            print(pprefix, '[{}] batch_V {}'.format(self.worker_thread_index, batch_R))
+            print(pprefix, ' batch_a[0] {}'.format(batch_adist[0]))
+            print(pprefix, ' batch_V {}'.format(batch_R))
         '''
         Always reverse, the RLEnv need this sequential info for training.
         '''
@@ -209,7 +230,9 @@ class A2CTrainer:
         dic = {
                 advcore.rgb_1: batch_rgb[:-1],
                 advcore.dep_1: batch_dep[:-1],
-                self.Adist_tensor: batch_adist,
+                advcore.rgb_2: batch_rgb[1:],
+                advcore.dep_2: batch_dep[1:],
+                advcore.action_tensor : batch_adist,
                 self.TD_tensor: batch_td,
                 self.V_tensor: batch_V
               }
@@ -222,12 +245,13 @@ class A2CTrainer:
         print(pprefix, 'batch_td {}'.format(batch_td))
         print(pprefix, 'batch_V {}'.format(batch_V))
         sess.run(self.train_op, feed_dict=dic)
-        advcore.train(sess, batch_rgb, batch_dep, batch_adist)
+        # advcore.train(sess, batch_rgb, batch_dep, batch_adist)
         # FIXME: Re-enable summary after joint the two losses.
         '''
         summary = sess.run(self.summary_op)
         self.train_writer.add_summary(summary, self.global_step)
         '''
+        return batch_V
 
     def train_by_samples(self, envir, sess, actions, states, trewards, reaching_terminal, pprefix):
         advcore = self.advcore
@@ -236,16 +260,21 @@ class A2CTrainer:
             return
         arewards = advcore.get_artificial_from_experience(sess, states, actions)
         [values] = advcore.evaluate(trimmed_states, sess, [advcore.value])
-        print('> ARewards {}'.format(arewards))
-        print('> Values {}'.format(values))
+        print(pprefix, '> ARewards {}'.format(arewards))
+        # print(pprefix, '> Values {}'.format(values))
         arewards = np.reshape(arewards, newshape=(-1)).tolist()
         values = np.reshape(values, newshape=(-1)).tolist()
-        print('> Values list {}'.format(values))
+        print(pprefix, '> Values list {}'.format(values))
         rewards = []
         for (tr,ar) in zip(trewards, arewards):
             rewards.append(tr+ar)
-        print('> Rewards {}'.format(rewards))
-        self.a2c(envir, sess, actions, states, rewards, values, reaching_terminal, pprefix)
+        print(pprefix, '> Rewards {}'.format(rewards))
+        bv = self.a2c(envir, sess, actions, states, rewards, values, reaching_terminal, pprefix)
+        [valuesafter] = advcore.evaluate(trimmed_states, sess, [advcore.value])
+        valuesafter = np.reshape(valuesafter, newshape=(-1)).tolist()
+        print(pprefix, '> [DEBUG] Values before training {}'.format(values))
+        print(pprefix, '> [DEBUG] Values target {}'.format(bv))
+        print(pprefix, '> [DEBUG] Values after training {}'.format(valuesafter))
 
     '''
     a2c_erep: A2C Training with Expreience REPlay

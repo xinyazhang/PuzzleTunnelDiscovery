@@ -107,7 +107,7 @@ class IExperienceReplayEnvironment(IEnvironment):
         return a,s,r,self.erep_term[pick_end-1]
 
     def reset(self):
-            [q.clear() for q in self.erep_all_deques]
+        [q.clear() for q in self.erep_all_deques]
 
 '''
 Overall design idea:
@@ -235,9 +235,14 @@ class IAdvantageCore(object):
 
     Note: cannot be merged to a2c since ICM has different inputs
     Note2: actions should be a distribution
+
+    CAVEAT: deprecated, use build_loss instead
     '''
-    @abstractmethod
     def train(self, sess, rgb, dep, actions):
+        raise "Deprecated buggy solution"
+
+    @abstractmethod
+    def build_loss(self):
         pass
 
     '''

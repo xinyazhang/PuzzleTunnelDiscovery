@@ -148,7 +148,7 @@ class AlphaPuzzle(rlenv.IExperienceReplayEnvironment):
         self.state = nstate
         rgb_2, dep_2 = self.vstate
         print(pprefix, "New state {} ratio {} terminal {} reward {}".format(nstate, ratio, reaching_terminal, reward))
-        return nstate, reward, reaching_terminal
+        return nstate, reward, reaching_terminal, ratio
 
     def reset(self):
         super(AlphaPuzzle, self).reset()
@@ -214,8 +214,6 @@ class CuriosityRL(rlenv.IAdvantageCore):
                         permuation_matrix=pm)
                 self.model.get_inverse_model()
 
-        self.inverse_loss = self.model.get_inverse_loss(discrete=True)
-
         self.polout, self.polparams, self.polnets = self.create_polnet(args)
         self.valout, self.valparams, self.valnets = self.create_valnet(args)
         '''
@@ -234,28 +232,29 @@ class CuriosityRL(rlenv.IAdvantageCore):
                     np.zeros([1, self.model.lstmsize], dtype=np.float32))
             print("[LSTM] {}".format(self.lstm_states_in.c))
         self.optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
-        self.curiosity_loss = tf.reduce_sum(self.curiosity)
-        tf.summary.scalar('curiosity_loss', self.curiosity_loss)
-        self.refine_vision_and_memory_op = self.optimizer.minimize(
-                self.inverse_loss + self.curiosity_loss,
-                var_list = self.curiosity_params)
+        self.loss = None
+        # self.refine_vision_and_memory_op = self.optimizer.minimize(var_list = self.curiosity_params)
 
     def load_pretrained(self, args):
         self.icm.restore(sess, args.viewinitckpt)
+
+    '''
+    CAVEAT: MUST use randomized initial value, otherwise ValNet always has the same output.
+    '''
 
     def create_polnet(self, args):
         hidden = args.polhidden + [int(self.action_tensor.shape[-1])]
         return self.model.create_somenet_from_feature(hidden, 'PolNet',
                 elu=args.elu,
                 lstm=args.lstm,
-                initialized_as_zero=True)
+                initialized_as_zero=False)
 
     def create_valnet(self, args):
         hidden = args.valhidden + [1]
         return self.model.create_somenet_from_feature(hidden, 'ValNet',
                 elu=args.elu,
                 lstm=args.lstm,
-                initialized_as_zero=True)
+                initialized_as_zero=False)
 
     def create_curiosity_net(self, args):
         fwd_params, fwd_feat = self.model.get_forward_model(args.jointfw)
@@ -378,6 +377,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
         return ret
 
     def train(self, sess, rgb, dep, actions):
+        raise "Deprecated buggy function"
         dic = {
                 self.action_tensor : actions,
                 self.rgb_1 : rgb[:-1],
@@ -386,6 +386,16 @@ class CuriosityRL(rlenv.IAdvantageCore):
                 self.dep_2 : dep[1:],
               }
         sess.run(self.refine_vision_and_memory_op, feed_dict=dic)
+
+    def build_loss(self):
+        if self.loss is not None:
+            return self.loss
+        self.inverse_loss = self.model.get_inverse_loss(discrete=True)
+        self.curiosity_loss = tf.reduce_sum(self.curiosity)
+        tf.summary.scalar('inverse_loss', self.inverse_loss)
+        tf.summary.scalar('curiosity_loss', self.curiosity_loss)
+        self.loss = self.inverse_loss + self.curiosity_loss
+        return self.loss
 
     def lstm_next(self):
         if self.using_lstm:
@@ -425,8 +435,9 @@ class TrainerMT:
         self.trainer = a2c.A2CTrainer(
                 advcore=self.advcore,
                 tmax=args.batch,
-                gamma=config.GAMMA,
-                learning_rate=1e-3,
+                # gamma=config.GAMMA,
+                gamma=0.5,
+                learning_rate=1e-6,
                 ckpt_dir=args.ckptdir,
                 global_step=global_step)
         assert not (self.advcore.using_lstm and self.trainer.erep_sample_cap > 0), "CuriosityRL does not support Experience Replay with LSTM"

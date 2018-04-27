@@ -46,7 +46,7 @@ class Corridor(rlenv.IEnvironment):
         elif nstate <= -self.mag:
             reward = -1000
             nstate = -self.mag
-        return nstate, reward, reaching_terminal
+        return nstate, reward, reaching_terminal, 1.0
 
     def reset(self):
         self.state = 0

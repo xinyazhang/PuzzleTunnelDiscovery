@@ -280,7 +280,7 @@ class IntrinsicCuriosityModule:
         TODO: Check if this returns LSTM as well (probably not)
         '''
         params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=netname)
-        print('Params {}'.format(params))
+        print('{} Params {}'.format(netname, params))
         print('LSTM Params {}'.format(self.acquire_lstm_params()))
         return out, params, [net]
 
