@@ -21,12 +21,14 @@ class A2CTrainer:
             ckpt_dir,
             global_step=None,
             entropy_beta=0.01,
-            erep_cap = -1
+            erep_cap = -1,
+            debug = True
             ):
         self.advcore = advcore
         self.a2c_tmax = tmax
         self.gamma = gamma
         self.entropy_beta = entropy_beta
+        self.debug = debug
         self.action_space_dimension = int(advcore.policy.shape[-1])
         '''
         Create the optimizers to train the AdvCore
@@ -51,6 +53,10 @@ class A2CTrainer:
             self.train_writer = tf.summary.FileWriter(ckpt_dir + '/summary', tf.get_default_graph())
         self.global_step = global_step
         self.dbg_sample_peek = 0
+
+    def print(self, *args, **kwargs):
+        if self.debug:
+            print(*args, **kwargs)
 
     '''
     Private: Return A2C Loss
@@ -77,11 +83,11 @@ class A2CTrainer:
         log_policy = tf.log(tf.clip_by_value(policy, 1e-20, 1.0))
         # cond_prob = tf.reduce_sum(policy * self.Adist_tensor, axis=1)
         rindices = [i for i in range(1, len(log_policy.shape))]
-        print('rindices {}'.format(rindices))
+        self.print('rindices {}'.format(rindices))
         action_entropy = tf.reduce_sum(tf.multiply(log_policy, self.Adist_tensor),
                 reduction_indices=rindices)
         entropy = -tf.reduce_sum(policy * log_policy, reduction_indices=rindices)
-        print('action_entropy shape {}'.format(action_entropy.shape))
+        self.print('action_entropy shape {}'.format(action_entropy.shape))
 
         # Why do we add entropy to our loss?
         # policy_loss_per_step = tf.reduce_sum(action_entropy * self.TD_tensor) + entropy * self.entropy_beta
@@ -89,7 +95,7 @@ class A2CTrainer:
         policy_loss = -tf.reduce_sum(policy_loss_per_step)
         flattened_value = tf.reshape(advcore.value, [-1])
         value_loss = tf.nn.l2_loss(self.V_tensor - flattened_value)
-        print("V_tensor {} AdvCore.value {}".format(self.V_tensor.shape, flattened_value.shape))
+        self.print("V_tensor {} AdvCore.value {}".format(self.V_tensor.shape, flattened_value.shape))
         self.loss = policy_loss+value_loss
         '''
         Debug: minimize w.r.t. value loss
@@ -122,7 +128,7 @@ class A2CTrainer:
             '''
             Pick up the only frame
             '''
-            print(pprefix, 'pol {} shape {}; val {} shape {}'.format(policy, policy.shape, value, value.shape))
+            self.print('{}pol {} shape {}; val {} shape {}'.format(pprefix, policy, policy.shape, value, value.shape))
             policy = policy[0][0] # Policy View from first qstate and first view
             value = np.asscalar(value) # value[0][0][0]
             lstm_next = advcore.get_lstm()
@@ -134,7 +140,7 @@ class A2CTrainer:
             actions.append(action)
             values.append(value)
 
-            print(pprefix, "Peeking action")
+            self.print("{}Peeking action".format(pprefix))
             nstate,reward,reaching_terminal,ratio = envir.peek_act(action, pprefix=pprefix)
             actual_rewards.append(reward)
             # print("action peeked {} ratio {} terminal? {}".format(nstate, ratio, reaching_terminal))
@@ -187,7 +193,7 @@ class A2CTrainer:
         V = 0.0
         if not reaching_terminal:
             V = np.asscalar(advcore.evaluate([envir.vstate], sess, tensors=[advcore.value])[0])
-            print('> V from advcore.evaluate {}'.format(V))
+            self.print('> V from advcore.evaluate {}'.format(V))
 
         # actions.reverse()
         # rewards.reverse()
@@ -208,7 +214,7 @@ class A2CTrainer:
         for (ai, ri, Vi) in zip(r_actions, r_rewards, r_values):
             V = ri + self.gamma * V
             td = V - Vi
-            print(pprefix, "V(env+ar) {} V(nn) {}".format(V, Vi))
+            self.print("{}V(env+ar) {} V(nn) {}".format(pprefix, V, Vi))
             adist = np.zeros(shape=(1, self.action_space_dimension),
                     dtype=np.float32)
             adist[0, ai] = 1.0
@@ -219,8 +225,8 @@ class A2CTrainer:
         batch_rgb = [state[0] for state in vstates]
         batch_dep = [state[1] for state in vstates]
         if self.verbose_training:
-            print(pprefix, ' batch_a[0] {}'.format(batch_adist[0]))
-            print(pprefix, ' batch_V {}'.format(batch_R))
+            self.print('{}batch_a[0] {}'.format(pprefix, batch_adist[0]))
+            self.print('{}batch_V {}'.format(pprefix, batch_R))
         '''
         Always reverse, the RLEnv need this sequential info for training.
         '''
@@ -242,8 +248,8 @@ class A2CTrainer:
                 advcore.lstm_states_in.h : advcore.current_lstm.h,
                 advcore.lstm_len : len(batch_rgb[:-1])
                        })
-        print(pprefix, 'batch_td {}'.format(batch_td))
-        print(pprefix, 'batch_V {}'.format(batch_V))
+        self.print('{}batch_td {}'.format(pprefix, batch_td))
+        self.print('{}batch_V {}'.format(pprefix, batch_V))
         sess.run(self.train_op, feed_dict=dic)
         # advcore.train(sess, batch_rgb, batch_dep, batch_adist)
         # FIXME: Re-enable summary after joint the two losses.
@@ -260,21 +266,21 @@ class A2CTrainer:
             return
         arewards = advcore.get_artificial_from_experience(sess, states, actions)
         [values] = advcore.evaluate(trimmed_states, sess, [advcore.value])
-        print(pprefix, '> ARewards {}'.format(arewards))
+        self.print(pprefix, '> ARewards {}'.format(arewards))
         # print(pprefix, '> Values {}'.format(values))
         arewards = np.reshape(arewards, newshape=(-1)).tolist()
         values = np.reshape(values, newshape=(-1)).tolist()
-        print(pprefix, '> Values list {}'.format(values))
+        self.print(pprefix, '> Values list {}'.format(values))
         rewards = []
         for (tr,ar) in zip(trewards, arewards):
             rewards.append(tr+ar)
-        print(pprefix, '> Rewards {}'.format(rewards))
+        self.print(pprefix, '> Rewards {}'.format(rewards))
         bv = self.a2c(envir, sess, actions, states, rewards, values, reaching_terminal, pprefix)
         [valuesafter] = advcore.evaluate(trimmed_states, sess, [advcore.value])
         valuesafter = np.reshape(valuesafter, newshape=(-1)).tolist()
-        print(pprefix, '> [DEBUG] Values before training {}'.format(values))
-        print(pprefix, '> [DEBUG] Values target {}'.format(bv))
-        print(pprefix, '> [DEBUG] Values after training {}'.format(valuesafter))
+        self.print(pprefix, '> [DEBUG] Values before training {}'.format(values))
+        self.print(pprefix, '> [DEBUG] Values target {}'.format(bv))
+        self.print(pprefix, '> [DEBUG] Values after training {}'.format(valuesafter))
 
     '''
     a2c_erep: A2C Training with Expreience REPlay
