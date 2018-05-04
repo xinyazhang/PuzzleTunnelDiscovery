@@ -46,8 +46,9 @@ class A2CTrainer:
         Approach 2: Train everything
         '''
         self.train_op = self.optimizer.minimize(self.loss, global_step=global_step)
-        self.summary_op = tf.summary.merge_all()
-        self.train_writer = tf.summary.FileWriter(ckpt_dir + '/summary', tf.get_default_graph())
+        if ckpt_dir is not None:
+            self.summary_op = tf.summary.merge_all()
+            self.train_writer = tf.summary.FileWriter(ckpt_dir + '/summary', tf.get_default_graph())
         self.global_step = global_step
         self.dbg_sample_peek = 0
 
@@ -188,12 +189,13 @@ class A2CTrainer:
             V = np.asscalar(advcore.evaluate([envir.vstate], sess, tensors=[advcore.value])[0])
             print('> V from advcore.evaluate {}'.format(V))
 
-        actions.reverse()
-        rewards.reverse()
-        values.reverse()
+        # actions.reverse()
+        # rewards.reverse()
+        # values.reverse()
+        r_actions = actions[::-1]
+        r_rewards = rewards[::-1]
+        r_values = values[::-1]
 
-        batch_rgb = []
-        batch_dep = []
         batch_adist = []
         batch_td = []
         batch_V = []
@@ -203,7 +205,7 @@ class A2CTrainer:
         '''
         print('[{}] R start with {}'.format(self.worker_thread_index, R))
         '''
-        for (ai, ri, Vi) in zip(actions, rewards, values):
+        for (ai, ri, Vi) in zip(r_actions, r_rewards, r_values):
             V = ri + self.gamma * V
             td = V - Vi
             print(pprefix, "V(env+ar) {} V(nn) {}".format(V, Vi))
@@ -222,8 +224,6 @@ class A2CTrainer:
         '''
         Always reverse, the RLEnv need this sequential info for training.
         '''
-        batch_rgb.reverse()
-        batch_dep.reverse()
         batch_adist.reverse()
         batch_td.reverse()
         batch_V.reverse()
