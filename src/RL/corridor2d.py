@@ -9,6 +9,7 @@ import a2c
 import numpy as np
 import random
 import vision
+import threading
 
 class Corridor(rlenv.IExperienceReplayEnvironment):
     ACTION_DELTA = np.array(
@@ -18,15 +19,16 @@ class Corridor(rlenv.IExperienceReplayEnvironment):
              [ 0,-1]], dtype=np.int32)
     ACTION_SYMBOL = [ '↓', '↑', '→', '←']
 
-    def __init__(self, args):
+    def __init__(self, args, tid=0):
         super(Corridor, self).__init__(tmax=args.batch, erep_cap=4)
 
         self.state = np.array([0,0], dtype=np.int32)
         self.mag = args.res
-        self.egreedy = 0.5
+        self.egreedy = args.egreedy[tid]
         self.noerep = args.noerep
         self.die = args.die
         self.debug = args.debug
+        self.israd = args.israd
 
     def qstate_setter(self, state):
         self.state = state
@@ -63,7 +65,7 @@ class Corridor(rlenv.IExperienceReplayEnvironment):
 
     def reset(self):
         super(Corridor, self).reset()
-        self.state = np.array([0,0], dtype=np.int32)
+        self.state = np.random.randint(-self.israd, self.israd+1, size=2, dtype=np.int32)
 
     '''
     This disables experience replay
@@ -120,6 +122,7 @@ class TabularRL(rlenv.IAdvantageCore):
         print('> Polout {} Valout {} Curiosity {}'.format(self.polout.shape, self.valout.shape, self.curiosity.shape))
         self.loss = None
         self.debug = args.debug
+        self.cr = args.cr
 
     @property
     def softmax_policy(self):
@@ -164,7 +167,7 @@ class TabularRL(rlenv.IAdvantageCore):
 
     def make_decision(self, envir, policy_dist, pprefix):
         best = np.argmax(policy_dist, axis=-1)
-        if random.random() < envir.egreedy:
+        if random.random() > envir.egreedy:
             ret = random.randrange(self.action_space_dimension)
         else:
             ret = np.asscalar(best)
@@ -173,7 +176,8 @@ class TabularRL(rlenv.IAdvantageCore):
         return ret
 
     def get_artificial_reward(self, envir, sess, state_1, adist, state_2, pprefix):
-        return 0
+        if not self.cr:
+            return 0
         envir.qstate = state_1
         vs1 = envir.vstate
         envir.qstate = state_2
@@ -191,7 +195,8 @@ class TabularRL(rlenv.IAdvantageCore):
         return ret
 
     def get_artificial_from_experience(self, sess, vstates, actions):
-        return [0] * len(actions)
+        if not self.cr:
+            return [0] * len(actions)
         adists_array = []
         for ai in actions:
             adist = np.zeros(shape=(1, self.action_space_dimension),
@@ -227,6 +232,23 @@ class TabularRL(rlenv.IAdvantageCore):
     def load_pretrain(self, sess, viewinitckpt):
         pass
 
+def run_trainer(args, sess, trainer, envir, advcore, saver, gs, tid):
+    total_epoch = args.iter
+    epoch = 0
+    while epoch < total_epoch:
+        trainer.train(envir, sess)
+        if args.debug:
+            np.set_printoptions(precision=4, linewidth=180)
+            allval = sess.run(advcore.valparams)
+            print("===Iteration {}===".format(epoch))
+            print('Pol {}'.format(sess.run(advcore.smpolparams)))
+            print('Val\n{}'.format(allval))
+            np.set_printoptions()
+        epoch += 1
+        if tid == 0 and epoch % 1024 == 0:
+            fn = saver.save(sess, args.ckpt, global_step=gs)
+            print("Saved checkpoint to {}".format(fn))
+
 def corridor_main():
     parser = argparse.ArgumentParser(description='Process some integers.', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--res', help='Size of the corridor', type=int, default=8)
@@ -254,17 +276,32 @@ def corridor_main():
     parser.add_argument('--debug',
             help='Enable debugging output',
             action='store_true')
+    parser.add_argument('--threads',
+            type=int,
+            help='Number of threads',
+            default=1)
+    parser.add_argument('--egreedy',
+            type=float,
+            nargs='+',
+            help='epsilon-greedy',
+            default=[0.5])
+    parser.add_argument('--israd',
+            type=int,
+            help='Initial State RADius',
+            default=0)
+    parser.add_argument('--cr',
+            help='Enable CuRiosity',
+            action='store_true')
 
     args = parser.parse_args()
-
-    total_epoch = args.iter
+    assert len(args.egreedy) == args.threads, "--egreedy should match --thread"
 
     g = tf.Graph()
     with g.as_default(), tf.device("/cpu:0"):
         global_step = tf.contrib.framework.get_or_create_global_step()
 
         lr = 1e-2
-        envir = Corridor(args)
+        envirs = [Corridor(args, tid) for tid in range(args.threads)]
         advcore = TabularRL(learning_rate=lr, args=args)
         trainer = a2c.A2CTrainer(
                 advcore=advcore,
@@ -285,6 +322,7 @@ def corridor_main():
             if ckpt and ckpt.model_checkpoint_path:
                 saver.restore(sess, ckpt.model_checkpoint_path)
             if args.showp:
+                envir = envirs[0]
                 p = sess.run(advcore.polparams)
                 pmax = np.argmax(p, axis=2)
                 print(pmax)
@@ -295,6 +333,7 @@ def corridor_main():
                     print('')
                 return
             elif args.play:
+                envir = envirs[0]
                 envir.egreedy = 1 - 0.99
                 while True:
                     pol = advcore.evaluate([envir.vstate], sess, [advcore.softmax_policy])
@@ -307,19 +346,14 @@ def corridor_main():
                     if rt:
                         break
                 return
-            while epoch < total_epoch:
-                trainer.train(envir, sess)
-                if args.debug:
-                    np.set_printoptions(precision=4, linewidth=180)
-                    allval = sess.run(advcore.valparams)
-                    print("===Iteration {}===".format(epoch))
-                    print('Pol {}'.format(sess.run(advcore.smpolparams)))
-                    print('Val\n{}'.format(allval))
-                    np.set_printoptions()
-                epoch += 1
-                if epoch % 1024 == 0:
-                    fn = saver.save(sess, args.ckpt, global_step=global_step)
-                    print("Saved checkpoint to {}".format(fn))
+            threads = []
+            for i in range(args.threads):
+                a=(args, sess, trainer, envirs[i], advcore, saver, global_step, i)
+                thread = threading.Thread(target=run_trainer, args=a)
+                thread.start()
+                threads.append(thread)
+            for t in threads:
+                t.join()
             saver.save(sess, args.ckpt, global_step=global_step)
 
 if __name__ == '__main__':
