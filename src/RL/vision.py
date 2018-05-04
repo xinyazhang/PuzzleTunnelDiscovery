@@ -200,6 +200,7 @@ class FCLayerConfig:
 
     def __init__(self, ch_out):
         self.ch_out = ch_out
+        self.nolu = False
 
     def create_kernel(self, prev_shape):
         if self.weight is not None:
@@ -230,22 +231,28 @@ class FCLayerConfig:
         self.weight, self.bias = weight, bias
         return weight, bias
 
-    # FIXME: ACCEPT 2D TENSOR [None, N]
     def apply_layer(self, prev, _):
         # Dim 0 is BATCH
         print('prev {}'.format(prev.shape))
         if len(prev.shape.as_list()) > 2:
             flatten = tf.reshape(prev, [-1, prev.shape[1].value, reduce(mul, prev.shape[2:].as_list(), 1)])
+            post_reshape = True
         else:
             flatten = prev
+            post_reshape = False
         print('flatten {}'.format(flatten.shape))
+        lastdim = len(flatten.shape.as_list()) - 1
         w,b = self.create_kernel(flatten.shape[-1])
         print('w,b {} {}'.format(w.get_shape(), b.get_shape()))
-        td = tf.tensordot(flatten, w, [[2], [0]])
+        td = tf.tensordot(flatten, w, [[lastdim], [0]])
         print('tdshape {}'.format(td.get_shape()))
-        td.set_shape([None, prev.shape[1].value, self.ch_out])
-        print('tdshape set to {}'.format(td.get_shape()))
-        out = tf.nn.elu(td + b) if self.elu else tf.nn.relu(td + b)
+        if post_reshape:
+            td.set_shape([None, prev.shape[1].value, self.ch_out])
+            print('tdshape set to {}'.format(td.get_shape()))
+        if self.nolu:
+            out = td + b
+        else:
+            out = tf.nn.elu(td + b) if self.elu else tf.nn.relu(td + b)
         return w,b,out,None,None
 
 class VisionNetwork:
@@ -431,7 +438,8 @@ class ConvApplier:
             naming=None,
             elu=False,
             gradb=False,
-            initialized_as_zero=False):
+            initialized_as_zero=False,
+            nolu_at_final=False):
         self.layer_configs = []
         self.elu = elu
         self.gradb = gradb
@@ -441,6 +449,8 @@ class ConvApplier:
         if featnums is not None:
             for featnum in featnums:
                 self.layer_configs.append(FCLayerConfig(featnum))
+            if nolu_at_final:
+                self.layer_configs[-1].nolu = True
         self.naming = naming
         if self.naming is not None:
             index = 0
