@@ -26,6 +26,7 @@ class Corridor(rlenv.IExperienceReplayEnvironment):
         self.egreedy = 0.5
         self.noerep = args.noerep
         self.die = args.die
+        self.debug = args.debug
 
     def qstate_setter(self, state):
         self.state = state
@@ -56,7 +57,8 @@ class Corridor(rlenv.IExperienceReplayEnvironment):
             ratio = 0.0
             reaching_terminal = self.die
         np.clip(nstate, -self.mag, self.mag, nstate)
-        print('> state {} action {} nstate {} r {}'.format(self.state, action, nstate, reward))
+        if self.debug:
+            print('> state {} action {} nstate {} r {}'.format(self.state, action, nstate, reward))
         return nstate, reward, reaching_terminal, ratio
 
     def reset(self):
@@ -117,6 +119,7 @@ class TabularRL(rlenv.IAdvantageCore):
 
         print('> Polout {} Valout {} Curiosity {}'.format(self.polout.shape, self.valout.shape, self.curiosity.shape))
         self.loss = None
+        self.debug = args.debug
 
     @property
     def softmax_policy(self):
@@ -165,7 +168,8 @@ class TabularRL(rlenv.IAdvantageCore):
             ret = random.randrange(self.action_space_dimension)
         else:
             ret = np.asscalar(best)
-        print('{}Action best {} chosen {}'.format(pprefix, best, ret))
+        if self.debug:
+            print('{}Action best {} chosen {}'.format(pprefix, best, ret))
         return ret
 
     def get_artificial_reward(self, envir, sess, state_1, adist, state_2, pprefix):

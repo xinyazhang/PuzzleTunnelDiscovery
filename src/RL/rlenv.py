@@ -243,6 +243,9 @@ class IAdvantageCore(object):
 
     @abstractmethod
     def build_loss(self):
+        '''
+        Return the interal loss function from a segment
+        '''
         pass
 
     '''
