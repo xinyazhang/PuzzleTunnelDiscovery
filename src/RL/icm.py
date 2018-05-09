@@ -35,7 +35,8 @@ class IntrinsicCuriosityModule:
             imhidden=[],
             fehidden=[1024,1024],
             fwhidden=[],
-            permuation_matrix=None):
+            permuation_matrix=None,
+            batch_normalization=None):
         print('! IntrinsicCuriosityModule')
         print('! ICM FEREV {}'.format(ferev))
         self.action_tensor = action_tensor
@@ -104,11 +105,13 @@ class IntrinsicCuriosityModule:
         elif ferev == 11:
             self.feature_extractor = vision.FeatureExtractorResNet(
                     config.SV_RESNET18,
-                    fehidden + [featnum], 'VisionNetRev11', elu)
+                    fehidden + [featnum], 'VisionNetRev11', elu,
+                    batch_normalization=batch_normalization)
         elif ferev == 12:
             self.feature_extractor = vision.FeatureExtractorResNet(
                     config.SV_RESNET18,
-                    fehidden + [featnum], 'VisionNetRev12', elu, gradb=True)
+                    fehidden + [featnum], 'VisionNetRev12', elu, gradb=True,
+                    batch_normalization=batch_normalization)
         '''
         featvec: shape [BATCH, VIEW, N]
         '''

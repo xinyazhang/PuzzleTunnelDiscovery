@@ -25,6 +25,7 @@ class VisionLayerConfig:
     res_type = RESIDUAL_NONE        # No residual
     gradb = False                   # bias with gradients
     initialized_as_zero = False     # Zero initial weights rather than randomized values
+    batch_normalization = None      # input of tf.layers.batch_normalization(training=)
 
     def __init__(self, ch_out, strides=[1, 2, 2, 1], kernel_size=[3,3], padding = 'SAME'):
         self.ch_out = ch_out
@@ -136,7 +137,11 @@ class VisionLayerConfig:
         if self.gradb:
             b = self.calc_gradb_tensor(b, int(conv.shape[-3]), int(conv.shape[-2]))
             print('CNN out shape {}'.format(conv.shape))
-        out = tf.nn.elu(conv + b) if self.elu else tf.nn.relu(conv + b)
+        luinput = conv + b
+        if self.batch_normalization is not None:
+            luinput = tf.layers.batch_normalization(luinput,
+                    training=self.batch_normalization)
+        out = tf.nn.elu(luinput) if self.elu else tf.nn.relu(luinput)
         if self.max_pooling_kernel_size is not None:
             ksize = [1, 1] + self.max_pooling_kernel_size + [1]
             strides = [1, 1] + self.max_pooling_strides + [1]
@@ -197,6 +202,7 @@ class FCLayerConfig:
     elu = False
     gradb = False
     initialized_as_zero = False
+    batch_normalization = None
 
     def __init__(self, ch_out):
         self.ch_out = ch_out
@@ -252,7 +258,11 @@ class FCLayerConfig:
         if self.nolu:
             out = td + b
         else:
-            out = tf.nn.elu(td + b) if self.elu else tf.nn.relu(td + b)
+            luinput = td + b
+            if self.batch_normalization is not None:
+                luinput = tf.layers.batch_normalization(luinput,
+                    training=self.batch_normalization)
+            out = tf.nn.elu(luinput) if self.elu else tf.nn.relu(luinput)
         return w,b,out,None,None
 
 class VisionNetwork:
@@ -439,7 +449,14 @@ class ConvApplier:
             elu=False,
             gradb=False,
             initialized_as_zero=False,
-            nolu_at_final=False):
+            nolu_at_final=False,
+            batch_normalization=None):
+        '''
+        batch_normalization should be
+         - None, disable batch_normalization
+         - Boolean Scalar Tensor, enable batch_normalization, and feed this
+           tensor to training= of tf.layers.batch_normalization
+        '''
         self.layer_configs = []
         self.elu = elu
         self.gradb = gradb
@@ -457,6 +474,7 @@ class ConvApplier:
             for conf in self.layer_configs:
                 conf.naming = "Layer_{}".format(index)
                 index += 1
+        self.batch_normalization = batch_normalization
         # print("== Init Len of layer_configs {}, confdict {}, featnums {}".format(len(self.layer_configs), confdict, featnums))
 
     def infer(self, input_tensor):
@@ -471,6 +489,7 @@ class ConvApplier:
             layer.elu = self.elu
             layer.gradb = self.gradb
             layer.initialized_as_zero = self.initialized_as_zero
+            layer.batch_normalization = self.batch_normalization
         nn_layer_tensor = [input_tensor]
         nn_args = []
         residual = None
@@ -744,8 +763,10 @@ class FeatureExtractorResNet:
             featnums,
             naming,
             elu,
-            gradb=False):
-        self.resnetrgbd = ConvApplier(cnnconf, featnums, "ResNet18RGBD", elu, gradb)
+            gradb=False,
+            batch_normalization=None):
+        self.resnetrgbd = ConvApplier(cnnconf, featnums, "ResNet18RGBD", elu, gradb,
+                batch_normalization=batch_normalization)
 
         self.naming = naming
 

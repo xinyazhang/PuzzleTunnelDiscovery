@@ -335,6 +335,7 @@ def pretrain_main(args):
         rgb_2 = tf.placeholder(tf.float32, shape=[None, view_num, w, h, 3])
         dep_1 = tf.placeholder(tf.float32, shape=[None, view_num, w, h, 1])
         dep_2 = tf.placeholder(tf.float32, shape=[None, view_num, w, h, 1])
+        bnorm = tf.placeholder(tf.bool, shape=()) if args.batchnorm else None
         if args.viewinitckpt:
             assert not args.sharedmultiview, "--viewinitckpt is incompatible with --sharedmultiview"
             model = icm.IntrinsicCuriosityModuleIndependentCommittee(action,
@@ -398,7 +399,8 @@ def pretrain_main(args):
                             ferev=args.ferev,
                             imhidden=args.imhidden,
                             fehidden=args.fehidden,
-                            permuation_matrix=pm)
+                            permuation_matrix=pm,
+                            batch_normalization=bnorm)
                     model.get_inverse_model()
         else:
             assert not args.sharedmultiview, "--committee is incompatible with --sharedmultiview"
@@ -425,7 +427,12 @@ def pretrain_main(args):
         predicts = tf.nn.softmax(predicts)
         loss = model.get_inverse_loss(discrete=True)
         if not args.eval:
-            train_op = optimizer.minimize(loss, global_step)
+            if bnorm is not None:
+              update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+              with tf.control_dependencies(update_ops):
+                train_op = optimizer.minimize(loss, global_step)
+            else:
+                train_op = optimizer.minimize(loss, global_step)
             tf.summary.scalar('loss', loss)
         if args.capture:
             tf.summary.image('input', tf.reshape(tf.slice(rgb_1, [0,0,0,0,0], [1, 1, w, h, 3]), [1, w, h, 3]), 1)
@@ -469,6 +476,8 @@ def pretrain_main(args):
                         dep_1: gt.dep_1,
                         dep_2: gt.dep_2
                       }
+                if bnorm is not None:
+                    dic.update({bnorm : not args.eval})
                 if MT_VERBOSE:
                     print('train with rgb_1 {}'.format(gt.rgb_1.shape))
                 batch_size = gt.actions.shape[0]

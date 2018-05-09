@@ -36,6 +36,9 @@ def get_parser():
     parser.add_argument('--batch', metavar='NUMBER',
             help='Batch size of each iteration in training, also serves as T_MAX in A3C/A2C algo.',
             type=int, default=32)
+    parser.add_argument('--batchnorm',
+            help='Enable Batch Normalization',
+            action='store_true')
     parser.add_argument('--samplebatching', metavar='NUMBER',
             help='Number of samples to aggregrate in training',
             type=int, default=1)
@@ -154,7 +157,7 @@ def get_parser():
     parser.add_argument('--visionformula',
             help='Load preset formulas for vision. Note this overrides other options',
             type=int,
-            choices=[1],
+            choices=[1,2],
             default=0)
     parser.add_argument('--agents',
             metavar='NUMBER',
@@ -175,7 +178,7 @@ def get_parser():
 def parse():
     parser = get_parser()
     args = parser.parse_args()
-    if args.visionformula == 1:
+    if args.visionformula in [1,2]:
         args.elu = True
         args.res = 224
         args.avi = True
@@ -184,4 +187,6 @@ def parse():
         args.sharedmultiview = True
         args.featnum = 256
         args.imhidden = [256, 256]
+    if args.visionformula == 2:
+        args.batchnorm = True
     return args
