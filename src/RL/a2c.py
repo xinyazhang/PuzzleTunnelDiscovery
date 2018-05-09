@@ -36,8 +36,10 @@ class A2CTrainer:
         self.optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
         LAMBDA = 0.5
         self.loss = LAMBDA * self.build_loss(advcore)
+        print("self.loss 1 {}".format(self.loss))
         tf.summary.scalar('a2c_loss', self.loss)
         self.loss += advcore.build_loss()
+        print("self.loss 2 {}".format(self.loss))
         '''
         Approach 1: Do not train Vision since we don't have reliable GT from RL procedure
         self.train_op = self.optimizer.minimize(self.loss,
@@ -76,8 +78,11 @@ class A2CTrainer:
                 name='ADistPh')
         '''
         self.Adist_tensor = advcore.action_tensor
+
         self.TD_tensor = tf.placeholder(tf.float32, shape=[None], name='TDPh')
         self.V_tensor = tf.placeholder(tf.float32, shape=[None], name='VPh')
+        # self.TD_tensor = tf.placeholder(tf.float32, shape=[None])
+        # self.V_tensor = tf.placeholder(tf.float32, shape=[None])
 
         policy = advcore.softmax_policy
         log_policy = tf.log(tf.clip_by_value(policy, 1e-20, 1.0))

@@ -12,7 +12,18 @@ kEnableActionCalculation = True
 def interpolate(pkey, nkey, tau):
     return pyosr.interpolate(pkey, nkey, tau)
 
-def reanimate(gtfn, pathfn, swap):
+def partition(key0, key1, thresh):
+    d = pyosr.distance(key0, key1)
+    print("{}\n {}\n\tdist: {}".format(key0, key1, d))
+    if d < thresh:
+        return []
+    mid = interpolate(key0, key1, 0.5)
+    print("\t\tmid: {}".format(mid))
+    firstlist = partition(key0, mid, thresh)
+    secondlist = partition(mid, key1, thresh)
+    return firstlist + [mid] + secondlist
+
+def reanimate(gtfn, pathfn, swap, cachedir,interpthresh=0):
     pyosr.init()
     dpy = pyosr.create_display()
     glctx = pyosr.create_gl_context(dpy)
@@ -84,7 +95,7 @@ def reanimate(gtfn, pathfn, swap):
                 print("distance to next: {} Closer? {}".format(d, d < mag))
             return
             '''
-            fn = 'blend-traj-16k/{}.npz'.format(self.st_index)
+            fn = '{}/{}.npz'.format(cachedir, self.st_index)
             if not os.path.isfile(fn):
                 tup = self.gt.project_trajectory(self.state, keys[self.st_index + 1])
                 self.exp_st = tup[0]
@@ -154,8 +165,21 @@ def reanimate(gtfn, pathfn, swap):
     fig = plt.figure()
     keys = np.loadtxt(pathfn)
     if swap:
+        '''
+        Transpose W-Last data into W-First format
+        '''
         keys[:, [3,4,5,6]] = keys[:,[6,3,4,5]]
-    ra = ExpandingReAnimator(r, gt, keys, 1024)
+    if interpthresh > 0:
+        ikeys = [keys[0]]
+        for key in keys[1:]:
+            print("Partition {}\n{}".format(ikeys[-1], key))
+            inodes = partition(ikeys[-1], key, interpthresh)
+            ikeys += inodes
+            ikeys.append(key)
+        ikeys = np.array(ikeys)
+        print("Using: {}".format(ikeys))
+        print("Total nodes: {}".format(len(ikeys)))
+    ra = ExpandingReAnimator(r, gt, keys)
     ani = animation.FuncAnimation(fig, ra.perform)
     plt.show()
 
@@ -163,5 +187,10 @@ def usage():
     print("rl-reanimator.py <preprocessed ground truth file>")
 
 if __name__ == '__main__':
+    np.set_printoptions(linewidth=240)
     # reanimate('blend-low.gt.npz', 'blend.path', swap=False)
-    reanimate('blend-low.gt.npz', 'rrt.path', swap=True)
+    # reanimate('blend-low.gt.npz', 'rrt.path', swap=True, cachedir='blend-traj-16k')
+    # reanimate('blend-low.gt.npz', 'rrt-secondhalf.path', swap=True, cachedir='blend-traj-secondhalf-parted', interpthresh=4.0)
+    # reanimate('blend-low.gt.npz', 'ver1.2.path', swap=True, cachedir='ver1.2-traj')
+    #reanimate('blend-low.gt.npz', '../res/alpha/alpha-1.2.org.path', swap=True, cachedir='classical-traj')
+    reanimate('blend-low.gt.npz', '../res/alpha/alpha-1.2.org.path', swap=True, cachedir='classical-traj-parted', interpthresh=1.0)

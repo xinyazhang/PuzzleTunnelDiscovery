@@ -20,11 +20,12 @@ def reanimate():
     r.scaleToUnit()
     r.angleModel(0.0, 0.0)
     r.default_depth = 0.0
-    r.views = np.array([[15.0, 110.0]], dtype=np.float32)
+    # r.views = np.array([[15.0, 110.0]], dtype=np.float32)
+    r.views = np.array([[0.0, 0.0]], dtype=np.float32)
     print(r.scene_matrix)
     print(r.robot_matrix)
     # r.set_perturbation(uw_random.random_state(0.00))
-    r.set_perturbation(uw_random.random_state(0.25))
+    # r.set_perturbation(uw_random.random_state(0.25))
     # r.set_perturbation(np.array([0,0.0,0,0.5,0.5,0.5,0.5],dtype=np.float32))
     # r.set_perturbation(np.array([0,0.0,0,0,0,1,0],dtype=np.float32))
     # return
@@ -50,9 +51,9 @@ def reanimate():
                 pkey = self.keys[index]
                 nkey = self.keys[nindex]
                 tau = self.t - index
-                print("tau {}".format(tau))
                 state = interpolate(pkey, nkey, tau)
                 r.state = r.translate_to_unit_state(state)
+                print("tau {} TO NKEY {}".format(tau, pyosr.distance(r.state, r.translate_to_unit_state(nkey))))
                 r.render_mvrgbd()
                 print(r.mvrgb.shape)
                 rgb = r.mvrgb.reshape((r.pbufferWidth, r.pbufferHeight, 3))
@@ -71,12 +72,15 @@ def reanimate():
                 self.t += self.delta
 
     fig = plt.figure()
-    keys = np.loadtxt(aniconf.keys_fn)
-    if aniconf.keys_w_last:
+    # keys = np.loadtxt(aniconf.keys_fn)
+    keys = np.loadtxt('rrt-secondhalf.path')
+    #if aniconf.keys_w_last:
+    if True:
         print('before keys[0] {}'.format(keys[0]))
         keys[:, [3,4,5,6]] = keys[:,[6,3,4,5]]
         print('after keys[0] {}'.format(keys[0]))
-    ra = ReAnimator(r, keys, 1.0)
+    # ra = ReAnimator(r, keys, 1.0)
+    ra = ReAnimator(r, keys, 0.0625)
     '''
     st0 = np.array([21.782108575648873,11.070742691783639,13.072090341969885,0.99496368307688909,-0.050573680994590003,0.08255004745739393,0.025981951687884433], dtype=np.float64)
     st1 = np.array([24.404447383193428,16.614281021136808,17.241012748680941,0.89856334412742611,-0.42392368380753659,0.035352511370216902,0.10780921499298371], dtype=np.float64)

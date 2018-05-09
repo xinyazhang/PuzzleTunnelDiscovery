@@ -16,5 +16,5 @@ class ReAnimator(object):
 def reanimate(generator):
     ra = ReAnimator()
     fig = plt.figure()
-    ani = animation.FuncAnimation(fig, ra.perform, frames=generator)
+    ani = animation.FuncAnimation(fig, ra.perform, frames=generator, repeat=False)
     plt.show()
