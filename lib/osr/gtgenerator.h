@@ -54,7 +54,8 @@ public:
 	std::tuple<ArrayOfStates, Eigen::VectorXi>
 	projectTrajectory(const StateVector& from,
 	                  const StateVector& to,
-	                  int max_steps = -1);
+	                  int max_steps = -1,
+	                  bool in_unit = true);
 
 	/*
 	 * Returns array of translation, array of axis angle rotations, and
@@ -103,6 +104,9 @@ private:
 	 * 
 	 * Returns the final state since it is usually not possible to get
 	 * "to" accuractly.
+	 * 
+	 * choose_in_unit: use the closest point in unit world (true) or
+	 *                 original world (false)
 	 */
 	StateVector castTrajectory(const StateVector& from,
 	                           const StateVector& to,
@@ -110,7 +114,8 @@ private:
 	                           std::vector<int>& actions,
 	                           int max_steps,
 	                           Progress* = nullptr,
-	                           bool for_rl = true);
+	                           bool for_rl = true,
+	                           bool choose_in_unit = true);
 };
 
 }

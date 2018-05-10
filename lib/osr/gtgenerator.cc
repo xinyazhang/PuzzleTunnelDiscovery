@@ -463,7 +463,8 @@ GTGenerator::generateGTPath(const StateVector& init_state,
 std::tuple<ArrayOfStates, Eigen::VectorXi>
 GTGenerator::projectTrajectory(const StateVector& from,
 	                       const StateVector& to,
-	                       int max_steps)
+	                       int max_steps,
+	                       bool in_unit)
 {
 	std::vector<StateVector> states;
 	std::vector<int> actions;
@@ -471,7 +472,10 @@ GTGenerator::projectTrajectory(const StateVector& from,
 	               to,
 	               states,
 	               actions,
-	               max_steps);
+	               max_steps,
+	               nullptr,
+	               true,
+	               in_unit);
 	ArrayOfStates ret_states;
 	ret_states.resize(states.size(), Eigen::NoChange);
 	for (size_t i = 0; i < states.size(); i++)
@@ -558,7 +562,8 @@ GTGenerator::castTrajectory(const StateVector& from,
 			    std::vector<int>& actions,
 			    int max_steps,
 			    Progress* prog,
-			    bool for_rl)
+			    bool for_rl,
+			    bool choose_in_unit)
 {
 	if (!for_rl) {
 		/* W/O CD */
@@ -576,6 +581,9 @@ GTGenerator::castTrajectory(const StateVector& from,
 			  << std::endl;
 		if (unit_distance < rl_stepping_size)
 			break;
+		// dists: store the distance to the goal state
+		//        Note the distance is measured in original state
+		//        space if choose_in_unit is false.
 		Eigen::VectorXd dists(kTotalNumberOfActions);
 		Eigen::VectorXd ratios(kTotalNumberOfActions);
 		// Eigen::VectorXi valids(kTotalNumberOfActions);
@@ -593,7 +601,12 @@ GTGenerator::castTrajectory(const StateVector& from,
 				dists(i) = 1000.0;
 				continue;
 			}
-			dists(i) = distance(std::get<0>(tup), unit_to);
+			if (choose_in_unit) {
+				dists(i) = distance(std::get<0>(tup), unit_to);
+			} else {
+				auto next = uw_.translateFromUnitState(std::get<0>(tup));
+				dists(i) = distance(next, to);
+			}
 			nexts.row(i) = std::get<0>(tup);
 			// valids(i) = uw_.isValid(nexts.row(i));
 		}
@@ -608,14 +621,19 @@ GTGenerator::castTrajectory(const StateVector& from,
 			std::cerr << dists << std::endl;
 			throw std::runtime_error("SAN CHECK FAILED: TRAPPED");
 		}
+		double udist;
+		if (choose_in_unit)
+			udist = dists(action);
+		else
+			udist = distance(nexts.row(action), unit_to);
 		// if (distance(nexts.row(action), to) > distance(current, to)) {
-		if (dists(action) > unit_distance) {
+		if (udist > unit_distance) {
 			std::cerr << "SAN CHECK 1/1D6: CANNOT CONVERGE INTO STEPPING SIZE\n";
 			// std::cerr << "\tCURRENT: " << distance(current, to);
 			// std::cerr << "\n\tNEXT: " << distance(nexts.row(action), to) << '\n';
 			std::cerr << "\tCURRENT: " << unit_distance;
 			std::cerr << "\n\tNEXT: " << dists(action) << '\n';
-			break;
+			throw std::runtime_error("SAN CHECK FAILED: DIVERGED");
 		}
 		actions.emplace_back(action);
 		unit_current = nexts.row(action);

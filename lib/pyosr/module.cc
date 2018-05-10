@@ -131,7 +131,9 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("project_trajectory", &GTGenerator::projectTrajectory,
 		     py::arg("from"),
 		     py::arg("to"),
-		     py::arg("max_steps") = -1)
+		     py::arg("max_steps") = -1,
+		     py::arg("in_unit") = true
+		     )
 		.def_readwrite("verify_magnitude", &GTGenerator::verify_magnitude)
 		.def_readwrite("gamma", &GTGenerator::gamma)
 		.def_readwrite("rl_stepping_size", &GTGenerator::rl_stepping_size)

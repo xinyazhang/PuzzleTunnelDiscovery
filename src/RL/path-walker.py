@@ -23,7 +23,7 @@ def partition(key0, key1, thresh):
     secondlist = partition(mid, key1, thresh)
     return firstlist + [mid] + secondlist
 
-def reanimate(gtfn, pathfn, swap, cachedir,interpthresh=0):
+def reanimate(gtfn, pathfn, swap, cachedir,interpthresh=0,in_unit=True):
     pyosr.init()
     dpy = pyosr.create_display()
     glctx = pyosr.create_gl_context(dpy)
@@ -97,7 +97,7 @@ def reanimate(gtfn, pathfn, swap, cachedir,interpthresh=0):
             '''
             fn = '{}/{}.npz'.format(cachedir, self.st_index)
             if not os.path.isfile(fn):
-                tup = self.gt.project_trajectory(self.state, keys[self.st_index + 1])
+                tup = self.gt.project_trajectory(self.state, keys[self.st_index + 1],in_unit=in_unit)
                 self.exp_st = tup[0]
                 if self.exp_st.shape[0] > 0:
                     self.state = self.exp_st[-1]
@@ -193,4 +193,5 @@ if __name__ == '__main__':
     # reanimate('blend-low.gt.npz', 'rrt-secondhalf.path', swap=True, cachedir='blend-traj-secondhalf-parted', interpthresh=4.0)
     # reanimate('blend-low.gt.npz', 'ver1.2.path', swap=True, cachedir='ver1.2-traj')
     #reanimate('blend-low.gt.npz', '../res/alpha/alpha-1.2.org.path', swap=True, cachedir='classical-traj')
-    reanimate('blend-low.gt.npz', '../res/alpha/alpha-1.2.org.path', swap=True, cachedir='classical-traj-parted', interpthresh=1.0)
+    #reanimate('blend-low.gt.npz', '../res/alpha/alpha-1.2.org.path', swap=True, cachedir='classical-traj-parted', interpthresh=1.0)
+    reanimate('blend-low.gt.npz', '../res/alpha/alpha-1.2.org.path', swap=True, cachedir='classical-traj-parted-nonunitmeasure', interpthresh=1.0,in_unit=False)
