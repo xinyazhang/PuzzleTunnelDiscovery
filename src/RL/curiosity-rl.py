@@ -171,11 +171,12 @@ class CuriosityRL(rlenv.IAdvantageCore):
     action_magnitude = None
     verify_magnitude = None
 
-    def __init__(self, learning_rate, args):
+    def __init__(self, learning_rate, args, batch_normalization=None):
         super(CuriosityRL, self).__init__()
         self.view_num, self.views = _get_view_cfg(args)
         w = h = args.res
         self.args = args
+        self.batch_normalization = batch_normalization
 
         self.action_space_dimension = uw_random.DISCRETE_ACTION_NUMBER
         self.action_tensor = tf.placeholder(tf.float32, shape=[None, 1, self.action_space_dimension], name='ActionPh')
@@ -185,6 +186,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
         self.dep_2_tensor = tf.placeholder(tf.float32, shape=[None, self.view_num, w, h, 1], name='Dep2Ph')
 
         if self.view_num > 1 and not args.sharedmultiview:
+            assert False,"Deprecated Code Path, Check Your Arguments"
             self.model = icm.IntrinsicCuriosityModuleIndependentCommittee(self.action_tensor,
                     self.rgb_1_tensor, self.dep_1_tensor,
                     self.rgb_2_tensor, self.dep_2_tensor,
@@ -211,7 +213,8 @@ class CuriosityRL(rlenv.IAdvantageCore):
                         imhidden=args.imhidden,
                         fehidden=args.fehidden,
                         fwhidden=args.fwhidden,
-                        permuation_matrix=pm)
+                        permuation_matrix=pm,
+                        batch_normalization=batch_normalization)
                 self.model.get_inverse_model()
 
         self.polout, self.polparams, self.polnets = self.create_polnet(args)
@@ -231,7 +234,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
                     np.zeros([1, self.model.lstmsize], dtype=np.float32),
                     np.zeros([1, self.model.lstmsize], dtype=np.float32))
             print("[LSTM] {}".format(self.lstm_states_in.c))
-        self.optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
+        # self.optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
         self.loss = None
         # self.refine_vision_and_memory_op = self.optimizer.minimize(var_list = self.curiosity_params)
 
@@ -247,14 +250,18 @@ class CuriosityRL(rlenv.IAdvantageCore):
         return self.model.create_somenet_from_feature(hidden, 'PolNet',
                 elu=args.elu,
                 lstm=args.lstm,
-                initialized_as_zero=False)
+                initialized_as_zero=False,
+                nolu_at_final=True,
+                batch_normalization=batch_normalization)
 
     def create_valnet(self, args):
         hidden = args.valhidden + [1]
         return self.model.create_somenet_from_feature(hidden, 'ValNet',
                 elu=args.elu,
                 lstm=args.lstm,
-                initialized_as_zero=False)
+                initialized_as_zero=False,
+                nolu_at_final=True,
+                batch_normalization=batch_normalization)
 
     def create_curiosity_net(self, args):
         fwd_params, fwd_feat = self.model.get_forward_model(args.jointfw)
@@ -311,6 +318,8 @@ class CuriosityRL(rlenv.IAdvantageCore):
                 self.rgb_1 : rgbs,
                 self.dep_1 : deps
               }
+        if self.batch_normalization is not None:
+            dic[self.batch_normalization] = False
         if additional_dict is not None:
             dic.update(additional_dict)
         if not self.using_lstm:
@@ -337,6 +346,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
         return ret
 
     def get_artificial_reward(self, envir, sess, state_1, adist, state_2, pprefix=""):
+        # TODO: re-implement this with get_artificial_from_experience
         envir.qstate = state_1
         vs1 = envir.vstate
         envir.qstate = state_2
@@ -348,6 +358,8 @@ class CuriosityRL(rlenv.IAdvantageCore):
                 self.rgb_2 : [vs2[0]],
                 self.dep_2 : [vs2[1]],
               }
+        if self.batch_normalization is not None:
+            dic[self.batch_normalization] = False
         '''
         self.curiosity now becomes [None] tensor rather than scalar
         '''
@@ -373,11 +385,13 @@ class CuriosityRL(rlenv.IAdvantageCore):
                 self.rgb_2 : rgbs[1:],
                 self.dep_2 : deps[1:],
               }
+        if self.batch_normalization is not None:
+            dic[self.batch_normalization] = False
         ret = sess.run(self.curiosity, feed_dict=dic)
         return ret
 
     def train(self, sess, rgb, dep, actions):
-        raise "Deprecated buggy function"
+        assert False, "Deprecated buggy function"
         dic = {
                 self.action_tensor : actions,
                 self.rgb_1 : rgb[:-1],
@@ -422,16 +436,18 @@ class TrainerMT:
     kSyncTask = 2
     kExitTask = -1
 
-    def __init__(self, args, g, global_step):
+    def __init__(self, args, g, global_step, batch_normalization):
         if len(args.egreedy) != 1 and len(args.egreedy) != args.threads:
             print("--egreedy should have only one argument, or match the number of threads")
         self.args = args
-        self.advcore = CuriosityRL(learning_rate=1e-3, args=args)
+        self.advcore = CuriosityRL(learning_rate=1e-3, args=args,
+                                   batch_normalization=batch_normalization)
         self.tfgraph = g
         self.threads = []
         self.taskQ = queue.Queue(args.queuemax)
         self.sessQ = queue.Queue(args.queuemax)
         self.reportQ = queue.Queue(args.queuemax)
+        self.bnorm = batch_normalization
         self.trainer = a2c.A2CTrainer(
                 advcore=self.advcore,
                 tmax=args.batch,
@@ -439,7 +455,9 @@ class TrainerMT:
                 gamma=0.5,
                 learning_rate=1e-6,
                 ckpt_dir=args.ckptdir,
-                global_step=global_step)
+                global_step=global_step,
+                batch_normalization=self.bnorm,
+                period=args.period)
         assert not (self.advcore.using_lstm and self.trainer.erep_sample_cap > 0), "CuriosityRL does not support Experience Replay with LSTM"
         for i in range(args.threads):
             thread = threading.Thread(target=self.run_worker, args=(i,g))
@@ -568,8 +586,9 @@ def curiosity_main(args):
                 learning_rate=1e-3,
                 global_step=global_step)
         '''
+        bnorm = tf.placeholder(tf.bool, shape=()) if args.batchnorm else None
         if not args.eval:
-            trainer = TrainerMT(args, g, global_step)
+            trainer = TrainerMT(args, g, global_step, batch_normalization=bnorm)
         else:
             player = PolicyPlayer(args, g, global_step)
 

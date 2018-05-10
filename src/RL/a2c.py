@@ -21,8 +21,9 @@ class A2CTrainer:
             ckpt_dir,
             global_step=None,
             entropy_beta=0.01,
-            erep_cap = -1,
-            debug = True
+            debug=True,
+            batch_normalization=None,
+            period=1
             ):
         self.advcore = advcore
         self.a2c_tmax = tmax
@@ -30,10 +31,13 @@ class A2CTrainer:
         self.entropy_beta = entropy_beta
         self.debug = debug
         self.action_space_dimension = int(advcore.policy.shape[-1])
+        self.batch_normalization = batch_normalization
         '''
         Create the optimizers to train the AdvCore
         '''
         self.optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
+        if period > 1:
+            self.optimizer = tf.train.SyncReplicasOptimizer(self.optimizer, replicas_to_aggregate=period)
         LAMBDA = 0.5
         self.loss = LAMBDA * self.build_loss(advcore)
         print("self.loss 1 {}".format(self.loss))
@@ -49,7 +53,12 @@ class A2CTrainer:
         '''
         Approach 2: Train everything
         '''
-        self.train_op = self.optimizer.minimize(self.loss, global_step=global_step)
+        if batch_normalization is not None:
+            update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+            with tf.control_dependencies(update_ops):
+                self.train_op = self.optimizer.minimize(self.loss, global_step=global_step)
+        else:
+            self.train_op = self.optimizer.minimize(self.loss, global_step=global_step)
         if ckpt_dir is not None:
             self.summary_op = tf.summary.merge_all()
             self.train_writer = tf.summary.FileWriter(ckpt_dir + '/summary', tf.get_default_graph())
@@ -247,6 +256,8 @@ class A2CTrainer:
                 self.TD_tensor: batch_td,
                 self.V_tensor: batch_V
               }
+        if self.batch_normalization is not None:
+            dic[self.batch_normalization] = True
         if advcore.using_lstm:
             dic.update({
                 advcore.lstm_states_in.c : advcore.current_lstm.c,

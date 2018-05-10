@@ -428,9 +428,9 @@ def pretrain_main(args):
         loss = model.get_inverse_loss(discrete=True)
         if not args.eval:
             if bnorm is not None:
-              update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-              with tf.control_dependencies(update_ops):
-                train_op = optimizer.minimize(loss, global_step)
+                update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+                with tf.control_dependencies(update_ops):
+                    train_op = optimizer.minimize(loss, global_step)
             else:
                 train_op = optimizer.minimize(loss, global_step)
             tf.summary.scalar('loss', loss)

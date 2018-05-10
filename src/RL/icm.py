@@ -269,7 +269,10 @@ class IntrinsicCuriosityModule:
     class LSTMCache:
         pass
 
-    def create_somenet_from_feature(self, hidden, netname, elu, lstm, initialized_as_zero=False):
+    def create_somenet_from_feature(self, hidden, netname, elu, lstm,
+            initialized_as_zero=False,
+            nolu_at_final=False,
+            batch_normalization=None):
         # featvec = self.cur_featvec
         '''
         Note flattened multi-view feature vector [B, 1, F*V] should be used
@@ -277,7 +280,10 @@ class IntrinsicCuriosityModule:
         featvec = self.cur_mvfeatvec
         if lstm is True:
             featvec = self.get_lstm_featvec('LSTM', featvec)
-        net = vision.ConvApplier(None, hidden, netname, elu, initialized_as_zero=initialized_as_zero)
+        net = vision.ConvApplier(None, hidden, netname, elu,
+                initialized_as_zero=initialized_as_zero,
+                nolu_at_final=nolu_at_final,
+                batch_normalization=batch_normalization)
         _, out = net.infer(featvec)
         '''
         TODO: Check if this returns LSTM as well (probably not)
