@@ -47,6 +47,7 @@ class IntrinsicCuriosityModule:
         self.pretrain_saver = None
         self.pm = permuation_matrix
         self.view_num = int(rgb_tensor.shape[1])
+        self.batch_normalization = batch_normalization
         '''
         pm_tensor: shape [VIEW, ACTION, ACTION]
         '''
@@ -220,7 +221,7 @@ class IntrinsicCuriosityModule:
         else:
             featnums += [output_fn]
         featvec_plus_action = tf.concat([atensor, input_featvec], 2)
-        self.forward_fc_applier = vision.ConvApplier(None, featnums, name, self.elu)
+        self.forward_fc_applier = vision.ConvApplier(None, featnums, name, self.elu, nolu_at_final=True)
         # FIXME: ConvApplier.infer returns tuples, which is unsuitable for Optimizer
         params, out = self.forward_fc_applier.infer(featvec_plus_action)
         if jointfw:

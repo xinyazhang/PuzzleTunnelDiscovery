@@ -280,9 +280,10 @@ class CuriosityRL(rlenv.IAdvantageCore):
             # Re-use get_forward_model to generate the ratio prediction
             ratio_params, ratio_out = self.model.get_forward_model(args.jointfw, output_fn=1)
             mean_ratios = tf.reduce_mean(ratio_out, axis=[1,2])
+            sigmoid_ratios = tf.sigmoid(mean_ratios)
             print(">> ratios {}".format(self.ratios_tensor.shape))
             print(">> mean_ratios {}".format(mean_ratios.shape))
-            curiosity = tf.squared_difference(mean_ratios, self.ratios_tensor)
+            curiosity = tf.squared_difference(sigmoid_ratios, self.ratios_tensor)
         else:
             assert False, "Unknown curiosity_type {}".format(args.curiosity_type)
         print(">> curiosity {}".format(curiosity.shape))
