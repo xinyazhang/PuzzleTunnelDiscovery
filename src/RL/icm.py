@@ -193,7 +193,7 @@ class IntrinsicCuriosityModule:
         self.inverse_output_tensor = self.vote(out)
         return params, out
 
-    def get_forward_model(self, jointfw=False):
+    def get_forward_model(self, jointfw=False, output_fn=-1):
         if self.forward_output_tensor is not None:
             return self.forward_model_params, self.forward_output_tensor
         '''
@@ -207,10 +207,18 @@ class IntrinsicCuriosityModule:
             atensor = self.action_tensor
             name = 'JointForwardModelNet'
         else:
+            '''
+            Without --jointfw, get_local_action would generate action in local
+            coord. sys. and then get_forward_model() predicts each view individually
+            '''
             atensor = self.get_local_action(self.action_tensor)
             input_featvec = self.cur_featvec
             name = 'ForwardModelNet'
-        featnums = self.fwhidden_params + [int(input_featvec.shape[-1])]
+        featnums = self.fwhidden_params
+        if output_fn <= 0:
+            featnums += [int(input_featvec.shape[-1])]
+        else:
+            featnums += [output_fn]
         featvec_plus_action = tf.concat([atensor, input_featvec], 2)
         self.forward_fc_applier = vision.ConvApplier(None, featnums, name, self.elu)
         # FIXME: ConvApplier.infer returns tuples, which is unsuitable for Optimizer

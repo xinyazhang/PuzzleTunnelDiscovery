@@ -220,14 +220,18 @@ class IAdvantageCore(object):
     Return the artificial reward
     '''
     @abstractmethod
-    def get_artificial_reward(self, envir, sess, state_1, adist, state_2):
+    def get_artificial_reward(self, envir, sess, state_1, action, state_2, ratio, pprefix):
         pass
 
     '''
     Return the artificial reward
     '''
     @abstractmethod
-    def get_artificial_from_experience(self, sess, vstates, action_performed):
+    def get_artificial_from_experience(self, sess, vstates, actions, ratios):
+        pass
+
+    @abstractmethod
+    def get_artificial_rewards(self, envir, sess, qstates, actions, ratios):
         pass
 
     '''

@@ -158,10 +158,8 @@ class A2CTrainer:
             nstate,reward,reaching_terminal,ratio = envir.peek_act(action, pprefix=pprefix)
             actual_rewards.append(reward)
             # print("action peeked {} ratio {} terminal? {}".format(nstate, ratio, reaching_terminal))
-            adist = np.zeros(shape=(self.action_space_dimension),
-                    dtype=np.float32)
-            adist[action] = 1.0
-            reward += advcore.get_artificial_reward(envir, sess, envir.qstate, adist, nstate, pprefix)
+            reward += advcore.get_artificial_reward(envir, sess,
+                    envir.qstate, action, nstate, ratio, pprefix)
             combined_rewards.append(reward)
             '''
             Store Exprience

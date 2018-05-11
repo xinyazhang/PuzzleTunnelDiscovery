@@ -223,6 +223,8 @@ class CuriosityRL(rlenv.IAdvantageCore):
         valout ranges from -2 COLLIDE_PEN_MAG to + inf
         '''
         self.valout = self.valout * (COLLIDE_PEN_MAG * 2.0)
+        if args.curiosity_type == 2:
+            self.ratios_tensor = tf.placeholder(tf.float32, shape=[None], name='RatioPh')
         self.curiosity, self.curiosity_params = self.create_curiosity_net(args)
         print('Curiosity Params: {}'.format(self.curiosity_params))
 
@@ -264,15 +266,25 @@ class CuriosityRL(rlenv.IAdvantageCore):
                 batch_normalization=batch_normalization)
 
     def create_curiosity_net(self, args):
-        fwd_params, fwd_feat = self.model.get_forward_model(args.jointfw)
         '''
         Note: we need to train the curiosity model as memory, so tf.losses is used.
         '''
         # curiosity = tf.metrics.mean_squared_error(fwd_feat, self.model.next_featvec)
-        curiosity = tf.reduce_mean(tf.squared_difference(fwd_feat, self.model.next_featvec),
-                                   axis=[1,2])
-        print(">> FWD_FEAT {}".format(fwd_feat.shape))
-        print(">> next_featvec {}".format(self.model.next_featvec.shape))
+        if args.curiosity_type == 1:
+            fwd_params, fwd_feat = self.model.get_forward_model(args.jointfw)
+            curiosity = tf.reduce_mean(tf.squared_difference(fwd_feat, self.model.next_featvec),
+                                       axis=[1,2])
+            print(">> FWD_FEAT {}".format(fwd_feat.shape))
+            print(">> next_featvec {}".format(self.model.next_featvec.shape))
+        elif args.curiosity_type == 2:
+            # Re-use get_forward_model to generate the ratio prediction
+            ratio_params, ratio_out = self.model.get_forward_model(args.jointfw, output_fn=1)
+            mean_ratios = tf.reduce_mean(ratio_out, axis=[1,2])
+            print(">> ratios {}".format(self.ratios_tensor.shape))
+            print(">> mean_ratios {}".format(mean_ratios.shape))
+            curiosity = tf.squared_difference(mean_ratios, self.ratios_tensor)
+        else:
+            assert False, "Unknown curiosity_type {}".format(args.curiosity_type)
         print(">> curiosity {}".format(curiosity.shape))
         return curiosity, fwd_params
 
@@ -345,12 +357,13 @@ class CuriosityRL(rlenv.IAdvantageCore):
         print(pprefix, 'Action best {} chosen {}'.format(best, ret))
         return ret
 
-    def get_artificial_reward(self, envir, sess, state_1, adist, state_2, pprefix=""):
-        # TODO: re-implement this with get_artificial_from_experience
+    def get_artificial_reward(self, envir, sess, state_1, action, state_2, ratio, pprefix=""):
         envir.qstate = state_1
         vs1 = envir.vstate
         envir.qstate = state_2
         vs2 = envir.vstate
+        return self.get_artificial_from_experience(envir, sess, [vs1,vs2], [action], [ratio], pprefix)[0]
+        # TODO: Remove the following piece
         dic = {
                 self.action_tensor : [[adist]], # Expand from [12] (A only) to [1,1,12] ([F,V,A])
                 self.rgb_1 : [vs1[0]],
@@ -368,7 +381,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
         print(pprefix, "AR Input adist {} vs1 {} {} vs2 {} {}".format(adist, vs1[0].shape, vs1[1].shape, vs2[0].shape, vs2[1].shape))
         return ret
 
-    def get_artificial_from_experience(self, sess, vstates, actions):
+    def get_artificial_from_experience(self, sess, vstates, actions, ratios, pprefix):
         adists_array = []
         for ai in actions:
             adist = np.zeros(shape=(1, self.action_space_dimension),
@@ -387,6 +400,8 @@ class CuriosityRL(rlenv.IAdvantageCore):
               }
         if self.batch_normalization is not None:
             dic[self.batch_normalization] = False
+        if self.args.curiosity_type == 2:
+            dic[self.ratios_tensor] = ratios
         ret = sess.run(self.curiosity, feed_dict=dic)
         return ret
 
