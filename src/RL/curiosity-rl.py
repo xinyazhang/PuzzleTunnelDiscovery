@@ -219,10 +219,6 @@ class CuriosityRL(rlenv.IAdvantageCore):
 
         self.polout, self.polparams, self.polnets = self.create_polnet(args)
         self.valout, self.valparams, self.valnets = self.create_valnet(args)
-        '''
-        valout ranges from -2 COLLIDE_PEN_MAG to + inf
-        '''
-        self.valout = self.valout * (COLLIDE_PEN_MAG * 2.0)
         if args.curiosity_type == 2:
             self.ratios_tensor = tf.placeholder(tf.float32, shape=[None], name='RatioPh')
         else:
