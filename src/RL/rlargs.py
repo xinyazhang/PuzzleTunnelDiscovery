@@ -176,11 +176,13 @@ def get_parser():
             help='Use the joint all views as the input of forward model',
             action='store_true')
     parser.add_argument('--curiosity_type',
-            help='Select type of curiosity. 1: Curiosity from mean squared error of feature vectors;
-            2: Curiosity from the squared for ratios',
+            help='Select type of curiosity. 1: Curiosity from mean squared error of feature vectors; 2: Curiosity from the squared for ratios',
             type=int,
             choices=[1,2],
             default=1)
+    parser.add_argument('--qlearning_with_gt',
+            help='Train the ValNet with Ground Truth from RRT',
+            action='store_true')
 
     return parser
 

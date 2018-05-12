@@ -67,44 +67,55 @@ class IExperienceReplayEnvironment(IEnvironment):
         super(IExperienceReplayEnvironment, self).__init__()
         self.tmax = tmax
         self.erep_sample_cap = erep_cap * tmax
-        self.erep_actions = deque()
         self.erep_states = deque()
+        self.erep_actions = deque()
+        self.erep_ratios = deque()
         self.erep_reward = deque()
         self.erep_term = deque()
-        self.erep_all_deques = [self.erep_actions, self.erep_states,
-                self.erep_reward, self.erep_term]
+        self.erep_all_deques = (self.erep_states, self.erep_actions,
+                self.erep_ratios,
+                self.erep_reward, self.erep_term)
         '''
-        Actionn State Reward Queues
+        State Action raTio Reward Queues
         '''
-        self.erep_asr_deques = [self.erep_actions, self.erep_states, self.erep_reward]
+        self.erep_satr_deques = (self.erep_states, self.erep_actions,
+                self.erep_ratios, self.erep_reward)
 
     '''
     Store Experience REPlay
     '''
-    def store_erep(self, action, state, reward, reaching_terminal):
+    def store_erep(self, state, action, ratio, reward, reaching_terminal):
         if self.erep_sample_cap <= 0:
             return
         while len(self.erep_actions) >= self.erep_sample_cap:
             [q.popleft() for q in self.erep_all_deques]
-        self.erep_actions.append(action)
         self.erep_states.append(state)
+        self.erep_actions.append(action)
+        self.erep_ratios.append(ratio)
         self.erep_reward.append(reward)
         self.erep_term.append(reaching_terminal)
 
     def sample_in_erep(self, pprefix):
+        if self.erep_sample_cap <= 0:
+            return [],[],[],[],False
         # FIXME: Handle terminal in the cache
         cached_samples = len(self.erep_actions)
         size = min(cached_samples, self.tmax)
         start = random.randrange(-size + 1, cached_samples)
         pick_start = max(start, 0)
         pick_end = min(start + size, cached_samples)
-        a,s,r = [list(itertools.islice(q, pick_start, pick_end)) for q in self.erep_asr_deques]
+        s,a,t,r = (list(itertools.islice(q, pick_start, pick_end)) for q in self.erep_satr_deques)
         '''
         Number of actions = Number of States - 1
+        So the last element of ATR was trimmed
+        Otherwise we have no final state after the last action
         '''
         a=a[:-1]
+        t=t[:-1]
         r=r[:-1]
-        return a,s,r,self.erep_term[pick_end-1]
+        if len(a) > 0:
+            assert a[-1] >= 0 and self.erep_term[pick_end-1] == False, "State without valid action was picked up"
+        return s,a,t,r,self.erep_term[pick_end-1]
 
     def reset(self):
         [q.clear() for q in self.erep_all_deques]
@@ -228,10 +239,6 @@ class IAdvantageCore(object):
     '''
     @abstractmethod
     def get_artificial_from_experience(self, sess, vstates, actions, ratios):
-        pass
-
-    @abstractmethod
-    def get_artificial_rewards(self, envir, sess, qstates, actions, ratios):
         pass
 
     '''

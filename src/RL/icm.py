@@ -202,6 +202,10 @@ class IntrinsicCuriosityModule:
         3D tensor unifies per-view tensors and combined-view tensors.
         '''
         if jointfw:
+            '''
+            Joint Prediction of V views
+            Expecting better accuracy with V^2 size of network.
+            '''
             V=int(self.cur_featvec.shape[1])
             N=int(self.cur_featvec.shape[2])
             input_featvec = tf.reshape(self.cur_featvec, [-1, 1, V*N])
@@ -225,7 +229,10 @@ class IntrinsicCuriosityModule:
         # FIXME: ConvApplier.infer returns tuples, which is unsuitable for Optimizer
         params, out = self.forward_fc_applier.infer(featvec_plus_action)
         if jointfw:
-            out = tf.reshape(out, [-1, V, N])
+            if output_fn <= 0:
+                out = tf.reshape(out, [-1, V, N])
+            else:
+                pass # Return [-1, 1, output_fn] as requested
         self.forward_model_params = params
         self.forward_output_tensor = out
         print('FWD Params {}'.format(params))

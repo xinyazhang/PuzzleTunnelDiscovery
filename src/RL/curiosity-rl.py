@@ -36,7 +36,7 @@ MT_VERBOSE = False
 # MT_VERBOSE = True
 VIEW_CFG = config.VIEW_CFG
 
-COLLIDE_PEN_MAG = 1e3
+COLLIDE_PEN_MAG = 10
 
 def setup_global_variable(args):
     global VIEW_CFG
@@ -62,7 +62,7 @@ class GroundTruth:
 
 class AlphaPuzzle(rlenv.IExperienceReplayEnvironment):
     collision_pen_mag = COLLIDE_PEN_MAG
-    solved_award_mag = 1e7
+    solved_award_mag = 10
 
     def __init__(self, args, tid):
         super(AlphaPuzzle, self).__init__(tmax=args.batch, erep_cap=args.ereplayratio)
@@ -225,6 +225,8 @@ class CuriosityRL(rlenv.IAdvantageCore):
         self.valout = self.valout * (COLLIDE_PEN_MAG * 2.0)
         if args.curiosity_type == 2:
             self.ratios_tensor = tf.placeholder(tf.float32, shape=[None], name='RatioPh')
+        else:
+            self.ratios_tensor = None
         self.curiosity, self.curiosity_params = self.create_curiosity_net(args)
         print('Curiosity Params: {}'.format(self.curiosity_params))
 
@@ -254,7 +256,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
                 lstm=args.lstm,
                 initialized_as_zero=False,
                 nolu_at_final=True,
-                batch_normalization=batch_normalization)
+                batch_normalization=self.batch_normalization)
 
     def create_valnet(self, args):
         hidden = args.valhidden + [1]
@@ -263,7 +265,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
                 lstm=args.lstm,
                 initialized_as_zero=False,
                 nolu_at_final=True,
-                batch_normalization=batch_normalization)
+                batch_normalization=self.batch_normalization)
 
     def create_curiosity_net(self, args):
         '''
@@ -278,12 +280,13 @@ class CuriosityRL(rlenv.IAdvantageCore):
             print(">> next_featvec {}".format(self.model.next_featvec.shape))
         elif args.curiosity_type == 2:
             # Re-use get_forward_model to generate the ratio prediction
-            ratio_params, ratio_out = self.model.get_forward_model(args.jointfw, output_fn=1)
-            mean_ratios = tf.reduce_mean(ratio_out, axis=[1,2])
-            sigmoid_ratios = tf.sigmoid(mean_ratios)
+            fwd_params, ratio_out = self.model.get_forward_model(args.jointfw, output_fn=1)
+            sigmoid_ratios = tf.sigmoid(ratio_out)
+            mean_ratios = tf.reduce_mean(sigmoid_ratios, axis=[1,2])
             print(">> ratios {}".format(self.ratios_tensor.shape))
+            print(">> sigmoid_ratios {}".format(sigmoid_ratios.shape))
             print(">> mean_ratios {}".format(mean_ratios.shape))
-            curiosity = tf.squared_difference(sigmoid_ratios, self.ratios_tensor)
+            curiosity = tf.squared_difference(mean_ratios, self.ratios_tensor)
         else:
             assert False, "Unknown curiosity_type {}".format(args.curiosity_type)
         print(">> curiosity {}".format(curiosity.shape))
@@ -363,7 +366,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
         vs1 = envir.vstate
         envir.qstate = state_2
         vs2 = envir.vstate
-        return self.get_artificial_from_experience(envir, sess, [vs1,vs2], [action], [ratio], pprefix)[0]
+        return self.get_artificial_from_experience(sess, [vs1,vs2], [action], [ratio], pprefix)[0]
         # TODO: Remove the following piece
         dic = {
                 self.action_tensor : [[adist]], # Expand from [12] (A only) to [1,1,12] ([F,V,A])
@@ -454,7 +457,7 @@ class TrainerMT:
 
     def __init__(self, args, g, global_step, batch_normalization):
         if len(args.egreedy) != 1 and len(args.egreedy) != args.threads:
-            print("--egreedy should have only one argument, or match the number of threads")
+            assert False,"--egreedy should have only one argument, or match the number of threads"
         self.args = args
         self.advcore = CuriosityRL(learning_rate=1e-3, args=args,
                                    batch_normalization=batch_normalization)
@@ -531,6 +534,13 @@ class TrainerMT:
     def load_pretrain(self, sess, pretrained_ckpt):
         self.advcore.load_pretrain(sess, pretrained_ckpt)
 
+
+class QTrainer:
+    '''
+    QTrainer: create AdvCore and Envir as normal, but only trains the value net (Q function).
+    '''
+    def __init__(self, args, g, global_step, batch_normalization):
+
 class PolicyPlayer(object):
     def __init__(self, args, g, global_step):
         self.args = args
@@ -603,10 +613,16 @@ def curiosity_main(args):
                 global_step=global_step)
         '''
         bnorm = tf.placeholder(tf.bool, shape=()) if args.batchnorm else None
-        if not args.eval:
-            trainer = TrainerMT(args, g, global_step, batch_normalization=bnorm)
+        if args.eval:
+            if args.qlearning_with_gt:
+                assert False, "Evaluating of Q Learning is not implemented yet"
+            else:
+                player = PolicyPlayer(args, g, global_step)
         else:
-            player = PolicyPlayer(args, g, global_step)
+            if args.qlearning_with_gt:
+                assert False, "Q Learning is not implemented yet"
+            else:
+                trainer = TrainerMT(args, g, global_step, batch_normalization=bnorm)
 
         # TODO: Summaries
 

@@ -133,6 +133,7 @@ class A2CTrainer:
         reaching_terminal = False
         states = []
         actions = []
+        ratios = []
         actual_rewards = []
         combined_rewards = []
         values = []
@@ -156,6 +157,7 @@ class A2CTrainer:
 
             self.print("{}Peeking action".format(pprefix))
             nstate,reward,reaching_terminal,ratio = envir.peek_act(action, pprefix=pprefix)
+            ratios.append(ratio)
             actual_rewards.append(reward)
             # print("action peeked {} ratio {} terminal? {}".format(nstate, ratio, reaching_terminal))
             reward += advcore.get_artificial_reward(envir, sess,
@@ -164,7 +166,8 @@ class A2CTrainer:
             '''
             Store Exprience
             '''
-            envir.store_erep(actions[-1], states[-1], actual_rewards[-1],
+            envir.store_erep(states[-1], actions[-1], ratios[-1],
+                             actual_rewards[-1],
                              reaching_terminal)
             '''
             Experience Replay
@@ -174,9 +177,9 @@ class A2CTrainer:
                 break
             '''
             Leave for training because of collision
-            '''
             if ratio == 0:
                 break
+            '''
             advcore.set_lstm(lstm_next) # AdvCore next frame
             envir.qstate = nstate # Envir Next frame
         advcore.set_lstm(lstm_begin)
@@ -184,11 +187,23 @@ class A2CTrainer:
         # print("> states length {}, shape {}".format(len(states), states[0][0].shape))
         # print("> actions length {}, tmax {}".format(len(actions), tmax))
         states.append(envir.vstate)
-        self.train_by_samples(envir, sess, actions, states, actual_rewards,
-                reaching_terminal, pprefix)
+        self.train_by_samples(envir=envir,
+                sess=sess,
+                states=states,
+                actions=actions,
+                ratios=ratios,
+                trewards=actual_rewards,
+                reaching_terminal=reaching_terminal,
+                pprefix=pprefix)
         advcore.set_lstm(lstm_next)
 
         if reaching_terminal:
+            '''
+            Add the final state to erep cache
+            '''
+            envir.store_erep(states[-1], -1, -1,
+                             -1,
+                             reaching_terminal)
             '''
             Train the experience in sample_cap iterations
             '''
@@ -200,7 +215,7 @@ class A2CTrainer:
     '''
     Private function that performs the training
     '''
-    def a2c(self, envir, sess, actions, vstates, rewards, values, reaching_terminal, pprefix=""):
+    def a2c(self, envir, sess, vstates, actions, ratios, rewards, values, reaching_terminal, pprefix=""):
         advcore = self.advcore
         V = 0.0
         if not reaching_terminal:
@@ -256,6 +271,8 @@ class A2CTrainer:
               }
         if self.batch_normalization is not None:
             dic[self.batch_normalization] = True
+        if advcore.ratios_tensor is not None:
+            dic[advcore.ratios_tensor] = ratios
         if advcore.using_lstm:
             dic.update({
                 advcore.lstm_states_in.c : advcore.current_lstm.c,
@@ -273,12 +290,12 @@ class A2CTrainer:
         '''
         return batch_V
 
-    def train_by_samples(self, envir, sess, actions, states, trewards, reaching_terminal, pprefix):
+    def train_by_samples(self, envir, sess, states, actions, ratios, trewards, reaching_terminal, pprefix):
         advcore = self.advcore
         trimmed_states = states[:-1]
         if len(trimmed_states) <= 0:
             return
-        arewards = advcore.get_artificial_from_experience(sess, states, actions)
+        arewards = advcore.get_artificial_from_experience(sess, states, actions, ratios, pprefix)
         [values] = advcore.evaluate(trimmed_states, sess, [advcore.value])
         self.print(pprefix, '> ARewards {}'.format(arewards))
         # print(pprefix, '> Values {}'.format(values))
@@ -289,7 +306,7 @@ class A2CTrainer:
         for (tr,ar) in zip(trewards, arewards):
             rewards.append(tr+ar)
         self.print(pprefix, '> Rewards {}'.format(rewards))
-        bv = self.a2c(envir, sess, actions, states, rewards, values, reaching_terminal, pprefix)
+        bv = self.a2c(envir, sess, states, actions, ratios, rewards, values, reaching_terminal, pprefix)
         [valuesafter] = advcore.evaluate(trimmed_states, sess, [advcore.value])
         valuesafter = np.reshape(valuesafter, newshape=(-1)).tolist()
         self.print(pprefix, '> [DEBUG] Values before training {}'.format(values))
@@ -300,8 +317,14 @@ class A2CTrainer:
     a2c_erep: A2C Training with Expreience REPlay
     '''
     def a2c_erep(self, envir, sess, pprefix):
-        actions, states, trewards, reaching_terminal = envir.sample_in_erep(pprefix)
+        states, actions, ratios, trewards, reaching_terminal = envir.sample_in_erep(pprefix)
         if len(actions) == 0:
             return
-        self.train_by_samples(envir, sess, actions, states, trewards,
-                reaching_terminal, pprefix)
+        self.train_by_samples(envir=envir,
+                sess=sess,
+                states=states,
+                actions=actions,
+                ratios=ratios,
+                trewards=trewards,
+                reaching_terminal=reaching_terminal,
+                pprefix=pprefix)
