@@ -82,6 +82,7 @@ class AlphaPuzzle(rlenv.IExperienceReplayEnvironment):
             self.egreedy = args.egreedy[tid]
         self.permutemag = args.permutemag
         self.perturbation = False
+        self.dump_id = 0
 
     def enable_perturbation(self):
         self.perturbation = True
@@ -268,6 +269,8 @@ class CuriosityRL(rlenv.IAdvantageCore):
         Note: we need to train the curiosity model as memory, so tf.losses is used.
         '''
         # curiosity = tf.metrics.mean_squared_error(fwd_feat, self.model.next_featvec)
+        if args.curiosity_type == 0:
+            return None, None
         if args.curiosity_type == 1:
             fwd_params, fwd_feat = self.model.get_forward_model(args.jointfw)
             curiosity = tf.reduce_mean(tf.squared_difference(fwd_feat, self.model.next_featvec),
@@ -358,6 +361,8 @@ class CuriosityRL(rlenv.IAdvantageCore):
         return ret
 
     def get_artificial_reward(self, envir, sess, state_1, action, state_2, ratio, pprefix=""):
+        if self.curiosity is None:
+            return 0
         envir.qstate = state_1
         vs1 = envir.vstate
         envir.qstate = state_2
@@ -382,6 +387,8 @@ class CuriosityRL(rlenv.IAdvantageCore):
         return ret
 
     def get_artificial_from_experience(self, sess, vstates, actions, ratios, pprefix):
+        if self.curiosity is None:
+            return np.zeros(shape=(len(actions)))
         adists_array = []
         for ai in actions:
             adist = np.zeros(shape=(1, self.action_space_dimension),
@@ -466,8 +473,8 @@ class TrainerMT:
         self.trainer = a2c.A2CTrainer(
                 advcore=self.advcore,
                 tmax=args.batch,
-                # gamma=config.GAMMA,
-                gamma=0.5,
+                gamma=config.GAMMA,
+                # gamma=0.5,
                 learning_rate=1e-6,
                 ckpt_dir=args.ckptdir,
                 global_step=global_step,
@@ -536,6 +543,7 @@ class QTrainer:
     QTrainer: create AdvCore and Envir as normal, but only trains the value net (Q function).
     '''
     def __init__(self, args, g, global_step, batch_normalization):
+        pass
 
 class PolicyPlayer(object):
     def __init__(self, args, g, global_step):

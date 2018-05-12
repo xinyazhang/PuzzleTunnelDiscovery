@@ -157,6 +157,10 @@ class A2CTrainer:
 
             self.print("{}Peeking action".format(pprefix))
             nstate,reward,reaching_terminal,ratio = envir.peek_act(action, pprefix=pprefix)
+            if reward < 0:
+                # print("vstate shape {}".format(envir.vstate.shape))
+                imsave('collison_dump_{}.png'.format(self.dbg_sample_peek), envir.vstate[0][0])
+                self.dbg_sample_peek += 1
             ratios.append(ratio)
             actual_rewards.append(reward)
             # print("action peeked {} ratio {} terminal? {}".format(nstate, ratio, reaching_terminal))
@@ -241,7 +245,7 @@ class A2CTrainer:
         for (ai, ri, Vi) in zip(r_actions, r_rewards, r_values):
             V = ri + self.gamma * V
             td = V - Vi
-            self.print("{}V(env+ar) {} V(nn) {}".format(pprefix, V, Vi))
+            self.print("{}V(env+ar) {} V(nn) {} reward {}".format(pprefix, V, Vi, ri))
             adist = np.zeros(shape=(1, self.action_space_dimension),
                     dtype=np.float32)
             adist[0, ai] = 1.0

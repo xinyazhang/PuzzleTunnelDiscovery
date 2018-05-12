@@ -7,6 +7,8 @@ import vision
 import tensorflow as tf
 import rldriver
 import config
+import rlutil
+import rlargs
 
 def test():
     pyosr.init()
@@ -55,5 +57,20 @@ def test():
     r.teardown()
     pyosr.shutdown()
 
+def test_2():
+    pyosr.init()
+    args = rlargs.parse()
+    r = rlutil.create_renderer(args)
+    r.state = np.array(r.translate_to_unit_state(args.istateraw))
+    for action in args.actionset:
+        nstate, done, ratio = r.transit_state(r.state,
+                action,
+                args.amag,
+                args.vmag)
+        print("{} {} {}".format(nstate, done, ratio))
+        r.state = nstate
+
 if __name__ == '__main__':
+    test_2()
+    exit()
     test()
