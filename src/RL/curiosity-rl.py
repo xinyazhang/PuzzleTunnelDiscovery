@@ -354,9 +354,9 @@ class CuriosityRL(rlenv.IAdvantageCore):
     def make_decision(self, envir, policy_dist, pprefix=''):
         best = np.argmax(policy_dist, axis=-1)
         if random.random() < envir.egreedy:
-            ret = random.randrange(self.action_space_dimension)
-        else:
             ret = np.asscalar(best)
+        else:
+            ret = random.randrange(self.action_space_dimension)
         print(pprefix, 'Action best {} chosen {}'.format(best, ret))
         return ret
 
@@ -557,7 +557,7 @@ class PolicyPlayer(object):
         self.dpy = pyosr.create_display()
         self.ctx = pyosr.create_gl_context(self.dpy)
         self.envir = AlphaPuzzle(args, 0)
-        self.envir.egreedy = 1 - 0.995
+        self.envir.egreedy = 0.995
         self.advcore = CuriosityRL(learning_rate=1e-3, args=args)
         self.advcore.softmax_policy # Create the tensor
         self.gview = 0 if args.obview < 0 else args.obview
