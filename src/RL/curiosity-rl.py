@@ -510,6 +510,7 @@ class TrainerMT:
                 #thread_local_envirs = [AlphaPuzzle(args, tid)]
                 # Also disable randomized light position
                 # e.r.light_position = uw_random.random_on_sphere(5.0)
+            print("[{}] Number of Envirs {}".format(tid, len(thread_local_envirs)))
             while True:
                 task = self.taskQ.get()
                 if task == self.kExitTask:
@@ -519,6 +520,7 @@ class TrainerMT:
                 Pickup the envir stochasticly
                 '''
                 envir = random.choice(thread_local_envirs)
+                print("[{}] Choose Envir with Pertubation {}".format(tid, envir.r.perturbation))
                 self.trainer.train(envir, sess, tid)
                 if task == self.kSyncTask:
                     self.reportQ.put(1)

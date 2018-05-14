@@ -23,6 +23,7 @@ public:
 	void scaleToUnit();
 	void angleModel(float latitude, float longitude);
 	void setPerturbation(const StateVector& pert);
+	StateVector getPerturbation() const;
 
 	/*
 	 * Accessors of Robot State. For rigid bodies, the state vector is:

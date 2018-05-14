@@ -82,6 +82,7 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("scaleToUnit", &UnitWorld::scaleToUnit)
 		.def("angleModel", &UnitWorld::angleModel)
 		.def("set_perturbation", &UnitWorld::setPerturbation)
+		.def_property_readonly("perturbation", &UnitWorld::getPerturbation)
 		.def_property("state", &UnitWorld::getRobotState, &UnitWorld::setRobotState)
 		.def("is_valid_state", &UnitWorld::isValid, py::call_guard<py::gil_scoped_release>())
 		.def("is_disentangled", &UnitWorld::isDisentangled, py::call_guard<py::gil_scoped_release>())

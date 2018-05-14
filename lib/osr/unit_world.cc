@@ -124,6 +124,11 @@ UnitWorld::setPerturbation(const StateVector& pert)
 	perturbate_tf_ = translate_state_to_transform(pert);
 }
 
+StateVector
+UnitWorld::getPerturbation() const
+{
+	return perturbate_;
+}
 
 void
 UnitWorld::setRobotState(const StateVector& state)
