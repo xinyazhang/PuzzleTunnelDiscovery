@@ -502,12 +502,12 @@ class TrainerMT:
             Disable permutation in TID 0
             Completely disable randomized light source for now
             '''
-            if tid != 0:
-                thread_local_envirs = [AlphaPuzzle(args, tid) for i in range(args.agents)]
-                for e in thread_local_envirs:
-                    e.enable_perturbation()
-            else:
-                thread_local_envirs = [AlphaPuzzle(args, tid)]
+            # if tid != 0:
+            thread_local_envirs = [AlphaPuzzle(args, tid) for i in range(args.agents)]
+            for e in thread_local_envirs[1:]:
+                e.enable_perturbation()
+            #else:
+                #thread_local_envirs = [AlphaPuzzle(args, tid)]
                 # Also disable randomized light position
                 # e.r.light_position = uw_random.random_on_sphere(5.0)
             while True:
