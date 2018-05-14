@@ -59,7 +59,7 @@ def get_parser():
             type=int, default=0)
     parser.add_argument('--istateraw', metavar='REAL NUMBER',
             nargs='+',
-            help='Initial state in original scaling',
+            help='Initial state in original scaling; format: <Trans> <W-first Quat>',
             type=float, default=[17.97,7.23,10.2,1.0,0.0,0.0,0.0])
     parser.add_argument('--amag', metavar='REAL NUMBER',
             help='Magnitude of discrete actions',
@@ -152,6 +152,9 @@ def get_parser():
             type=float,
             nargs='*',
             default=[0.2])
+    parser.add_argument('--LAMBDA',
+            help='Ratio between A2C loss and ICM loss. Note: ICM loss consists of loss from invert model and forward (curiosity) model',
+            default=0.5)
     parser.add_argument('--sancheck',
             help='Different sanity check points',
             type=int,

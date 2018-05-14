@@ -23,7 +23,8 @@ class A2CTrainer:
             entropy_beta=0.01,
             debug=True,
             batch_normalization=None,
-            period=1
+            period=1,
+            LAMBDA=0.5
             ):
         self.advcore = advcore
         self.a2c_tmax = tmax
@@ -42,7 +43,7 @@ class A2CTrainer:
         self.loss = LAMBDA * self.build_loss(advcore)
         print("self.loss 1 {}".format(self.loss))
         tf.summary.scalar('a2c_loss', self.loss)
-        self.loss += advcore.build_loss()
+        self.loss += (1 - LAMBDA) * advcore.build_loss()
         print("self.loss 2 {}".format(self.loss))
         '''
         Approach 1: Do not train Vision since we don't have reliable GT from RL procedure

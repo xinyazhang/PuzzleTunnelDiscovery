@@ -482,7 +482,8 @@ class TrainerMT:
                 ckpt_dir=args.ckptdir,
                 global_step=global_step,
                 batch_normalization=self.bnorm,
-                period=args.period)
+                period=args.period,
+                LAMBDA=args.LAMBDA)
         assert not (self.advcore.using_lstm and self.trainer.erep_sample_cap > 0), "CuriosityRL does not support Experience Replay with LSTM"
         for i in range(args.threads):
             thread = threading.Thread(target=self.run_worker, args=(i,g))
