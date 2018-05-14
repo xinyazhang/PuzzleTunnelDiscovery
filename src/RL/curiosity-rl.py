@@ -427,10 +427,13 @@ class CuriosityRL(rlenv.IAdvantageCore):
         if self.loss is not None:
             return self.loss
         self.inverse_loss = self.model.get_inverse_loss(discrete=True)
-        self.curiosity_loss = tf.reduce_sum(self.curiosity)
         tf.summary.scalar('inverse_loss', self.inverse_loss)
-        tf.summary.scalar('curiosity_loss', self.curiosity_loss)
-        self.loss = self.inverse_loss + self.curiosity_loss
+        if self.curiosity is None:
+            self.loss = self.inverse_loss
+        else:
+            self.curiosity_loss = tf.reduce_sum(self.curiosity)
+            tf.summary.scalar('curiosity_loss', self.curiosity_loss)
+            self.loss = self.inverse_loss + self.curiosity_loss
         return self.loss
 
     def lstm_next(self):
