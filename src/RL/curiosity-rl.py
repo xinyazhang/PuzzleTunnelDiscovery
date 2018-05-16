@@ -13,6 +13,7 @@ from scipy.misc import imsave
 import matplotlib.animation as animation
 import sys
 import os
+import errno
 import time
 import util
 import argparse
@@ -61,11 +62,20 @@ class GroundTruth:
     pass
 
 class AlphaPuzzle(rlenv.IExperienceReplayEnvironment):
-    collision_pen_mag = COLLIDE_PEN_MAG
     solved_award_mag = 10
 
-    def __init__(self, args, tid):
-        super(AlphaPuzzle, self).__init__(tmax=args.batch, erep_cap=args.ereplayratio)
+    def __init__(self, args, tid, agent_id=-1):
+        dumpdir = None
+        if args.exploredir is not None:
+            assert agent_id >= 0, '--exploredir require AlphaPuzzle constructed with non-negative agent_id'
+            dumpdir = '{}/agent-{}/'.format(args.exploredir, agent_id)
+            try:
+                os.makedirs(dumpdir)
+            except OSError as e:
+                print("Exc {}".format(e))
+                if errno.EEXIST != e.errno:
+                    raise
+        super(AlphaPuzzle, self).__init__(tmax=args.batch, erep_cap=args.ereplayratio, dumpdir=dumpdir)
         self.fb_cache = None
         self.fb_dirty = True
         r = self.r = create_renderer(args, creating_ctx=False)
@@ -83,10 +93,14 @@ class AlphaPuzzle(rlenv.IExperienceReplayEnvironment):
         self.permutemag = args.permutemag
         self.perturbation = False
         self.dump_id = 0
+        self.collision_pen_mag = args.collision_pen_mag
 
     def enable_perturbation(self):
         self.perturbation = True
         self.reset()
+
+    def get_perturbation(self):
+        return self.r.perturbation
 
     def qstate_setter(self, state):
         # print('old {}'.format(self.r.state))
@@ -137,6 +151,7 @@ class AlphaPuzzle(rlenv.IExperienceReplayEnvironment):
         sa = (colkey, (nstate, done, ratio))
         reaching_terminal = r.is_disentangled(nstate)
         reward = 0.0
+        reward += pyosr.distance(r.state, nstate) # Reward by translation
         reward += self.solved_award_mag if reaching_terminal is True else 0.0 # Large Reward for solution
         if not done:
             '''
@@ -462,8 +477,10 @@ class TrainerMT:
     kExitTask = -1
 
     def __init__(self, args, g, global_step, batch_normalization):
+        '''
         if len(args.egreedy) != 1 and len(args.egreedy) != args.threads:
             assert False,"--egreedy should have only one argument, or match the number of threads"
+        '''
         self.args = args
         self.advcore = CuriosityRL(learning_rate=1e-3, args=args,
                                    batch_normalization=batch_normalization)
@@ -504,9 +521,11 @@ class TrainerMT:
             Completely disable randomized light source for now
             '''
             # if tid != 0:
-            thread_local_envirs = [AlphaPuzzle(args, tid) for i in range(args.agents)]
+            thread_local_envirs = [AlphaPuzzle(args, tid, i) for i in range(args.agents)]
             for e in thread_local_envirs[1:]:
                 e.enable_perturbation()
+            for i in range(1, len(thread_local_envirs)):
+                thread_local_envirs[i].egreedy = args.egreedy[i % len(args.egreedy)]
             #else:
                 #thread_local_envirs = [AlphaPuzzle(args, tid)]
                 # Also disable randomized light position
@@ -521,7 +540,7 @@ class TrainerMT:
                 Pickup the envir stochasticly
                 '''
                 envir = random.choice(thread_local_envirs)
-                print("[{}] Choose Envir with Pertubation {}".format(tid, envir.r.perturbation))
+                print("[{}] Choose Envir with Pertubation {} and egreedy".format(tid, envir.r.perturbation, envir.egreedy))
                 self.trainer.train(envir, sess, tid)
                 if task == self.kSyncTask:
                     self.reportQ.put(1)

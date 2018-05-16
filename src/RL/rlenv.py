@@ -3,6 +3,7 @@ import tensorflow as tf
 from collections import deque
 import itertools
 import random
+import numpy as np
 
 '''
 Note: Python2 code?
@@ -27,6 +28,10 @@ class IEnvironment(object):
         pass
 
     qstate = abstractproperty(qstate_getter, qstate_setter)
+
+    @abstractmethod
+    def get_perturbation(self):
+        pass
 
     '''
     Property for Viewable state (i.e. RGB-D images)
@@ -63,37 +68,59 @@ class IEnvironment(object):
 
 class IExperienceReplayEnvironment(IEnvironment):
 
-    def __init__(self, tmax, erep_cap):
+    def __init__(self, tmax, erep_cap, dumpdir=None):
         super(IExperienceReplayEnvironment, self).__init__()
+        assert not (erep_cap > 0 and dumpdir is not None), "--ereplayratio is incompatitable with --exploredir in current implementation"
         self.tmax = tmax
         self.erep_sample_cap = erep_cap * tmax
-        self.erep_states = deque()
+        self.erep_vstates = deque()
+        self.erep_qstates = deque()
         self.erep_actions = deque()
         self.erep_ratios = deque()
         self.erep_reward = deque()
         self.erep_term = deque()
-        self.erep_all_deques = (self.erep_states, self.erep_actions,
+        self.erep_perm = deque()
+        self.erep_all_deques = (self.erep_vstates, self.erep_qstates, self.erep_actions,
                 self.erep_ratios,
-                self.erep_reward, self.erep_term)
+                self.erep_reward, self.erep_term,
+                self.erep_perm
+                )
         '''
-        State Action raTio Reward Queues
+        State Action raTio Reward Queues, for Sampling
         '''
-        self.erep_satr_deques = (self.erep_states, self.erep_actions,
+        self.erep_satr_deques = (self.erep_vstates, self.erep_actions,
                 self.erep_ratios, self.erep_reward)
+        self.dumpdir = dumpdir
+        self.dump_id = 0
 
     '''
     Store Experience REPlay
     '''
-    def store_erep(self, state, action, ratio, reward, reaching_terminal):
-        if self.erep_sample_cap <= 0:
+    def store_erep(self, vstate, qstate, action, ratio, reward, reaching_terminal, perm):
+        if self.erep_sample_cap <= 0 and self.dumpdir is None:
             return
-        while len(self.erep_actions) >= self.erep_sample_cap:
-            [q.popleft() for q in self.erep_all_deques]
-        self.erep_states.append(state)
+        self.erep_vstates.append(vstate)
+        self.erep_qstates.append(qstate)
         self.erep_actions.append(action)
         self.erep_ratios.append(ratio)
         self.erep_reward.append(reward)
         self.erep_term.append(reaching_terminal)
+        self.erep_perm.append(perm)
+        if self.erep_sample_cap > 0:
+            while len(self.erep_actions) > self.erep_sample_cap:
+                [q.popleft() for q in self.erep_all_deques]
+        elif self.dumpdir is not None:
+            if len(self.erep_actions) > 128:
+                fn = '{}/{}.npz'.format(self.dumpdir, self.dump_id)
+                np.savez(fn, QSTATE=list(self.erep_qstates),
+                        A=list(self.erep_actions),
+                        TAU=list(self.erep_ratios),
+                        R=list(self.erep_reward),
+                        T=list(self.erep_term),
+                        PERM=list(self.erep_perm)
+                        )
+                [q.clear() for q in self.erep_all_deques]
+                self.dump_id += 1
 
     def sample_in_erep(self, pprefix):
         if self.erep_sample_cap <= 0:

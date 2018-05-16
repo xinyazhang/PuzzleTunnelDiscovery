@@ -171,9 +171,11 @@ class A2CTrainer:
             '''
             Store Exprience
             '''
-            envir.store_erep(states[-1], actions[-1], ratios[-1],
+            envir.store_erep(states[-1], envir.qstate, actions[-1], ratios[-1],
                              actual_rewards[-1],
-                             reaching_terminal)
+                             reaching_terminal,
+                             envir.get_perturbation()
+                             )
             '''
             Experience Replay
             '''
@@ -206,9 +208,11 @@ class A2CTrainer:
             '''
             Add the final state to erep cache
             '''
-            envir.store_erep(states[-1], -1, -1,
-                             -1,
-                             reaching_terminal)
+            envir.store_erep(states[-1], envir.qstate,
+                    -1, -1, -1,
+                    reaching_terminal,
+                    envir.get_perturbation()
+                    )
             '''
             Train the experience in sample_cap iterations
             '''
