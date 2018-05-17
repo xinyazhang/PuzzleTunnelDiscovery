@@ -31,14 +31,16 @@ def random_on_sphere(scale=1.0):
     z = 1 - 2 * l2
     return np.array([x,y,z]) * scale
 
-def gen_init_state(uw):
+def gen_unit_init_state(uw):
     while True:
         state = random_state()
         if uw.is_disentangled(state):
             continue
         if uw.is_valid_state(state):
-            break
-    return uw.translate_from_unit_state(state)
+            return state
+
+def gen_init_state(uw):
+    return uw.translate_from_unit_state(gen_unit_init_state(uw))
 
 def random_unit_vector(size):
     mag = 0.0

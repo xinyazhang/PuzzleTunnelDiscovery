@@ -194,6 +194,11 @@ def get_parser():
     parser.add_argument('--exploredir',
             help='Path to store the exploration records',
             default=None)
+    parser.add_argument('--notrain',
+            help='Set untrainnable segments',
+            choices=['fe'],
+            nargs='*',
+            default=[])
 
     return parser
 

@@ -80,6 +80,13 @@ double distance(const StateVector& lhv, const StateVector& rhv)
 	return trdist + rotdist;
 }
 
+Eigen::Matrix3d
+extract_rotation_matrix(const StateVector& state)
+{
+	StateQuat rot(state(3), state(4), state(5), state(6));
+	return rot.toRotationMatrix();
+}
+
 std::tuple<StateTrans, AngleAxisVector>
 differential(const StateVector& from, const StateVector& to)
 {

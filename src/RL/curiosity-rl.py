@@ -32,6 +32,7 @@ from cachetools import LRUCache
 from six.moves import queue
 from rlreanimator import reanimate
 import rlutil
+import qtrainer
 
 MT_VERBOSE = False
 # MT_VERBOSE = True
@@ -93,6 +94,7 @@ class AlphaPuzzle(rlenv.IExperienceReplayEnvironment):
         self.permutemag = args.permutemag
         self.perturbation = False
         self.dump_id = 0
+        self.steps_since_reset = 0
         self.collision_pen_mag = args.collision_pen_mag
 
     def enable_perturbation(self):
@@ -109,6 +111,7 @@ class AlphaPuzzle(rlenv.IExperienceReplayEnvironment):
             return
         self.r.state = state
         self.fb_dirty = True
+        self.steps_since_reset += 1
 
     def qstate_getter(self):
         return self.r.state
@@ -176,6 +179,7 @@ class AlphaPuzzle(rlenv.IExperienceReplayEnvironment):
             '''
             self.istate = np.array(r.translate_to_unit_state(self.istateraw), dtype=np.float32)
         self.qstate = self.istate
+        self.steps_since_reset = 0
 
 class CuriosityRL(rlenv.IAdvantageCore):
     rgb_shape = None
@@ -471,6 +475,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
         else:
             self.model.load_pretrain(sess, viewinitckpt)
 
+
 class TrainerMT:
     kAsyncTask = 1
     kSyncTask = 2
@@ -482,25 +487,33 @@ class TrainerMT:
             assert False,"--egreedy should have only one argument, or match the number of threads"
         '''
         self.args = args
-        self.advcore = CuriosityRL(learning_rate=1e-3, args=args,
-                                   batch_normalization=batch_normalization)
+        self.advcore = CuriosityRL(learning_rate=1e-3, args=args, batch_normalization=batch_normalization)
         self.tfgraph = g
         self.threads = []
         self.taskQ = queue.Queue(args.queuemax)
         self.sessQ = queue.Queue(args.queuemax)
         self.reportQ = queue.Queue(args.queuemax)
         self.bnorm = batch_normalization
-        self.trainer = a2c.A2CTrainer(
-                advcore=self.advcore,
-                tmax=args.batch,
-                gamma=config.GAMMA,
-                # gamma=0.5,
-                learning_rate=1e-6,
-                ckpt_dir=args.ckptdir,
-                global_step=global_step,
-                batch_normalization=self.bnorm,
-                period=args.period,
-                LAMBDA=args.LAMBDA)
+        if not args.qlearning_with_gt:
+            self.trainer = a2c.A2CTrainer(
+                    advcore=self.advcore,
+                    tmax=args.batch,
+                    gamma=config.GAMMA,
+                    # gamma=0.5,
+                    learning_rate=1e-6,
+                    ckpt_dir=args.ckptdir,
+                    global_step=global_step,
+                    batch_normalization=self.bnorm,
+                    period=args.period,
+                    LAMBDA=args.LAMBDA)
+        else:
+            self.trainer = qtrainer.QTrainer(
+                    advcore=self.advcore,
+                    batch=args.batch,
+                    learning_rate=1e-4,
+                    ckpt_dir=args.ckptdir,
+                    period=args.period,
+                    global_step=global_step)
         assert not (self.advcore.using_lstm and self.trainer.erep_sample_cap > 0), "CuriosityRL does not support Experience Replay with LSTM"
         for i in range(args.threads):
             thread = threading.Thread(target=self.run_worker, args=(i,g))
@@ -562,13 +575,6 @@ class TrainerMT:
     def load_pretrain(self, sess, pretrained_ckpt):
         self.advcore.load_pretrain(sess, pretrained_ckpt)
 
-
-class QTrainer:
-    '''
-    QTrainer: create AdvCore and Envir as normal, but only trains the value net (Q function).
-    '''
-    def __init__(self, args, g, global_step, batch_normalization):
-        pass
 
 class PolicyPlayer(object):
     def __init__(self, args, g, global_step):
@@ -648,10 +654,7 @@ def curiosity_main(args):
             else:
                 player = PolicyPlayer(args, g, global_step)
         else:
-            if args.qlearning_with_gt:
-                assert False, "Q Learning is not implemented yet"
-            else:
-                trainer = TrainerMT(args, g, global_step, batch_normalization=bnorm)
+            trainer = TrainerMT(args, g, global_step, batch_normalization=bnorm)
 
         # TODO: Summaries
 
