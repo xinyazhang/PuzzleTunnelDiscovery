@@ -576,7 +576,6 @@ class TrainerMT:
     def load_pretrain(self, sess, pretrained_ckpt):
         self.advcore.load_pretrain(sess, pretrained_ckpt)
 
-
 class PolicyPlayer(object):
     def __init__(self, args, g, global_step):
         self.args = args
@@ -590,6 +589,9 @@ class PolicyPlayer(object):
 
     def attach(self, sess):
         self.sess = sess
+
+    def play(self):
+        reanimate(self)
 
     def __iter__(self):
         envir = self.envir
@@ -608,8 +610,52 @@ class PolicyPlayer(object):
             action = advcore.make_decision(envir, policy, pprefix)
             print("PolicyPlayer pol {}".format(policy))
             print("PolicyPlayer Action {}".format(action))
-            nstate,reward,reaching_terminal = envir.peek_act(action, pprefix=pprefix)
+            nstate,reward,reaching_terminal,ratio = envir.peek_act(action, pprefix=pprefix)
             envir.qstate = nstate
+
+class QPlayer(object):
+    def __init__(self, args, g, global_step):
+        self.args = args
+        self.dpy = pyosr.create_display()
+        self.ctx = pyosr.create_gl_context(self.dpy)
+        self.envir = AlphaPuzzle(args, 0)
+        self.envir.egreedy = 0.995
+        self.advcore = CuriosityRL(learning_rate=1e-3, args=args)
+        self.advcore.softmax_policy # Create the tensor
+        self.gview = 0 if args.obview < 0 else args.obview
+
+    def attach(self, sess):
+        self.sess = sess
+
+    def render(self, envir, state):
+        envir.qstate = state
+        return envir.vstate
+
+    def play(self):
+        Q = [] # list of states
+        V = [] # list of numpy array of batched values
+        args = self.args
+        sess = self.sess
+        advcore = self.advcore
+        envir = self.envir
+        assert args.iter % args.batch == 0, "presumably --iter is dividable by --batch"
+        for i in range(args.iter/args.batch):
+            states = [uw_random.gen_unit_init_state(envir.r) for i in range(args.batch)]
+            Q += states
+            images = [self.render(envir, state) for state in states]
+            batch_rgb = [image[0] for image in images]
+            batch_dep = [image[1] for image in images]
+            dic = {
+                    advcore.rgb_1: batch_rgb,
+                    advcore.dep_1: batch_dep,
+                  }
+            values = sess.run(advcore.value, feed_dict=dic)
+            values = np.reshape(values, [-1]) # flatten
+            V.append(values)
+        Q = np.array(Q)
+        V = np.concatenate(V)
+        np.savez(args.sampleout, Q=Q, V=V)
+
 
 def curiosity_main(args):
     '''
@@ -651,7 +697,10 @@ def curiosity_main(args):
         bnorm = tf.placeholder(tf.bool, shape=()) if args.batchnorm else None
         if args.eval:
             if args.qlearning_with_gt:
-                assert False, "Evaluating of Q Learning is not implemented yet"
+                assert args.sampleout, "--sampleout is required to store the samples for --qlearning_with_gt"
+                assert args.iter > 0, "--iter needs to be specified as the samples to generate"
+                # assert False, "Evaluating of Q Learning is not implemented yet"
+                player = QPlayer(args, g, global_step)
             else:
                 player = PolicyPlayer(args, g, global_step)
         else:
@@ -688,7 +737,7 @@ def curiosity_main(args):
             g.finalize() # Prevent accidental changes
             if args.eval:
                 player.attach(sess)
-                reanimate(player)
+                player.play()
                 return
             while epoch < total_epoch:
                 trainer.train(sess)
