@@ -553,7 +553,8 @@ class TrainerMT:
                 Pickup the envir stochasticly
                 '''
                 envir = random.choice(thread_local_envirs)
-                print("[{}] Choose Envir with Pertubation {} and egreedy".format(tid, envir.r.perturbation, envir.egreedy))
+                if not self.args.qlearning_with_gt:
+                    print("[{}] Choose Envir with Pertubation {} and egreedy".format(tid, envir.r.perturbation, envir.egreedy))
                 self.trainer.train(envir, sess, tid)
                 if task == self.kSyncTask:
                     self.reportQ.put(1)
