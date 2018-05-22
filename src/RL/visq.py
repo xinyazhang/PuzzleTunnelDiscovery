@@ -1,10 +1,3 @@
-'''
-==============
-3D scatterplot
-==============
-
-Demonstration of a basic scatterplot in 3D.
-'''
 #!/usr/bin/env python3
 
 from mpl_toolkits.mplot3d import Axes3D
