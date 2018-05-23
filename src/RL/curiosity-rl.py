@@ -586,6 +586,7 @@ class RLVisualizer(object):
         self.advcore = CuriosityRL(learning_rate=1e-3, args=args)
         self.advcore.softmax_policy # Create the tensor
         self.gview = 0 if args.obview < 0 else args.obview
+        self.envir.enable_perturbation()
 
     def attach(self, sess):
         self.sess = sess
