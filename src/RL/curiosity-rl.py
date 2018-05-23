@@ -576,7 +576,7 @@ class TrainerMT:
     def load_pretrain(self, sess, pretrained_ckpt):
         self.advcore.load_pretrain(sess, pretrained_ckpt)
 
-class PolicyPlayer(object):
+class RLVisualizer(object):
     def __init__(self, args, g, global_step):
         self.args = args
         self.dpy = pyosr.create_display()
@@ -589,6 +589,10 @@ class PolicyPlayer(object):
 
     def attach(self, sess):
         self.sess = sess
+
+class PolicyPlayer(RLVisualizer):
+    def __init__(self, args, g, global_step):
+        super(PolicyPlayer, self).__init__(args, g, global_step)
 
     def play(self):
         reanimate(self)
@@ -613,21 +617,11 @@ class PolicyPlayer(object):
             nstate,reward,reaching_terminal,ratio = envir.peek_act(action, pprefix=pprefix)
             envir.qstate = nstate
 
-class QPlayer(object):
+class QPlayer(RLVisualizer):
     def __init__(self, args, g, global_step):
-        self.args = args
-        self.dpy = pyosr.create_display()
-        self.ctx = pyosr.create_gl_context(self.dpy)
-        self.envir = AlphaPuzzle(args, 0)
-        self.envir.egreedy = 0.995
-        self.advcore = CuriosityRL(learning_rate=1e-3, args=args)
-        self.advcore.softmax_policy # Create the tensor
-        self.gview = 0 if args.obview < 0 else args.obview
+        super(QPlayer, self).__init__(args, g, global_step)
         if args.permutemag > 0:
             self.envir.enable_perturbation()
-
-    def attach(self, sess):
-        self.sess = sess
 
     def render(self, envir, state):
         envir.qstate = state
@@ -727,6 +721,43 @@ class QPlayer(object):
                 current_value = -1
                 TRAJ = []
 
+class CuriositySampler(RLVisualizer):
+    def __init__(self, args, g, global_step):
+        super(CuriositySampler, self).__init__(args, g, global_step)
+        assert args.visualize == 'curiosity', '--visualize must be curiosity'
+        assert args.curiosity_type == 1, "--curiosity_type should be 1 if --visualize is enabled"
+        assert args.sampleout != '', '--sampleout must be enabled for --visualize curiosity'
+
+    def play(self):
+        args = self.args
+        sess = self.sess
+        advcore = self.advcore
+        envir = self.envir
+        samples= []
+        curiosities_by_action = [ [] for i in range(uw_random.DISCRETE_ACTION_NUMBER) ]
+        for i in range(args.iter):
+            state = uw_random.gen_unit_init_state(envir.r)
+            samples.append(state)
+            for action in range(uw_random.DISCRETE_ACTION_NUMBER):
+                nstate, reward, terminal, ratio = envir.peek_act(action)
+                areward = advcore.get_artificial_reward(envir, sess,
+                        state, action, nstate, ratio)
+                curiosities_by_action[action].append(areward)
+        samples = np.array(samples)
+        curiosity = np.array(curiosities_by_action)
+        np.savez(args.sampleout, Q=samples, C=curiosity)
+
+def create_visualizer(args, g, global_step):
+    if args.qlearning_with_gt:
+        # assert args.sampleout, "--sampleout is required to store the samples for --qlearning_with_gt"
+        assert args.iter > 0, "--iter needs to be specified as the samples to generate"
+        # assert False, "Evaluating of Q Learning is not implemented yet"
+        player = QPlayer(args, g, global_step)
+    elif args.visualize == 'policy':
+        return PolicyPlayer(args, g, global_step)
+    elif args.visualize == 'curiosity':
+        return CuriositySampler(args, g, global_step)
+    assert False, '--visualize {} is not implemented yet'.format(args.visualize)
 
 def curiosity_main(args):
     '''
@@ -767,13 +798,7 @@ def curiosity_main(args):
         '''
         bnorm = tf.placeholder(tf.bool, shape=()) if args.batchnorm else None
         if args.eval:
-            if args.qlearning_with_gt:
-                # assert args.sampleout, "--sampleout is required to store the samples for --qlearning_with_gt"
-                assert args.iter > 0, "--iter needs to be specified as the samples to generate"
-                # assert False, "Evaluating of Q Learning is not implemented yet"
-                player = QPlayer(args, g, global_step)
-            else:
-                player = PolicyPlayer(args, g, global_step)
+            player = create_visualizer(args, g, global_step)
         else:
             trainer = TrainerMT(args, g, global_step, batch_normalization=bnorm)
 

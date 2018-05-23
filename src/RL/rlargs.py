@@ -191,9 +191,17 @@ def get_parser():
     parser.add_argument('--qlearning_with_gt',
             help='Train the ValNet with Ground Truth from RRT',
             action='store_true')
+    parser.add_argument('--qlearning_gt_file',
+            metavar='FILE',
+            help='Specify the Ground Truth File. This option enables qlearning_with_gt',
+            default='')
     parser.add_argument('--exploredir',
             help='Path to store the exploration records',
             default=None)
+    parser.add_argument('--visualize',
+            help='Choose which aspect of the RL system to visualize',
+            choices=['policy', 'curiosity'],
+            default='policy')
     parser.add_argument('--notrain',
             help='Set untrainnable segments',
             choices=['fe'],
@@ -216,4 +224,6 @@ def parse():
         args.imhidden = [256, 256]
     if args.visionformula == 2:
         args.batchnorm = True
+    if args.qlearning_gt_file:
+        args.qlearning_with_gt = True
     return args
