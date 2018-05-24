@@ -33,6 +33,7 @@ from six.moves import queue,input
 from rlreanimator import reanimate
 import rlutil
 import qtrainer
+import ctrainer
 
 MT_VERBOSE = False
 # MT_VERBOSE = True
@@ -134,14 +135,15 @@ class AlphaPuzzle(rlenv.IExperienceReplayEnvironment):
     def vstatedim(self):
         return self.rgb_shape[0:3]
 
-    def peek_act(self, action, pprefix=""):
+    def peek_act(self, action, pprefix="", start_state=None):
         r = self.r
-        colkey = tuple(r.state.tolist() + [action])
+        start_state = r.state if start_state is None else start_state
+        colkey = tuple(start_state.tolist() + [action])
         if colkey in self.collision_cache:
             print("Cache Hit {}".format(colkey))
             nstate, done, ratio = self.collision_cache[colkey]
         else:
-            nstate, done, ratio = r.transit_state(r.state,
+            nstate, done, ratio = r.transit_state(start_state,
                     action,
                     self.action_magnitude,
                     self.verify_magnitude)
@@ -150,11 +152,11 @@ class AlphaPuzzle(rlenv.IExperienceReplayEnvironment):
                 Disable moving forward if ratio is too small.
                 '''
                 ratio = 0
-                nstate = np.copy(r.state)
+                nstate = np.copy(start_state)
         sa = (colkey, (nstate, done, ratio))
         reaching_terminal = r.is_disentangled(nstate)
         reward = 0.0
-        reward += pyosr.distance(r.state, nstate) # Reward by translation
+        reward += pyosr.distance(start_state, nstate) # Reward by translation
         reward += self.solved_award_mag if reaching_terminal is True else 0.0 # Large Reward for solution
         if not done:
             '''
@@ -408,12 +410,15 @@ class CuriosityRL(rlenv.IAdvantageCore):
     def get_artificial_from_experience(self, sess, vstates, actions, ratios, pprefix):
         if self.curiosity is None:
             return np.zeros(shape=(len(actions)))
+        '''
         adists_array = []
         for ai in actions:
             adist = np.zeros(shape=(1, self.action_space_dimension),
                     dtype=np.float32)
             adist[0, ai] = 1.0
             adists_array.append(adist)
+        '''
+        adists_array = rlutil.actions_to_adist_array(actions)
         rgbs = [state[0] for state in vstates]
         deps = [state[1] for state in vstates]
         print('> RGBs {} len: {}'.format(rgbs[0].shape, len(rgbs)))
@@ -494,7 +499,7 @@ class TrainerMT:
         self.sessQ = queue.Queue(args.queuemax)
         self.reportQ = queue.Queue(args.queuemax)
         self.bnorm = batch_normalization
-        if not args.qlearning_with_gt:
+        if args.train == 'a2c':
             self.trainer = a2c.A2CTrainer(
                     advcore=self.advcore,
                     tmax=args.batch,
@@ -506,7 +511,7 @@ class TrainerMT:
                     batch_normalization=self.bnorm,
                     period=args.period,
                     LAMBDA=args.LAMBDA)
-        else:
+        elif args.train == 'QwithGT' or args.qlearning_with_gt:
             self.trainer = qtrainer.QTrainer(
                     advcore=self.advcore,
                     batch=args.batch,
@@ -514,6 +519,16 @@ class TrainerMT:
                     ckpt_dir=args.ckptdir,
                     period=args.period,
                     global_step=global_step)
+        elif args.train == 'curiosity':
+            self.trainer = ctrainer.CTrainer(
+                    advcore=self.advcore,
+                    batch=args.batch,
+                    learning_rate=1e-4,
+                    ckpt_dir=args.ckptdir,
+                    period=args.period,
+                    global_step=global_step)
+        else:
+            assert False, '--train {} not implemented yet'.format(args.train)
         assert not (self.advcore.using_lstm and self.trainer.erep_sample_cap > 0), "CuriosityRL does not support Experience Replay with LSTM"
         for i in range(args.threads):
             thread = threading.Thread(target=self.run_worker, args=(i,g))

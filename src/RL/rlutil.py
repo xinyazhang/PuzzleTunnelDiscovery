@@ -2,6 +2,7 @@ import vision
 import config
 import numpy as np
 import pyosr
+import uw_random
 
 def get_view_cfg(args):
     VIEW_CFG = config.VIEW_CFG
@@ -46,6 +47,15 @@ def create_renderer(args, creating_ctx=True):
         va = view_array
     r.views = np.array(va, dtype=np.float32)
     return r
+
+def actions_to_adist_array(actions):
+    n = len(actions)
+    adists = np.zeros(
+            shape=(n, 1, uw_random.DISCRETE_ACTION_NUMBER),
+            dtype=np.float32)
+    for i in range(n):
+        adists[i, 0, actions[i]] = 1.0
+    return adists
 
 SC_PRED_PERMUTATION = 1
 SC_ACTION_PERMUTATION = 2

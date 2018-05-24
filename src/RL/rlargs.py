@@ -189,7 +189,7 @@ def get_parser():
             choices=[0,1,2],
             default=1)
     parser.add_argument('--qlearning_with_gt',
-            help='Train the ValNet with Ground Truth from RRT',
+            help='Train the ValNet with Ground Truth from RRT, implies --train QwithGT',
             action='store_true')
     parser.add_argument('--qlearning_gt_file',
             metavar='FILE',
@@ -202,6 +202,14 @@ def get_parser():
             help='Choose which aspect of the RL system to visualize',
             choices=['policy', 'curiosity'],
             default='policy')
+    parser.add_argument('--train',
+            help='''
+Choose which component to train separately (if --eval does not present).
+a2c: whole system;
+QwithGT: only Q function;
+curiosity: train the forward model, expecting overfitting.''',
+            choices=['a2c', 'QwithGT', 'curiosity'],
+            default='a2c')
     parser.add_argument('--notrain',
             help='Set untrainnable segments',
             choices=['fe'],
@@ -226,4 +234,9 @@ def parse():
         args.batchnorm = True
     if args.qlearning_gt_file:
         args.qlearning_with_gt = True
+    if args.train == 'QwithGT':
+        args.qlearning_with_gt = True
+    elif args.qlearning_with_gt:
+        assert args.train == '', '--qlearning_with_gt overrides --train options'
+        args.train = 'QwithGT'
     return args
