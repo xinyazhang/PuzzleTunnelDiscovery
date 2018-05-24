@@ -753,6 +753,7 @@ class CuriositySampler(RLVisualizer):
         curiosities_by_action = [ [] for i in range(uw_random.DISCRETE_ACTION_NUMBER) ]
         for i in range(args.iter):
             state = uw_random.gen_unit_init_state(envir.r)
+            envir.qstate = state
             samples.append(state)
             for action in range(uw_random.DISCRETE_ACTION_NUMBER):
                 nstate, reward, terminal, ratio = envir.peek_act(action)
