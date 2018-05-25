@@ -12,9 +12,11 @@ Q = d['Q']
 V = d['C']
 assert len(V) == 12, "Number of discrete actions is not 12"
 
-xs = Q[:, 0]
-ys = Q[:, 1]
-zs = Q[:, 2]
+m=256
+
+xs = Q[:m, 0]
+ys = Q[:m, 1]
+zs = Q[:m, 2]
 for action in range(12):
     ax = fig.add_subplot(2,6,action+1, projection='3d')
 
@@ -22,7 +24,7 @@ print(fig.axes)
 
 for action in range(12):
     ax = fig.axes[action]
-    ax.scatter(xs, ys, zs, c=V[action])
+    ax.scatter(xs, ys, zs, c=V[action, :m])
     ax.set_xlabel('X Label')
     ax.set_ylabel('Y Label')
     ax.set_zlabel('Z Label')
