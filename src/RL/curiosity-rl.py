@@ -63,6 +63,8 @@ class TrainingManager:
                     ckpt_dir=args.ckptdir,
                     period=args.period,
                     global_step=global_step)
+            if args.qlearning_gt_file:
+                self.trainer.attach_gt(args.qlearning_gt_file)
         elif args.train == 'curiosity':
             self.trainer = ctrainer.CTrainer(
                     advcore=self.advcore,

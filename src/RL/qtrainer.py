@@ -13,6 +13,7 @@ class QTrainer:
             period,
             global_step
             ):
+        self.gt = None
         self.advcore = advcore
         self.batch = batch
         self.period = period
@@ -32,7 +33,7 @@ class QTrainer:
 
     UP = np.array([0,0,1])
 
-    def calculate_q(self, envir, states):
+    def _analytic_q(self, envir, states):
         r = envir.r
         p = r.perturbation
         rot = pyosr.extract_rotation_matrix(p)
@@ -42,14 +43,32 @@ class QTrainer:
         # print(states[0][0:3] - origin)
         return [abs(np.dot(up, state[0:3] - origin)) for state in states]
 
+    def attach_gt(self, gt):
+        # GT format should match the output from rl-precalcmap.py
+        self.gt = np.load(gt)
+        self.gt_iter = 0
+
+    def sample(self, envir):
+        if self.gt is None:
+            states = [uw_random.gen_unit_init_state(envir.r) for i in range(self.batch)]
+            values = self._analytic_q(envir, states)
+            values = np.array(values, dtype=np.float)
+            return states, values
+        states = np.take(self.gt['V'],
+                indices=range(self.gt_iter, self.gt_iter + self.batch),
+                axis=0, mode='wrap')
+        values = np.take(self.gt['D'],
+                indices=range(self.gt_iter, self.gt_iter + self.batch),
+                axis = 0,mode='wrap')
+        self.gt_iter += self.batch
+        return states, values
+
     def render(self, envir, state):
         envir.qstate = state
         return envir.vstate
 
     def train(self, envir, sess, tid=None):
-        states = [uw_random.gen_unit_init_state(envir.r) for i in range(self.batch)]
-        values = self.calculate_q(envir, states)
-        values = np.array(values, dtype=np.float)
+        states, values = sample(envir)
         images = [self.render(envir, state) for state in states]
         batch_rgb = [image[0] for image in images]
         batch_dep = [image[1] for image in images]
