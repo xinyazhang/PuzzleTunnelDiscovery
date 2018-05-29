@@ -315,7 +315,7 @@ def create_visualizer(args, g, global_step):
         # assert args.sampleout, "--sampleout is required to store the samples for --qlearning_with_gt"
         assert args.iter > 0, "--iter needs to be specified as the samples to generate"
         # assert False, "Evaluating of Q Learning is not implemented yet"
-        player = QPlayer(args, g, global_step)
+        return QPlayer(args, g, global_step)
     elif args.visualize == 'policy':
         return PolicyPlayer(args, g, global_step)
     elif args.visualize == 'curiosity':
