@@ -1,6 +1,7 @@
 import argparse
 import config
 import aniconf12 as aniconf
+import sys
 
 def get_parser():
     parser = argparse.ArgumentParser(description='Process some integers.', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -237,6 +238,6 @@ def parse():
     if args.train == 'QwithGT':
         args.qlearning_with_gt = True
     elif args.qlearning_with_gt:
-        assert args.train == '', '--qlearning_with_gt overrides --train options'
+        assert '--train' not in sys.argv, '--qlearning_with_gt overrides --train options'
         args.train = 'QwithGT'
     return args
