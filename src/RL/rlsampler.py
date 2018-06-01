@@ -52,6 +52,11 @@ class QPlayer(RLVisualizer):
         super(QPlayer, self).__init__(args, g, global_step)
         if args.permutemag > 0:
             self.envir.enable_perturbation()
+        if args.samplein: # User can feed samples through samplein
+            self.gt = np.load(args.samplein)
+            self.gt_iter = 0
+        else:
+            self.gt = None
 
     def render(self, envir, state):
         envir.qstate = state
@@ -63,6 +68,15 @@ class QPlayer(RLVisualizer):
         else:
             self._play()
 
+    def _sample_mini_batch(self, batch):
+        if self.gt is None:
+            return [uw_random.gen_unit_init_state(envir.r) for i in range(args.batch)]
+        states = np.take(self.gt['V'],
+                indices=range(self.gt_iter, self.gt_iter + batch),
+                axis=0, mode='wrap')
+        self.gt_iter += batch
+        return states
+
     def _sample(self):
         Q = [] # list of states
         V = [] # list of numpy array of batched values
@@ -72,7 +86,7 @@ class QPlayer(RLVisualizer):
         envir = self.envir
         assert args.iter % args.batch == 0, "presumably --iter is dividable by --batch"
         for i in range(args.iter/args.batch):
-            states = [uw_random.gen_unit_init_state(envir.r) for i in range(args.batch)]
+            states = self._sample_mini_batch(args.batch)
             Q += states
             images = [self.render(envir, state) for state in states]
             batch_rgb = [image[0] for image in images]
