@@ -3,6 +3,7 @@ import rlenv
 import numpy as np
 import uw_random
 import pyosr
+from scipy.misc import imsave
 
 class QTrainer:
     def __init__(self,
@@ -25,10 +26,12 @@ class QTrainer:
             self.summary_op = tf.summary.merge_all()
             self.train_writer = tf.summary.FileWriter(ckpt_dir + '/summary', tf.get_default_graph())
         self.train_op = self.optimizer.minimize(self.loss, global_step=global_step, var_list=advcore.valparams)
+        print("Training Q function over {}".format(advcore.valparams))
 
     def build_loss(self, advcore):
         self.V_tensor = tf.placeholder(tf.float32, shape=[None], name='VPh')
         flattened_value = tf.reshape(advcore.value, [-1])
+        assert "{}".format(self.V_tensor.shape) == "{}".format(flattened_value.shape), "V_tensor's shape {} does not match flattened_value's {}".format(self.V_tensor.shape, flattened_value.shape)
         return tf.nn.l2_loss(self.V_tensor - flattened_value)
 
     UP = np.array([0,0,1])
@@ -68,7 +71,7 @@ class QTrainer:
         return envir.vstate
 
     def train(self, envir, sess, tid=None):
-        states, values = sample(envir)
+        states, values = self.sample(envir)
         images = [self.render(envir, state) for state in states]
         batch_rgb = [image[0] for image in images]
         batch_dep = [image[1] for image in images]
@@ -78,6 +81,12 @@ class QTrainer:
                 advcore.dep_1: batch_dep,
                 self.V_tensor: values,
               }
+        '''
+        if self.gt_iter == self.batch: # First iteration, dump the RGB
+            for i, rgb in enumerate(batch_rgb):
+                imsave('qtrainer_peek_{}.png'.format(i), rgb[0])
+            exit()
+        '''
         # print(values)
         # print(values.shape)
         loss, _, summary, step = sess.run([self.loss, self.train_op, self.summary_op, self.global_step], feed_dict=dic)
