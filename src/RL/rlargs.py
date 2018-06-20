@@ -240,4 +240,6 @@ def parse():
     elif args.qlearning_with_gt:
         assert '--train' not in sys.argv, '--qlearning_with_gt overrides --train options'
         args.train = 'QwithGT'
+    if -1 in args.actionset:
+        args.actionset = [i for i in range(12)]
     return args
