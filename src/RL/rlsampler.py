@@ -75,7 +75,7 @@ class QPlayer(RLVisualizer):
                 indices=range(self.gt_iter, self.gt_iter + batch),
                 axis=0, mode='wrap')
         self.gt_iter += batch
-        return states
+        return [state for state in states] # Convert 2D np.array to list of 1D np.array
 
     def _sample(self):
         Q = [] # list of states
