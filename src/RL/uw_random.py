@@ -31,9 +31,9 @@ def random_on_sphere(scale=1.0):
     z = 1 - 2 * l2
     return np.array([x,y,z]) * scale
 
-def gen_unit_init_state(uw):
+def gen_unit_init_state(uw, scale=1.0):
     while True:
-        state = random_state()
+        state = random_state(scale)
         if uw.is_disentangled(state):
             continue
         if uw.is_valid_state(state):
