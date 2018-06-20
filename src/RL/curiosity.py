@@ -124,7 +124,7 @@ class RigidPuzzle(rlenv.IExperienceReplayEnvironment):
         rgb_1, dep_1 = self.vstate
         self.state = nstate
         rgb_2, dep_2 = self.vstate
-        print(pprefix, "New state {} ratio {} terminal {} reward {}".format(nstate, ratio, reaching_terminal, reward))
+        print("{}New state {} ratio {} terminal {} reward {}".format(pprefix, nstate, ratio, reaching_terminal, reward))
         return nstate, reward, reaching_terminal, ratio
 
     def reset(self):
