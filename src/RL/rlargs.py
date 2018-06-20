@@ -208,8 +208,10 @@ def get_parser():
 Choose which component to train separately (if --eval does not present).
 a2c: whole system;
 QwithGT: only Q function;
-curiosity: train the forward model, expecting overfitting.''',
-            choices=['a2c', 'QwithGT', 'curiosity'],
+curiosity: train the forward model, expecting overfitting.
+QandFCFE: Q and Fully Connected Layers in Feature Extractors
+''',
+            choices=['a2c', 'QwithGT', 'curiosity', 'QandFCFE'],
             default='a2c')
     parser.add_argument('--notrain',
             help='Set untrainnable segments',

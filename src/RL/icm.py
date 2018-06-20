@@ -2,6 +2,7 @@ import tensorflow as tf
 import numpy as np
 import vision
 import config
+import warnings
 
 class IntrinsicCuriosityModule:
     action_tensor = None
@@ -123,6 +124,11 @@ class IntrinsicCuriosityModule:
         print('MV Feature shape {}'.format(self.cur_mvfeatvec.shape))
         self.next_nn_params, self.next_featvec = self.feature_extractor.infer(next_rgb_tensor, next_depth_tensor)
         self.elu = elu
+        if hasattr(self.feature_extractor, 'cat_nn_vars'):
+            self.cat_nn_vars = self.feature_extractor.cat_nn_vars
+        else:
+            warnings.warn("selected feature_extractor does not expose cat_nn_vars attribute")
+            warnings.warn("Consider switching to --ferev 11 or --ferev 12")
 
         self.featnum = featnum
         self.lstmsize = featnum

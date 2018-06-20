@@ -155,6 +155,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
         w = h = args.res
         self.args = args
         self.batch_normalization = batch_normalization
+        self.nn_vars = dict()
 
         self.action_space_dimension = uw_random.DISCRETE_ACTION_NUMBER
         self.action_tensor = tf.placeholder(tf.float32, shape=[None, 1, self.action_space_dimension], name='ActionPh')

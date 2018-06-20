@@ -12,7 +12,8 @@ class QTrainer:
             learning_rate,
             ckpt_dir,
             period,
-            global_step
+            global_step,
+            train_fcfe=False
             ):
         self.gt = None
         self.advcore = advcore
@@ -25,8 +26,11 @@ class QTrainer:
         if ckpt_dir is not None:
             self.summary_op = tf.summary.merge_all()
             self.train_writer = tf.summary.FileWriter(ckpt_dir + '/summary', tf.get_default_graph())
-        self.train_op = self.optimizer.minimize(self.loss, global_step=global_step, var_list=advcore.valparams)
-        print("Training Q function over {}".format(advcore.valparams))
+        var_list=advcore.valparams
+        if train_fcfe:
+            var_list += advcore.model.cat_nn_vars['fc']
+        self.train_op = self.optimizer.minimize(self.loss, global_step=global_step, var_list=var_list)
+        print("Training Q function over {}".format(var_list))
 
     def build_loss(self, advcore):
         self.V_tensor = tf.placeholder(tf.float32, shape=[None], name='VPh')

@@ -26,6 +26,7 @@ class VisionLayerConfig:
     gradb = False                   # bias with gradients
     initialized_as_zero = False     # Zero initial weights rather than randomized values
     batch_normalization = None      # input of tf.layers.batch_normalization(training=)
+    cat = 'cnn'
 
     def __init__(self, ch_out, strides=[1, 2, 2, 1], kernel_size=[3,3], padding = 'SAME'):
         self.ch_out = ch_out
@@ -203,6 +204,7 @@ class FCLayerConfig:
     gradb = False
     initialized_as_zero = False
     batch_normalization = None
+    cat = 'fc'
 
     def __init__(self, ch_out):
         self.ch_out = ch_out
@@ -475,6 +477,7 @@ class ConvApplier:
                 conf.naming = "Layer_{}".format(index)
                 index += 1
         self.batch_normalization = batch_normalization
+        self.cat_nn_vars = None
         # print("== Init Len of layer_configs {}, confdict {}, featnums {}".format(len(self.layer_configs), confdict, featnums))
 
     def infer(self, input_tensor):
@@ -492,6 +495,11 @@ class ConvApplier:
             layer.batch_normalization = self.batch_normalization
         nn_layer_tensor = [input_tensor]
         nn_args = []
+        if self.cat_nn_vars is None:
+            # Note: do NOT initialize self.cat_nn_vars right now
+            #       We need self.cat_nn_vars is None to indicate this is the
+            #       first time to run infer_impl
+            cat_nn_vars = dict()
         residual = None
         # print("== Len of layer_configs {}".format(len(self.layer_configs)))
         for conf in self.layer_configs:
@@ -499,9 +507,16 @@ class ConvApplier:
             w,b,out,residual,res_proj = conf.apply_layer(prev_layer_tensor, residual)
             nn_layer_tensor.append(out)
             if res_proj is None:
-                nn_args += [w,b]
+                current_layer_args = [w,b]
             else:
-                nn_args += [w,b,res_proj]
+                current_layer_args = [w,b,res_proj]
+            nn_args += current_layer_args
+            if self.cat_nn_vars is None:
+                if conf.cat not in cat_nn_vars:
+                    cat_nn_vars[conf.cat] = []
+                cat_nn_vars[conf.cat] += current_layer_args
+        if self.cat_nn_vars is None:
+            self.cat_nn_vars = cat_nn_vars
         return nn_args, nn_layer_tensor[-1]
 
 def GetFeatureSquare(featvec):
@@ -775,6 +790,7 @@ class FeatureExtractorResNet:
         #with tf.variable_scope(self.naming, reuse=tf.AUTO_REUSE) as scope:
             rgbd_input = tf.concat([rgb_input, depth_input], axis=-1)
             params, featvec = self.resnetrgbd.infer(rgbd_input)
+            self.cat_nn_vars = self.resnetrgbd.cat_nn_vars.copy()
             print("> Rev11 {}".format(featvec.shape))
         self.reuse = True
         return params, featvec

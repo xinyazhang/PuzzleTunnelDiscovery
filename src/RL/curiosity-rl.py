@@ -55,14 +55,15 @@ class TrainingManager:
                     batch_normalization=self.bnorm,
                     period=args.period,
                     LAMBDA=args.LAMBDA)
-        elif args.train == 'QwithGT' or args.qlearning_with_gt:
+        elif args.train == 'QwithGT' or args.qlearning_with_gt or args.train == 'QandFCFE':
             self.trainer = qtrainer.QTrainer(
                     advcore=self.advcore,
                     batch=args.batch,
                     learning_rate=1e-4,
                     ckpt_dir=args.ckptdir,
                     period=args.period,
-                    global_step=global_step)
+                    global_step=global_step,
+                    train_fcfe=(args.train == 'QandFCFE'))
             if args.qlearning_gt_file:
                 self.trainer.attach_gt(args.qlearning_gt_file)
         elif args.train == 'curiosity':
