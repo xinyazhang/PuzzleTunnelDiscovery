@@ -73,6 +73,10 @@ class TrainingManager:
                     ckpt_dir=args.ckptdir,
                     period=args.period,
                     global_step=global_step)
+            self.trainer.set_action_set(args.actionset)
+            self.trainer.limit_samples_to_use(args.sampletouse)
+            if args.samplein != '':
+                self.trainer.attach_samplein(args.samplein)
         else:
             assert False, '--train {} not implemented yet'.format(args.train)
         assert not (self.advcore.using_lstm and self.trainer.erep_sample_cap > 0), "CuriosityRL does not support Experience Replay with LSTM"
