@@ -52,7 +52,10 @@ class QTrainer:
 
     def attach_gt(self, gt):
         # GT format should match the output from rl-precalcmap.py
-        self.gt = np.load(gt)
+        self.gt_file = np.load(gt)
+        self.gt = {}
+        self.gt['V'] = np.copy(self.gt_file['V'])
+        self.gt['D'] = np.copy(self.gt_file['D'])
         self.gt_iter = 0
 
     def sample(self, envir):

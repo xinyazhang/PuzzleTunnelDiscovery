@@ -19,8 +19,10 @@ import threading
 from six.moves import queue,input
 import qtrainer
 import ctrainer
+import iftrainer
 import curiosity
 import rlsampler
+import sample_reader
 
 AlphaPuzzle = curiosity.RigidPuzzle
 CuriosityRL = curiosity.CuriosityRL
@@ -78,6 +80,17 @@ class TrainingManager:
             self.trainer.limit_samples_to_use(args.sampletouse)
             if args.samplein != '':
                 self.trainer.attach_samplein(args.samplein)
+        elif args.train == 'InF':
+            # TODO: allow samples from files
+            # Note: precomputed samples have one problem:
+            #       Actions cannot be translated to new permutations
+            self.trainer = iftrainer.IFTrainer(
+                    advcore=self.advcore,
+                    batch=args.batch,
+                    learning_rate=1e-4,
+                    ckpt_dir=args.ckptdir,
+                    period=args.period,
+                    global_step=global_step)
         else:
             assert False, '--train {} not implemented yet'.format(args.train)
         assert not (self.advcore.using_lstm and self.trainer.erep_sample_cap > 0), "CuriosityRL does not support Experience Replay with LSTM"

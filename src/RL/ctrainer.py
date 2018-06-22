@@ -5,7 +5,7 @@ import numpy as np
 import uw_random
 import pyosr
 
-class CTrainer:
+class CTrainer(object):
     def __init__(self,
             advcore,
             batch,

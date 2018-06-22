@@ -209,9 +209,10 @@ Choose which component to train separately (if --eval does not present).
 a2c: whole system;
 QwithGT: only Q function;
 curiosity: train the forward model, expecting overfitting.
-QandFCFE: Q and Fully Connected Layers in Feature Extractors
+QandFCFE: Q and Fully Connected Layers in Feature Extractors.
+InF: Train Inverse model and Forward model with samples from files.
 ''',
-            choices=['a2c', 'QwithGT', 'curiosity', 'QandFCFE'],
+            choices=['a2c', 'QwithGT', 'curiosity', 'QandFCFE', 'InF'],
             default='a2c')
     parser.add_argument('--notrain',
             help='Set untrainnable segments',
@@ -237,7 +238,7 @@ def parse():
         args.batchnorm = True
     if args.qlearning_gt_file:
         args.qlearning_with_gt = True
-    if args.train == 'QwithGT':
+    if args.train == 'QwithGT' or args.train == 'QandFCFE':
         args.qlearning_with_gt = True
     elif args.qlearning_with_gt:
         assert '--train' not in sys.argv, '--qlearning_with_gt overrides --train options'
