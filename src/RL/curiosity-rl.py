@@ -22,7 +22,6 @@ import ctrainer
 import iftrainer
 import curiosity
 import rlsampler
-import sample_reader
 
 AlphaPuzzle = curiosity.RigidPuzzle
 CuriosityRL = curiosity.CuriosityRL
