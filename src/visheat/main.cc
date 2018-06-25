@@ -134,8 +134,9 @@ public:
 		for(unsigned i = 0; i < vertback_.size(); i++) {
 			V_temp_.row(i) = V_.row(vertback_[i]);
 		}
-		V_temp_.block(vertback_.size(), 0, pathV_.rows(), 3)
-			= pathV_;
+		if (pathV_.rows() > 0)
+			V_temp_.block(vertback_.size(), 0, pathV_.rows(), 3)
+				= pathV_;
 
 		F_temp_.resize(tetleft_.size()*4 + pathF_.rows(), 3);
 		// Put old vert id to F_temp_
@@ -146,8 +147,9 @@ public:
 			F_temp_.row(i*4+2) << tet(3), tet(2), tet(0);
 			F_temp_.row(i*4+3) << tet(1), tet(2), tet(3);
 		}
-		F_temp_.block(tetleft_.size() * 4, 0, pathF_.rows(), 3)
-			= pathF_.array() + vertback_.size();
+		if (pathF_.rows() > 0)
+			F_temp_.block(tetleft_.size() * 4, 0, pathF_.rows(), 3)
+				= pathF_.array() + vertback_.size();
 		// Translate to new vert id
 		for(unsigned j = 0; j < tetleft_.size()*4; j++)
 			for(unsigned k = 0; k < 3; k++)
