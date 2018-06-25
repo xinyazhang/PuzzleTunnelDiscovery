@@ -28,16 +28,6 @@ import rlutil
 
 MT_VERBOSE = False
 # MT_VERBOSE = True
-VIEW_CFG = config.VIEW_CFG
-
-def setup_global_variable(args):
-    global VIEW_CFG
-    if args.viewset == 'cube':
-        VIEW_CFG = [(0, 4), (90, 1), (-90, 1)]
-    elif args.viewset == '14' or args.ferev >= 4:
-        VIEW_CFG = config.VIEW_CFG_REV4
-    elif args.viewset == '22' or args.ferev != 1:
-        VIEW_CFG = config.VIEW_CFG_REV2
 
 def _get_action_set(args):
     if args.uniqueaction > 0:
@@ -305,11 +295,6 @@ def pretrain_main(args):
     else:
         threads, syncQ = spawn_gt_reader_thread(args)
 
-    view_array = vision.create_view_array_from_config(VIEW_CFG)
-    if args.view >= 0:
-        view_num = 1
-    else:
-        view_num = len(view_array)
     w = h = args.res
 
     ckpt_dir = args.ckptdir
@@ -555,7 +540,6 @@ if __name__ == '__main__':
     if (not args.eval) and len(args.viewinitckpt) > 0:
         print('--eval must be set when viewinitckpt is given')
         exit()
-    setup_global_variable(args)
     if args.continuetrain:
         if args.samplein:
             print('--continuetrain is incompatible with --samplein')
