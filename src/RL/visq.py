@@ -9,8 +9,14 @@ fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 fn = sys.argv[1]
 d = np.load(fn)
-Q = d['Q']
-V = d['V']
+if 'Q' not in d:
+    # V,D dataset
+    Q = d['V']
+    V = d['D']
+else:
+    # Q,V dataset
+    Q = d['Q']
+    V = d['V']
 
 xs = Q[:, 0]
 ys = Q[:, 1]
