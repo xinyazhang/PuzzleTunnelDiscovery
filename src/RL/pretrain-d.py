@@ -433,6 +433,8 @@ def pretrain_main(args):
             accum_epoch = 0
             if args.viewinitckpt:
                 model.restore(sess, args.viewinitckpt)
+            elif args.eval: #TMP hack: DEBUG load_pretrain
+                model.load_pretrain(sess, ckpt_dir)
             else:
                 ckpt = tf.train.get_checkpoint_state(checkpoint_dir=ckpt_dir)
                 print('ckpt {}'.format(ckpt))
@@ -447,6 +449,10 @@ def pretrain_main(args):
                     if args.eval:
                         print('PANIC: --eval is set but checkpoint does not exits')
                         return
+            print('+*+ All variables')
+            for p in tf.trainable_variables():
+                print("\t{}".format(p.name))
+            print('+*+')
             period_loss = 0.0
             period_accuracy = 0
             total_accuracy = 0

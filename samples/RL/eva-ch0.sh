@@ -1,3 +1,59 @@
+ulimit -c 0
+# Resnet-18 FV size 256
+# Debug Load Pretrain (icm.IntrinsicCuriosityModule.load_pretrain)
+# Note: this is done through hacking pretrain-d, not by changing parameters
+NAME=Vision-Formula-1-DLP
+OUT=evaluation/$NAME/
+mkdir -p $OUT
+
+./pretrain-d.sh --visionformula 1 \
+	--ckptdir ackpt/Vision-Formula-1-FEAT-256/ \
+	--batch 2 --queuemax 64 --threads 1 \
+	--iter 1024 \
+	--eval \
+	--samplein sample/batch2-view14-norgbd-T6-R6-2M/ \
+	--sampletouse 1048576 \
+	--samplebatching 16 \
+	--samplebase 1048576 > evaluation/$NAME.out
+
+exit
+
+# Resnet-18 FV size 256
+# New Samples (Randomly Generated)
+NAME=Vision-Formula-1-reg-NS
+OUT=evaluation/$NAME/
+mkdir -p $OUT
+
+./pretrain-d.sh --visionformula 1 \
+	--ckptdir ackpt/Vision-Formula-1-FEAT-256/ \
+	--batch 2 --queuemax 64 --threads 1 \
+	--iter 1024 \
+	--eval \
+	--sampletouse 1024 \
+	--samplebatching 16 \
+	> evaluation/$NAME.out
+
+exit
+
+# Resnet-18 FV size 256
+# Regression test (we cannot reproduce 9*% accuracy with curiosity-rl.py
+NAME=Vision-Formula-1-reg
+OUT=evaluation/$NAME/
+mkdir -p $OUT
+
+./pretrain-d.sh --visionformula 1 \
+	--ckptdir ackpt/Vision-Formula-1-FEAT-256/ \
+	--batch 2 --queuemax 64 --threads 1 \
+	--iter 1048576 \
+	--eval \
+	--mispout $OUT \
+	--samplein sample/batch2-view14-norgbd-T6-R6-2M/ \
+	--sampletouse 1048576 \
+	--samplebatching 16 \
+	--samplebase 1048576 > evaluation/$NAME.out
+
+exit
+
 # Resnet-18 FV size 256
 # 
 OUT=evaluation/Vision-Formula-1/

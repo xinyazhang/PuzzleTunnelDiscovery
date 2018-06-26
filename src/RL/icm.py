@@ -139,7 +139,11 @@ class IntrinsicCuriosityModule:
             self.get_inverse_model()
             ''' Note: cur nn and next nn share params '''
             params = self.cur_nn_params + self.inverse_model_params
-            print('+*+ params: {}'.format(params))
+            # print('+*+ ICM load params from {}: {}'.format(ckpt_dir, params))
+            print('+*+ ICM load params from {}:'.format(ckpt_dir))
+            for p in params:
+                print("\t{}".format(p.name))
+            print('+*+')
             self.pretrain_saver = tf.train.Saver(params)
             self.pretrain_saver.view = view
         saver = self.pretrain_saver

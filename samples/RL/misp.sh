@@ -1,4 +1,22 @@
 TOTEST=524288
+ulimit -c 0
+
+# Evaluate InF (training Inverse Model and Forward Model simultaneously)
+OUT=evaluation/InF-nogen-Feat-2048/
+mkdir -p $OUT
+
+unbuffer ./pretrain-d.sh --visionformula 1 \
+	--ckptdir ckpt/alpha-vf1-nogen-InF/ \
+	--iter $TOTEST \
+	--mispout $OUT \
+	--norgbd \
+	--eval \
+	--samplein sample/batch2-view14-norgbd-T6-R6-2M/ \
+	--sampletouse $TOTEST \
+	--samplebatching 32 \
+	--samplebase 1048576 > $OUT/stdout
+
+exit
 
 # Evaluate naive rev 5
 
