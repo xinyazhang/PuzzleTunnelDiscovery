@@ -127,7 +127,6 @@ class VisionLayerConfig:
             conv = tf.nn.conv3d(prev_layer, w, strides, self.padding)
         # out = tf.nn.relu(conv + b)
         residual_out = None
-        res_proj = None
         if self.res_type == RESIDUAL_JOIN:
             conv = conv + residual
             residual_out = None
@@ -161,7 +160,7 @@ class VisionLayerConfig:
         '''
         NOTE: Must return self.bias rather than b. b might be a tensor while self.bias store the variable.
         '''
-        return w,self.bias,out,residual_out,res_proj
+        return w,self.bias,out,residual_out,self.res_proj
 
     @staticmethod
     def createFromDict(visdict):
