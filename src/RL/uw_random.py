@@ -63,8 +63,8 @@ def random_continuous_action(max_stepping):
     tpart, rpart = random_continuous_action_2(max_stepping)
     return np.concatenate((tpart, rpart))
 
-def random_path(uw, max_stepping, node_num):
-    state = uw.translate_to_unit_state(gen_init_state(uw))
+def random_path(uw, max_stepping, node_num, scale=0.5):
+    state = gen_unit_init_state(uw, scale)
     keys = [state]
     ratio = 0.0
     actions = []
