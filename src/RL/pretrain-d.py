@@ -423,7 +423,10 @@ def pretrain_main(args):
             tf.summary.image('input', tf.reshape(tf.slice(rgb_1, [0,0,0,0,0], [1, 1, w, h, 3]), [1, w, h, 3]), 1)
             tf.summary.tensor_summary('predicts', predicts)
         summary_op = tf.summary.merge_all()
-        train_writer = tf.summary.FileWriter(ckpt_dir + '/summary', g)
+        summary_path = ckpt_dir + '/summary'
+        if args.eval:
+            summary_path += "_eval"
+        train_writer = tf.summary.FileWriter(summary_path, g)
 
         saver = tf.train.Saver() # Save everything
         last_time = time.time()
