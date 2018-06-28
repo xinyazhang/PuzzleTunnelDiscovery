@@ -102,7 +102,6 @@ class TrainingManager:
                     global_step=global_step)
         else:
             assert False, '--train {} not implemented yet'.format(args.train)
-        assert not (self.advcore.using_lstm and self.trainer.erep_sample_cap > 0), "CuriosityRL does not support Experience Replay with LSTM"
         for i in range(args.threads):
             thread = threading.Thread(target=self.run_worker, args=(i,g))
             thread.start()

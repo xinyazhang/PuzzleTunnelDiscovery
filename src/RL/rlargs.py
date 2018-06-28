@@ -246,4 +246,5 @@ def parse():
         args.train = 'QwithGT'
     if -1 in args.actionset or len(args.actionset) == 0:
         args.actionset = [i for i in range(12)]
+    assert not (args.lstm and args.ereplayratio > 0), "LSTM cannot be used in combination with Experience Replay"
     return args
