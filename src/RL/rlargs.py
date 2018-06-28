@@ -212,7 +212,7 @@ curiosity: train the forward model, expecting overfitting.
 QandFCFE: Q and Fully Connected Layers in Feature Extractors.
 InF: Train Inverse model and Forward model with samples from files.
 ''',
-            choices=['a2c', 'QwithGT', 'curiosity', 'QandFCFE', 'InF'],
+            choices=['a2c', 'QwithGT', 'curiosity', 'QandFCFE', 'InF', 'Ionly'],
             default='a2c')
     parser.add_argument('--notrain',
             help='Set untrainnable segments',

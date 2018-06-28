@@ -90,6 +90,16 @@ class TrainingManager:
                     ckpt_dir=args.ckptdir,
                     period=args.period,
                     global_step=global_step)
+        elif args.train == 'Ionly':
+            # SAN Check: Only optimize agains Inverse Model
+            # Should work pretty well after loading pretrained weights
+            self.trainer = iftrainer.ITrainer(
+                    advcore=self.advcore,
+                    batch=args.batch,
+                    learning_rate=1e-4,
+                    ckpt_dir=args.ckptdir,
+                    period=args.period,
+                    global_step=global_step)
         else:
             assert False, '--train {} not implemented yet'.format(args.train)
         assert not (self.advcore.using_lstm and self.trainer.erep_sample_cap > 0), "CuriosityRL does not support Experience Replay with LSTM"
