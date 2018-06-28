@@ -5,6 +5,22 @@ import numpy as np
 import uw_random
 import pyosr
 
+'''
+NOTE: CLARIFY ABOUT --samplebatching AND --batch
+      In pretrain-d.py, --batch defines how many frames to generate for each
+      sampled initial state, and hence decide how many actions to sample for
+      each initial state.
+
+      On the other hand --samplebatching defines how many (frame, next frame)
+      samples to aggregrate into one training operation.
+
+      THIS HAS CHANGED IN curiosity-rl, we always use --batch, and it has
+      different semantics under different trainers.
+
+      For CTrainer, we always assume one action per initial state. and --batch
+      determines how many samples to aggregrate into one training action.
+'''
+
 class CTrainer(object):
     def __init__(self,
             advcore,
@@ -24,11 +40,16 @@ class CTrainer(object):
         if ckpt_dir is not None:
             self.summary_op = tf.summary.merge_all()
             self.train_writer = tf.summary.FileWriter(ckpt_dir + '/summary', tf.get_default_graph())
-        self.train_op = self.optimizer.minimize(self.loss, global_step=global_step, var_list=advcore.curiosity_params)
+        var_list = self._get_variables_to_train(advcore)
+        print('Variables to Train {}'.format(var_list))
+        self.train_op = self.optimizer.minimize(self.loss, global_step=global_step, var_list=var_list)
         self.action_space_dimension = uw_random.DISCRETE_ACTION_NUMBER
         self.actionset = None
         self.sample = None
         self.sample_limit = -1
+
+    def _get_variables_to_train(self, advcore):
+        return advcore.curiosity_params
 
     def build_loss(self, advcore):
         return tf.reduce_sum(advcore.curiosity)
@@ -64,6 +85,12 @@ class CTrainer(object):
             return np.random.randint(0, high=self.action_space_dimension, size=(self.batch))
         return np.random.choice(self.actionset, size=(self.batch))
 
+    def _extra_tensor(self):
+        return []
+
+    def _process_extra(self, dic, rtups):
+        pass
+
     def train(self, envir, sess, tid=None):
         advcore = self.advcore
         pprefix = "[{}] ".format(tid) if tid is not None else ""
@@ -87,8 +114,13 @@ class CTrainer(object):
               }
         # print(values)
         # print(values.shape)
-        loss, _, summary, step = sess.run([self.loss, self.train_op, self.summary_op, self.global_step], feed_dict=dic)
+        to_eva = [self.loss, self.train_op, self.summary_op, self.global_step] + self._extra_tensor()
+        rtups = sess.run(to_eva, feed_dict=dic)
+        loss = rtups[0]
+        summary = rtups[2]
+        step = rtups[3]
         self.train_writer.add_summary(summary, step)
+        self._process_extra(dic, rtups)
         print("Current loss {}".format(loss))
         if envir.steps_since_reset >= self.period * self.batch:
             envir.reset()
