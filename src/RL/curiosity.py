@@ -158,11 +158,12 @@ class CuriosityRL(rlenv.IAdvantageCore):
         self.nn_vars = dict()
 
         self.action_space_dimension = uw_random.DISCRETE_ACTION_NUMBER
+        common_shape = [None, self.view_num, w, h]
         self.action_tensor = tf.placeholder(tf.float32, shape=[None, 1, self.action_space_dimension], name='ActionPh')
-        self.rgb_1_tensor = tf.placeholder(tf.float32, shape=[None, self.view_num, w, h, 3], name='Rgb1Ph')
-        self.rgb_2_tensor = tf.placeholder(tf.float32, shape=[None, self.view_num, w, h, 3], name='Rgb2Ph')
-        self.dep_1_tensor = tf.placeholder(tf.float32, shape=[None, self.view_num, w, h, 1], name='Dep1Ph')
-        self.dep_2_tensor = tf.placeholder(tf.float32, shape=[None, self.view_num, w, h, 1], name='Dep2Ph')
+        self.rgb_1_tensor = tf.placeholder(tf.float32, shape=common_shape+[3], name='Rgb1Ph')
+        self.rgb_2_tensor = tf.placeholder(tf.float32, shape=common_shape+[3], name='Rgb2Ph')
+        self.dep_1_tensor = tf.placeholder(tf.float32, shape=common_shape+[1], name='Dep1Ph')
+        self.dep_2_tensor = tf.placeholder(tf.float32, shape=common_shape+[1], name='Dep2Ph')
 
         if self.view_num > 1 and not args.sharedmultiview:
             assert False,"Deprecated Code Path, Check Your Arguments"
@@ -206,7 +207,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
         print('Curiosity Params: {}'.format(self.curiosity_params))
 
         self.using_lstm = args.lstm
-        if args.lstm:
+        if self.using_lstm:
             self.lstm_states_in, self.lstm_len, self.lstm_states_out = self.model.acquire_lstm_io('LSTM')
             # batching is madantory, although our batch size is 1
             self.current_lstm = tf.contrib.rnn.LSTMStateTuple(
