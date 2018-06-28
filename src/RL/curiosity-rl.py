@@ -122,10 +122,11 @@ class TrainingManager:
             '''
             # if tid != 0:
             thread_local_envirs = [AlphaPuzzle(args, tid, i) for i in range(args.agents)]
-            for e in thread_local_envirs[1:]:
-                e.enable_perturbation()
-            for i in range(1, len(thread_local_envirs)):
-                thread_local_envirs[i].egreedy = args.egreedy[i % len(args.egreedy)]
+            if args.permutemag >= 0
+                for e in thread_local_envirs:
+                    e.enable_perturbation()
+            for i,e in enumerate(thread_local_envirs):
+                e.egreedy = args.egreedy[i % len(args.egreedy)]
             #else:
                 #thread_local_envirs = [AlphaPuzzle(args, tid)]
                 # Also disable randomized light position
