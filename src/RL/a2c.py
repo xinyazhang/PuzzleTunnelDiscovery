@@ -47,19 +47,19 @@ class A2CTrainer:
         print("self.loss 2 {}".format(self.loss))
         '''
         Approach 1: Do not train Vision since we don't have reliable GT from RL procedure
+        '''
         self.train_op = self.optimizer.minimize(self.loss,
                 global_step=global_step,
                 var_list=advcore.policy_params + advcore.value_params + advcore.lstm_params)
         '''
-        '''
         Approach 2: Train everything
-        '''
         if batch_normalization is not None:
             update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
             with tf.control_dependencies(update_ops):
                 self.train_op = self.optimizer.minimize(self.loss, global_step=global_step)
         else:
             self.train_op = self.optimizer.minimize(self.loss, global_step=global_step)
+        '''
         if ckpt_dir is not None:
             self.summary_op = tf.summary.merge_all()
             self.train_writer = tf.summary.FileWriter(ckpt_dir + '/summary', tf.get_default_graph())
