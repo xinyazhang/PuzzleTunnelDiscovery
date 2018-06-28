@@ -127,7 +127,7 @@ def get_parser():
             help='Do not store preview RGB images from generated samples, to save disk spaces',
             action='store_true')
     parser.add_argument('--view',
-            help='Pickup one view to train',
+            help='Pickup one view to train. -1 means all views',
             type=int, default=-1)
     parser.add_argument('--obview',
             help='The actual view used by renderer, defaults to --view but can be different for debugging purpose',
