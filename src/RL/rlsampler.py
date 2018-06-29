@@ -4,6 +4,7 @@ import pyosr
 import numpy as np
 from rlreanimator import reanimate
 import uw_random
+from six.moves import input
 
 class RLVisualizer(object):
     def __init__(self, args, g, global_step):
@@ -15,7 +16,8 @@ class RLVisualizer(object):
         self.advcore = CuriosityRL(learning_rate=1e-3, args=args)
         self.advcore.softmax_policy # Create the tensor
         self.gview = 0 if args.obview < 0 else args.obview
-        self.envir.enable_perturbation()
+        if args.permutemag >= 0:
+            self.envir.enable_perturbation(args.manual_p)
 
     def attach(self, sess):
         self.sess = sess
@@ -37,7 +39,10 @@ class PolicyPlayer(RLVisualizer):
             rgb,_ = envir.vstate
             yield rgb[self.gview] # First view
             if reaching_terminal:
+                print("#############################################")
                 print("##########CONGRATS TERMINAL REACHED##########")
+                print("########## PRESS ENTER TO CONTINUE ##########")
+                input("#############################################")
                 envir.reset()
             policy = advcore.evaluate([envir.vstate], sess, [advcore.softmax_policy])
             policy = policy[0][0]

@@ -54,8 +54,9 @@ class RigidPuzzle(rlenv.IExperienceReplayEnvironment):
         self.steps_since_reset = 0
         self.collision_pen_mag = args.collision_pen_mag
 
-    def enable_perturbation(self):
+    def enable_perturbation(self, manual_p=None):
         self.perturbation = True
+        self.manual_p = manual_p
         self.reset()
 
     def get_perturbation(self):
@@ -131,7 +132,10 @@ class RigidPuzzle(rlenv.IExperienceReplayEnvironment):
         super(RigidPuzzle, self).reset()
         if self.perturbation:
             r = self.r
-            r.set_perturbation(uw_random.random_state(self.permutemag))
+            if self.manual_p is None:
+                r.set_perturbation(uw_random.random_state(self.permutemag))
+            else:
+                r.set_perturbation(self.manual_p)
             '''
             Different perturbation has different istate in unit world.
             '''

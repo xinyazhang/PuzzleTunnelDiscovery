@@ -176,6 +176,12 @@ def get_parser():
             help='Magnitude of translation in the randomized permutation',
             type=float,
             default=0.0)
+    parser.add_argument('--manual_p',
+            metavar='REAL NUMBER',
+            nargs=7,
+            help='Specify a fixed permutation',
+            type=float,
+            default=None)
     parser.add_argument('--collision_pen_mag',
             metavar='REAL',
             help='Magnitude to peneralize collisions',
