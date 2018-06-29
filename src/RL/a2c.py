@@ -160,7 +160,12 @@ class A2CTrainer:
             nstate,reward,reaching_terminal,ratio = envir.peek_act(action, pprefix=pprefix)
             if reward < 0:
                 # print("vstate shape {}".format(envir.vstate.shape))
-                imsave('collison_dump_{}.png'.format(self.dbg_sample_peek), envir.vstate[0][0])
+                imsave('coldu/collison_dump_{}.png'.format(self.dbg_sample_peek), envir.vstate[0][0])
+                np.savez('coldu/collison_dump_{}.npz'.format(self.dbg_sample_peek),
+                        Q1=envir.qstate,
+                        Q2=nstate,
+                        P=envir.get_perturbation(),
+                        A=action)
                 self.dbg_sample_peek += 1
             ratios.append(ratio)
             actual_rewards.append(reward)
