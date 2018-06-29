@@ -64,6 +64,7 @@ class A2CTrainer:
         else:
             self.train_op = self.optimizer.minimize(self.loss, global_step=global_step)
         '''
+        assert ckpt_dir is not None, "A2CTrainer: ckpt_dir must not be None"
         if ckpt_dir is not None:
             self.summary_op = tf.summary.merge_all()
             self.train_writer = tf.summary.FileWriter(ckpt_dir + '/summary', tf.get_default_graph())
