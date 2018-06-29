@@ -48,9 +48,13 @@ class A2CTrainer:
         '''
         Approach 1: Do not train Vision since we don't have reliable GT from RL procedure
         '''
+        var_list = advcore.policy_params
+        var_list += advcore.value_params
+        var_list += advcore.curiosity_params
+        var_list += advcore.lstm_params
         self.train_op = self.optimizer.minimize(self.loss,
                 global_step=global_step,
-                var_list=advcore.policy_params + advcore.value_params + advcore.lstm_params)
+                var_list=var_list)
         '''
         Approach 2: Train everything
         if batch_normalization is not None:
