@@ -112,7 +112,7 @@ class RigidPuzzle(rlenv.IExperienceReplayEnvironment):
         sa = (colkey, (nstate, done, ratio))
         reaching_terminal = r.is_disentangled(nstate)
         reward = 0.0
-        reward += pyosr.distance(start_state, nstate) # Reward by translation
+        # reward += pyosr.distance(start_state, nstate) # Reward by translation
         reward += self.solved_award_mag if reaching_terminal is True else 0.0 # Large Reward for solution
         if not done:
             '''
