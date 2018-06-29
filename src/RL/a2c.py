@@ -300,8 +300,8 @@ class A2CTrainer:
                        })
         self.print('{}batch_td {}'.format(pprefix, batch_td))
         self.print('{}batch_V {}'.format(pprefix, batch_V))
-        _, summary = sess.run([self.train_op, self.summary_op], feed_dict=dic)
-        self.train_writer.add_summary(summary, self.global_step)
+        _, summary, gs = sess.run([self.train_op, self.summary_op, self.global_step], feed_dict=dic)
+        self.train_writer.add_summary(summary, gs)
         # advcore.train(sess, batch_rgb, batch_dep, batch_adist)
         # FIXME: Re-enable summary after joint the two losses.
         '''
