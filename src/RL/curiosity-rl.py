@@ -122,7 +122,7 @@ class TrainingManager:
             '''
             # if tid != 0:
             thread_local_envirs = [AlphaPuzzle(args, tid, i) for i in range(args.agents)]
-            if args.permutemag >= 0
+            if args.permutemag >= 0:
                 for e in thread_local_envirs:
                     e.enable_perturbation()
             for i,e in enumerate(thread_local_envirs):
