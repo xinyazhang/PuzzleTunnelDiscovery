@@ -395,7 +395,7 @@ class A2CTrainerDTT(A2CTrainer):
         self.dtt.start()
 
     def __del__(self):
-        self.Q.put(Arguments())
+        self.Q.put(self.Arguments())
         print("[A2CTrainerDTT] Waiting for DTT")
         self.dtt.join()
         print("[A2CTrainerDTT] DTT waited")
@@ -404,11 +404,11 @@ class A2CTrainerDTT(A2CTrainer):
     override the synchronous version defined in A2CTrainer
     '''
     def dispatch_training(self, sess, dic):
-        self.Q.put(Arguments(dic, sess))
+        self.Q.put(self.Arguments(dic, sess))
 
     def dedicated_training(self):
         while True:
             a = self.Q.get()
             if a.dic is None:
                 break
-            super(A2CTrainer, self).dispatch_training(a.sess, a.dic)
+            super(A2CTrainerDTT, self).dispatch_training(a.sess, a.dic)
