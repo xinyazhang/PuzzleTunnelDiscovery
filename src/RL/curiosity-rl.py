@@ -27,9 +27,11 @@ AlphaPuzzle = curiosity.RigidPuzzle
 CuriosityRL = curiosity.CuriosityRL
 
 '''
-Facade Class:
+Facade Class TrainingManager:
     Agent layer between main thread and actual training classes.
     Use --train to choose component/network to train
+
+    Note: threading has been done at this class.
 '''
 class TrainingManager:
     kAsyncTask = 1
@@ -50,7 +52,11 @@ class TrainingManager:
         self.reportQ = queue.Queue(args.queuemax)
         self.bnorm = batch_normalization
         if args.train == 'a2c':
-            self.trainer = a2c.A2CTrainer(
+            if args.threads > 1:
+                TRAINER = a2c.A2CTrainerDTT
+            else:
+                TRAINER = a2c.A2CTrainer
+            self.trainer = TRAINER(
                     advcore=self.advcore,
                     tmax=args.batch,
                     gamma=config.GAMMA,

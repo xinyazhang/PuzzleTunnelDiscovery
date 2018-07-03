@@ -6,26 +6,28 @@ from collections import deque
 import itertools
 # imsave for Debug
 from scipy.misc import imsave
+import threading
+from six.moves import queue, input
 
-class A2CTrainer:
+class A2CTrainer(object):
     a2c_tmax = None
     optimizer = None
     loss = None
     verbose_training = False
 
     def __init__(self,
-            advcore,
-            tmax,
-            gamma,
-            learning_rate,
-            ckpt_dir,
-            global_step=None,
-            entropy_beta=0.01,
-            debug=True,
-            batch_normalization=None,
-            period=1,
-            LAMBDA=0.5
-            ):
+                 advcore,
+                 tmax,
+                 gamma,
+                 learning_rate,
+                 ckpt_dir,
+                 global_step=None,
+                 entropy_beta=0.01,
+                 debug=True,
+                 batch_normalization=None,
+                 period=1,
+                 LAMBDA=0.5
+                ):
         self.advcore = advcore
         self.a2c_tmax = tmax
         self.gamma = gamma
@@ -300,8 +302,7 @@ class A2CTrainer:
                        })
         self.print('{}batch_td {}'.format(pprefix, batch_td))
         self.print('{}batch_V {}'.format(pprefix, batch_V))
-        _, summary, gs = sess.run([self.train_op, self.summary_op, self.global_step], feed_dict=dic)
-        self.train_writer.add_summary(summary, gs)
+        self.dispatch_training(sess, dic)
         # advcore.train(sess, batch_rgb, batch_dep, batch_adist)
         # FIXME: Re-enable summary after joint the two losses.
         '''
@@ -309,6 +310,10 @@ class A2CTrainer:
         self.train_writer.add_summary(summary, self.global_step)
         '''
         return batch_V
+
+    def dispatch_training(self, sess, dic):
+        _, summary, gs = sess.run([self.train_op, self.summary_op, self.global_step], feed_dict=dic)
+        self.train_writer.add_summary(summary, gs)
 
     def train_by_samples(self, envir, sess, states, actions, ratios, trewards, reaching_terminal, pprefix):
         advcore = self.advcore
@@ -348,3 +353,62 @@ class A2CTrainer:
                 trewards=trewards,
                 reaching_terminal=reaching_terminal,
                 pprefix=pprefix)
+
+QUEUE_CAPACITY = 16
+
+'''
+A2C Trainer with Dedicated Training Thread
+'''
+class A2CTrainerDTT(A2CTrainer):
+    class Arguments:
+        def __init__(self, dic=None, sess=None):
+            self.dic = dic
+            self.sess = sess
+
+    def __init__(self,
+            advcore,
+            tmax,
+            gamma,
+            learning_rate,
+            ckpt_dir,
+            global_step=None,
+            entropy_beta=0.01,
+            debug=True,
+            batch_normalization=None,
+            period=1,
+            LAMBDA=0.5
+            ):
+        super(A2CTrainerDTT, self).__init__(
+                advcore=advcore,
+                tmax=tmax,
+                gamma=gamma,
+                learning_rate=learning_rate,
+                ckpt_dir=ckpt_dir,
+                global_step=global_step,
+                entropy_beta=entropy_beta,
+                debug=debug,
+                batch_normalization=batch_normalization,
+                period=period,
+                LAMBDA=LAMBDA)
+        self.Q = queue.Queue(QUEUE_CAPACITY)
+        self.dtt = threading.Thread(target=self.dedicated_training)
+        self.dtt.start()
+
+    def __del__(self):
+        self.Q.put(Arguments())
+        print("[A2CTrainerDTT] Waiting for DTT")
+        self.dtt.join()
+        print("[A2CTrainerDTT] DTT waited")
+
+    '''
+    override the synchronous version defined in A2CTrainer
+    '''
+    def dispatch_training(self, sess, dic):
+        self.Q.put(Arguments(dic, sess))
+
+    def dedicated_training(self):
+        while True:
+            a = self.Q.get()
+            if a.dic is None:
+                break
+            super(A2CTrainer, self).dispatch_training(a.sess, a.dic)
