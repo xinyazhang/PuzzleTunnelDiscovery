@@ -1,7 +1,7 @@
 '''
-    pretrain.py
+    curiosity-rl.py
 
-    Pre-Train the VisionNet and Inverse Model
+    Curiosity driven RL Framework
 '''
 
 from __future__ import print_function
@@ -26,6 +26,11 @@ import rlsampler
 AlphaPuzzle = curiosity.RigidPuzzle
 CuriosityRL = curiosity.CuriosityRL
 
+'''
+Facade Class:
+    Agent layer between main thread and actual training classes.
+    Use --train to choose component/network to train
+'''
 class TrainingManager:
     kAsyncTask = 1
     kSyncTask = 2
@@ -164,6 +169,15 @@ class TrainingManager:
     def load_pretrain(self, sess, pretrained_ckpt):
         self.advcore.load_pretrain(sess, pretrained_ckpt)
 
+'''
+Main Function:
+    1. Create TF graphs by creating Facade class TrainingManager
+        - This facade class will create corresponding training class on demand
+    1.a Alternatively, call rlsampler.create_visualizer to evaluate the traing results
+    2. Initialize TF sessions and TF Saver
+    3. Restore from checkpoints on demand
+    3. Call TrainingManager for some iterations on demand
+'''
 def curiosity_main(args):
     '''
     CAVEAT: WITHOUT ALLOW_GRWTH, WE MUST CREATE RENDERER BEFORE CALLING ANY TF ROUTINE
@@ -211,11 +225,12 @@ def curiosity_main(args):
         saver = tf.train.Saver() # Save everything
         last_time = time.time()
         with tf.Session(config=session_config) as sess:
-            sess.run(tf.global_variables_initializer())
             epoch = 0
             accum_epoch = 0
             if args.viewinitckpt and not args.eval:
                 trainer.load_pretrain(sess, args.viewinitckpt)
+            sess.run(tf.global_variables_initializer())
+            g.finalize() # Prevent accidental changes
 
             ckpt = tf.train.get_checkpoint_state(checkpoint_dir=ckpt_dir)
             print('ckpt {}'.format(ckpt))
@@ -234,7 +249,6 @@ def curiosity_main(args):
             period_loss = 0.0
             period_accuracy = 0
             total_accuracy = 0
-            g.finalize() # Prevent accidental changes
             if args.eval:
                 player.attach(sess)
                 player.play()

@@ -1,3 +1,12 @@
+'''
+Overall design idea:
+    separate the TF inferencing network, training network, rendering, and TF session
+    - Inferencing network is managed by IAdvantageCore
+    - training network is managed by trainer classes (e.g. A2CTrainer)
+    - rendering is moved to IEnvironment
+    - TF session is provided by trainer class
+'''
+
 from abc import ABCMeta, abstractmethod, abstractproperty
 import tensorflow as tf
 from collections import deque
@@ -9,6 +18,9 @@ import numpy as np
 Note: Python2 code?
 '''
 
+'''
+IEnvironment: Interface to objects that describe the RL environment
+'''
 class IEnvironment(object):
     __metaclass__ = ABCMeta
 
@@ -66,6 +78,12 @@ class IEnvironment(object):
     def reset(self):
         pass
 
+'''
+IExperienceReplayEnvironment:
+    Interface to objects that not only describe the RL environment, but also records the experiences
+
+    Note: this experience recording can be disabled by passing negative numbers to erep_cap when creating
+'''
 class IExperienceReplayEnvironment(IEnvironment):
 
     def __init__(self, tmax, erep_cap, dumpdir=None):
@@ -148,12 +166,8 @@ class IExperienceReplayEnvironment(IEnvironment):
         [q.clear() for q in self.erep_all_deques]
 
 '''
-Overall design idea:
-    separate the TF inferencing network, training network, rendering, and TF session
-    - Inferencing network is managed by itself
-    - training network is managed by trainer classes (e.g. A2CTrainer)
-    - rendering is moved to IEnvironment
-    - TF session is provided by trainer class
+IAdvantageCore:
+    Interface to objects that provides deep inferencing network
 '''
 class IAdvantageCore(object):
     __metaclass__ = ABCMeta

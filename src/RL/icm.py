@@ -163,6 +163,7 @@ class IntrinsicCuriosityModule:
         if self.pm is None:
             assert self.view_num == 1
             return local_pred
+        assert self.view_num == len(self.pm), "permuation_matrix does not match view number"
         print("local pred {}".format(local_pred.shape))
         local_preds = tf.unstack(local_pred, axis=1) # [BATCH, N] * VIEW
         world_preds = []

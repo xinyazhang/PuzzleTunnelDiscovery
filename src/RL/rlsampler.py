@@ -6,6 +6,9 @@ from rlreanimator import reanimate
 import uw_random
 from six.moves import input
 
+'''
+Base class to visualize/evaluate the RL training results
+'''
 class RLVisualizer(object):
     def __init__(self, args, g, global_step):
         self.args = args
