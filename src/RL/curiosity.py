@@ -183,7 +183,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
                     args.fehidden)
         else:
             pm = [pyosr.get_permutation_to_world(self.views, i) for i in range(len(self.views))]
-            pm = np.array(pm)
+            pm = np.array(pm) if args.view < 0 else None
             print(pm)
             with tf.variable_scope(icm.view_scope_name('0')):
                 self.model = icm.IntrinsicCuriosityModule(self.action_tensor,
