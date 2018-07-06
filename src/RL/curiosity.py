@@ -162,6 +162,16 @@ class CuriosityRL(rlenv.IAdvantageCore):
         self.nn_vars = dict()
 
         self.action_space_dimension = uw_random.DISCRETE_ACTION_NUMBER
+        '''
+        Mask out actions not in --actionset
+        Note: the masking is done at decision time, since it is hard to enforce
+              this at policy layer because of softmax "normalization".
+        '''
+        self.action_mask = np.full((self.action_space_dimension), 1.0)
+        for a in range(self.action_space_dimension):
+            if a not in args.actionset:
+                self.action_mask[a] = 0.0
+
         common_shape = [None, self.view_num, w, h]
         self.action_tensor = tf.placeholder(tf.float32, shape=[None, 1, self.action_space_dimension], name='ActionPh')
         self.rgb_1_tensor = tf.placeholder(tf.float32, shape=common_shape+[3], name='Rgb1Ph')
@@ -334,7 +344,8 @@ class CuriosityRL(rlenv.IAdvantageCore):
         self.lstm_cache = ret[-1]
         return ret[:-1]
 
-    def make_decision(self, envir, policy_dist, pprefix=''):
+    def make_decision(self, envir, unmasked_policy_dist, pprefix=''):
+        policy_dist = unmasked_policy_dist * self.action_mask
         best = np.argmax(policy_dist, axis=-1)
         if random.random() < envir.egreedy:
             ret = np.asscalar(best)
