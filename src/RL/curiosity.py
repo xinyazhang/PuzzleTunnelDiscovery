@@ -1,7 +1,7 @@
 '''
 Implement Interfaces in rlenv for Curiosity RL
 '''
-
+from __future__ import print_function
 # Fundamental packages
 import tensorflow as tf
 import numpy as np
@@ -350,7 +350,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
         if random.random() < envir.egreedy:
             ret = np.asscalar(best)
         else:
-            ret = random.randrange(self.action_space_dimension)
+            ret = np.random.choice(self.args.actionset)
         print(pprefix, 'Action best {} chosen {}'.format(best, ret))
         return ret
 
