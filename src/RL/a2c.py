@@ -101,6 +101,8 @@ class A2CTrainer(object):
         # self.TD_tensor = tf.placeholder(tf.float32, shape=[None])
         # self.V_tensor = tf.placeholder(tf.float32, shape=[None])
 
+        '''
+        # Old buggy policy loss
         policy = advcore.softmax_policy
         log_policy = tf.log(tf.clip_by_value(policy, 1e-20, 1.0))
         # cond_prob = tf.reduce_sum(policy * self.Adist_tensor, axis=1)
@@ -115,8 +117,26 @@ class A2CTrainer(object):
         # policy_loss_per_step = tf.reduce_sum(action_entropy * self.TD_tensor) + entropy * self.entropy_beta
         policy_loss_per_step = tf.reduce_sum(action_entropy * self.TD_tensor)
         policy_loss = -tf.reduce_sum(policy_loss_per_step)
+        '''
+
+        '''
+        New policy loss
+        '''
+        # Need V as critic
+        # advcore.value's shape is (B,V,1)
         flattened_value = tf.reshape(advcore.value, [-1])
-        value_loss = tf.nn.l2_loss(self.V_tensor - flattened_value)
+
+        # Pick out the sampled action from policy output
+        # Shape: (B,V,A)
+        policy = tf.multiply(advcore.softmax_policy, self.Adist_tensor)
+        policy = tf.reduce_sum(policy, axis=[1,2]) # Shape: (B) afterwards
+        log_policy = tf.log(tf.clip_by_value(policy, 1e-20, 1.0))
+        criticism = self.V_tensor - flattened_value
+        policy_loss = tf.reduce_sum(log_policy * criticism)
+        policy_loss = -policy_loss # A3C paper uses gradient ascend, which means we need to minimize the NEGATIVE of the original
+
+        # Value loss
+        value_loss = tf.nn.l2_loss(criticism)
         self.print("V_tensor {} AdvCore.value {}".format(self.V_tensor.shape, flattened_value.shape))
         self.loss = policy_loss+value_loss
         '''
