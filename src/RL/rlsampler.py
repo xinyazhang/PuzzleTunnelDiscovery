@@ -49,11 +49,11 @@ class PolicyPlayer(RLVisualizer):
                 envir.reset()
             policy = advcore.evaluate([envir.vstate], sess, [advcore.softmax_policy])
             policy = policy[0][0]
-            action = advcore.make_decision(envir, policy, pprefix)
+            action_index = advcore.make_decision(envir, policy, pprefix)
             print("PolicyPlayer unmasked pol {}".format(policy))
             print("PolicyPlayer masked pol {}".format(policy * advcore.action_mask))
-            print("PolicyPlayer Action {}".format(action))
-            nstate,reward,reaching_terminal,ratio = envir.peek_act(action, pprefix=pprefix)
+            print("PolicyPlayer Action Index {}".format(action_index))
+            nstate,reward,reaching_terminal,ratio = envir.peek_act(action_index, pprefix=pprefix)
             envir.qstate = nstate
 
 class QPlayer(RLVisualizer):

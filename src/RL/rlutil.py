@@ -48,10 +48,10 @@ def create_renderer(args, creating_ctx=True):
     r.views = np.array(va, dtype=np.float32)
     return r
 
-def actions_to_adist_array(actions):
+def actions_to_adist_array(actions, dim=uw_random.DISCRETE_ACTION_NUMBER):
     n = len(actions)
     adists = np.zeros(
-            shape=(n, 1, uw_random.DISCRETE_ACTION_NUMBER),
+            shape=(n, 1, dim),
             dtype=np.float32)
     for i in range(n):
         adists[i, 0, actions[i]] = 1.0

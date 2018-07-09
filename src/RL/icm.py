@@ -133,6 +133,7 @@ class IntrinsicCuriosityModule:
         self.featnum = featnum
         self.lstmsize = featnum
         self.lstm_dic = {}
+        self.action_space_dimension = int(self.action_tensor.shape[-1])
 
     def load_pretrain(self, sess, ckpt_dir, view=0):
         if self.pretrain_saver is None:
@@ -197,7 +198,7 @@ class IntrinsicCuriosityModule:
         print('inverse_model input {}'.format(input_featvec))
         # featnums = [config.INVERSE_MODEL_HIDDEN_LAYER, int(self.action_tensor.shape[-1])]
         # featnums = config.INVERSE_MODEL_HIDDEN_LAYER + [int(self.action_tensor.shape[-1])]
-        featnums = self.imhidden_params + [int(self.action_tensor.shape[-1])]
+        featnums = self.imhidden_params + [self.action_space_dimension]
         print('inverse_model featnums {}'.format(featnums))
         self.inverse_fc_applier = vision.ConvApplier(None, featnums, 'InverseModelNet', self.elu)
         params, out = self.inverse_fc_applier.infer(input_featvec)
@@ -271,8 +272,8 @@ class IntrinsicCuriosityModule:
             labels=self.action_tensor,
             logits=out)
         '''
-        labels = tf.reshape(self.action_tensor, [-1, 12])
-        logits = tf.reshape(out, [-1, 12])
+        labels = tf.reshape(self.action_tensor, [-1, self.action_space_dimension])
+        logits = tf.reshape(out, [-1, self.action_space_dimension])
         ret = tf.losses.softmax_cross_entropy(
             onehot_labels=labels,
             logits=logits)

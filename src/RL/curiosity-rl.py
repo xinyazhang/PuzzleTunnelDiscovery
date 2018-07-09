@@ -56,6 +56,7 @@ class TrainingManager:
                 TRAINER = a2c.A2CTrainerDTT
             else:
                 TRAINER = a2c.A2CTrainer
+            train_everything = False if args.viewinitckpt else True
             self.trainer = TRAINER(
                     advcore=self.advcore,
                     tmax=args.batch,
@@ -66,7 +67,8 @@ class TrainingManager:
                     global_step=global_step,
                     batch_normalization=self.bnorm,
                     period=args.period,
-                    LAMBDA=args.LAMBDA)
+                    LAMBDA=args.LAMBDA,
+                    train_everything=train_everything)
         elif args.train == 'QwithGT' or args.qlearning_with_gt or args.train == 'QandFCFE':
             self.trainer = qtrainer.QTrainer(
                     advcore=self.advcore,
@@ -233,6 +235,9 @@ def curiosity_main(args):
         with tf.Session(config=session_config) as sess:
             epoch = 0
             accum_epoch = 0
+            '''
+            MUST BEFORE loading checkpoints
+            '''
             if args.viewinitckpt and not args.eval:
                 trainer.load_pretrain(sess, args.viewinitckpt)
             sess.run(tf.global_variables_initializer())

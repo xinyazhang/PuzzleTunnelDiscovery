@@ -195,6 +195,9 @@ def get_parser():
             type=int,
             choices=[0,1,2],
             default=1)
+    parser.add_argument('--curiosity_factor', help='Scaling factor of the returned curiosity',
+            type=float,
+            default=1.0)
     parser.add_argument('--qlearning_with_gt',
             help='Train the ValNet with Ground Truth from RRT, implies --train QwithGT',
             action='store_true')
@@ -254,5 +257,6 @@ def parse():
         args.train = 'QwithGT'
     if -1 in args.actionset or len(args.actionset) == 0:
         args.actionset = [i for i in range(12)]
+    args.actionset = list(set(args.actionset)) # deduplication
     assert not (args.lstm and args.ereplayratio > 0), "LSTM cannot be used in combination with Experience Replay"
     return args

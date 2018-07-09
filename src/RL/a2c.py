@@ -26,7 +26,8 @@ class A2CTrainer(object):
                  debug=True,
                  batch_normalization=None,
                  period=1,
-                 LAMBDA=0.5
+                 LAMBDA=0.5,
+                 train_everything=False
                 ):
         self.advcore = advcore
         self.a2c_tmax = tmax
@@ -47,25 +48,29 @@ class A2CTrainer(object):
         tf.summary.scalar('a2c_loss', self.loss)
         self.loss += (1 - LAMBDA) * advcore.build_loss()
         print("self.loss 2 {}".format(self.loss))
-        '''
-        Approach 1: Do not train Vision since we don't have reliable GT from RL procedure
-        '''
-        var_list = advcore.policy_params
-        var_list += advcore.value_params
-        var_list += advcore.curiosity_params
-        var_list += advcore.lstm_params
-        self.train_op = self.optimizer.minimize(self.loss,
-                global_step=global_step,
-                var_list=var_list)
-        '''
-        Approach 2: Train everything
-        if batch_normalization is not None:
-            update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-            with tf.control_dependencies(update_ops):
-                self.train_op = self.optimizer.minimize(self.loss, global_step=global_step)
+        if train_everything is False:
+            '''
+            Approach 1: With --viewinitckpt, do not train Vision since we don't
+                        have reliable GT from RL procedure
+            '''
+            var_list = advcore.policy_params
+            var_list += advcore.value_params
+            if advcore.curiosity_params is not None: # guard for --curiosity_type 0
+                var_list += advcore.curiosity_params
+            var_list += advcore.lstm_params
+            self.train_op = self.optimizer.minimize(self.loss,
+                    global_step=global_step,
+                    var_list=var_list)
         else:
-            self.train_op = self.optimizer.minimize(self.loss, global_step=global_step)
-        '''
+            '''
+            Approach 2: Train everything
+            '''
+            if batch_normalization is not None:
+                update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+                with tf.control_dependencies(update_ops):
+                    self.train_op = self.optimizer.minimize(self.loss, global_step=global_step)
+            else:
+                self.train_op = self.optimizer.minimize(self.loss, global_step=global_step)
         assert ckpt_dir is not None, "A2CTrainer: ckpt_dir must not be None"
         if ckpt_dir is not None:
             self.summary_op = tf.summary.merge_all()
@@ -160,7 +165,7 @@ class A2CTrainer(object):
         advcore = self.advcore
         reaching_terminal = False
         states = []
-        actions = []
+        action_indices = []
         ratios = []
         actual_rewards = []
         combined_rewards = []
@@ -172,21 +177,20 @@ class A2CTrainer(object):
             Pick up the only frame
             '''
             self.print('{}unmasked pol {} shape {}; val {} shape {}'.format(pprefix, policy, policy.shape, value, value.shape))
-            policy = policy * advcore.action_mask
             self.print('{}masked pol {} shape {};'.format(pprefix, policy, policy.shape))
             policy = policy[0][0] # Policy View from first qstate and first view
             value = np.asscalar(value) # value[0][0][0]
             lstm_next = advcore.get_lstm()
-            action = advcore.make_decision(envir, policy, pprefix)
+            action_index = advcore.make_decision(envir, policy, pprefix)
             states.append(envir.vstate)
             '''
             FIXME: Wait, shouldn't be policy?
             '''
-            actions.append(action)
+            action_indices.append(action_index)
             values.append(value)
 
             self.print("{}Peeking action".format(pprefix))
-            nstate,reward,reaching_terminal,ratio = envir.peek_act(action, pprefix=pprefix)
+            nstate,reward,reaching_terminal,ratio = envir.peek_act(action_index, pprefix=pprefix)
             if reward < 0:
                 # print("vstate shape {}".format(envir.vstate.shape))
                 imsave('coldu/collison_dump_{}.png'.format(self.dbg_sample_peek), envir.vstate[0][0])
@@ -194,18 +198,18 @@ class A2CTrainer(object):
                         Q1=envir.qstate,
                         Q2=nstate,
                         P=envir.get_perturbation(),
-                        A=action)
+                        A=action_index)
                 self.dbg_sample_peek += 1
             ratios.append(ratio)
             actual_rewards.append(reward)
             # print("action peeked {} ratio {} terminal? {}".format(nstate, ratio, reaching_terminal))
             reward += advcore.get_artificial_reward(envir, sess,
-                    envir.qstate, action, nstate, ratio, pprefix)
+                    envir.qstate, action_index, nstate, ratio, pprefix)
             combined_rewards.append(reward)
             '''
             Store Exprience
             '''
-            envir.store_erep(states[-1], envir.qstate, actions[-1], ratios[-1],
+            envir.store_erep(states[-1], envir.qstate, action_indices[-1], ratios[-1],
                              actual_rewards[-1],
                              reaching_terminal,
                              envir.get_perturbation()
@@ -224,14 +228,14 @@ class A2CTrainer(object):
             advcore.set_lstm(lstm_next) # AdvCore next frame
             envir.qstate = nstate # Envir Next frame
         advcore.set_lstm(lstm_begin)
-        # self.a2c(envir, sess, actions, states, combined_rewards, values, reaching_terminal, pprefix)
+        # self.a2c(envir, sess, action_indices, states, combined_rewards, values, reaching_terminal, pprefix)
         # print("> states length {}, shape {}".format(len(states), states[0][0].shape))
-        # print("> actions length {}, tmax {}".format(len(actions), tmax))
+        # print("> action_indices length {}, tmax {}".format(len(action_indices), tmax))
         states.append(envir.vstate)
         self.train_by_samples(envir=envir,
                 sess=sess,
                 states=states,
-                actions=actions,
+                action_indices=action_indices,
                 ratios=ratios,
                 trewards=actual_rewards,
                 reaching_terminal=reaching_terminal,
@@ -253,22 +257,22 @@ class A2CTrainer(object):
             for i in range(envir.erep_sample_cap):
                 self.a2c_erep(envir, sess, pprefix)
             envir.reset()
-            assert len(envir.erep_actions) == 0, "Exp Rep is not cleared after reaching terminal"
+            assert len(envir.erep_action_indices) == 0, "Exp Rep is not cleared after reaching terminal"
 
     '''
     Private function that performs the training
     '''
-    def a2c(self, envir, sess, vstates, actions, ratios, rewards, values, reaching_terminal, pprefix=""):
+    def a2c(self, envir, sess, vstates, action_indices, ratios, rewards, values, reaching_terminal, pprefix=""):
         advcore = self.advcore
         V = 0.0
         if not reaching_terminal:
             V = np.asscalar(advcore.evaluate([envir.vstate], sess, tensors=[advcore.value])[0])
             self.print('> V from advcore.evaluate {}'.format(V))
 
-        # actions.reverse()
+        # action_indices.reverse()
         # rewards.reverse()
         # values.reverse()
-        r_actions = actions[::-1]
+        r_action_indices = action_indices[::-1]
         r_rewards = rewards[::-1]
         r_values = values[::-1]
 
@@ -281,7 +285,7 @@ class A2CTrainer(object):
         '''
         print('[{}] R start with {}'.format(self.worker_thread_index, R))
         '''
-        for (ai, ri, Vi) in zip(r_actions, r_rewards, r_values):
+        for (ai, ri, Vi) in zip(r_action_indices, r_rewards, r_values):
             V = ri + self.gamma * V
             td = V - Vi
             self.print("{}V(env+ar) {} V(nn) {} reward {}".format(pprefix, V, Vi, ri))
@@ -337,40 +341,44 @@ class A2CTrainer(object):
         _, summary, gs = sess.run([self.train_op, self.summary_op, self.global_step], feed_dict=dic)
         self.train_writer.add_summary(summary, gs)
 
-    def train_by_samples(self, envir, sess, states, actions, ratios, trewards, reaching_terminal, pprefix):
+    def train_by_samples(self, envir, sess, states, action_indices, ratios, trewards, reaching_terminal, pprefix):
         advcore = self.advcore
         trimmed_states = states[:-1]
         if len(trimmed_states) <= 0:
             return
-        arewards = advcore.get_artificial_from_experience(sess, states, actions, ratios, pprefix)
+        arewards = advcore.get_artificial_from_experience(sess, states, action_indices, ratios, pprefix)
+        arewards = np.reshape(arewards, newshape=(-1)).tolist()
         [values] = advcore.evaluate(trimmed_states, sess, [advcore.value])
+        values = np.reshape(values, newshape=(-1)).tolist()
+        '''
         self.print(pprefix, '> ARewards {}'.format(arewards))
         # print(pprefix, '> Values {}'.format(values))
-        arewards = np.reshape(arewards, newshape=(-1)).tolist()
-        values = np.reshape(values, newshape=(-1)).tolist()
         self.print(pprefix, '> Values list {}'.format(values))
+        '''
         rewards = []
         for (tr,ar) in zip(trewards, arewards):
             rewards.append(tr+ar)
         self.print(pprefix, '> Rewards {}'.format(rewards))
-        bv = self.a2c(envir, sess, states, actions, ratios, rewards, values, reaching_terminal, pprefix)
+        bv = self.a2c(envir, sess, states, action_indices, ratios, rewards, values, reaching_terminal, pprefix)
+        '''
         [valuesafter] = advcore.evaluate(trimmed_states, sess, [advcore.value])
         valuesafter = np.reshape(valuesafter, newshape=(-1)).tolist()
         self.print(pprefix, '> [DEBUG] Values before training {}'.format(values))
         self.print(pprefix, '> [DEBUG] Values target {}'.format(bv))
         self.print(pprefix, '> [DEBUG] Values after training {}'.format(valuesafter))
+        '''
 
     '''
     a2c_erep: A2C Training with Expreience REPlay
     '''
     def a2c_erep(self, envir, sess, pprefix):
-        states, actions, ratios, trewards, reaching_terminal = envir.sample_in_erep(pprefix)
-        if len(actions) == 0:
+        states, action_indices, ratios, trewards, reaching_terminal = envir.sample_in_erep(pprefix)
+        if len(action_indices) == 0:
             return
         self.train_by_samples(envir=envir,
                 sess=sess,
                 states=states,
-                actions=actions,
+                action_indices=action_indices,
                 ratios=ratios,
                 trewards=trewards,
                 reaching_terminal=reaching_terminal,
@@ -398,7 +406,8 @@ class A2CTrainerDTT(A2CTrainer):
             debug=True,
             batch_normalization=None,
             period=1,
-            LAMBDA=0.5
+            LAMBDA=0.5,
+            train_everything=False
             ):
         super(A2CTrainerDTT, self).__init__(
                 advcore=advcore,
@@ -411,7 +420,8 @@ class A2CTrainerDTT(A2CTrainer):
                 debug=debug,
                 batch_normalization=batch_normalization,
                 period=period,
-                LAMBDA=LAMBDA)
+                LAMBDA=LAMBDA,
+                train_everything=train_everything)
         self.Q = queue.Queue(QUEUE_CAPACITY)
         self.dtt = threading.Thread(target=self.dedicated_training)
         self.dtt.start()
