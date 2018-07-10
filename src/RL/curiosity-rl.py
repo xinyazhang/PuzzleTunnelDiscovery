@@ -139,7 +139,7 @@ class TrainingManager:
                 for e in thread_local_envirs:
                     e.enable_perturbation()
             for i,e in enumerate(thread_local_envirs):
-                e.egreedy = args.egreedy[i % len(args.egreedy)]
+                e.egreedy = args.egreedy[(i+tid) % len(args.egreedy)]
             #else:
                 #thread_local_envirs = [AlphaPuzzle(args, tid)]
                 # Also disable randomized light position
