@@ -207,8 +207,6 @@ class CuriosityRL(rlenv.IAdvantageCore):
         self.valout, self.valparams, self.valnets = self.create_valnet(args)
         if args.curiosity_type == 2:
             self.ratios_tensor = tf.placeholder(tf.float32, shape=[None], name='RatioPh')
-        else:
-            self.ratios_tensor = None
         self.curiosity, self.curiosity_params = self.create_curiosity_net(args)
         print('Curiosity Params: {}'.format(self.curiosity_params))
 

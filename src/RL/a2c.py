@@ -71,10 +71,12 @@ class A2CTrainer(object):
                     self.train_op = self.optimizer.minimize(self.loss, global_step=global_step)
             else:
                 self.train_op = self.optimizer.minimize(self.loss, global_step=global_step)
-        assert ckpt_dir is not None, "A2CTrainer: ckpt_dir must not be None"
         if ckpt_dir is not None:
             self.summary_op = tf.summary.merge_all()
             self.train_writer = tf.summary.FileWriter(ckpt_dir + '/summary', tf.get_default_graph())
+        else:
+            self.summary_op = None
+            self.train_writer = None
         self.global_step = global_step
         self.dbg_sample_peek = 0
 
@@ -122,6 +124,8 @@ class A2CTrainer(object):
         # policy_loss_per_step = tf.reduce_sum(action_entropy * self.TD_tensor) + entropy * self.entropy_beta
         policy_loss_per_step = tf.reduce_sum(action_entropy * self.TD_tensor)
         policy_loss = -tf.reduce_sum(policy_loss_per_step)
+        flattened_value = tf.reshape(advcore.value, [-1])
+        value_loss = tf.nn.l2_loss(self.V_tensor - flattened_value)
         '''
 
         '''
@@ -130,7 +134,6 @@ class A2CTrainer(object):
         # Need V as critic
         # advcore.value's shape is (B,V,1)
         flattened_value = tf.reshape(advcore.value, [-1])
-
         # Pick out the sampled action from policy output
         # Shape: (B,V,A)
         policy = tf.multiply(advcore.softmax_policy, self.Adist_tensor)
@@ -139,9 +142,9 @@ class A2CTrainer(object):
         criticism = self.V_tensor - flattened_value
         policy_loss = tf.reduce_sum(log_policy * criticism)
         policy_loss = -policy_loss # A3C paper uses gradient ascend, which means we need to minimize the NEGATIVE of the original
-
         # Value loss
         value_loss = tf.nn.l2_loss(criticism)
+
         self.print("V_tensor {} AdvCore.value {}".format(self.V_tensor.shape, flattened_value.shape))
         self.loss = policy_loss+value_loss
         '''
@@ -191,7 +194,7 @@ class A2CTrainer(object):
 
             self.print("{}Peeking action".format(pprefix))
             nstate,reward,reaching_terminal,ratio = envir.peek_act(action_index, pprefix=pprefix)
-            if reward < 0:
+            if False and reward < 0:
                 # print("vstate shape {}".format(envir.vstate.shape))
                 imsave('coldu/collison_dump_{}.png'.format(self.dbg_sample_peek), envir.vstate[0][0])
                 np.savez('coldu/collison_dump_{}.npz'.format(self.dbg_sample_peek),
@@ -257,7 +260,7 @@ class A2CTrainer(object):
             for i in range(envir.erep_sample_cap):
                 self.a2c_erep(envir, sess, pprefix)
             envir.reset()
-            assert len(envir.erep_action_indices) == 0, "Exp Rep is not cleared after reaching terminal"
+            assert len(envir.erep_actions) == 0, "Exp Rep is not cleared after reaching terminal"
 
     '''
     Private function that performs the training
@@ -299,8 +302,12 @@ class A2CTrainer(object):
         batch_rgb = [state[0] for state in vstates]
         batch_dep = [state[1] for state in vstates]
         if self.verbose_training:
-            self.print('{}batch_a[0] {}'.format(pprefix, batch_adist[0]))
-            self.print('{}batch_V {}'.format(pprefix, batch_R))
+            print("values {}".format(values))
+            print("rewards {}".format(rewards))
+            print("action_indices {}".format(action_indices))
+            print("batch_rgb {}".format(batch_rgb))
+            print('{}batch_a[0] {}'.format(pprefix, batch_adist[0]))
+            print('{}batch_V {}'.format(pprefix, batch_V))
         '''
         Always reverse, the RLEnv need this sequential info for training.
         '''
@@ -338,8 +345,11 @@ class A2CTrainer(object):
         return batch_V
 
     def dispatch_training(self, sess, dic):
-        _, summary, gs = sess.run([self.train_op, self.summary_op, self.global_step], feed_dict=dic)
-        self.train_writer.add_summary(summary, gs)
+        if self.summary_op is not None:
+            _, summary, gs = sess.run([self.train_op, self.summary_op, self.global_step], feed_dict=dic)
+            self.train_writer.add_summary(summary, gs)
+        else:
+            sess.run(self.train_op, feed_dict=dic)
 
     def train_by_samples(self, envir, sess, states, action_indices, ratios, trewards, reaching_terminal, pprefix):
         advcore = self.advcore
@@ -356,6 +366,7 @@ class A2CTrainer(object):
         self.print(pprefix, '> Values list {}'.format(values))
         '''
         rewards = []
+        assert len(trewards) == len(arewards), "Artificial rewards' size should match true rewards'"
         for (tr,ar) in zip(trewards, arewards):
             rewards.append(tr+ar)
         self.print(pprefix, '> Rewards {}'.format(rewards))
