@@ -93,8 +93,7 @@ class RigidPuzzle(rlenv.IExperienceReplayEnvironment):
     def vstatedim(self):
         return self.rgb_shape[0:3]
 
-    def peek_act(self, action_index, pprefix="", start_state=None):
-        action = self.args.actionset[action_index]
+    def peek_act(self, action, pprefix="", start_state=None):
         r = self.r
         start_state = r.state if start_state is None else start_state
         colkey = tuple(start_state.tolist() + [action])
@@ -163,8 +162,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
         self.batch_normalization = batch_normalization
         self.nn_vars = dict()
 
-        # self.action_space_dimension = uw_random.DISCRETE_ACTION_NUMBER
-        self.action_space_dimension = len(args.actionset)
+        self.action_space_dimension = uw_random.DISCRETE_ACTION_NUMBER
 
         common_shape = [None, self.view_num, w, h]
         self.action_tensor = tf.placeholder(tf.float32, shape=[None, 1, self.action_space_dimension], name='ActionPh')
@@ -294,6 +292,22 @@ class CuriosityRL(rlenv.IAdvantageCore):
     def policy(self):
         return self.polout
     @property
+    def softmax_policy(self):
+        if self._softmax_policy_tensor is None:
+            actionset = self.args.actionset
+            asize = len(actionset)
+            extractor = np.zeros((self.action_space_dimension, asize), dtype=np.float32)
+            for i, a in enumerate(actionset):
+                extractor[a, i] = 1.0
+            adaptor = np.transpose(extractor)
+            assert len(self.policy.shape) == 3, 'shape of policy ({}) does not follow (B,V,A)'.format(self.policy.shape)
+            compact = tf.tensordot(self.policy, extractor, [[2], [0]])
+            assert int(compact.shape[-1]) == asize, 'softmax_policy compact shape assertion failed'
+            compact_softmax = tf.nn.softmax(compact)
+            self._softmax_policy_tensor = tf.tensordot(compact_softmax, adaptor, [[2],[0]])
+            assert int(self._softmax_policy_tensor.shape[-1]) == self.action_space_dimension, "softmax policy shape failed"
+        return self._softmax_policy_tensor
+    @property
     def value(self):
         return self.valout
     @property
@@ -344,22 +358,23 @@ class CuriosityRL(rlenv.IAdvantageCore):
         if random.random() < envir.egreedy:
             ret = np.asscalar(best)
         else:
-            ret = np.random.choice(len(actionset))
-        print(pprefix, 'Action best index {} ({}) chosen index {} ({})'.format(best, actionset[best], ret, actionset[ret]))
+            ret = np.random.choice(actionset)
+        # print(pprefix, 'Action best index {} ({}) chosen index {} ({})'.format(best, actionset[best], ret, actionset[ret]))
+        print(pprefix, 'Action best {} chosen {}'.format(best, ret))
         return ret
 
-    def get_artificial_reward(self, envir, sess, state_1, action_index, state_2, ratio, pprefix=""):
+    def get_artificial_reward(self, envir, sess, state_1, action, state_2, ratio, pprefix=""):
         if self.curiosity is None:
             return 0
         envir.qstate = state_1
         vs1 = envir.vstate
         envir.qstate = state_2
         vs2 = envir.vstate
-        return self.get_artificial_from_experience(sess, [vs1,vs2], [action_index], [ratio], pprefix)[0]
+        return self.get_artificial_from_experience(sess, [vs1,vs2], [action], [ratio], pprefix)[0]
 
-    def get_artificial_from_experience(self, sess, vstates, action_indices, ratios, pprefix):
+    def get_artificial_from_experience(self, sess, vstates, actions, ratios, pprefix):
         if self.curiosity is None:
-            return np.zeros(shape=(len(action_indices)))
+            return np.zeros(shape=(len(actions)))
         '''
         adists_array = []
         for ai in actions:
@@ -368,7 +383,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
             adist[0, ai] = 1.0
             adists_array.append(adist)
         '''
-        adists_array = rlutil.actions_to_adist_array(action_indices, dim=self.action_space_dimension)
+        adists_array = rlutil.actions_to_adist_array(actions, dim=self.action_space_dimension)
         rgbs = [state[0] for state in vstates]
         deps = [state[1] for state in vstates]
         print('> RGBs {} len: {}'.format(rgbs[0].shape, len(rgbs)))
@@ -386,10 +401,10 @@ class CuriosityRL(rlenv.IAdvantageCore):
         ret = sess.run(self.curiosity, feed_dict=dic)
         return ret * self.args.curiosity_factor
 
-    def train(self, sess, rgb, dep, action_indices):
+    def train(self, sess, rgb, dep, actions):
         assert False, "Deprecated buggy function"
         dic = {
-                self.action_tensor : action_indices,
+                self.action_tensor : actions,
                 self.rgb_1 : rgb[:-1],
                 self.dep_1 : dep[:-1],
                 self.rgb_2 : rgb[1:],

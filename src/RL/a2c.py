@@ -177,7 +177,7 @@ class A2CTrainer(object):
             Pick up the only frame
             '''
             self.print('{}unmasked pol {} shape {}; val {} shape {}'.format(pprefix, policy, policy.shape, value, value.shape))
-            self.print('{}masked pol {} shape {};'.format(pprefix, policy, policy.shape))
+            # self.print('{}masked pol {} shape {};'.format(pprefix, policy, policy.shape))
             policy = policy[0][0] # Policy View from first qstate and first view
             value = np.asscalar(value) # value[0][0][0]
             lstm_next = advcore.get_lstm()
