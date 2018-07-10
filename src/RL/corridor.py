@@ -6,11 +6,11 @@ import a2c
 import numpy as np
 import random
 
-class Corridor(rlenv.IEnvironment):
+class Corridor(rlenv.IExperienceReplayEnvironment):
     ACTION_DELTA = [-1,1]
 
     def __init__(self, args):
-        super(Corridor, self).__init__()
+        super(Corridor, self).__init__(tmax=args.batch, erep_cap=-1)
 
         self.state = 0
         self.mag = args.res
@@ -20,6 +20,9 @@ class Corridor(rlenv.IEnvironment):
 
     def qstate_getter(self):
         return self.state
+
+    def get_perturbation(self):
+        return None
 
     qstate = property(qstate_getter, qstate_setter)
 
@@ -35,7 +38,7 @@ class Corridor(rlenv.IEnvironment):
     0 Left  (-=1)
     1 Right (+=1)
     '''
-    def peek_act(self, action):
+    def peek_act(self, action, pprefix):
         nstate = self.state + self.ACTION_DELTA[action]
         reward = 0
         reaching_terminal = False
@@ -76,14 +79,15 @@ class TabularRL(rlenv.IAdvantageCore):
         self.polout = tf.gather(self.smpolparams,
             indices=self.indices)
         print('polout shape {}'.format(self.polout.shape))
-        self.valout = 1000.0 * tf.gather(self.valparams,
+        self.valout = tf.gather(self.valparams,
             indices=self.indices)
 
         print('Polout {} Valout {}'.format(self.polout.shape, self.valout.shape))
+        self._softmax_policy_tensor = tf.reshape(self.policy, [-1,1,2])
 
     @property
     def softmax_policy(self):
-        return tf.reshape(self.policy, [-1,1,2])
+        return self._softmax_policy_tensor
 
     @property
     def rgb_1(self):
@@ -113,29 +117,37 @@ class TabularRL(rlenv.IAdvantageCore):
     def lstm_params(self):
         return []
 
-    def evaluate_current(self, vstate, sess, tensors, additional_dict=None):
-        rgb,dep = vstate
+    def evaluate(self, vstates, sess, tensors, additional_dict=None):
+        rgbs = [state[0] for state in vstates]
+        deps = [state[1] for state in vstates]
         dic = {
-                self.rgb_1 : [rgb],
+                self.rgb_1 : rgbs,
+                self.dep_1 : deps
         }
         if additional_dict is not None:
             dic.update(additional_dict)
         return sess.run(tensors, feed_dict=dic)
 
-    def make_decision(self, policy_dist):
+    def make_decision(self, envir, policy_dist, pprefix):
         best = np.argmax(policy_dist, axis=-1)
         if random.random() < self.egreedy:
             ret = random.randrange(2)
         else:
             ret = best
-        print('Action best {} chosen {}'.format(best, ret))
+        # print('Action best {} chosen {}'.format(best, ret))
         return ret
 
-    def get_artificial_reward(self, envir, sess, state_1, adist, state_2):
+    def get_artificial_reward(self, envir, sess, state_1, adist, state_2, ratio, pprefix):
         return 0
+
+    def get_artificial_from_experience(self, sess, vstates, actions, ratios, pprefix):
+        return np.zeros(shape=(len(actions)))
 
     def train(self, sess, rgb, dep, actions):
         pass
+
+    def build_loss(self):
+        return 0
 
     def lstm_next(self):
         return 0
@@ -163,27 +175,30 @@ def corridor_main():
     total_epoch = args.iter
 
     g = tf.Graph()
+    np.set_printoptions(linewidth=120)
     with g.as_default(), tf.device("/cpu:0"):
         global_step = tf.contrib.framework.get_or_create_global_step()
 
         envir = Corridor(args)
         advcore = TabularRL(learning_rate=1e-2, args=args)
-        trainer = a2c.A2CTrainer(envir=envir,
-                advcore=advcore,
+        trainer = a2c.A2CTrainer(advcore=advcore,
                 tmax=args.batch,
                 gamma=config.GAMMA,
                 learning_rate=1e-2,
-                global_step=global_step)
+                global_step=global_step,
+                debug=False,
+                ckpt_dir=None)
 
-        saver = tf.train.Saver() # Save everything
+        # saver = tf.train.Saver() # Save everything
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
             epoch = 0
+            g.finalize()
             while epoch < total_epoch:
-                trainer.train(sess)
+                trainer.train(envir, sess)
                 print("===Iteration {}===".format(epoch))
                 print('Pol {}'.format(sess.run(advcore.smpolparams)))
-                print('Val {}'.format(sess.run(advcore.valparams)))
+                print('Val {}'.format(np.reshape(sess.run(advcore.valparams), [-1])))
                 epoch += 1
 
 if __name__ == '__main__':

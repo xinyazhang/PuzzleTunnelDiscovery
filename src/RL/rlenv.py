@@ -175,6 +175,8 @@ class IAdvantageCore(object):
     def __init__(self):
         super(IAdvantageCore, self).__init__()
         self._softmax_policy_tensor = None
+        self.curiosity_params = None
+        self.ratios_tensor = None
 
     '''
     Input RGB for Current Frame
