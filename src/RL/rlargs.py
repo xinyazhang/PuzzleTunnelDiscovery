@@ -210,7 +210,7 @@ def get_parser():
             default=None)
     parser.add_argument('--visualize',
             help='Choose which aspect of the RL system to visualize',
-            choices=['policy', 'curiosity'],
+            choices=['policy', 'curiosity', 'fake3d'],
             default='policy')
     parser.add_argument('--train',
             help='''

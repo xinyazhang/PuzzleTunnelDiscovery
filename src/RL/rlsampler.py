@@ -16,6 +16,8 @@ class RLVisualizer(object):
         self.ctx = pyosr.create_gl_context(self.dpy)
         self.envir = AlphaPuzzle(args, 0)
         self.envir.egreedy = 0.995
+        self.uw = self.envir.r
+        self.r = self.envir.r
         self.advcore = CuriosityRL(learning_rate=1e-3, args=args)
         self.advcore.softmax_policy # Create the tensor
         self.gview = 0 if args.obview < 0 else args.obview
@@ -201,6 +203,72 @@ class CuriositySampler(RLVisualizer):
         curiosity = np.array(curiosities_by_action)
         np.savez(args.sampleout, Q=samples, C=curiosity)
 
+class Fake3dSampler(RLVisualizer):
+    def __init__(self, args, g, global_step):
+        super(Fake3dSampler, self).__init__(args, g, global_step)
+        assert args.sampleout, '--visualize fake3d requires --sampleout'
+        self.istate = np.array(self.r.translate_to_unit_state(args.istateraw), dtype=np.float32)
+        if 10 in args.actionset or 11 in args.actionset:
+            self.has_rotation = True
+        else:
+            self.has_rotation = False
+        self.zaxis_row = np.array([[0,0,1]],dtype=np.float32)
+
+    def _sample(self, scale = 0.5):
+        while True:
+            quat = np.array([1, 0, 0, 0], dtype=np.float32)
+            if self.has_rotation:
+                theta = np.random.rand() * np.pi
+                quat[0] = np.cos(theta) # * 0.5 was cancelled since we sampled from [0,pi)
+                quat[3] = np.sin(theta) # rotation around z axis, hence [1,2] == 0
+            tr = scale * (np.random.rand(3) - 0.5)
+            tr[2] = self.istate[2] # Fix at the same plane
+            state = np.concatenate((tr, quat))
+            if self.r.is_disentangled(state):
+                continue
+            if self.r.is_valid_state(state):
+                return state
+
+    '''
+    Sample in 2D space and convert it to 3D
+    '''
+    def _sample_mini_batch(self, batch):
+        ret = []
+        for i in range(batch):
+            ret.append(self._sample())
+        return ret
+
+    def render(self, envir, state):
+        envir.qstate = state
+        return envir.vstate
+
+    def play(self):
+        args = self.args
+        advcore = self.advcore
+        envir = self.envir
+        Q = []
+        V = []
+        Po = []
+        for i in range(args.iter / args.batch):
+            qbatch = self._sample_mini_batch(args.batch)
+            images = [self.render(envir, state) for state in qbatch]
+            batch_rgb = [image[0] for image in images]
+            batch_dep = [image[1] for image in images]
+            dic = {
+                    advcore.rgb_1: batch_rgb,
+                    advcore.dep_1: batch_dep,
+                  }
+            policies, values = sess.run([advcore.softmax_policy, advcore.value], feed_dict=dic)
+            values = np.reshape(values, [-1]) # flatten
+            policies = np.reshape(values, [-1, advcore.action_space_dimension]) #
+            Q += qbatch
+            V.append(values)
+            Po.append(policies)
+        Q = np.array(Q)
+        V = np.concatenate(V)
+        Po = np.concatenate(Po)
+        np.savez(args.sampleout, Q=Q, V=V, Po=Po)
+
 def create_visualizer(args, g, global_step):
     if args.qlearning_with_gt:
         # assert args.sampleout, "--sampleout is required to store the samples for --qlearning_with_gt"
@@ -211,4 +279,6 @@ def create_visualizer(args, g, global_step):
         return PolicyPlayer(args, g, global_step)
     elif args.visualize == 'curiosity':
         return CuriositySampler(args, g, global_step)
+    elif args.visualize == 'fake3d':
+        return Fake3dSampler(args, g, global_step)
     assert False, '--visualize {} is not implemented yet'.format(args.visualize)
