@@ -214,7 +214,7 @@ class Fake3dSampler(RLVisualizer):
             self.has_rotation = False
         self.zaxis_row = np.array([[0,0,1]],dtype=np.float32)
 
-    def _sample(self, scale = 0.5):
+    def _sample(self, scale = 5.0):
         while True:
             quat = np.array([1, 0, 0, 0], dtype=np.float32)
             if self.has_rotation:
@@ -246,6 +246,7 @@ class Fake3dSampler(RLVisualizer):
         args = self.args
         advcore = self.advcore
         envir = self.envir
+        sess = self.sess
         Q = []
         V = []
         Po = []
@@ -260,7 +261,7 @@ class Fake3dSampler(RLVisualizer):
                   }
             policies, values = sess.run([advcore.softmax_policy, advcore.value], feed_dict=dic)
             values = np.reshape(values, [-1]) # flatten
-            policies = np.reshape(values, [-1, advcore.action_space_dimension]) #
+            policies = np.reshape(policies, [-1, advcore.action_space_dimension]) #
             Q += qbatch
             V.append(values)
             Po.append(policies)
