@@ -5,6 +5,7 @@ import numpy as np
 from rlreanimator import reanimate
 import uw_random
 from six.moves import input
+import progressbar
 
 '''
 Base class to visualize/evaluate the RL training results
@@ -250,7 +251,7 @@ class Fake3dSampler(RLVisualizer):
         Q = []
         V = []
         Po = []
-        for i in range(args.iter / args.batch):
+        for i in progressbar.progressbar(range(args.iter / args.batch)):
             qbatch = self._sample_mini_batch(args.batch)
             images = [self.render(envir, state) for state in qbatch]
             batch_rgb = [image[0] for image in images]
