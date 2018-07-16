@@ -9,6 +9,68 @@ from scipy.misc import imsave
 import threading
 from six.moves import queue, input
 
+
+'''
+    Side effects: self.advcore.lstm_state is changed
+'''
+class RLSample(object):
+    def __init__(self, advcore, envir, sess):
+        # Capture Current Frame
+        self.qstate = envir.qstate
+        self.perturbation = envir.get_perturbation()
+        self.vstate = envir.vstate
+        # Sample Pi and V
+        policy, value = advcore.evaluate([envir.vstate], sess, [advcore.softmax_policy, advcore.value])
+        self.policy = policy[0][0] # Policy View from first qstate and first view
+        self.value = np.asscalar(value) # value[0][0][0]
+
+    def proceed(self, advcore, envir, sess):
+        # Sample Action
+        self.action_index = advcore.make_decision(envir, policy)
+        # Preview Next frame
+        self.nstate, self.true_reward, self.reaching_terminal, self.ratio = envir.peek_act(self.action_index)
+        # Artificial Reward
+        self.artificial_reward = advcore.get_artificial_reward(envir, sess,
+                envir.qstate, self.action_index, self.nstate, self.ratio)
+        self.combined_reward = self.true_reward + self.artificial_reward
+        # Side Effects: Maintain LSTM
+        lstm_next = advcore.get_lstm() # Get the output of current frame
+        advcore.set_lstm(lstm_next) # AdvCore next frame
+
+class A2CSampler(object):
+
+    def __init__(self,
+                 advcore,
+                 tmax):
+        self.advcore = advcore
+        self.a2c_tmax = tmax
+
+    '''
+    Sample one in a mini-batch
+
+    Side effects: self.advcore.lstm_state is changed
+    '''
+    def _sample_one(self, envir, sess):
+        sam = RLSample(self.advcore, envir, sess)
+        sam.proceed(self.advcore, envir, sess)
+        return sam
+
+    def sample_minibatch(self, envir, sess, tid=None, tmax=-1):
+        if tmax < 0:
+            tmax = self.a2c_tmax
+        advcore = self.advcore
+        samples = []
+        # LSTM is also tracked by Envir, since it's derived by vstate
+        # FIXME: Initialize envir.lstm_barn somewhere else.
+        advcore.set_lstm(envir.lstm_barn)
+        for i in range(tmax):
+            s = self._sample_one(envir, sess)
+            samples.append(s)
+            if s.reaching_terminal:
+                break
+        envir.lstm_barn = advcore.get_lstm().copy()
+        return samples
+
 class A2CTrainer(object):
     a2c_tmax = None
     optimizer = None
@@ -26,11 +88,13 @@ class A2CTrainer(object):
                  debug=True,
                  batch_normalization=None,
                  period=1,
+                 total_number_of_replicas=None,
                  LAMBDA=0.5,
                  train_everything=False
                 ):
-        self.advcore = advcore
-        self.a2c_tmax = tmax
+        super(A2CTrainer, self).__init__(
+                advcore=advcore,
+                tmax=tmax)
         self.gamma = gamma
         self.entropy_beta = entropy_beta
         self.debug = debug
@@ -41,7 +105,9 @@ class A2CTrainer(object):
         '''
         self.optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
         if period > 1:
-            self.optimizer = tf.train.SyncReplicasOptimizer(self.optimizer, replicas_to_aggregate=period)
+            self.optimizer = tf.train.SyncReplicasOptimizer(self.optimizer,
+                    replicas_to_aggregate=period,
+                    total_num_replicas=total_number_of_replicas)
         LAMBDA = 0.5
         self.loss = LAMBDA * self.build_loss(advcore)
         print("self.loss 1 {}".format(self.loss))
@@ -164,118 +230,25 @@ class A2CTrainer(object):
         return self.loss
 
     '''
-    Train the network
-
-    This method interacts with RLEnv object to collect truths
+    New training function.
     '''
     def train(self, envir, sess, tid=None, tmax=-1):
-        if tmax < 0:
-            tmax = self.a2c_tmax
-        if tid is None:
-            pprefix = ""
-        else:
-            pprefix = "[{}] ".format(tid)
-        advcore = self.advcore
-        reaching_terminal = False
-        states = []
-        action_indices = []
-        ratios = []
-        actual_rewards = []
-        combined_rewards = []
-        values = []
-        lstm_begin = advcore.get_lstm()
-        for i in range(tmax):
-            policy, value = advcore.evaluate([envir.vstate], sess, [advcore.softmax_policy, advcore.value])
-            '''
-            Pick up the only frame
-            '''
-            self.print('{}unmasked pol {} shape {}; val {} shape {}'.format(pprefix, policy, policy.shape, value, value.shape))
-            # self.print('{}masked pol {} shape {};'.format(pprefix, policy, policy.shape))
-            policy = policy[0][0] # Policy View from first qstate and first view
-            value = np.asscalar(value) # value[0][0][0]
-            lstm_next = advcore.get_lstm()
-            action_index = advcore.make_decision(envir, policy, pprefix)
-            states.append(envir.vstate)
-            '''
-            FIXME: Wait, shouldn't be policy?
-            '''
-            action_indices.append(action_index)
-            values.append(value)
-
-            self.print("{}Peeking action".format(pprefix))
-            nstate,reward,reaching_terminal,ratio = envir.peek_act(action_index, pprefix=pprefix)
-            if False and reward < 0:
-                # print("vstate shape {}".format(envir.vstate.shape))
-                imsave('coldu/collison_dump_{}.png'.format(self.dbg_sample_peek), envir.vstate[0][0])
-                np.savez('coldu/collison_dump_{}.npz'.format(self.dbg_sample_peek),
-                        Q1=envir.qstate,
-                        Q2=nstate,
-                        P=envir.get_perturbation(),
-                        A=action_index)
-                self.dbg_sample_peek += 1
-            ratios.append(ratio)
-            actual_rewards.append(reward)
-            # print("action peeked {} ratio {} terminal? {}".format(nstate, ratio, reaching_terminal))
-            reward += advcore.get_artificial_reward(envir, sess,
-                    envir.qstate, action_index, nstate, ratio, pprefix)
-            combined_rewards.append(reward)
-            '''
-            Store Exprience
-            '''
-            envir.store_erep(states[-1], envir.qstate, action_indices[-1], ratios[-1],
-                             actual_rewards[-1],
-                             reaching_terminal,
-                             envir.get_perturbation()
-                             )
-            '''
-            Experience Replay
-            '''
-            self.a2c_erep(envir, sess, pprefix)
-            if reaching_terminal:
-                break
-            '''
-            Leave for training because of collision
-            if ratio == 0:
-                break
-            '''
-            advcore.set_lstm(lstm_next) # AdvCore next frame
-            envir.qstate = nstate # Envir Next frame
-        advcore.set_lstm(lstm_begin)
-        # self.a2c(envir, sess, action_indices, states, combined_rewards, values, reaching_terminal, pprefix)
-        # print("> states length {}, shape {}".format(len(states), states[0][0].shape))
-        # print("> action_indices length {}, tmax {}".format(len(action_indices), tmax))
-        states.append(envir.vstate)
-        self.train_by_samples(envir=envir,
-                sess=sess,
-                states=states,
-                action_indices=action_indices,
-                ratios=ratios,
-                trewards=actual_rewards,
-                reaching_terminal=reaching_terminal,
-                pprefix=pprefix)
-        advcore.set_lstm(lstm_next)
-
-        if reaching_terminal:
-            '''
-            Add the final state to erep cache
-            '''
-            envir.store_erep(states[-1], envir.qstate,
-                    -1, -1, -1,
-                    reaching_terminal,
-                    envir.get_perturbation()
-                    )
-            '''
-            Train the experience in sample_cap iterations
-            '''
-            for i in range(envir.erep_sample_cap):
-                self.a2c_erep(envir, sess, pprefix)
-            envir.reset()
-            assert len(envir.erep_actions) == 0, "Exp Rep is not cleared after reaching terminal"
+        rlsamples = self.sample_minibatch(envir, sess, tid, tmax)
+        self.a2c(envir=envir,
+                 sess=sess,
+                 vstates=[s.vstata for s in rlsamples],
+                 action_indices=[s.action_index for s in rlsamples],
+                 ratios=[s.ratio for s in rlsamples],
+                 rewards=[s.combined_reward for s in rlsamples],
+                 values=[s.value for s in rlsamples],
+                 reaching_terminal=rlsamples[-1].reaching_terminal
+                )
 
     '''
     Private function that performs the training
     '''
     def a2c(self, envir, sess, vstates, action_indices, ratios, rewards, values, reaching_terminal, pprefix=""):
+        assert len(vstate) == len(action_indices) + 1, "[a2c] SAS sequence was not satisfied"
         advcore = self.advcore
         V = 0.0
         if not reaching_terminal:
@@ -427,6 +400,7 @@ class A2CTrainerDTT(A2CTrainer):
             debug=True,
             batch_normalization=None,
             period=1,
+            total_number_of_replicas=None,
             LAMBDA=0.5,
             train_everything=False
             ):
@@ -441,6 +415,7 @@ class A2CTrainerDTT(A2CTrainer):
                 debug=debug,
                 batch_normalization=batch_normalization,
                 period=period,
+                total_number_of_replicas=total_number_of_replicas,
                 LAMBDA=LAMBDA,
                 train_everything=train_everything)
         self.Q = queue.Queue(QUEUE_CAPACITY)

@@ -249,6 +249,19 @@ Ionly: Inverse model only.
             choices=['fe'],
             nargs='*',
             default=[])
+    # Distributed Tensorflow
+    # (Maximize Performance under GIL)
+    parser.add_argument('--localcluster_size', metavar='NUMBER',
+            help='Number of Worker Processes',
+            type=int, default=0)
+    parser.add_argument('--localcluster_portbase', metavar='NUMBER',
+            help='Number of Worker Processes',
+            type=int, default=0)
+    """
+    parser.add_argument('--task_index', metavar='NUMBER',
+            help='Task index in distributed training',
+            type=int, default=0)
+    """
 
     return parser
 

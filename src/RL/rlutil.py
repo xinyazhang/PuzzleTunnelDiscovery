@@ -3,6 +3,7 @@ import config
 import numpy as np
 import pyosr
 import uw_random
+import copy
 
 def get_view_cfg(args):
     VIEW_CFG = config.VIEW_CFG
@@ -56,6 +57,28 @@ def actions_to_adist_array(actions, dim=uw_random.DISCRETE_ACTION_NUMBER):
     for i in range(n):
         adists[i, 0, actions[i]] = 1.0
     return adists
+
+def assemble_distributed_arguments(args):
+    args.ps_hosts = 'localhost:{}'.format(args.localcluster_portbase)
+    args.worker_hosts = ''
+    for i in range(args.cluster_size):
+        if i > 0:
+            args.worker_hosts += ','
+        args.worker_hosts += 'localhost:{}'.format(args.localcluster_portbase+i+1)
+    ps_args = copy.deepcopy(args)
+    ps_args.job_name = 'ps'
+    ret = [ps_args]
+    for i in range(args.cluster_size):
+        w_args = copy.deepcopy(args)
+        w_args.job_name = 'worker'
+        w_args.task_index = i
+        ret.append(w_args)
+    return ret
+
+def create_cluster_dic(args):
+    ps_hosts = args.ps_hosts.split(',')
+    wk_hosts = args.wk_hosts.split(',')
+    return {"ps": ps_hosts, "worker": wk_hosts}
 
 SC_PRED_PERMUTATION = 1
 SC_ACTION_PERMUTATION = 2

@@ -385,7 +385,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
         vs2 = envir.vstate
         return self.get_artificial_from_experience(sess, [vs1,vs2], [action], [ratio], pprefix)[0]
 
-    def get_artificial_from_experience(self, sess, vstates, actions, ratios, pprefix):
+    def get_artificial_from_experience(self, sess, vstates, actions, ratios, pprefix=''):
         if self.curiosity is None:
             return np.zeros(shape=(len(actions)))
         '''
