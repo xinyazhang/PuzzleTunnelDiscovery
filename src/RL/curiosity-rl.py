@@ -62,7 +62,7 @@ class TrainingManager:
                     tmax=args.batch,
                     gamma=config.GAMMA,
                     # gamma=0.5,
-                    learning_rate=1e-6,
+                    learning_rate=1e-3,
                     ckpt_dir=args.ckptdir,
                     global_step=global_step,
                     batch_normalization=self.bnorm,
