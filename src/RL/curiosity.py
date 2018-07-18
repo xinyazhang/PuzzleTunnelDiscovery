@@ -20,7 +20,6 @@ from cachetools import LRUCache
 import config
 
 class RigidPuzzle(rlenv.IExperienceReplayEnvironment):
-    solved_award_mag = 10
 
     def __init__(self, args, tid, agent_id=-1):
         dumpdir = None
@@ -53,7 +52,8 @@ class RigidPuzzle(rlenv.IExperienceReplayEnvironment):
         self.perturbation = False
         self.dump_id = 0
         self.steps_since_reset = 0
-        self.collision_pen_mag = args.collision_pen_mag
+        self.PEN = args.PEN
+        self.REW = args.REW
 
     def enable_perturbation(self, manual_p=None):
         self.perturbation = True
@@ -115,13 +115,13 @@ class RigidPuzzle(rlenv.IExperienceReplayEnvironment):
         reaching_terminal = r.is_disentangled(nstate)
         reward = 0.0
         # reward += pyosr.distance(start_state, nstate) # Reward by translation
-        reward += self.solved_award_mag if reaching_terminal is True else 0.0 # Large Reward for solution
+        reward += self.REW if reaching_terminal is True else 0.0 # Large Reward for solution
         if not done:
             '''
             Special handling of collision
             '''
             if ratio == 0.0:
-                reward = -self.collision_pen_mag
+                reward += self.PEN
             self.collision_cache.update([sa])
         rgb_1, dep_1 = self.vstate
         self.state = nstate

@@ -160,6 +160,14 @@ def get_parser():
             help='Reward discount factor, negative value means lineay decay (cost)',
             type=float,
             default=config.GAMMA)
+    parser.add_argument('--PEN',
+            help='Penalty reward from collision',
+            type=float,
+            default=-10.0)
+    parser.add_argument('--REW',
+            help='Reward from disentanglement',
+            type=float,
+            default=10.0)
     parser.add_argument('--sancheck',
             help='Different sanity check points',
             type=int,
@@ -186,11 +194,6 @@ def get_parser():
             help='Specify a fixed permutation',
             type=float,
             default=None)
-    parser.add_argument('--collision_pen_mag',
-            metavar='REAL',
-            help='Magnitude to peneralize collisions',
-            type=float,
-            default=10.0)
     parser.add_argument('--jointfw',
             help='Use the joint all views as the input of forward model',
             action='store_true')
