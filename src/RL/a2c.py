@@ -138,10 +138,17 @@ class A2CTrainer(object):
         # Shape: (B,V,A)
         policy = tf.multiply(advcore.softmax_policy, self.Adist_tensor)
         policy = tf.reduce_sum(policy, axis=[1,2]) # Shape: (B) afterwards
-        log_policy = tf.log(tf.clip_by_value(policy, 1e-20, 1.0))
-        criticism = self.V_tensor - flattened_value
+        log_policy = -tf.log(tf.clip_by_value(policy, 1e-20, 1.0))
+        # criticism = self.V_tensor - flattened_value
+
+        # TD_tensor input is the same as of V_tensor - flattened_value,
+        # but policy loss should not optimize value parameters.
+        # 
+        # Alternatively, call tf.stop_gradient().
+        criticism = self.TD_tensor
+        assert log_policy.shape.as_list() == criticism.shape.as_list(), "shape match failure: log(Pi) {} criticism {}".format(log_policy.shape, criticism.shape)
         policy_loss = tf.reduce_sum(log_policy * criticism)
-        policy_loss = -policy_loss # A3C paper uses gradient ascend, which means we need to minimize the NEGATIVE of the original
+        # policy_loss = -policy_loss # A3C paper uses gradient ascend, which means we need to minimize the NEGATIVE of the original
         # Value loss
         value_loss = tf.nn.l2_loss(criticism)
 
