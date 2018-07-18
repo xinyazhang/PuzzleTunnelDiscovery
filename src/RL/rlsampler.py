@@ -312,6 +312,65 @@ class Fake3dSampler(RLVisualizer):
         Po = np.concatenate(Po)
         np.savez(args.sampleout, Q=Q, V=V, Po=Po)
 
+'''
+Milestome To State Action sampler
+'''
+class MSASampler(RLVisualizer):
+    def __init__(self, args, g, global_step):
+        super(MSASampler, self).__init__(args, g, global_step)
+        assert args.msiraw, '--visualize msa requires --msiraw as input'
+        assert args.sampleout, '--visualize msa requires --sampleout'
+        msraw = np.array(args.msiraw)
+        self.msraw = np.reshape(msraw, (-1, 7))
+        assert self.msraw[0].all() == np.array(args.msiraw[:7]).all(), "--msiraw reshaped well"
+        ms = []
+        for msraw in self.msraw:
+            ms.append(np.array(self.r.translate_to_unit_state(msraw), dtype=np.float32))
+        self.ms = np.array(ms, dtype=np.float32)
+        self.traj_s = []
+        self.traj_a = []
+
+    def play(self):
+        reanimate(self)
+
+    def __iter__(self):
+        envir = self.envir
+        sess = self.sess
+        advcore = self.advcore
+        reaching_terminal = False
+        args = self.args
+        pprefix = "[0] "
+        print("MS list {}".format(self.ms))
+        for ms in self.ms:
+            print("Switch MS to {}".format(ms))
+            while True:
+                self.traj_s.append(envir.qstate)
+                print("Current state {}".format(envir.qstate))
+                rgb,_ = envir.vstate
+                yield rgb[self.gview] # First view
+                if reaching_terminal:
+                    print("#############################################")
+                    print("##########CONGRATS TERMINAL REACHED##########")
+                    print("##########   PRESS ENTER TO EXIT   ##########")
+                    input("#############################################")
+                    np.savez(args.sampleout, TRAJ_S=self.traj_s, TRAJ_A=self.traj_a)
+                    return
+                    yield
+                sa = []
+                sd = []
+                for a in args.actionset:
+                    nstate,_,reaching_terminal,_ = envir.peek_act(a)
+                    sa.append(nstate)
+                    sd.append(pyosr.distance(nstate, ms))
+                print("sa {} \nsd {}".format(sa, sd))
+                ai = np.argmin(sd)
+                if sd[ai] > pyosr.distance(envir.qstate, ms): # Local minimum reached
+                    break
+                a = args.actionset[ai]
+                self.traj_a.append(a)
+                envir.qstate = sa[ai]
+
+
 def create_visualizer(args, g, global_step):
     if args.qlearning_with_gt:
         # assert args.sampleout, "--sampleout is required to store the samples for --qlearning_with_gt"
@@ -326,4 +385,6 @@ def create_visualizer(args, g, global_step):
         return CuriositySampler(args, g, global_step)
     elif args.visualize == 'fake3d':
         return Fake3dSampler(args, g, global_step)
+    elif args.visualize == 'msa':
+        return MSASampler(args, g, global_step)
     assert False, '--visualize {} is not implemented yet'.format(args.visualize)

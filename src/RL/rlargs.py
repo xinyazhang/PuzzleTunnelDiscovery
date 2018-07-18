@@ -222,8 +222,13 @@ policy: visualize the path walked by according to policy network.
 curiosity: sample the curiosity value, i.e. forward model loss.
 fake3d: sample Pi and V for fake3d cases
             ''',
-            choices=['policy', 'curiosity', 'fake3d', 'critic'],
+            choices=['policy', 'curiosity', 'fake3d', 'critic', 'msa'],
             default='policy')
+    parser.add_argument('--msiraw',
+            help='MileStone Injection (RAW state). in the same protocol as of --istateraw',
+            type=float,
+            nargs='*',
+            default=[])
     parser.add_argument('--train',
             help='''
 Choose which component to train separately (if --eval does not present).
@@ -272,4 +277,5 @@ def parse():
         args.actionset = [i for i in range(12)]
     args.actionset = list(set(args.actionset)) # deduplication
     assert not (args.lstm and args.ereplayratio > 0), "LSTM cannot be used in combination with Experience Replay"
+    assert len(args.msiraw) % 7 == 0, "--msiraw only accepts 7n elements as (R^3,W-First Quaternion)"
     return args
