@@ -216,7 +216,12 @@ def get_parser():
             help='Path to store the exploration records',
             default=None)
     parser.add_argument('--visualize',
-            help='Choose which aspect of the RL system to visualize',
+            help='''
+Choose which aspect of the RL system to visualize.
+policy: visualize the path walked by according to policy network.
+curiosity: sample the curiosity value, i.e. forward model loss.
+fake3d: sample Pi and V for fake3d cases
+            ''',
             choices=['policy', 'curiosity', 'fake3d'],
             default='policy')
     parser.add_argument('--train',
@@ -227,6 +232,7 @@ QwithGT: only Q function;
 curiosity: train the forward model, expecting overfitting.
 QandFCFE: Q and Fully Connected Layers in Feature Extractors.
 InF: Train Inverse model and Forward model with samples from files.
+Ionly: Inverse model only.
 ''',
             choices=['a2c', 'QwithGT', 'curiosity', 'QandFCFE', 'InF', 'Ionly'],
             default='a2c')
