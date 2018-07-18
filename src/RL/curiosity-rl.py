@@ -60,7 +60,7 @@ class TrainingManager:
             self.trainer = TRAINER(
                     advcore=self.advcore,
                     tmax=args.batch,
-                    gamma=config.GAMMA,
+                    gamma=args.GAMMA,
                     # gamma=0.5,
                     learning_rate=1e-3,
                     ckpt_dir=args.ckptdir,

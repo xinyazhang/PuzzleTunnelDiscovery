@@ -156,6 +156,10 @@ def get_parser():
     parser.add_argument('--LAMBDA',
             help='Ratio between A2C loss and ICM loss. Note: ICM loss consists of loss from invert model and forward (curiosity) model',
             default=0.5)
+    parser.add_argument('--GAMMA',
+            help='Reward discount factor, negative value means lineay decay (cost)',
+            type=float,
+            default=config.GAMMA)
     parser.add_argument('--sancheck',
             help='Different sanity check points',
             type=int,

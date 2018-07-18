@@ -296,7 +296,7 @@ class A2CTrainer(object):
         print('[{}] R start with {}'.format(self.worker_thread_index, R))
         '''
         for (ai, ri, Vi) in zip(r_action_indices, r_rewards, r_values):
-            V = ri + self.gamma * V
+            V = ri + self.gamma * V if self.gamma > 0 else ri + V - self.gamma
             td = V - Vi
             self.print("{}V(env+ar) {} V(nn) {} reward {}".format(pprefix, V, Vi, ri))
             adist = np.zeros(shape=(1, self.action_space_dimension),
