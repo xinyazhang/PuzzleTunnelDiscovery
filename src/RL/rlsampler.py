@@ -50,13 +50,54 @@ class PolicyPlayer(RLVisualizer):
                 print("########## PRESS ENTER TO CONTINUE ##########")
                 input("#############################################")
                 envir.reset()
-            [policy] = advcore.evaluate([envir.vstate], sess, [advcore.softmax_policy])
+            [policy, value] = advcore.evaluate([envir.vstate], sess, [advcore.softmax_policy, advcore.value])
             policy = policy[0][0]
+            value = np.asscalar(value)
             action_index = advcore.make_decision(envir, policy, pprefix)
+            print("Current Value {}".format(value))
             print("PolicyPlayer unmasked pol {}".format(policy))
             # print("PolicyPlayer masked pol {}".format(policy * advcore.action_mask))
             print("PolicyPlayer Action Index {}".format(action_index))
             nstate,reward,reaching_terminal,ratio = envir.peek_act(action_index, pprefix=pprefix)
+            envir.qstate = nstate
+
+class CriticPlayer(RLVisualizer):
+    def __init__(self, args, g, global_step):
+        super(CriticPlayer, self).__init__(args, g, global_step)
+
+    def play(self):
+        reanimate(self)
+
+    def __iter__(self):
+        envir = self.envir
+        sess = self.sess
+        advcore = self.advcore
+        reaching_terminal = False
+        pprefix = "[0] "
+        while True:
+            rgb,_ = envir.vstate
+            yield rgb[self.gview] # First view
+            if reaching_terminal:
+                print("#############################################")
+                print("##########CONGRATS TERMINAL REACHED##########")
+                print("########## PRESS ENTER TO CONTINUE ##########")
+                input("#############################################")
+                envir.reset()
+            qs_bak = envir.qstate
+            vs = []
+            for a in self.args.actionset:
+                nstate,reward,reaching_terminal,ratio = envir.peek_act(a)
+                envir.qstate = nstate
+                vs.append(envir.vstate)
+            envir.qstate = qs_bak
+            values = advcore.evaluate(vs, sess, [advcore.value])
+            values = np.reshape(values, (-1))
+            print("Values {}".format(values))
+            ai = np.argmax(values)
+            # print("PolicyPlayer unmasked pol {}".format(policy))
+            # print("PolicyPlayer masked pol {}".format(policy * advcore.action_mask))
+            # print("PolicyPlayer Action Index {}".format(action_index))
+            nstate,reward,reaching_terminal,ratio = envir.peek_act(self.args.actionset[ai], pprefix=pprefix)
             envir.qstate = nstate
 
 class QPlayer(RLVisualizer):
@@ -279,6 +320,8 @@ def create_visualizer(args, g, global_step):
         return QPlayer(args, g, global_step)
     elif args.visualize == 'policy':
         return PolicyPlayer(args, g, global_step)
+    elif args.visualize == 'critic':
+        return CriticPlayer(args, g, global_step)
     elif args.visualize == 'curiosity':
         return CuriositySampler(args, g, global_step)
     elif args.visualize == 'fake3d':

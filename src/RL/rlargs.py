@@ -222,7 +222,7 @@ policy: visualize the path walked by according to policy network.
 curiosity: sample the curiosity value, i.e. forward model loss.
 fake3d: sample Pi and V for fake3d cases
             ''',
-            choices=['policy', 'curiosity', 'fake3d'],
+            choices=['policy', 'curiosity', 'fake3d', 'critic'],
             default='policy')
     parser.add_argument('--train',
             help='''
