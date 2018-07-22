@@ -18,10 +18,12 @@ else:
     Q = d['Q']
     V = d['V']
 
-xs = Q[:, 0]
-ys = Q[:, 1]
-zs = V
-ax.scatter(xs, ys, zs, c=V)
+L = min(len(Q), 4096)
+
+xs = Q[:L, 0]
+ys = Q[:L, 1]
+zs = V[:L]
+ax.scatter(xs, ys, zs, c=V[:L])
 
 ax.set_xlabel('X Label')
 ax.set_ylabel('Y Label')
