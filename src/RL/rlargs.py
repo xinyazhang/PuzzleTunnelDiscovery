@@ -229,6 +229,9 @@ fake3d: sample Pi and V for fake3d cases
             type=float,
             nargs='*',
             default=[])
+    parser.add_argument('--msi_file',
+            help='MileStone Injection From File (unit state). Assumes the --sampleout file from --visualize msa',
+            default='')
     parser.add_argument('--train',
             help='''
 Choose which component to train separately (if --eval does not present).

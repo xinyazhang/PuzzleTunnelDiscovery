@@ -54,6 +54,15 @@ class RigidPuzzle(rlenv.IExperienceReplayEnvironment):
         self.steps_since_reset = 0
         self.PEN = args.PEN
         self.REW = args.REW
+        if args.msi_file:
+            dic = np.load(args.msi_file)
+            self.traj_s = dic['TRAJ_S']
+            assert self.traj_s[0].all() == self.istate.all(), "--mis_file does not match istate"
+            self.traj_a = dic['TRAJ_A']
+            self.msi_index = 0
+        else:
+            self.traj_a = None
+            self.msi_index = None
 
     def enable_perturbation(self, manual_p=None):
         self.perturbation = True
@@ -143,6 +152,8 @@ class RigidPuzzle(rlenv.IExperienceReplayEnvironment):
             self.istate = np.array(r.translate_to_unit_state(self.istateraw), dtype=np.float32)
         self.qstate = self.istate
         self.steps_since_reset = 0
+        if self.msi_index is not None:
+            self.msi_index = 0
 
 class CuriosityRL(rlenv.IAdvantageCore):
     rgb_shape = None
@@ -351,6 +362,10 @@ class CuriosityRL(rlenv.IAdvantageCore):
         return ret[:-1]
 
     def make_decision(self, envir, subspace_policy_dist, pprefix=''):
+        if envir.msi_index is not None:
+            ret = np.asscalar(envir.traj_a[envir.msi_index])
+            envir.msi_index += 1
+            return ret
         actionset = self.args.actionset
         best = np.argmax(subspace_policy_dist, axis=-1)
         if random.random() < envir.egreedy:
