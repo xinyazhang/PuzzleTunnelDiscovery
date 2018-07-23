@@ -114,6 +114,7 @@ class A2CTrainer(object):
         log_policy = tf.log(tf.clip_by_value(policy, 1e-20, 1.0))
         # cond_prob = tf.reduce_sum(policy * self.Adist_tensor, axis=1)
         rindices = [i for i in range(1, len(log_policy.shape))]
+        criticism = self.TD_tensor
         self.print('rindices {}'.format(rindices))
         action_entropy = tf.reduce_sum(tf.multiply(log_policy, self.Adist_tensor),
                 reduction_indices=rindices)
@@ -139,15 +140,17 @@ class A2CTrainer(object):
         policy = tf.multiply(advcore.softmax_policy, self.Adist_tensor)
         policy = tf.reduce_sum(policy, axis=[1,2]) # Shape: (B) afterwards
         log_policy = -tf.log(tf.clip_by_value(policy, 1e-20, 1.0))
-        # criticism = self.V_tensor - flattened_value
 
         # TD_tensor input is the same as of V_tensor - flattened_value,
         # but policy loss should not optimize value parameters.
-        # 
+        #
+        # NOTE: DO NOT use this approach, value_loss depends on criticism
+        # criticism = self.TD_tensor
+        #
         # Alternatively, call tf.stop_gradient().
-        criticism = self.TD_tensor
+        criticism = self.V_tensor - flattened_value
         assert log_policy.shape.as_list() == criticism.shape.as_list(), "shape match failure: log(Pi) {} criticism {}".format(log_policy.shape, criticism.shape)
-        policy_loss = tf.reduce_sum(log_policy * criticism)
+        policy_loss = tf.reduce_sum(log_policy * tf.stop_gradient(criticism))
         # policy_loss = -policy_loss # A3C paper uses gradient ascend, which means we need to minimize the NEGATIVE of the original
         # Value loss
         value_loss = tf.nn.l2_loss(criticism)
