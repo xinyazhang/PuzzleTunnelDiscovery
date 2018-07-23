@@ -58,6 +58,14 @@ def actions_to_adist_array(actions, dim=uw_random.DISCRETE_ACTION_NUMBER):
         adists[i, 0, actions[i]] = 1.0
     return adists
 
+'''
+Return a list of args for multiprocessing
+The following fields are added to args according to --localcluster_size and --localcluster_portbase
+  * ps_hosts : to locate parameter server (shared)
+  * worker_hosts : to locate other workers (shared)
+  * job_name : either 'ps' or 'worker' (non-shared)
+  * task_index : for job_name == 'worker", indicate the index of task (non-shared)
+'''
 def assemble_distributed_arguments(args):
     args.ps_hosts = 'localhost:{}'.format(args.localcluster_portbase)
     args.worker_hosts = ''
@@ -77,7 +85,7 @@ def assemble_distributed_arguments(args):
 
 def create_cluster_dic(args):
     ps_hosts = args.ps_hosts.split(',')
-    wk_hosts = args.wk_hosts.split(',')
+    wk_hosts = args.worker_hosts.split(',')
     return {"ps": ps_hosts, "worker": wk_hosts}
 
 SC_PRED_PERMUTATION = 1
