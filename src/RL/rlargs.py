@@ -257,6 +257,14 @@ Ionly: Inverse model only.
     parser.add_argument('--localcluster_portbase', metavar='NUMBER',
             help='Number of Worker Processes',
             type=int, default=0)
+    parser.add_argument('--ps_hosts', metavar='HOST:PORT',
+            nargs='*',
+            help='(NOT RECOMMENDED) MANUALLY specify parameter server host(s)',
+            default=[])
+    parser.add_argument('--worker_hosts', metavar='HOST:PORT',
+            nargs='*',
+            help='(NOT RECOMMENDED) MANUALLY specify worker host(s)',
+            default=[])
     """
     parser.add_argument('--task_index', metavar='NUMBER',
             help='Task index in distributed training',

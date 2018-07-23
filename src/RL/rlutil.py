@@ -67,12 +67,9 @@ The following fields are added to args according to --localcluster_size and --lo
   * task_index : for job_name == 'worker", indicate the index of task (non-shared)
 '''
 def assemble_distributed_arguments(args):
-    args.ps_hosts = 'localhost:{}'.format(args.localcluster_portbase)
-    args.worker_hosts = ''
+    args.ps_hosts += ['localhost:{}'.format(args.localcluster_portbase)]
     for i in range(args.cluster_size):
-        if i > 0:
-            args.worker_hosts += ','
-        args.worker_hosts += 'localhost:{}'.format(args.localcluster_portbase+i+1)
+        args.worker_hosts.append('localhost:{}'.format(args.localcluster_portbase+i+1))
     ps_args = copy.deepcopy(args)
     ps_args.job_name = 'ps'
     ret = [ps_args]
@@ -84,9 +81,9 @@ def assemble_distributed_arguments(args):
     return ret
 
 def create_cluster_dic(args):
-    ps_hosts = args.ps_hosts.split(',')
-    wk_hosts = args.worker_hosts.split(',')
-    return {"ps": ps_hosts, "worker": wk_hosts}
+    if not args.ps_hosts or not args.worker_hosts:
+        return None
+    return {"ps": args.ps_hosts, "worker": args.worker_hosts}
 
 SC_PRED_PERMUTATION = 1
 SC_ACTION_PERMUTATION = 2
