@@ -22,6 +22,7 @@ import ctrainer
 import iftrainer
 import curiosity
 import rlsampler
+import rlutil
 
 AlphaPuzzle = curiosity.RigidPuzzle
 CuriosityRL = curiosity.CuriosityRL
@@ -129,6 +130,7 @@ class TEngine(IEngine):
         super(TEngine, self).__init__(args)
         self.mts_master = ''
         self.mts_is_chief = True
+        self.tid = 0
 
     def get_hooks(self):
         hooks = [tf.train.StopAtStepHook(last_step=args.iter)]
@@ -152,14 +154,21 @@ class TEngine(IEngine):
 
     def _create_trainer(self, args):
         self.bnorm = tf.placeholder(tf.bool, shape=()) if args.batchnorm else None
-        self.trainer, self.advcore = create_trainer(args, global_step, batch_normalization=bnorm)
+        self.gs = tf.contrib.framework.get_or_create_global_step()
+        self.trainer, self.advcore = create_trainer(args, self.gs, batch_normalization=self.bnorm)
 
     def run(self):
         hooks = self.get_hooks()
+        # Create MonitoredTrainingSession to BOTH training and evaluation, since it's RL
+        #
+        # Note: we need to disable summaries and write it manually, because the
+        # summary ops are evaluated in every mon_sess.run(), and there is no way to disable it for evaluation
         with tf.train.MonitoredTrainingSession(master=self.mts_master,
                                                is_chief=self.mts_is_chief,
                                                checkpoint_dir=args.ckptdir,
                                                config=self.session_config,
+                                               save_summaries_steps=0,
+                                               save_summaries_secs=0,
                                                hooks=hooks) as mon_sess:
             while not mon_sess.should_stop():
                 self.trainer.train(self.envir, mon_sess, self.tid)
@@ -219,6 +228,7 @@ def curiosity_create_engine(args):
     cluster_dict = rlutil.create_cluster_dic(args)
     if cluster_dict is None:
         return CentralizedTrainer(args)
+    assert False, "Not testing DistributedTrainer for now"
     # Create a cluster from the parameter server and worker hosts.
     cluster = tf.train.ClusterSpec(cluster_dict)
     # Create and start a server for the local task.
@@ -246,6 +256,8 @@ def process_main(args):
     CAVEAT: WITHOUT ALLOW_GRWTH, WE MUST CREATE RENDERER BEFORE CALLING ANY TF ROUTINE
     '''
     pyosr.init()
+    dpy = pyosr.create_display()
+    glctx = pyosr.create_gl_context(dpy)
     # Create Training/Evaluation Engine
     engine = curiosity_create_engine(args)
     # Engine execution

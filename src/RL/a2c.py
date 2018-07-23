@@ -8,33 +8,43 @@ import itertools
 from scipy.misc import imsave
 import threading
 from six.moves import queue, input
+import copy
+import rlutil
 
 
-'''
-    Side effects: self.advcore.lstm_state is changed
-'''
 class RLSample(object):
-    def __init__(self, advcore, envir, sess):
+    def __init__(self, advcore, envir, sess, is_terminal=False):
         # Capture Current Frame
         self.qstate = envir.qstate
         self.perturbation = envir.get_perturbation()
         self.vstate = envir.vstate
-        # Sample Pi and V
-        policy, value = advcore.evaluate([envir.vstate], sess, [advcore.softmax_policy, advcore.value])
-        self.policy = policy[0][0] # Policy View from first qstate and first view
-        self.value = np.asscalar(value) # value[0][0][0]
+        if is_terminal:
+            self.policy = None
+            self.value = 0.0
+        else:
+            # Sample Pi and V
+            policy, value = advcore.evaluate([envir.vstate], sess, [advcore.softmax_policy, advcore.value])
+            self.policy = policy[0][0] # Policy View from first qstate and first view
+            self.value = np.asscalar(value) # value[0][0][0]
 
+    '''
+        Side effects:
+            1. envir.qstate is changed according to the evaluated policy function
+            2. self.advcore.lstm_state is changed
+    '''
     def proceed(self, advcore, envir, sess):
         # Sample Action
-        self.action_index = advcore.make_decision(envir, policy)
+        self.action_index = advcore.make_decision(envir, self.policy)
         # Preview Next frame
         self.nstate, self.true_reward, self.reaching_terminal, self.ratio = envir.peek_act(self.action_index)
         # Artificial Reward
         self.artificial_reward = advcore.get_artificial_reward(envir, sess,
                 envir.qstate, self.action_index, self.nstate, self.ratio)
         self.combined_reward = self.true_reward + self.artificial_reward
+        # Side Effects: change qstate
+        envir.qstate = self.nstate
         # Side Effects: Maintain LSTM
-        lstm_next = advcore.get_lstm() # Get the output of current frame
+        lstm_next = copy.deepcopy(advcore.get_lstm()) # Get the output of current frame
         advcore.set_lstm(lstm_next) # AdvCore next frame
 
 class A2CSampler(object):
@@ -68,10 +78,16 @@ class A2CSampler(object):
             samples.append(s)
             if s.reaching_terminal:
                 break
-        envir.lstm_barn = advcore.get_lstm().copy()
-        return samples
+        reaching_terminal = samples[-1].reaching_terminal
+        envir.lstm_barn = copy.deepcopy(advcore.get_lstm())
+        final = RLSample(self.advcore, envir, sess, is_terminal=reaching_terminal)
+        if reaching_terminal:
+            envir.reset()
+        return (samples, final)
 
-class A2CTrainer(object):
+
+# TODO: A2CSampler should be owned rather than subclassed by A2CTrainer
+class A2CTrainer(A2CSampler):
     a2c_tmax = None
     optimizer = None
     loss = None
@@ -233,14 +249,14 @@ class A2CTrainer(object):
     New training function.
     '''
     def train(self, envir, sess, tid=None, tmax=-1):
-        rlsamples = self.sample_minibatch(envir, sess, tid, tmax)
+        rlsamples, final_state = self.sample_minibatch(envir, sess, tid, tmax)
         self.a2c(envir=envir,
                  sess=sess,
-                 vstates=[s.vstata for s in rlsamples],
+                 vstates=[s.vstate for s in rlsamples] + [final_state.vstate],
                  action_indices=[s.action_index for s in rlsamples],
                  ratios=[s.ratio for s in rlsamples],
                  rewards=[s.combined_reward for s in rlsamples],
-                 values=[s.value for s in rlsamples],
+                 values=[s.value for s in rlsamples] + [final_state.value],
                  reaching_terminal=rlsamples[-1].reaching_terminal
                 )
 
@@ -248,19 +264,25 @@ class A2CTrainer(object):
     Private function that performs the training
     '''
     def a2c(self, envir, sess, vstates, action_indices, ratios, rewards, values, reaching_terminal, pprefix=""):
-        assert len(vstate) == len(action_indices) + 1, "[a2c] SAS sequence was not satisfied"
+        assert len(vstates) == len(action_indices) + 1, "[a2c] SAS sequence was not satisfied, len(vstates) = {}, len(action_indices) = {}".format(len(vstates), len(action_indices))
+        assert len(vstates) == len(values), "[a2c] len(S) != len(V) "
+        assert len(action_indices) == len(rewards), "[a2c] len(A) != len(rewards) "
         advcore = self.advcore
-        V = 0.0
-        if not reaching_terminal:
-            V = np.asscalar(advcore.evaluate([envir.vstate], sess, tensors=[advcore.value])[0])
-            self.print('> V from advcore.evaluate {}'.format(V))
+        '''
+        # Deprecated code path
+        # V = 0.0
+        # if not reaching_terminal:
+            # V = np.asscalar(advcore.evaluate([envir.vstate], sess, tensors=[advcore.value])[0])
+            # self.print('> V from advcore.evaluate {}'.format(V))
+        '''
+        V = values[-1] # Guaranteed by A2CSampler.sample_minibatch
 
         # action_indices.reverse()
         # rewards.reverse()
         # values.reverse()
         r_action_indices = action_indices[::-1]
         r_rewards = rewards[::-1]
-        r_values = values[::-1]
+        r_values = values[-2::-1] # Remove the trailing (-1) value, by starting from -2
 
         batch_adist = []
         batch_td = []
@@ -275,11 +297,6 @@ class A2CTrainer(object):
             V = ri + self.gamma * V if self.gamma > 0 else ri + V - self.gamma
             td = V - Vi
             self.print("{}V(env+ar) {} V(nn) {} reward {}".format(pprefix, V, Vi, ri))
-            adist = np.zeros(shape=(1, self.action_space_dimension),
-                    dtype=np.float32)
-            adist[0, ai] = 1.0
-
-            batch_adist.append(adist)
             batch_td.append(td)
             batch_V.append(V)
         batch_rgb = [state[0] for state in vstates]
@@ -294,9 +311,9 @@ class A2CTrainer(object):
         '''
         Always reverse, the RLEnv need this sequential info for training.
         '''
-        batch_adist.reverse()
         batch_td.reverse()
         batch_V.reverse()
+        batch_adist = rlutil.actions_to_adist_array(action_indices, dim=self.action_space_dimension)
         dic = {
                 advcore.rgb_1: batch_rgb[:-1],
                 advcore.dep_1: batch_dep[:-1],

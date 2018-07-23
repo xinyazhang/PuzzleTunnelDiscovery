@@ -47,7 +47,7 @@ class RigidPuzzle(rlenv.IExperienceReplayEnvironment):
         self.collision_cache = LRUCache(maxsize = 128)
         self.egreedy = args.egreedy[0] # e-greedy is an agent-specific variable
         if len(args.egreedy) != 1:
-            self.egreedy = args.egreedy[tid]
+            self.egreedy = args.egreedy[tid % len(args.egreedy)]
         self.permutemag = args.permutemag
         self.perturbation = False
         self.dump_id = 0
@@ -63,6 +63,8 @@ class RigidPuzzle(rlenv.IExperienceReplayEnvironment):
         else:
             self.traj_a = None
             self.msi_index = None
+        # lstm_barn: a cookie property to track the lstm states
+        self.lstm_barn = None
 
     def enable_perturbation(self, manual_p=None):
         self.perturbation = True
@@ -213,6 +215,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
                         permuation_matrix=pm,
                         batch_normalization=batch_normalization)
                 self.model.get_inverse_model()
+                self.model.create_pretrain_saver()
 
         self.polout, self.polparams, self.polnets = self.create_polnet(args)
         self.valout, self.valparams, self.valnets = self.create_valnet(args)

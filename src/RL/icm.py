@@ -135,18 +135,22 @@ class IntrinsicCuriosityModule:
         self.lstm_dic = {}
         self.action_space_dimension = int(self.action_tensor.shape[-1])
 
+    def create_pretrain_saver(self, view=0):
+        self.get_inverse_model()
+        ''' Note: cur nn and next nn share params '''
+        params = self.cur_nn_params + self.inverse_model_params
+        # print('+*+ ICM load params from {}: {}'.format(ckpt_dir, params))
+        self.pretrain_saver = tf.train.Saver(params)
+        self.pretrain_saver.view = view
+
     def load_pretrain(self, sess, ckpt_dir, view=0):
         if self.pretrain_saver is None:
-            self.get_inverse_model()
-            ''' Note: cur nn and next nn share params '''
-            params = self.cur_nn_params + self.inverse_model_params
-            # print('+*+ ICM load params from {}: {}'.format(ckpt_dir, params))
-            print('+*+ ICM load params from {}:'.format(ckpt_dir))
-            for p in params:
-                print("\t{}".format(p.name))
-            print('+*+')
-            self.pretrain_saver = tf.train.Saver(params)
-            self.pretrain_saver.view = view
+            self.create_pretrain_saver(view=view)
+        params = self.cur_nn_params + self.inverse_model_params
+        print('+*+ ICM load params from {}:'.format(ckpt_dir))
+        for p in params:
+            print("\t{}".format(p.name))
+        print('+*+')
         saver = self.pretrain_saver
         ckpt = tf.train.get_checkpoint_state(checkpoint_dir=ckpt_dir)
         if not ckpt or not ckpt.model_checkpoint_path:
