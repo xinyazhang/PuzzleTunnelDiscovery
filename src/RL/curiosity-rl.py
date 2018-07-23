@@ -124,7 +124,59 @@ class ParamServer(IEngine):
     def run(self):
         self.server.join()
 
-class DistributedTrainer(IEngine):
+class TEngine(IEngine):
+    def __init__(self, args):
+        super(TEngine, self).__init__(args)
+        self.mts_master = ''
+        self.mts_is_chief = True
+
+    def get_hooks(self):
+        hooks = [tf.train.StopAtStepHook(last_step=args.iter)]
+
+        if self.args.viewinitckpt:
+            class PretrainLoader(tf.train.SessionRunHook):
+                def __init__(self, advcore, ckpt):
+                    self.advcore = advcore
+                    self.ckpt = ckpt
+
+                def after_create_session(self, session, coord):
+                    self.advcore.load_pretrain(session, self.ckpt)
+                    print("PretrainLoader.after_create_session called")
+
+            ckpt = tf.train.get_checkpoint_state(checkpoint_dir=self.args.ckptdir)
+            # Do NOT load the pretrained weights if checkpoint exists.
+            if not (ckpt and ckpt.model_checkpoint_path):
+                hooks += [PretrainLoader(self.advcore, self.args.viewinitckpt)]
+
+        return hooks
+
+    def _create_trainer(self, args):
+        self.bnorm = tf.placeholder(tf.bool, shape=()) if args.batchnorm else None
+        self.trainer, self.advcore = create_trainer(args, global_step, batch_normalization=bnorm)
+
+    def run(self):
+        hooks = self.get_hooks()
+        with tf.train.MonitoredTrainingSession(master=self.mts_master,
+                                               is_chief=self.mts_is_chief,
+                                               checkpoint_dir=args.ckptdir,
+                                               config=self.session_config,
+                                               hooks=hooks) as mon_sess:
+            while not mon_sess.should_stop():
+                self.trainer.train(self.envir, mon_sess, self.tid)
+
+class CentralizedTrainer(TEngine):
+    def __init__(self, args):
+        super(CentralizedTrainer, self).__init__(args)
+        self.envir = AlphaPuzzle(args, 0, 0)
+        self._create_trainer(args)
+
+'''
+DistributedTrainer:
+    Enable the distribution by:
+        1. Create model under different tf.device
+        2. set self.mts_* to enable distributed MonitoredTrainingSession in TEngine.run
+'''
+class DistributedTrainer(TEngine):
     def __init__(self, args, cluster, server):
         super(DistributedTrainer, self).__init__(args)
         self.tid = args.task_index
@@ -135,37 +187,9 @@ class DistributedTrainer(IEngine):
         with tf.device(tf.train.replica_device_setter(
             worker_device="/job:worker/task:{}".format(args.task_index),
             cluster=cluster)):
-            self.bnorm = tf.placeholder(tf.bool, shape=()) if args.batchnorm else None
-            self.trainer, self.advcore = create_trainer(args, global_step, batch_normalization=bnorm)
-
-    def get_hooks(self):
-        hooks = [tf.train.StopAtStepHook(last_step=args.iter)]
-
-        class PartialRestore(tf.train.SessionRunHook):
-            def __init__(self, advcore, ckpt):
-                self.advcore = advcore
-                self.ckpt = ckpt
-
-            def after_create_session(self, session, coord):
-                self.advcore.load_pretrain(session, self.ckpt)
-
-        if self.args.viewinitckpt:
-            ckpt = tf.train.get_checkpoint_state(checkpoint_dir=self.args.ckptdir)
-            # Do NOT load the pretrained weights if checkpoint exists.
-            if not (ckpt and ckpt.model_checkpoint_path):
-                hooks += [PartialRestore(self.advcore, self.args.viewinitckpt)]
-
-        return hooks
-
-    def run(self):
-        hooks = self.get_hooks()
-        with tf.train.MonitoredTrainingSession(master=self.server.target,
-                                               is_chief=(args.task_index == 0),
-                                               checkpoint_dir=args.ckptdir,
-                                               config=self.session_config,
-                                               hooks=hooks) as mon_sess:
-            while not mon_sess.should_stop():
-                self.trainer.train(self.envir, mon_sess, self.tid)
+            self._create_trainer(args)
+        self.mts_master = self.server.target
+        self.mts_is_chief = (args.task_index == 0)
 
 class Evaluator(IEngine):
     def __init__(self, args):
@@ -193,6 +217,8 @@ def curiosity_create_engine(args):
     if args.eval:
         return Evaluator(args)
     cluster_dict = rlutil.create_cluster_dic(args)
+    if cluster_dict is None:
+        return CentralizedTrainer(args)
     # Create a cluster from the parameter server and worker hosts.
     cluster = tf.train.ClusterSpec(cluster_dict)
     # Create and start a server for the local task.
@@ -226,7 +252,7 @@ def process_main(args):
     engine.run()
 
 def curiosity_main(args):
-    if args.localcluster_size <= 0:
+    if args.localcluster_size <= 0 and not args.ps_hosts:
         process_main(args)
         return
     # Distributed execution
