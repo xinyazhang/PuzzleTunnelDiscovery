@@ -233,9 +233,11 @@ class A2CTrainer(A2CSampler):
         criticism = self.V_tensor - flattened_value
         assert log_policy.shape.as_list() == criticism.shape.as_list(), "shape match failure: log(Pi) {} criticism {}".format(log_policy.shape, criticism.shape)
         policy_loss = tf.reduce_sum(log_policy * tf.stop_gradient(criticism))
+        tf.summary.scalar('policy_loss', policy_loss)
         # policy_loss = -policy_loss # A3C paper uses gradient ascend, which means we need to minimize the NEGATIVE of the original
         # Value loss
         value_loss = tf.nn.l2_loss(criticism)
+        tf.summary.scalar('value_loss', value_loss)
 
         self.print("V_tensor {} AdvCore.value {}".format(self.V_tensor.shape, flattened_value.shape))
         self.loss = policy_loss+value_loss
@@ -335,6 +337,7 @@ class A2CTrainer(A2CSampler):
                        })
         self.print('{}batch_td {}'.format(pprefix, batch_td))
         self.print('{}batch_V {}'.format(pprefix, batch_V))
+        self.print('{}action_indices {}'.format(pprefix, action_indices))
         self.dispatch_training(sess, dic)
         # advcore.train(sess, batch_rgb, batch_dep, batch_adist)
         # FIXME: Re-enable summary after joint the two losses.
