@@ -19,6 +19,15 @@ from cachetools import LRUCache
 # Legacy package, ResNet 18 does not need this
 import config
 
+def sess_no_hook(sess, tensors, feed_dict):
+    if isinstance(sess, tf.Session):
+        return sess.run(tensors, feed_dict=feed_dict)
+    if isinstance(sess, tf.train.MonitoredSession):
+        def step_fn(step_context):
+            return step_context.session.run(fetches=tensors, feed_dict=feed_dict)
+        return sess.run_step_fn(step_fn)
+    assert False, "sess_no_hook: sess is not an instance of tf.Session or tf.MonitoredSession"
+
 class RigidPuzzle(rlenv.IExperienceReplayEnvironment):
 
     def __init__(self, args, tid, agent_id=-1):
@@ -351,7 +360,8 @@ class CuriosityRL(rlenv.IAdvantageCore):
         if additional_dict is not None:
             dic.update(additional_dict)
         if not self.using_lstm:
-            return sess.run(tensors, feed_dict=dic)
+            return sess_no_hook(sess, tensors, feed_dict=dic)
+        assert False, "TODO: replace sess.run with run_step_fn"
         # print(self.lstm_states_in.c)
         # print(self.current_lstm)
         dic.update({
@@ -360,7 +370,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
             self.lstm_len : 1
                    })
         # FIXME: verify ret[-1] is a tuple
-        ret = sess.run(tensors + [self.lstm_states_out], feed_dict=dic)
+        ret = sess_no_hook(tensors + [self.lstm_states_out], feed_dict=dic)
         self.lstm_cache = ret[-1]
         return ret[:-1]
 
@@ -414,7 +424,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
             dic[self.batch_normalization] = False
         if self.args.curiosity_type == 2:
             dic[self.ratios_tensor] = ratios
-        ret = sess.run(self.curiosity, feed_dict=dic)
+        ret = sess_no_hook(self.curiosity, feed_dict=dic)
         return ret * self.args.curiosity_factor
 
     def train(self, sess, rgb, dep, actions):
@@ -426,6 +436,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
                 self.rgb_2 : rgb[1:],
                 self.dep_2 : dep[1:],
               }
+        # Note: do NOT use sess_no_hook, since this is training the network
         sess.run(self.refine_vision_and_memory_op, feed_dict=dic)
 
     def build_loss(self):

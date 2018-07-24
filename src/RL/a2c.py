@@ -10,7 +10,7 @@ import threading
 from six.moves import queue, input
 import copy
 import rlutil
-
+import curiosity
 
 class RLSample(object):
     def __init__(self, advcore, envir, sess, is_terminal=False):
@@ -124,11 +124,12 @@ class A2CTrainer(A2CSampler):
             self.optimizer = tf.train.SyncReplicasOptimizer(self.optimizer,
                     replicas_to_aggregate=period,
                     total_num_replicas=total_number_of_replicas)
-        LAMBDA = 0.5
-        self.loss = LAMBDA * self.build_loss(advcore)
+        LAMBDA_1 = 1
+        LAMBDA_2 = 10
+        self.loss = LAMBDA_1 * self.build_loss(advcore)
         print("self.loss 1 {}".format(self.loss))
         tf.summary.scalar('a2c_loss', self.loss)
-        self.loss += (1 - LAMBDA) * advcore.build_loss()
+        self.loss += LAMBDA_2 * advcore.build_loss()
         print("self.loss 2 {}".format(self.loss))
         if train_everything is False:
             '''
@@ -220,6 +221,7 @@ class A2CTrainer(A2CSampler):
         # Pick out the sampled action from policy output
         # Shape: (B,V,A)
         policy = tf.multiply(advcore.softmax_policy, self.Adist_tensor)
+        assert advcore.softmax_policy.shape.as_list() == self.Adist_tensor.shape.as_list(), "shape match failure: advcore.softmax_policy {} Adist_tensor {}".format(advcore.softmax_policy.shape, self.Adist_tensor.shape)
         policy = tf.reduce_sum(policy, axis=[1,2]) # Shape: (B) afterwards
         log_policy = -tf.log(tf.clip_by_value(policy, 1e-20, 1.0))
 
@@ -232,7 +234,8 @@ class A2CTrainer(A2CSampler):
         # Alternatively, call tf.stop_gradient().
         criticism = self.V_tensor - flattened_value
         assert log_policy.shape.as_list() == criticism.shape.as_list(), "shape match failure: log(Pi) {} criticism {}".format(log_policy.shape, criticism.shape)
-        policy_loss = tf.reduce_sum(log_policy * tf.stop_gradient(criticism))
+        policy_per_sample = log_policy * tf.stop_gradient(criticism)
+        policy_loss = tf.reduce_sum(policy_per_sample)
         tf.summary.scalar('policy_loss', policy_loss)
         # policy_loss = -policy_loss # A3C paper uses gradient ascend, which means we need to minimize the NEGATIVE of the original
         # Value loss
@@ -241,6 +244,10 @@ class A2CTrainer(A2CSampler):
 
         self.print("V_tensor {} AdvCore.value {}".format(self.V_tensor.shape, flattened_value.shape))
         self.loss = policy_loss+value_loss
+        self._policy = policy
+        self._criticism = criticism
+        self._log_policy = log_policy
+        self._policy_per_sample = policy_per_sample
         '''
         Debug: minimize w.r.t. value loss
         '''
@@ -258,7 +265,7 @@ class A2CTrainer(A2CSampler):
                  action_indices=[s.action_index for s in rlsamples],
                  ratios=[s.ratio for s in rlsamples],
                  rewards=[s.combined_reward for s in rlsamples],
-                 values=[s.value for s in rlsamples] + [final_state.value],
+                 values=[s.value for s in rlsamples],
                  reaching_terminal=rlsamples[-1].reaching_terminal
                 )
 
@@ -267,24 +274,21 @@ class A2CTrainer(A2CSampler):
     '''
     def a2c(self, envir, sess, vstates, action_indices, ratios, rewards, values, reaching_terminal, pprefix=""):
         assert len(vstates) == len(action_indices) + 1, "[a2c] SAS sequence was not satisfied, len(vstates) = {}, len(action_indices) = {}".format(len(vstates), len(action_indices))
-        assert len(vstates) == len(values), "[a2c] len(S) != len(V) "
+        assert len(vstates) == len(values) + 1, "[a2c] len(S) != len(V) + 1"
         assert len(action_indices) == len(rewards), "[a2c] len(A) != len(rewards) "
         advcore = self.advcore
-        '''
-        # Deprecated code path
-        # V = 0.0
-        # if not reaching_terminal:
-            # V = np.asscalar(advcore.evaluate([envir.vstate], sess, tensors=[advcore.value])[0])
-            # self.print('> V from advcore.evaluate {}'.format(V))
-        '''
-        V = values[-1] # Guaranteed by A2CSampler.sample_minibatch
+        V = 0.0
+        if not reaching_terminal:
+            V = np.asscalar(advcore.evaluate([vstates[-1]], sess, tensors=[advcore.value])[0])
+            self.print('> V from advcore.evaluate {}'.format(V))
+        # V = values[-1] # Guaranteed by A2CSampler.sample_minibatch
 
         # action_indices.reverse()
         # rewards.reverse()
         # values.reverse()
         r_action_indices = action_indices[::-1]
         r_rewards = rewards[::-1]
-        r_values = values[-2::-1] # Remove the trailing (-1) value, by starting from -2
+        r_values = values[::-1]
 
         batch_adist = []
         batch_td = []
@@ -345,6 +349,11 @@ class A2CTrainer(A2CSampler):
         summary = sess.run(self.summary_op)
         self.train_writer.add_summary(summary, self.global_step)
         '''
+        c,l,bp,p = curiosity.sess_no_hook(sess, [self._criticism, self._log_policy, self._policy_per_sample, self._policy], feed_dict=dic)
+        print("policy output (flatten) {}".format(p))
+        print("criticism {}".format(c))
+        print("log_policy {}".format(l))
+        print("policy_per_sample {}".format(c))
         return batch_V
 
     def dispatch_training(self, sess, dic):
@@ -402,6 +411,7 @@ QUEUE_CAPACITY = 16
 
 '''
 A2C Trainer with Dedicated Training Thread
+NOTE: NOT VERY EFFECTIVE BECAUSE OF GIL
 '''
 class A2CTrainerDTT(A2CTrainer):
     class Arguments:
@@ -460,3 +470,4 @@ class A2CTrainerDTT(A2CTrainer):
             if a.dic is None:
                 break
             super(A2CTrainerDTT, self).dispatch_training(a.sess, a.dic)
+

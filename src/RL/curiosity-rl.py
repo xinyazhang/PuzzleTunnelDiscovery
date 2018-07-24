@@ -14,6 +14,7 @@ import config
 import pyosr
 import rlargs
 import a2c
+import a2c_overfit
 import random
 from multiprocessing import Process
 from six.moves import queue,input
@@ -34,11 +35,13 @@ def create_trainer(args, global_step, batch_normalization):
     '''
     advcore = CuriosityRL(learning_rate=1e-3, args=args, batch_normalization=batch_normalization)
     bnorm = batch_normalization
-    if args.train == 'a2c':
+    if args.train == 'a2c' or args.train == 'a2c_overfit':
         if args.threads > 1:
             TRAINER = a2c.A2CTrainerDTT
         else:
             TRAINER = a2c.A2CTrainer
+        if args.train == 'a2c_overfit':
+            TRAINER = a2c_overfit.OverfitTrainer
         train_everything = False if args.viewinitckpt else True
         trainer = TRAINER(
                 advcore=advcore,

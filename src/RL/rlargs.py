@@ -241,8 +241,9 @@ curiosity: train the forward model, expecting overfitting.
 QandFCFE: Q and Fully Connected Layers in Feature Extractors.
 InF: Train Inverse model and Forward model with samples from files.
 Ionly: Inverse model only.
+a2c_overfit: Try to overfit the RL model with Actor-Critic Method
 ''',
-            choices=['a2c', 'QwithGT', 'curiosity', 'QandFCFE', 'InF', 'Ionly'],
+            choices=['a2c', 'QwithGT', 'curiosity', 'QandFCFE', 'InF', 'Ionly', 'a2c_overfit'],
             default='a2c')
     parser.add_argument('--notrain',
             help='Set untrainnable segments',
