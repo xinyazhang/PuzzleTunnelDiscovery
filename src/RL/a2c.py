@@ -218,12 +218,13 @@ class A2CTrainer(A2CSampler):
         # Need V as critic
         # advcore.value's shape is (B,V,1)
         flattened_value = tf.reshape(advcore.value, [-1])
+        self.flattened_value = flattened_value
         # Pick out the sampled action from policy output
         # Shape: (B,V,A)
         policy = tf.multiply(advcore.softmax_policy, self.Adist_tensor)
         assert advcore.softmax_policy.shape.as_list() == self.Adist_tensor.shape.as_list(), "shape match failure: advcore.softmax_policy {} Adist_tensor {}".format(advcore.softmax_policy.shape, self.Adist_tensor.shape)
         policy = tf.reduce_sum(policy, axis=[1,2]) # Shape: (B) afterwards
-        log_policy = -tf.log(tf.clip_by_value(policy, 1e-20, 1.0))
+        log_policy = tf.log(tf.clip_by_value(policy, 1e-20, 1.0))
 
         # TD_tensor input is the same as of V_tensor - flattened_value,
         # but policy loss should not optimize value parameters.
@@ -234,16 +235,25 @@ class A2CTrainer(A2CSampler):
         # Alternatively, call tf.stop_gradient().
         criticism = self.V_tensor - flattened_value
         assert log_policy.shape.as_list() == criticism.shape.as_list(), "shape match failure: log(Pi) {} criticism {}".format(log_policy.shape, criticism.shape)
-        policy_per_sample = log_policy * tf.stop_gradient(criticism)
-        policy_loss = tf.reduce_sum(policy_per_sample)
-        tf.summary.scalar('policy_loss', policy_loss)
+        if 'no_critic' in advcore.args.train:
+            policy_per_sample = log_policy
+        elif 'abs_critic' in advcore.args.train:
+            policy_per_sample = log_policy * tf.abs(tf.stop_gradient(criticism))
+        else:
+            policy_per_sample = log_policy * tf.stop_gradient(criticism)
+        policy_loss = tf.reduce_sum(-policy_per_sample)
+        policy_loss = policy_loss * 10.0 # HACKING: Larger weight
         # policy_loss = -policy_loss # A3C paper uses gradient ascend, which means we need to minimize the NEGATIVE of the original
         # Value loss
         value_loss = tf.nn.l2_loss(criticism)
-        tf.summary.scalar('value_loss', value_loss)
 
         self.print("V_tensor {} AdvCore.value {}".format(self.V_tensor.shape, flattened_value.shape))
-        self.loss = policy_loss+value_loss
+        tf.summary.scalar('value_loss', value_loss)
+        self.loss = value_loss
+        if 'qonly' not in advcore.args.train:
+            tf.summary.scalar('policy_loss', policy_loss)
+            self.loss += policy_loss
+        self._raw_policy = advcore.policy
         self._policy = policy
         self._criticism = criticism
         self._log_policy = log_policy
@@ -352,11 +362,13 @@ class A2CTrainer(A2CSampler):
         summary = sess.run(self.summary_op)
         self.train_writer.add_summary(summary, self.global_step)
         '''
-        c,l,bp,p = curiosity.sess_no_hook(sess, [self._criticism, self._log_policy, self._policy_per_sample, self._policy], feed_dict=dic)
-        print("policy output (flatten) {}".format(p))
+        c,l,bp,p,raw,smraw = curiosity.sess_no_hook(sess, [self._criticism, self._log_policy, self._policy_per_sample, self._policy, self._raw_policy, advcore.softmax_policy], feed_dict=dic)
+        print("policy_output_raw {}".format(raw))
+        print("policy_output_smraw {}".format(smraw))
+        print("policy_output_flatten {}".format(p))
         print("criticism {}".format(c))
         print("log_policy {}".format(l))
-        print("policy_per_sample {}".format(c))
+        print("policy_per_sample {}".format(bp))
         return batch_V
 
     def dispatch_training(self, sess, dic):

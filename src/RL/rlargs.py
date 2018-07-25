@@ -243,7 +243,8 @@ InF: Train Inverse model and Forward model with samples from files.
 Ionly: Inverse model only.
 a2c_overfit: Try to overfit the RL model with Actor-Critic Method
 ''',
-            choices=['a2c', 'QwithGT', 'curiosity', 'QandFCFE', 'InF', 'Ionly', 'a2c_overfit'],
+            choices=['a2c', 'QwithGT', 'curiosity', 'QandFCFE', 'InF', 'Ionly',
+                     'a2c_overfit', 'a2c_overfit_qonly', 'a2c_no_critic', 'a2c_abs_critic'],
             default='a2c')
     parser.add_argument('--notrain',
             help='Set untrainnable segments',
