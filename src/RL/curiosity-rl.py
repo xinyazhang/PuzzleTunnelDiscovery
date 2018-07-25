@@ -179,8 +179,15 @@ class TEngine(IEngine):
 class CentralizedTrainer(TEngine):
     def __init__(self, args):
         super(CentralizedTrainer, self).__init__(args)
-        self.envir = AlphaPuzzle(args, 0, 0)
+        self._envirs = [AlphaPuzzle(args, aid, aid) for aid in range(self.args.agents)]
         self._create_trainer(args)
+        self.envir_picker = 0
+
+    @property
+    def envir(self):
+        ret = self._envirs[self.envir_picker]
+        self.envir_picker = (self.envir_picker + 1) % self.args.agents
+        return ret
 
 '''
 DistributedTrainer:
