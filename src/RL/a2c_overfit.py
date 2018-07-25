@@ -47,13 +47,13 @@ class OverfitTrainer(A2CTrainer):
                 if rlsamples[-1].reaching_terminal:
                     break
         rlsamples, final_state = self.all_samples_cache[self.minibatch_index % len(self.all_samples_cache)]
-        self.minibatch_index += 1
+        self.minibatch_index += 1 # [DISABLED] HACKING: NO SECOND SEGMENT
         self.a2c(envir=envir,
                  sess=sess,
                  vstates=[s.vstate for s in rlsamples] + [final_state.vstate],
                  action_indices=[s.action_index for s in rlsamples],
                  ratios=[s.ratio for s in rlsamples],
                  rewards=[s.combined_reward for s in rlsamples],
-                 values=[s.value for s in rlsamples],
+                 values=None,
                  reaching_terminal=rlsamples[-1].reaching_terminal
                 )

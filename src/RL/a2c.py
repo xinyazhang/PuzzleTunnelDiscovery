@@ -273,6 +273,9 @@ class A2CTrainer(A2CSampler):
     Private function that performs the training
     '''
     def a2c(self, envir, sess, vstates, action_indices, ratios, rewards, values, reaching_terminal, pprefix=""):
+        if values is None:
+            # Need to Re-evaluate it
+            values = self.advcore.evaluate(vstates[:-1], sess, self.flattened_value)
         assert len(vstates) == len(action_indices) + 1, "[a2c] SAS sequence was not satisfied, len(vstates) = {}, len(action_indices) = {}".format(len(vstates), len(action_indices))
         assert len(vstates) == len(values) + 1, "[a2c] len(S) != len(V) + 1"
         assert len(action_indices) == len(rewards), "[a2c] len(A) != len(rewards) "
@@ -300,7 +303,7 @@ class A2CTrainer(A2CSampler):
         print('[{}] R start with {}'.format(self.worker_thread_index, R))
         '''
         for (ai, ri, Vi) in zip(r_action_indices, r_rewards, r_values):
-            V = ri + self.gamma * V if self.gamma > 0 else ri + V - self.gamma
+            V = ri + self.gamma * V if self.gamma > 0 else ri + V + self.gamma
             td = V - Vi
             self.print("{}V(env+ar) {} V(nn) {} reward {}".format(pprefix, V, Vi, ri))
             batch_td.append(td)
