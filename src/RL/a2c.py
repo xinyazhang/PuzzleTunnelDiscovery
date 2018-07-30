@@ -125,7 +125,7 @@ class A2CTrainer(A2CSampler):
                     replicas_to_aggregate=period,
                     total_num_replicas=total_number_of_replicas)
         LAMBDA_1 = 1
-        LAMBDA_2 = 10
+        LAMBDA_2 = 1
         self.loss = LAMBDA_1 * self.build_loss(advcore)
         print("self.loss 1 {}".format(self.loss))
         tf.summary.scalar('a2c_loss', self.loss)
@@ -242,7 +242,7 @@ class A2CTrainer(A2CSampler):
         else:
             policy_per_sample = log_policy * tf.stop_gradient(criticism)
         policy_loss = tf.reduce_sum(-policy_per_sample)
-        policy_loss = policy_loss * 10.0 # HACKING: Larger weight
+        # policy_loss = policy_loss * 10.0 # HACKING: Larger weight
         # policy_loss = -policy_loss # A3C paper uses gradient ascend, which means we need to minimize the NEGATIVE of the original
         # Value loss
         value_loss = tf.nn.l2_loss(criticism)
