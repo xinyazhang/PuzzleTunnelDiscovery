@@ -24,6 +24,7 @@ class RLVisualizer(object):
         self.gview = 0 if args.obview < 0 else args.obview
         if args.permutemag >= 0:
             self.envir.enable_perturbation(args.manual_p)
+        self.mandatory_ckpt = True
 
     def attach(self, sess):
         self.sess = sess
@@ -329,6 +330,7 @@ class MSASampler(RLVisualizer):
         self.ms = np.array(ms, dtype=np.float32)
         self.traj_s = []
         self.traj_a = []
+        self.mandatory_ckpt = False
 
     def play(self):
         reanimate(self)
@@ -336,7 +338,6 @@ class MSASampler(RLVisualizer):
     def __iter__(self):
         envir = self.envir
         sess = self.sess
-        advcore = self.advcore
         reaching_terminal = False
         args = self.args
         pprefix = "[0] "

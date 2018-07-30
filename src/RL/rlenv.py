@@ -26,6 +26,7 @@ class IEnvironment(object):
 
     def __init__(self):
         super(IEnvironment, self).__init__()
+        self.lstm_barn = None
 
     '''
     Property for Configuration(Q) state

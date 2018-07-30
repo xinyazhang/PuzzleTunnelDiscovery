@@ -10,7 +10,7 @@ def get_parser():
     parser.add_argument('--robgeo', help='Path to robot geometry',
             default=aniconf.rob_fn)
     parser.add_argument('--ckptdir', help='Path for checkpoint files',
-            default='ckpt/pretrain-d/')
+            default=None)
     parser.add_argument('--sampleout', help='Path to store generated samples',
             default='')
     parser.add_argument('--mispout', help='Path to store mispredicted samples',
