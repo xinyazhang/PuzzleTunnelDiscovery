@@ -208,6 +208,7 @@ EGLContext create_gl_context(EGLDisplay dpy, EGLContext share_context)
 		std::cerr << "Reason: " << glewGetErrorString(glew_err) << std::endl;
 		// exit(EXIT_SUCCESS);
 	}
+	std::cerr << "glew initialized for dpy : " << dpy << std::endl;
 	return core_ctx;
 }
 
