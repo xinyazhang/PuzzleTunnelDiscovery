@@ -1,3 +1,3 @@
 #!/bin/bash
 
-python2 ../src/RL/corridor.py "$@"
+PYTHONPATH=../bin python2 ../src/RL/corridor.py "$@"

@@ -38,16 +38,16 @@ class Corridor(rlenv.IExperienceReplayEnvironment):
     0 Left  (-=1)
     1 Right (+=1)
     '''
-    def peek_act(self, action, pprefix):
+    def peek_act(self, action, pprefix=''):
         nstate = self.state + self.ACTION_DELTA[action]
         reward = 0
         reaching_terminal = False
         if nstate > self.mag:
-            reward = 1000
+            reward = 10
             reaching_terminal = True
             nstate = self.mag
         elif nstate <= -self.mag:
-            reward = -1000
+            reward = -10
             nstate = -self.mag
         return nstate, reward, reaching_terminal, 1.0
 
@@ -128,7 +128,7 @@ class TabularRL(rlenv.IAdvantageCore):
             dic.update(additional_dict)
         return sess.run(tensors, feed_dict=dic)
 
-    def make_decision(self, envir, policy_dist, pprefix):
+    def make_decision(self, envir, policy_dist, pprefix=''):
         best = np.argmax(policy_dist, axis=-1)
         if random.random() < self.egreedy:
             ret = random.randrange(2)
@@ -137,10 +137,10 @@ class TabularRL(rlenv.IAdvantageCore):
         # print('Action best {} chosen {}'.format(best, ret))
         return ret
 
-    def get_artificial_reward(self, envir, sess, state_1, adist, state_2, ratio, pprefix):
+    def get_artificial_reward(self, envir, sess, state_1, adist, state_2, ratio, pprefix=''):
         return 0
 
-    def get_artificial_from_experience(self, sess, vstates, actions, ratios, pprefix):
+    def get_artificial_from_experience(self, sess, vstates, actions, ratios, pprefix=''):
         return np.zeros(shape=(len(actions)))
 
     def train(self, sess, rgb, dep, actions):

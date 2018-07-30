@@ -99,7 +99,7 @@ class Corridor(rlenv.IExperienceReplayEnvironment):
     def vstatedim(self):
         return [1]
 
-    def peek_act(self, action, pprefix):
+    def peek_act(self, action, pprefix=''):
         nstate = self.state + self.ACTION_DELTA[action]
         reward = 0
         reaching_terminal = False
@@ -135,7 +135,7 @@ class Corridor(rlenv.IExperienceReplayEnvironment):
     '''
     This disables experience replay
     '''
-    def sample_in_erep(self, pprefix):
+    def sample_in_erep(self, pprefix=''):
         if self.noerep:
             return [],0,0,0
         return super(Corridor, self).sample_in_erep(pprefix)
@@ -180,6 +180,9 @@ class Corridor(rlenv.IExperienceReplayEnvironment):
                 self.vgt[nx,ny] = nr
                 q.append((nx,ny,nr))
         return self.vgt
+
+    def get_perturbation(self):
+        return None
 
 class TabularRL(rlenv.IAdvantageCore):
 
@@ -319,7 +322,7 @@ class TabularRL(rlenv.IAdvantageCore):
             dic.update(additional_dict)
         return sess.run(tensors, feed_dict=dic)
 
-    def make_decision(self, envir, policy_dist, pprefix):
+    def make_decision(self, envir, policy_dist, pprefix=''):
         best = np.argmax(policy_dist, axis=-1)
         if random.random() > envir.egreedy:
             ret = random.randrange(self.action_space_dimension)
@@ -329,7 +332,7 @@ class TabularRL(rlenv.IAdvantageCore):
             print('{}Action best {} chosen {}'.format(pprefix, best, ret))
         return ret
 
-    def get_artificial_reward(self, envir, sess, state_1, adist, state_2, pprefix):
+    def get_artificial_reward(self, envir, sess, state_1, adist, state_2, pprefix=''):
         if not self.cr:
             return 0
         envir.qstate = state_1

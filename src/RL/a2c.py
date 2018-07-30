@@ -255,6 +255,7 @@ class A2CTrainer(A2CSampler):
             self.loss += policy_loss
         self._raw_policy = advcore.policy
         self._policy = policy
+        self._flattened_value = flattened_value
         self._criticism = criticism
         self._log_policy = log_policy
         self._policy_per_sample = policy_per_sample
@@ -362,13 +363,18 @@ class A2CTrainer(A2CSampler):
         summary = sess.run(self.summary_op)
         self.train_writer.add_summary(summary, self.global_step)
         '''
-        c,l,bp,p,raw,smraw = curiosity.sess_no_hook(sess, [self._criticism, self._log_policy, self._policy_per_sample, self._policy, self._raw_policy, advcore.softmax_policy], feed_dict=dic)
+        c,l,bp,p,v,fv,raw,smraw = curiosity.sess_no_hook(sess, [self._criticism, self._log_policy, self._policy_per_sample, self._policy, advcore.value, self._flattened_value, self._raw_policy, advcore.softmax_policy], feed_dict=dic)
+        print("action input {}".format(action_indices))
+        print("reward output {}".format(rewards))
+        print("V {}".format(batch_V))
         print("policy_output_raw {}".format(raw))
         print("policy_output_smraw {}".format(smraw))
         print("policy_output_flatten {}".format(p))
         print("criticism {}".format(c))
         print("log_policy {}".format(l))
-        print("policy_per_sample {}".format(bp))
+        print("policy_per_sample {}".format(c))
+        print("value {}".format(v))
+        print("flattened_value {}".format(fv))
         return batch_V
 
     def dispatch_training(self, sess, dic):
