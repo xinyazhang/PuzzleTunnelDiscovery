@@ -330,6 +330,7 @@ class MSASampler(RLVisualizer):
         self.ms = np.array(ms, dtype=np.float32)
         self.traj_s = []
         self.traj_a = []
+        self.traj_fv = []
         self.mandatory_ckpt = False
 
     def play(self):
@@ -346,6 +347,8 @@ class MSASampler(RLVisualizer):
             print("Switch MS to {}".format(ms))
             while True:
                 self.traj_s.append(envir.qstate)
+                fv = advcore.evaluate([envir.vstate], sess, advcore.model.cur_featvec)
+                self.traj_fv.append(fv)
                 print("Current state {}".format(envir.qstate))
                 rgb,_ = envir.vstate
                 yield rgb[self.gview] # First view
@@ -354,7 +357,10 @@ class MSASampler(RLVisualizer):
                     print("##########CONGRATS TERMINAL REACHED##########")
                     print("##########   PRESS ENTER TO EXIT   ##########")
                     input("#############################################")
-                    np.savez(args.sampleout, TRAJ_S=self.traj_s, TRAJ_A=self.traj_a)
+                    np.savez(args.sampleout,
+                             TRAJ_S=self.traj_s,
+                             TRAJ_A=self.traj_a,
+                             TRAJ_FV=self.traj_fv)
                     return
                     yield
                 sa = []
