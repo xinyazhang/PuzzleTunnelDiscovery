@@ -60,7 +60,8 @@ def actions_to_adist_array(actions, dim=uw_random.DISCRETE_ACTION_NUMBER):
 
 '''
 Return a list of args for multiprocessing
-The following fields are added to args according to --localcluster_size and --localcluster_portbase
+The following fields are added to args according to --localcluster_nsampler and
+--localcluster_portbase
   * ps_hosts : to locate parameter server (shared)
   * worker_hosts : to locate other workers (shared)
   * job_name : either 'ps' or 'worker' (non-shared)
@@ -68,12 +69,15 @@ The following fields are added to args according to --localcluster_size and --lo
 '''
 def assemble_distributed_arguments(args):
     args.ps_hosts += ['localhost:{}'.format(args.localcluster_portbase)]
-    for i in range(args.cluster_size):
+    # Worker 0 only calculates gradients, others only sample
+    nworker = args.localcluster_nsampler + 1
+    for i in range(nworker):
         args.worker_hosts.append('localhost:{}'.format(args.localcluster_portbase+i+1))
     ps_args = copy.deepcopy(args)
     ps_args.job_name = 'ps'
+    ps_args.task_index = 0 # task_index is also mandatory for ps
     ret = [ps_args]
-    for i in range(args.cluster_size):
+    for i in range(nworker):
         w_args = copy.deepcopy(args)
         w_args.job_name = 'worker'
         w_args.task_index = i

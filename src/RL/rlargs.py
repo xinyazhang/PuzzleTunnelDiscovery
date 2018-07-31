@@ -253,11 +253,11 @@ a2c_overfit: Try to overfit the RL model with Actor-Critic Method
             default=[])
     # Distributed Tensorflow
     # (Maximize Performance under GIL)
-    parser.add_argument('--localcluster_size', metavar='NUMBER',
-            help='Number of Worker Processes',
+    parser.add_argument('--localcluster_nsampler', metavar='NUMBER',
+            help='Enable MP training by specifying the number of sampler processes',
             type=int, default=0)
     parser.add_argument('--localcluster_portbase', metavar='NUMBER',
-            help='Number of Worker Processes',
+            help='Port of the first worker process',
             type=int, default=0)
     parser.add_argument('--ps_hosts', metavar='HOST:PORT',
             nargs='*',
@@ -304,4 +304,6 @@ def parse():
     args.actionset = list(set(args.actionset)) # deduplication
     assert not (args.lstm and args.ereplayratio > 0), "LSTM cannot be used in combination with Experience Replay"
     assert len(args.msiraw) % 7 == 0, "--msiraw only accepts 7n elements as (R^3,W-First Quaternion)"
+    if args.localcluster_nsampler > 0:
+        assert args.localcluster_portbase != 0, "--localcluster_portbase is missing"
     return args

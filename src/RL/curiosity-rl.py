@@ -15,8 +15,8 @@ import pyosr
 import rlargs
 import a2c
 import a2c_overfit
+import a2c_mp
 import random
-from multiprocessing import Process
 from six.moves import queue,input
 import qtrainer
 import ctrainer
@@ -24,6 +24,7 @@ import iftrainer
 import curiosity
 import rlsampler
 import rlutil
+import multiprocessing as mp
 
 AlphaPuzzle = curiosity.RigidPuzzle
 CuriosityRL = curiosity.CuriosityRL
@@ -42,6 +43,8 @@ def create_trainer(args, global_step, batch_normalization):
             TRAINER = a2c.A2CTrainer
         if 'a2c_overfit' in args.train:
             TRAINER = a2c_overfit.OverfitTrainer
+        if args.localcluster_nsampler > 0:
+            TRAINER = a2c_mp.MPA2CTrainer
         train_everything = False if args.viewinitckpt else True
         trainer = TRAINER(
                 advcore=advcore,
@@ -52,7 +55,7 @@ def create_trainer(args, global_step, batch_normalization):
                 ckpt_dir=args.ckptdir,
                 global_step=global_step,
                 batch_normalization=bnorm,
-                total_number_of_replicas=args.localcluster_size,
+                total_number_of_replicas=args.localcluster_nsampler,
                 period=args.period,
                 LAMBDA=args.LAMBDA,
                 train_everything=train_everything)
@@ -136,7 +139,7 @@ class TEngine(IEngine):
         self.tid = 0
 
     def get_hooks(self):
-        hooks = [tf.train.StopAtStepHook(last_step=args.iter)]
+        hooks = [tf.train.StopAtStepHook(last_step=self.trainer.total_iter)]
 
         if self.args.viewinitckpt:
             class PretrainLoader(tf.train.SessionRunHook):
@@ -196,7 +199,8 @@ DistributedTrainer:
         2. set self.mts_* to enable distributed MonitoredTrainingSession in TEngine.run
 '''
 class DistributedTrainer(TEngine):
-    def __init__(self, args, cluster, server):
+    def __init__(self, args, cluster, server, mpqueue):
+        assert args.period > 0, "--period is mandatory for distributed training"
         super(DistributedTrainer, self).__init__(args)
         self.tid = args.task_index
         self.envir = AlphaPuzzle(args, self.tid, self.tid)
@@ -207,6 +211,7 @@ class DistributedTrainer(TEngine):
             worker_device="/job:worker/task:{}".format(args.task_index),
             cluster=cluster)):
             self._create_trainer(args)
+            self.trainer.install_mpqueue_as(mpqueue, args.task_index)
         self.mts_master = self.server.target
         self.mts_is_chief = (args.task_index == 0)
 
@@ -234,24 +239,28 @@ class Evaluator(IEngine):
             self.player.attach(sess)
             self.player.play()
 
-def curiosity_create_engine(args):
+def curiosity_create_engine(args, mpqueue):
     if args.eval:
         return Evaluator(args)
     cluster_dict = rlutil.create_cluster_dic(args)
     if cluster_dict is None:
         return CentralizedTrainer(args)
-    assert False, "Not testing DistributedTrainer for now"
+    assert mpqueue is not None, "[curiosity_create_engine] MP training requires a mp.Queue object "
+    # assert False, "Not testing DistributedTrainer for now"
     # Create a cluster from the parameter server and worker hosts.
     cluster = tf.train.ClusterSpec(cluster_dict)
     # Create and start a server for the local task.
+    session_config = tf.ConfigProto()
+    session_config.gpu_options.allow_growth = True
     server = tf.train.Server(cluster,
             job_name=args.job_name,
-            task_index=args.task_index)
+            task_index=args.task_index,
+            config=session_config)
     if args.job_name == 'ps':
         engine = ParamServer(args, server)
     else:
         assert args.job_name == 'worker', "--job_name should be either ps or worker"
-        engine = DistributedTrainer(args, cluster, server)
+        engine = DistributedTrainer(args, cluster, server, mpqueue)
     return engine
 
 '''
@@ -263,7 +272,7 @@ Main Function:
     3. Restore from checkpoints on demand
     3. Call TrainingManager for some iterations on demand
 '''
-def process_main(args):
+def process_main(args, mpqueue=None):
     '''
     CAVEAT: WITHOUT ALLOW_GRWTH, WE MUST CREATE RENDERER BEFORE CALLING ANY TF ROUTINE
     '''
@@ -271,17 +280,19 @@ def process_main(args):
     dpy = pyosr.create_display()
     glctx = pyosr.create_gl_context(dpy)
     # Create Training/Evaluation Engine
-    engine = curiosity_create_engine(args)
+    engine = curiosity_create_engine(args, mpqueue=mpqueue)
     # Engine execution
     engine.run()
 
 def curiosity_main(args):
-    if args.localcluster_size <= 0 and not args.ps_hosts:
+    if args.localcluster_nsampler <= 0 and not args.ps_hosts:
         process_main(args)
         return
     # Distributed execution
     args_list = rlutil.assemble_distributed_arguments(args)
-    procs = [Process(target=process_main, args=(a)) for a in args_list]
+    mgr = mp.Manager()
+    mpq = mgr.Queue()
+    procs = [mp.Process(target=process_main, args=(a, mpq)) for a in args_list]
     for p in procs:
         p.start()
     for p in procs:

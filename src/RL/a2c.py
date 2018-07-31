@@ -167,6 +167,10 @@ class A2CTrainer(A2CSampler):
         if self.debug:
             print(*args, **kwargs)
 
+    @property
+    def total_iter(self):
+        return self.advcore.args.iter
+
     '''
     Private: Return A2C Loss
 
@@ -334,15 +338,44 @@ class A2CTrainer(A2CSampler):
         batch_td.reverse()
         batch_V.reverse()
         batch_adist = rlutil.actions_to_adist_array(action_indices, dim=self.action_space_dimension)
+        ndic = {
+                'rgb' : batch_rgb,
+                'dep' : batch_dep,
+                'aindex' : action_indices,
+                'adist' : batch_adist,
+                'rewards' : rewards,
+                'TD' : batch_td,
+                'V' : batch_V
+               }
+        assert self.batch_normalization is None, "FIXME: batch_normalization in ndic"
+        assert advcore.ratios_tensor is None, "FIXME: ratios_tensor in ndic"
+        assert advcore.using_lstm is False, "FIXME: lstm in ndic"
+        # self.print('{}batch_td {}'.format(pprefix, batch_td))
+        # self.print('{}batch_V {}'.format(pprefix, batch_V))
+        # self.print('{}action_indices {}'.format(pprefix, action_indices))
+        self.dispatch_training(sess, ndic)
+        # advcore.train(sess, batch_rgb, batch_dep, batch_adist)
+        # FIXME: Re-enable summary after joint the two losses.
+        '''
+        summary = sess.run(self.summary_op)
+        self.train_writer.add_summary(summary, self.global_step)
+        '''
+        # Alternative way to log these?
+        return batch_V
+
+    def dispatch_training(self, sess, ndic, debug_output=True):
+        advcore = self.advcore
         dic = {
-                advcore.rgb_1: batch_rgb[:-1],
-                advcore.dep_1: batch_dep[:-1],
-                advcore.rgb_2: batch_rgb[1:],
-                advcore.dep_2: batch_dep[1:],
-                advcore.action_tensor : batch_adist,
-                self.TD_tensor: batch_td,
-                self.V_tensor: batch_V
+                advcore.rgb_1: ndic['rgb'][:-1],
+                advcore.dep_1: ndic['dep'][:-1],
+                advcore.rgb_2: ndic['rgb'][1:],
+                advcore.dep_2: ndic['dep'][1:],
+                advcore.action_tensor : ndic['adist'],
+                self.TD_tensor: ndic['TD'],
+                self.V_tensor: ndic['V']
               }
+        '''
+        Left for future
         if self.batch_normalization is not None:
             dic[self.batch_normalization] = True
         if advcore.ratios_tensor is not None:
@@ -353,36 +386,25 @@ class A2CTrainer(A2CSampler):
                 advcore.lstm_states_in.h : advcore.current_lstm.h,
                 advcore.lstm_len : len(batch_rgb[:-1])
                        })
-        self.print('{}batch_td {}'.format(pprefix, batch_td))
-        self.print('{}batch_V {}'.format(pprefix, batch_V))
-        self.print('{}action_indices {}'.format(pprefix, action_indices))
-        self.dispatch_training(sess, dic)
-        # advcore.train(sess, batch_rgb, batch_dep, batch_adist)
-        # FIXME: Re-enable summary after joint the two losses.
         '''
-        summary = sess.run(self.summary_op)
-        self.train_writer.add_summary(summary, self.global_step)
-        '''
-        c,l,bp,p,v,fv,raw,smraw = curiosity.sess_no_hook(sess, [self._criticism, self._log_policy, self._policy_per_sample, self._policy, advcore.value, self._flattened_value, self._raw_policy, advcore.softmax_policy], feed_dict=dic)
-        print("action input {}".format(action_indices))
-        print("reward output {}".format(rewards))
-        print("V {}".format(batch_V))
-        print("policy_output_raw {}".format(raw))
-        print("policy_output_smraw {}".format(smraw))
-        print("policy_output_flatten {}".format(p))
-        print("criticism {}".format(c))
-        print("log_policy {}".format(l))
-        print("policy_per_sample {}".format(c))
-        print("value {}".format(v))
-        print("flattened_value {}".format(fv))
-        return batch_V
-
-    def dispatch_training(self, sess, dic):
         if self.summary_op is not None:
             _, summary, gs = sess.run([self.train_op, self.summary_op, self.global_step], feed_dict=dic)
             self.train_writer.add_summary(summary, gs)
         else:
             sess.run(self.train_op, feed_dict=dic)
+        if debug_output:
+            c,l,bp,p,v,fv,raw,smraw = curiosity.sess_no_hook(sess, [self._criticism, self._log_policy, self._policy_per_sample, self._policy, advcore.value, self._flattened_value, self._raw_policy, advcore.softmax_policy], feed_dict=dic)
+            print("action input {}".format(ndic['aindex']))
+            print("reward output {}".format(ndic['rewards']))
+            print("V {}".format(ndic['V']))
+            print("policy_output_raw {}".format(raw))
+            print("policy_output_smraw {}".format(smraw))
+            print("policy_output_flatten {}".format(p))
+            print("criticism {}".format(c))
+            print("log_policy {}".format(l))
+            print("policy_per_sample {}".format(c))
+            print("value {}".format(v))
+            print("flattened_value {}".format(fv))
 
     def train_by_samples(self, envir, sess, states, action_indices, ratios, trewards, reaching_terminal, pprefix):
         advcore = self.advcore
