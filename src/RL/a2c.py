@@ -298,7 +298,7 @@ class A2CTrainer(A2CSampler):
         V = 0.0
         if not reaching_terminal:
             V = np.asscalar(advcore.evaluate([vstates[-1]], sess, tensors=[advcore.value])[0])
-            self.print('> V from advcore.evaluate {}'.format(V))
+            self.print('> V bootstraped from advcore.evaluate {}'.format(V))
         # V = values[-1] # Guaranteed by A2CSampler.sample_minibatch
 
         # action_indices.reverse()
@@ -387,11 +387,6 @@ class A2CTrainer(A2CSampler):
                 advcore.lstm_len : len(batch_rgb[:-1])
                        })
         '''
-        if self.summary_op is not None:
-            _, summary, gs = sess.run([self.train_op, self.summary_op, self.global_step], feed_dict=dic)
-            self.train_writer.add_summary(summary, gs)
-        else:
-            sess.run(self.train_op, feed_dict=dic)
         if debug_output:
             c,l,bp,p,v,fv,raw,smraw = curiosity.sess_no_hook(sess, [self._criticism, self._log_policy, self._policy_per_sample, self._policy, advcore.value, self._flattened_value, self._raw_policy, advcore.softmax_policy], feed_dict=dic)
             print("action input {}".format(ndic['aindex']))
@@ -405,6 +400,14 @@ class A2CTrainer(A2CSampler):
             print("policy_per_sample {}".format(c))
             print("value {}".format(v))
             print("flattened_value {}".format(fv))
+        if self.summary_op is not None:
+            _, summary, gs = sess.run([self.train_op, self.summary_op, self.global_step], feed_dict=dic)
+            self.train_writer.add_summary(summary, gs)
+        else:
+            sess.run(self.train_op, feed_dict=dic)
+        if debug_output:
+            [raw] = curiosity.sess_no_hook(sess, [self._raw_policy], feed_dict=dic)
+            print("policy_output_raw_after {}".format(raw))
 
     def train_by_samples(self, envir, sess, states, action_indices, ratios, trewards, reaching_terminal, pprefix):
         advcore = self.advcore

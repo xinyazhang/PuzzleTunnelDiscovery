@@ -27,14 +27,13 @@ import rlutil
 import multiprocessing as mp
 
 AlphaPuzzle = curiosity.RigidPuzzle
-CuriosityRL = curiosity.CuriosityRL
 
 def create_trainer(args, global_step, batch_normalization):
     '''
     if len(args.egreedy) != 1 and len(args.egreedy) != args.threads:
         assert False,"--egreedy should have only one argument, or match the number of threads"
     '''
-    advcore = CuriosityRL(learning_rate=1e-3, args=args, batch_normalization=batch_normalization)
+    advcore = curiosity.create_advcore(learning_rate=1e-3, args=args, batch_normalization=batch_normalization)
     bnorm = batch_normalization
     if 'a2c' in args.train:
         if args.threads > 1:
@@ -45,6 +44,8 @@ def create_trainer(args, global_step, batch_normalization):
             TRAINER = a2c_overfit.OverfitTrainer
         if args.localcluster_nsampler > 0:
             TRAINER = a2c_mp.MPA2CTrainer
+        if args.train == 'a2c_overfit_from_fv':
+            TRAINER = a2c_overfit.OverfitTrainerFromFV
         train_everything = False if args.viewinitckpt else True
         trainer = TRAINER(
                 advcore=advcore,
@@ -171,7 +172,7 @@ class TEngine(IEngine):
         # summary ops are evaluated in every mon_sess.run(), and there is no way to disable it for evaluation
         with tf.train.MonitoredTrainingSession(master=self.mts_master,
                                                is_chief=self.mts_is_chief,
-                                               checkpoint_dir=args.ckptdir,
+                                               checkpoint_dir=self.args.ckptdir,
                                                config=self.session_config,
                                                save_summaries_steps=0,
                                                save_summaries_secs=0,
@@ -303,7 +304,7 @@ def curiosity_main(args):
     for p in procs:
         p.join()
 
-if __name__ == '__main__':
+def main():
     args = rlargs.parse()
     if args.continuetrain:
         if args.samplein:
@@ -319,3 +320,6 @@ if __name__ == '__main__':
     args.total_epoch = args.total_sample / args.samplebatching
     print("> Arguments {}".format(args))
     curiosity_main(args)
+
+if __name__ == '__main__':
+    main()

@@ -57,3 +57,24 @@ class OverfitTrainer(A2CTrainer):
                  values=None,
                  reaching_terminal=rlsamples[-1].reaching_terminal
                 )
+
+'''
+Try to overfit V and P with given samples
+'''
+class OverfitTrainerFromFV(object):
+    def __init__(self,
+            advcore,
+            tmax,
+            gamma,
+            learning_rate,
+            ckpt_dir,
+            global_step=None,
+            entropy_beta=0.01,
+            debug=True,
+            batch_normalization=None,
+            period=1,
+            total_number_of_replicas=None,
+            LAMBDA=0.5,
+            train_everything=False
+            ):
+        pass
