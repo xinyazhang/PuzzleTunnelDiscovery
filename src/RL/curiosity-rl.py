@@ -227,11 +227,16 @@ class Evaluator(IEngine):
         saver = tf.train.Saver()
         with tf.Session(config=self.session_config) as sess:
             tf.get_default_graph().finalize()
+            if args.viewinitckpt:
+                self.player.advcore.load_pretrain(sess, args.viewinitckpt)
+                print("Load from viewinitckpt {}".format(args.viewinitckpt))
             if self.player.mandatory_ckpt:
                 assert args.ckptdir, "--ckptdir is mandatory when --eval"
+            if args.ckptdir:
                 ckpt = tf.train.get_checkpoint_state(checkpoint_dir=args.ckptdir)
                 print('ckpt {}'.format(ckpt))
-                assert ckpt is not None, "Missing actual checkpoints at --ckptdir"
+                if self.player.mandatory_ckpt:
+                    assert ckpt is not None, "Missing actual checkpoints at --ckptdir"
                 if ckpt and ckpt.model_checkpoint_path:
                     saver.restore(sess, ckpt.model_checkpoint_path)
                     accum_epoch = sess.run(self.gs)

@@ -328,13 +328,19 @@ class MSASampler(RLVisualizer):
         for msraw in self.msraw:
             ms.append(np.array(self.r.translate_to_unit_state(msraw), dtype=np.float32))
         self.ms = np.array(ms, dtype=np.float32)
-        self.traj_s = []
-        self.traj_a = []
-        self.traj_fv = []
+        # self.traj_s = []
+        # self.traj_a = []
+        # self.traj_fv = []
         self.mandatory_ckpt = False
 
     def play(self):
         reanimate(self)
+
+    def _fv(self):
+        advcore = self.advcore
+        envir = self.envir
+        sess = self.sess
+        return advcore.evaluate([envir.vstate], sess, advcore.model.cur_featvec)
 
     def __iter__(self):
         envir = self.envir
@@ -342,40 +348,60 @@ class MSASampler(RLVisualizer):
         reaching_terminal = False
         args = self.args
         pprefix = "[0] "
+        traj_s = [envir.qstate]
+        traj_a = []
+        traj_fv = [self._fv()]
+        print("Initial state {}".format(envir.qstate))
         print("MS list {}".format(self.ms))
+        rgb,_ = envir.vstate
+        yield rgb[self.gview] # First view
         for ms in self.ms:
             print("Switch MS to {}".format(ms))
             while True:
-                self.traj_s.append(envir.qstate)
-                fv = advcore.evaluate([envir.vstate], sess, advcore.model.cur_featvec)
-                self.traj_fv.append(fv)
                 print("Current state {}".format(envir.qstate))
-                rgb,_ = envir.vstate
-                yield rgb[self.gview] # First view
-                if reaching_terminal:
-                    print("#############################################")
-                    print("##########CONGRATS TERMINAL REACHED##########")
-                    print("##########   PRESS ENTER TO EXIT   ##########")
-                    input("#############################################")
-                    np.savez(args.sampleout,
-                             TRAJ_S=self.traj_s,
-                             TRAJ_A=self.traj_a,
-                             TRAJ_FV=self.traj_fv)
-                    return
-                    yield
                 sa = []
                 sd = []
+                rt = []
+                rw = []
                 for a in args.actionset:
-                    nstate,_,reaching_terminal,_ = envir.peek_act(a)
+                    nstate,r,reaching_terminal,_ = envir.peek_act(a)
                     sa.append(nstate)
                     sd.append(pyosr.distance(nstate, ms))
+                    rw.append(r)
+                    rt.append(reaching_terminal)
                 print("sa {} \nsd {}".format(sa, sd))
                 ai = np.argmin(sd)
                 if sd[ai] > pyosr.distance(envir.qstate, ms): # Local minimum reached
                     break
                 a = args.actionset[ai]
-                self.traj_a.append(a)
+                traj_a.append(a)
                 envir.qstate = sa[ai]
+                traj_s.append(envir.qstate)
+                traj_fv.append(self._fv())
+                rgb,_ = envir.vstate
+                if rw[ai] < 0:
+                    print("#############################################")
+                    print("!!!!!!!!!!   CRITICAL: COLLISION   !!!!!!!!!!")
+                    print("!!!!!!!!!!   PRESS ENTER TO EXIT   !!!!!!!!!!")
+                    input("#############################################")
+                    np.savez(args.sampleout+'.die',
+                             TRAJ_S=traj_s,
+                             TRAJ_A=traj_a,
+                             TRAJ_FV=traj_fv)
+                    return
+                    yield
+                if rt[ai]:
+                    print("#############################################")
+                    print("##########CONGRATS TERMINAL REACHED##########")
+                    print("##########   PRESS ENTER TO EXIT   ##########")
+                    input("#############################################")
+                    np.savez(args.sampleout,
+                             TRAJ_S=traj_s,
+                             TRAJ_A=traj_a,
+                             TRAJ_FV=traj_fv)
+                    return
+                    yield
+                yield rgb[self.gview] # First view
 
 
 def create_visualizer(args, g, global_step):
