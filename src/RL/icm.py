@@ -40,6 +40,7 @@ class IntrinsicCuriosityModule:
             batch_normalization=None):
         print('! IntrinsicCuriosityModule')
         print('! ICM FEREV {}'.format(ferev))
+        # assert ferev == 13, "[DEBUG slimnet-2] --ferev should be 13"
         self.action_tensor = action_tensor
         self.rgb_tensor = rgb_tensor
         self.depth_tensor = depth_tensor
@@ -113,6 +114,11 @@ class IntrinsicCuriosityModule:
             self.feature_extractor = vision.FeatureExtractorResNet(
                     config.SV_RESNET18,
                     fehidden + [featnum], 'VisionNetRev12', elu, gradb=True,
+                    batch_normalization=batch_normalization)
+        elif ferev == 13:
+            self.feature_extractor = vision.FeatureExtractorResNet(
+                    config.SV_RESNET18_TRUE,
+                    fehidden + [featnum], 'VisionNetRev13', elu,
                     batch_normalization=batch_normalization)
         '''
         featvec: shape [BATCH, VIEW, N]

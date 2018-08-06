@@ -22,6 +22,8 @@ class VisionLayerConfig:
     hole = None
     max_pooling_kernel_size = None  # Or integer
     max_pooling_strides = None      # Or integer
+    avg_pooling_kernel_size = None  #
+    avg_pooling_strides = None      #
     res_type = RESIDUAL_NONE        # No residual
     gradb = False                   # bias with gradients
     initialized_as_zero = False     # Zero initial weights rather than randomized values
@@ -149,6 +151,14 @@ class VisionLayerConfig:
                     ksize=ksize,
                     strides=strides,
                     padding=self.padding)
+        if self.avg_pooling_kernel_size is not None:
+            ksize = [1, 1] + self.avg_pooling_kernel_size + [1]
+            strides = [1, 1] + self.avg_pooling_strides + [1]
+            out = tf.nn.avg_pool3d(input=out,
+                    ksize=ksize,
+                    strides=strides,
+                    padding='VALID')
+            print('after avg_pool3d shape {}'.format(out.shape))
         print('after CNN {} res_type: {}'.format(out.shape, self.res_type))
         if self.res_proj is not None:
             residual_out = tf.nn.conv3d(residual_out,
@@ -190,6 +200,9 @@ class VisionLayerConfig:
             if 'max_pool' in visdesc:
                 viscfg.max_pooling_kernel_size = visdesc['max_pool']['kernel_size']
                 viscfg.max_pooling_strides = visdesc['max_pool']['strides']
+            if 'avg_pool' in visdesc:
+                viscfg.avg_pooling_kernel_size = visdesc['avg_pool']['kernel_size']
+                viscfg.avg_pooling_strides = visdesc['avg_pool']['strides']
             viscfg_array.append(viscfg)
         return viscfg_array
 

@@ -115,7 +115,7 @@ def get_parser():
             action='store_true')
     parser.add_argument('--ferev',
             help='Reversion of Feature Extractor',
-            choices=range(1,12+1),
+            choices=range(1,13+1),
             type=int, default=1)
     parser.add_argument('--capture',
             help='Capture input image to summary',
