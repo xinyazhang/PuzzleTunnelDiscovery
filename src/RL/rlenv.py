@@ -317,3 +317,86 @@ class IAdvantageCore(object):
     @abstractmethod
     def get_lstm(self):
         pass
+
+
+'''
+One sample from the environment
+'''
+class RLSample(object):
+    def __init__(self, advcore, envir, sess, is_terminal=False):
+        # Capture Current Frame
+        self.qstate = envir.qstate
+        self.perturbation = envir.get_perturbation()
+        self.vstate = envir.vstate
+        self.is_terminal = is_terminal
+        if is_terminal:
+            self.policy = None
+            self.value = 0.0
+        else:
+            # Sample Pi and V
+            policy, value = advcore.evaluate([envir.vstate], sess, [advcore.softmax_policy, advcore.value])
+            self.policy = policy[0][0] # Policy View from first qstate and first view
+            self.value = np.asscalar(value) # value[0][0][0]
+
+    '''
+        Side effects:
+            1. envir.qstate is changed according to the evaluated policy function
+            2. self.advcore.lstm_state is changed
+    '''
+    def proceed(self, advcore, envir, sess):
+        # Sample Action
+        self.action_index = advcore.make_decision(envir, self.policy)
+        # Preview Next frame
+        self.nstate, self.true_reward, self.reaching_terminal, self.ratio = envir.peek_act(self.action_index)
+        # Artificial Reward
+        self.artificial_reward = advcore.get_artificial_reward(envir, sess,
+                envir.qstate, self.action_index, self.nstate, self.ratio)
+        self.combined_reward = self.true_reward + self.artificial_reward
+        # Side Effects: change qstate
+        envir.qstate = self.nstate
+        # Side Effects: Maintain LSTM
+        lstm_next = copy.deepcopy(advcore.get_lstm()) # Get the output of current frame
+        advcore.set_lstm(lstm_next) # AdvCore next frame
+
+'''
+Sample a trajectory
+'''
+class MiniBatchSampler(object):
+
+    def __init__(self,
+                 advcore,
+                 tmax):
+        self.advcore = advcore
+        self.a2c_tmax = tmax
+
+    '''
+    Sample one in a mini-batch
+
+    Side effects: self.advcore.lstm_state is changed
+    '''
+    def _sample_one(self, envir, sess):
+        sam = RLSample(self.advcore, envir, sess)
+        sam.proceed(self.advcore, envir, sess)
+        return sam
+
+    def sample_minibatch(self, envir, sess, tid=None, tmax=-1):
+        if tmax < 0:
+            tmax = self.a2c_tmax
+        advcore = self.advcore
+        samples = []
+        # LSTM is also tracked by Envir, since it's derived by vstate
+        # FIXME: Initialize envir.lstm_barn somewhere else.
+        advcore.set_lstm(envir.lstm_barn)
+        for i in range(tmax):
+            s = self._sample_one(envir, sess)
+            samples.append(s)
+            if s.reaching_terminal:
+                break
+        reaching_terminal = samples[-1].reaching_terminal
+        envir.lstm_barn = copy.deepcopy(advcore.get_lstm())
+        final = RLSample(self.advcore, envir, sess, is_terminal=reaching_terminal)
+        if reaching_terminal:
+            envir.reset()
+        return (samples, final)
+
+

@@ -16,6 +16,7 @@ import rlargs
 import a2c
 import a2c_overfit
 import a2c_mp
+import dqn
 import random
 from six.moves import queue,input
 import qtrainer
@@ -60,6 +61,12 @@ def create_trainer(args, global_step, batch_normalization):
                 period=args.period,
                 LAMBDA=args.LAMBDA,
                 train_everything=train_everything)
+    elif args.train == 'dqn':
+        TRAINER = dqn.DQNTrainerMP if args.localcluster_nsampler > 0 else dqn.DQNTrainer
+        trainer = TRAINER(
+                advcore=advcore,
+                learning_rate=1e-4,
+                batch_normalization=bnorm)
     elif args.train == 'QwithGT' or args.qlearning_with_gt or args.train == 'QandFCFE':
         trainer = qtrainer.QTrainer(
                 advcore=advcore,

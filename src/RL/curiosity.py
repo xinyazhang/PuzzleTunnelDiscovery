@@ -229,7 +229,8 @@ class CuriosityRL(rlenv.IAdvantageCore):
                 self.model.create_pretrain_saver()
 
         self.polout, self.polparams, self.polnets = self.create_polnet(args)
-        self.valout, self.valparams, self.valnets = self.create_valnet(args)
+        if args.train != 'dqn':
+            self.valout, self.valparams, self.valnets = self.create_valnet(args)
         if args.curiosity_type == 2:
             self.ratios_tensor = tf.placeholder(tf.float32, shape=[None], name='RatioPh')
         self.curiosity, self.curiosity_params = self.create_curiosity_net(args)
