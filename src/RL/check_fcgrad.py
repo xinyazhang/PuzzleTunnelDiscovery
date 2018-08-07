@@ -70,7 +70,7 @@ policy_loss *= 1e-3
 
 loss = policy_loss + value_loss
 #loss = value_loss
-optimizer = tf.train.AdamOptimizer(learning_rate=1e-2)
+optimizer = tf.train.AdamOptimizer(learning_rate=1e-4)
 grad_op = optimizer.compute_gradients(loss)
 train_op = optimizer.minimize(loss)
 
@@ -82,7 +82,8 @@ A_IN = d['TRAJ_A']
 V = 10.0
 V_IN = [V]
 for i in range(len(A_IN)):
-    V *= 0.9
+    # V *= 0.9
+    V -= 0.2
     V_IN.append(V)
 
 V_IN.reverse()
@@ -97,10 +98,11 @@ dic = {
 
 with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
-    for i in range(1000*128):
+    TTL = 1024*1024
+    for i in range(TTL):
         _,pl,vl = sess.run([train_op, policy_loss, value_loss], feed_dict=dic)
         print("iter {} policy_loss {} value_loss {}".format(i, pl, vl))
-        if (i+1) % 100 == 0:
+        if (i+1) % 100 == 0 or i+1 == TTL:
             v,c,p = sess.run([flattened_value,criticism,compact], feed_dict=dic)
             print("\tval {}".format(v))
             print("\tcri {}".format(c))

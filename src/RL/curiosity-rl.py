@@ -183,6 +183,7 @@ class TEngine(IEngine):
                                                config=self.session_config,
                                                save_summaries_steps=0,
                                                save_summaries_secs=0,
+                                               save_checkpoint_secs=600,
                                                hooks=hooks) as mon_sess:
             while not mon_sess.should_stop():
                 self.trainer.train(self.envir, mon_sess, self.tid)
