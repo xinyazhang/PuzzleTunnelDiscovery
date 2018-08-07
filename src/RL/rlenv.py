@@ -13,6 +13,7 @@ from collections import deque
 import itertools
 import random
 import numpy as np
+import copy
 
 '''
 Note: Python2 code?
@@ -332,6 +333,9 @@ class RLSample(object):
         if is_terminal:
             self.policy = None
             self.value = 0.0
+        elif advcore.args.train == 'dqn':
+            [policy] = advcore.evaluate([envir.vstate], sess, [advcore.policy])
+            self.policy = policy[0][0] # Policy View from first qstate and first view
         else:
             # Sample Pi and V
             policy, value = advcore.evaluate([envir.vstate], sess, [advcore.softmax_policy, advcore.value])
