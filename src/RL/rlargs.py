@@ -42,7 +42,7 @@ def get_parser():
             action='store_true')
     parser.add_argument('--period',
             help='Accumulated Gradient',
-            type=int, default=0)
+            type=int, default=-1)
     parser.add_argument('--samplebatching', metavar='NUMBER',
             help='Number of samples read from disk in pretrain-d',
             type=int, default=1)

@@ -65,6 +65,7 @@ def create_trainer(args, global_step, batch_normalization):
         TRAINER = dqn.DQNTrainerMP if args.localcluster_nsampler > 0 else dqn.DQNTrainer
         trainer = TRAINER(
                 advcore=advcore,
+                args=args,
                 learning_rate=1e-4,
                 batch_normalization=bnorm)
     elif args.train == 'QwithGT' or args.qlearning_with_gt or args.train == 'QandFCFE':
@@ -209,7 +210,7 @@ DistributedTrainer:
 '''
 class DistributedTrainer(TEngine):
     def __init__(self, args, cluster, server, mpqueue):
-        assert args.period > 0, "--period is mandatory for distributed training"
+        assert args.period >= 0, "--period must be explicitly listed for distributed training"
         super(DistributedTrainer, self).__init__(args)
         self.tid = args.task_index
         self.envir = AlphaPuzzle(args, self.tid, self.tid)
