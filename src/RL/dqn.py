@@ -1,9 +1,11 @@
 from __future__ import print_function
 import tensorflow as tf
 import rlenv
+import rlutil
 import numpy as np
 import multiprocessing as mp
 import cPickle as pickle
+import time
 
 class DQNTrainer(object):
 
@@ -13,6 +15,7 @@ class DQNTrainer(object):
                  learning_rate,
                  batch_normalization=None):
         self.advcore = advcore
+        self.action_space_dimension = int(advcore.policy.shape[-1])
         self.args = args
         self.sampler = rlenv.MiniBatchSampler(advcore=advcore, tmax=args.batch)
         self.batch_normalization = batch_normalization
@@ -26,8 +29,8 @@ class DQNTrainer(object):
         self.optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
         if args.period > 1:
             self.optimizer = tf.train.SyncReplicasOptimizer(self.optimizer,
-                    replicas_to_aggregate=period,
-                    total_num_replicas=total_number_of_replicas)
+                    replicas_to_aggregate=args.period,
+                    total_num_replicas=args.localcluster_nsampler)
         LAMBDA_1 = 1
         LAMBDA_2 = 1
         self.loss = LAMBDA_1 * self._build_loss(advcore) + LAMBDA_2 * advcore.build_loss()
@@ -48,13 +51,16 @@ class DQNTrainer(object):
             self.summary_op = None
             self.train_writer = None
 
+    def _log(self, text):
+        print(text)
+
     @property
     def total_iter(self):
         return self.args.iter
 
     def _build_loss(self, advcore):
         self.Adist_tensor = advcore.action_tensor
-        self.Q_tensor = tf.placeholder(tf.float32, shape=[None], name='VPh')
+        self.Q_tensor = tf.placeholder(tf.float32, shape=[None], name='QPh')
         Q_output = tf.reduce_sum(tf.multiply(self.Adist_tensor, self.dqn_out), axis=[1,2])
         dqn_loss = tf.nn.l2_loss(self.Q_tensor - Q_output)
         tf.summary.scalar('dqn_loss', dqn_loss)
@@ -62,6 +68,7 @@ class DQNTrainer(object):
 
     def train(self, envir, sess, tid=None, tmax=-1):
         rlsamples, final_state = self.sampler.sample_minibatch(envir, sess, tid, tmax)
+        action_indices = [s.action_index for s in rlsamples]
         batch_adist = rlutil.actions_to_adist_array(action_indices, dim=self.action_space_dimension)
 
         advcore = self.advcore
@@ -69,8 +76,9 @@ class DQNTrainer(object):
         if final_state.is_terminal:
             V = 0.0
         else:
-            V = np.asscalar(advcore.evaluate([final_state.vstate], sess, tensors=[advcore.value])[0])
-            self.print('> V bootstraped from advcore.evaluate {}'.format(V))
+            allq = advcore.evaluate([final_state.vstate], sess, tensors=[advcore.policy])
+            V = np.amax(allq)
+            # self.print('> V bootstraped from advcore.evaluate {}'.format(V))
         # Calculate V from sampled Traj.
         r_rewards = [s.combined_reward for s in rlsamples][::-1]
         batch_V = []
@@ -81,7 +89,9 @@ class DQNTrainer(object):
         batch_V.reverse()
         # Prepare Input for Vision
         batch_rgb = [s.vstate[0] for s in rlsamples]
+        batch_rgb.append(final_state.vstate[0])
         batch_dep = [s.vstate[1] for s in rlsamples]
+        batch_dep.append(final_state.vstate[1])
 
         ndic = {
                 'rgb' : batch_rgb,
@@ -99,15 +109,17 @@ class DQNTrainer(object):
                 advcore.rgb_2: ndic['rgb'][1:],
                 advcore.dep_2: ndic['dep'][1:],
                 advcore.action_tensor : ndic['adist'],
-                self.V_tensor: ndic['V']
+                self.Q_tensor: ndic['V']
               }
         if self.summary_op is not None:
+            self._log("running training op")
             _, summary, gs = sess.run([self.train_op, self.summary_op, self.global_step], feed_dict=dic)
+            self._log("training op for gs {} finished".format(gs))
             self.train_writer.add_summary(summary, gs)
         else:
             sess.run(self.train_op, feed_dict=dic)
 
-class DQNTrainerMP(object):
+class DQNTrainerMP(DQNTrainer):
 
     def __init__(self,
                  advcore,
@@ -125,6 +137,11 @@ class DQNTrainerMP(object):
     def install_mpqueue_as(self, mpqueue, task_index):
         self._MPQ = mpqueue
         self._task_index = task_index
+        self._logfile = open(self.args.ckptdir + '{}.out'.format(task_index), 'w')
+
+    def _log(self, text):
+        print("[{}] {}".format(time.time(), text), file=self._logfile)
+        self._logfile.flush()
 
     '''
     TODO and FIXME: CODE REUSE
@@ -146,14 +163,19 @@ class DQNTrainerMP(object):
     def train(self, envir, sess, tid=None, tmax=-1):
         if self.is_chief:
             # Collect generated sample
+            self._log("waiting for training data")
             pk = self._MPQ.get()
             ndic = pickle.loads(pk)
+            self._log("training data waited, batch size {}".format(len(ndic['V'])))
             super(DQNTrainerMP, self).dispatch_training(sess, ndic, debug_output=False)
+            self._log("minibatch trained, batch size {}".format(len(ndic['V'])))
         else:
             # Generate samples
+            self._log("Generating minibatch")
             super(DQNTrainerMP, self).train(envir, sess, tid, tmax)
 
     def dispatch_training(self, sess, ndic):
         assert not self.is_chief, "DQNTrainerMP.dispatch_training must not be called by chief"
         pk = pickle.dumps(ndic, protocol=-1)
         self._MPQ.put(pk)
+        self._log("Minibatch put into queue")
