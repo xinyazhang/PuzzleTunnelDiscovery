@@ -17,6 +17,7 @@ class DQNTrainer(object):
                  batch_normalization=None):
         self.advcore = advcore
         self.action_space_dimension = int(advcore.policy.shape[-1])
+        advcore.softmax_policy # create normalized policy tensor
         self.args = args
         self.sampler = rlenv.MiniBatchSampler(advcore=advcore, tmax=args.batch)
         self.batch_normalization = batch_normalization
@@ -77,7 +78,9 @@ class DQNTrainer(object):
         if final_state.is_terminal:
             V = 0.0
         else:
-            allq = advcore.evaluate([final_state.vstate], sess, tensors=[advcore.policy])
+            [allq] = advcore.evaluate([final_state.vstate], sess, tensors=[advcore.policy])
+            assert allq.shape == (1, 1, 12), "advcore.policy output shape is not (1,1,12) but {}".format(allq.shape)
+            allq = allq[0][0][self.args.actionset] # Eliminate unselected actions
             V = np.amax(allq)
             # self.print('> V bootstraped from advcore.evaluate {}'.format(V))
         # Calculate V from sampled Traj.
@@ -149,7 +152,7 @@ class DQNTrainerMP(DQNTrainer):
         self._MPQ = mpqueue
         self._task_index = task_index
         self._logfile = open(self.args.ckptdir + '{}.out'.format(task_index), 'w')
-        self._sample_dumpdir = args.ckptdir + "sample-{}/".format(task_index)
+        self._sample_dumpdir = self.args.ckptdir + "sample-{}/".format(task_index)
         util.mkdir_p(self._sample_dumpdir)
         self._sample_index = 0
 
@@ -160,6 +163,7 @@ class DQNTrainerMP(DQNTrainer):
     def _dump_sample(self, ndic):
         fn = "{}/{}".format(self._sample_dumpdir, self._sample_index)
         np.savez(fn, Qs=ndic['q'], As=ndic['aindex'], Vs=ndic['V'])
+        self._sample_index += 1
 
     '''
     TODO and FIXME: CODE REUSE
@@ -198,3 +202,4 @@ class DQNTrainerMP(DQNTrainer):
         pk = pickle.dumps(ndic, protocol=-1)
         self._MPQ.put(pk)
         self._log("Minibatch put into queue")
+        self._dump_sample(ndic)
