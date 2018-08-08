@@ -264,7 +264,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
         return self.model.create_somenet_from_feature(hidden, 'PolNet',
                 elu=args.elu,
                 lstm=args.lstm,
-                initialized_as_zero=False,
+                initialized_as_zero=True if args.train == 'dqn' else False,
                 nolu_at_final=True,
                 batch_normalization=self.batch_normalization)
 
