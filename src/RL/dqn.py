@@ -2,6 +2,7 @@ from __future__ import print_function
 import tensorflow as tf
 import rlenv
 import rlutil
+import util
 import numpy as np
 import multiprocessing as mp
 import cPickle as pickle
@@ -97,6 +98,8 @@ class DQNTrainer(object):
                 'rgb' : batch_rgb,
                 'dep' : batch_dep,
                 'adist' : batch_adist,
+                'aindex' : action_indices,
+                'q' : np.array([s.qstate for s in rlsamples] + [final_state.qstate]),
                 'V' : batch_V,
                }
         self.dispatch_training(sess, ndic)
@@ -138,10 +141,17 @@ class DQNTrainerMP(DQNTrainer):
         self._MPQ = mpqueue
         self._task_index = task_index
         self._logfile = open(self.args.ckptdir + '{}.out'.format(task_index), 'w')
+        self._sample_dumpdir = args.ckptdir + "sample-{}/".format(task_index)
+        util.mkdir_p(self._sample_dumpdir)
+        self._sample_index = 0
 
     def _log(self, text):
         print("[{}] {}".format(time.time(), text), file=self._logfile)
         self._logfile.flush()
+
+    def _dump_sample(self, ndic):
+        fn = "{}/{}".format(self._sample_dumpdir, self._sample_index)
+        np.savez(fn, Qs=ndic['q'], As=ndic['aindex'], Vs=ndic['V'])
 
     '''
     TODO and FIXME: CODE REUSE
@@ -165,8 +175,9 @@ class DQNTrainerMP(DQNTrainer):
             # Collect generated sample
             self._log("waiting for training data")
             pk = self._MPQ.get()
+            self._log("packet received")
             ndic = pickle.loads(pk)
-            self._log("training data waited, batch size {}".format(len(ndic['V'])))
+            self._log("training data unpacked, batch size {}".format(len(ndic['V'])))
             super(DQNTrainerMP, self).dispatch_training(sess, ndic, debug_output=False)
             self._log("minibatch trained, batch size {}".format(len(ndic['V'])))
         else:
