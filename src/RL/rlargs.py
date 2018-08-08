@@ -306,6 +306,8 @@ def parse():
         args.train = 'QwithGT'
     if -1 in args.actionset or len(args.actionset) == 0:
         args.actionset = [i for i in range(12)]
+    if args.ckptdir is not None:
+        assert args.ckptdir.endswith('/'), '--ckptdir should specify a directory rather a prefix'
     args.actionset = list(set(args.actionset)) # deduplication
     assert not (args.lstm and args.ereplayratio > 0), "LSTM cannot be used in combination with Experience Replay"
     assert len(args.msiraw) % 7 == 0, "--msiraw only accepts 7n elements as (R^3,W-First Quaternion)"
