@@ -188,8 +188,11 @@ class CuriosityRL(rlenv.IAdvantageCore):
 
         self.action_space_dimension = uw_random.DISCRETE_ACTION_NUMBER
 
-        common_shape = [None, self.view_num, w, h]
-        self.action_tensor = tf.placeholder(tf.float32, shape=[None, 1, self.action_space_dimension], name='ActionPh')
+        batch_size = None if args.EXPLICIT_BATCH_SIZE < 0 else args.EXPLICIT_BATCH_SIZE
+        self.batch_size = batch_size
+
+        common_shape = [batch_size, self.view_num, w, h]
+        self.action_tensor = tf.placeholder(tf.float32, shape=[batch_size, 1, self.action_space_dimension], name='ActionPh')
         self.rgb_1_tensor = tf.placeholder(tf.float32, shape=common_shape+[3], name='Rgb1Ph')
         self.rgb_2_tensor = tf.placeholder(tf.float32, shape=common_shape+[3], name='Rgb2Ph')
         self.dep_1_tensor = tf.placeholder(tf.float32, shape=common_shape+[1], name='Dep1Ph')
@@ -236,7 +239,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
             self.valparams = []
             self.valnets = None
         if args.curiosity_type == 2:
-            self.ratios_tensor = tf.placeholder(tf.float32, shape=[None], name='RatioPh')
+            self.ratios_tensor = tf.placeholder(tf.float32, shape=[batch_size], name='RatioPh')
         self.curiosity, self.curiosity_params = self.create_curiosity_net(args)
         print('Curiosity Params: {}'.format(self.curiosity_params))
 

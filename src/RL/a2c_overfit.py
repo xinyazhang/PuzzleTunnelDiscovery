@@ -53,8 +53,8 @@ class OverfitTrainer(A2CTrainer):
         self.Adist_tensor = advcore.action_tensor
         # TD is required
         # V_sample - V*, for this case it's V_opt - V*
-        self.V_star = tf.placeholder(tf.float32, shape=[None], name='V_star_ph')
-        self.V_tensor = tf.placeholder(tf.float32, shape=[None], name='VPh')
+        self.V_star = tf.placeholder(tf.float32, shape=[advcore.batch_size], name='V_star_ph')
+        self.V_tensor = tf.placeholder(tf.float32, shape=[advcore.batch_size], name='VPh')
 
         flattened_value = tf.reshape(advcore.value, [-1])
         policy = tf.multiply(advcore.softmax_policy, self.Adist_tensor)

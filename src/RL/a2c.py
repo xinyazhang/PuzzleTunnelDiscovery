@@ -116,8 +116,8 @@ class A2CTrainer(rlenv.MiniBatchSampler):
         '''
         self.Adist_tensor = advcore.action_tensor
 
-        self.TD_tensor = tf.placeholder(tf.float32, shape=[None], name='TDPh')
-        self.V_tensor = tf.placeholder(tf.float32, shape=[None], name='VPh')
+        self.TD_tensor = tf.placeholder(tf.float32, shape=[advcore.batch_size], name='TDPh')
+        self.V_tensor = tf.placeholder(tf.float32, shape=[advcore.batch_size], name='VPh')
         # self.TD_tensor = tf.placeholder(tf.float32, shape=[None])
         # self.V_tensor = tf.placeholder(tf.float32, shape=[None])
 

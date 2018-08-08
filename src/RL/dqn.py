@@ -61,7 +61,7 @@ class DQNTrainer(object):
 
     def _build_loss(self, advcore):
         self.Adist_tensor = advcore.action_tensor
-        self.Q_tensor = tf.placeholder(tf.float32, shape=[None], name='QPh')
+        self.Q_tensor = tf.placeholder(tf.float32, shape=[advcore.batch_size], name='QPh')
         Q_output = tf.reduce_sum(tf.multiply(self.Adist_tensor, self.dqn_out), axis=[1,2])
         dqn_loss = tf.nn.l2_loss(self.Q_tensor - Q_output)
         tf.summary.scalar('dqn_loss', dqn_loss)

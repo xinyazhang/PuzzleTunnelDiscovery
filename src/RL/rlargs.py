@@ -167,6 +167,10 @@ def get_parser():
             help='Penalty reward from collision',
             type=float,
             default=-10.0)
+    parser.add_argument('--EXPLICIT_BATCH_SIZE',
+            help='Penalty reward from collision',
+            type=int,
+            default=-1)
     parser.add_argument('--REW',
             help='Reward from disentanglement',
             type=float,
