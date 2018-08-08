@@ -4,6 +4,7 @@ import tensorflow as tf
 import rlenv
 import numpy as np
 import rlutil
+import curiosity
 
 class OverfitTrainer(A2CTrainer):
     def __init__(self,
@@ -64,6 +65,13 @@ class OverfitTrainer(A2CTrainer):
         policy_loss = tf.reduce_sum(-policy_per_sample)
         value_loss = tf.nn.l2_loss(self.V_star - flattened_value)
 
+        self._raw_policy = advcore.policy
+        self._policy = policy
+        self._flattened_value = flattened_value
+        self._criticism = criticism
+        self._log_policy = log_policy
+        self._policy_per_sample = policy_per_sample
+
         self.loss = policy_loss + value_loss
         return self.loss
 
@@ -96,7 +104,8 @@ class OverfitTrainer(A2CTrainer):
             V = np.asscalar(advcore.evaluate([final_state.vstate], sess, tensors=[advcore.value])[0])
         V_star = V
 
-        r_rewards = [s.combined_reward for s in rlsamples][::-1]
+        rewards = [s.combined_reward for s in rlsamples]
+        r_rewards = rewards[::-1]
         batch_V = []
         batch_V_star = []
         GAMMA = self.gamma
@@ -117,6 +126,7 @@ class OverfitTrainer(A2CTrainer):
                 'dep' : batch_dep,
                 'aindex' : action_indices,
                 'adist' : batch_adist,
+                'rewards' : rewards,
                 'V' : batch_V,
                 'Vstar' : batch_V_star,
                }
@@ -133,11 +143,27 @@ class OverfitTrainer(A2CTrainer):
                 self.V_star : ndic['Vstar'],
                 self.V_tensor: ndic['V']
               }
+        if debug_output:
+            c,l,bp,p,v,fv,raw,smraw = curiosity.sess_no_hook(sess, [self._criticism, self._log_policy, self._policy_per_sample, self._policy, advcore.value, self._flattened_value, self._raw_policy, advcore.softmax_policy], feed_dict=dic)
+            print("action input {}".format(ndic['aindex']))
+            print("reward output {}".format(ndic['rewards']))
+            print("V {}".format(ndic['V']))
+            print("policy_output_raw {}".format(raw))
+            print("policy_output_smraw {}".format(smraw))
+            print("policy_output_flatten {}".format(p))
+            print("criticism {}".format(c))
+            print("log_policy {}".format(l))
+            print("policy_per_sample {}".format(c))
+            print("value {}".format(v))
+            print("flattened_value {}".format(fv))
         if self.summary_op is not None:
             _, summary, gs = sess.run([self.train_op, self.summary_op, self.global_step], feed_dict=dic)
             self.train_writer.add_summary(summary, gs)
         else:
             sess.run(self.train_op, feed_dict=dic)
+        if debug_output:
+            [raw] = curiosity.sess_no_hook(sess, [self._raw_policy], feed_dict=dic)
+            print("policy_output_raw_after {}".format(raw))
 
 '''
 Try to overfit V and P with given samples

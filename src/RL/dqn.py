@@ -81,7 +81,8 @@ class DQNTrainer(object):
             V = np.amax(allq)
             # self.print('> V bootstraped from advcore.evaluate {}'.format(V))
         # Calculate V from sampled Traj.
-        r_rewards = [s.combined_reward for s in rlsamples][::-1]
+        rewards = [s.combined_reward for s in rlsamples]
+        r_rewards = rewards[::-1]
         batch_V = []
         GAMMA = self.args.GAMMA
         for r in r_rewards:
@@ -101,6 +102,7 @@ class DQNTrainer(object):
                 'aindex' : action_indices,
                 'q' : np.array([s.qstate for s in rlsamples] + [final_state.qstate]),
                 'V' : batch_V,
+                'reward' : rewards,
                }
         self.dispatch_training(sess, ndic)
 
@@ -114,6 +116,12 @@ class DQNTrainer(object):
                 advcore.action_tensor : ndic['adist'],
                 self.Q_tensor: ndic['V']
               }
+        if debug_output:
+            [raw] = curiosity.sess_no_hook(sess, [self._criticism, self._log_policy, self._policy_per_sample, self._policy, advcore.value, self._flattened_value, self._raw_policy, advcore.softmax_policy], feed_dict=dic)
+            print("action input {}".format(ndic['aindex']))
+            print("reward output {}".format(ndic['rewards']))
+            print("V {}".format(ndic['V']))
+            print("policy_output_raw {}".format(raw))
         if self.summary_op is not None:
             self._log("running training op")
             _, summary, gs = sess.run([self.train_op, self.summary_op, self.global_step], feed_dict=dic)
