@@ -13,8 +13,8 @@ class ReAnimator(object):
         else:
             self.im.set_array(rgb)
 
-def reanimate(generator):
+def reanimate(generator, fps=5):
     ra = ReAnimator()
     fig = plt.figure()
-    ani = animation.FuncAnimation(fig, ra.perform, frames=generator, repeat=False)
+    ani = animation.FuncAnimation(fig, ra.perform, interval=1000/fps, frames=generator, repeat=False)
     plt.show()
