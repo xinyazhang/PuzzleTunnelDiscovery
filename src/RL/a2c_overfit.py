@@ -39,6 +39,7 @@ class OverfitTrainer(A2CTrainer):
         self.all_samples_cache = []
         self.minibatch_index = 0
         self.num_actions = len(advcore.args.actionset)
+        self.args = advcore.args
 
     # Redefine actor critic function, details:
     # 1. We are trying to overfit the model through a known optimal path

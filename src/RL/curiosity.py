@@ -267,7 +267,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
         return self.model.create_somenet_from_feature(hidden, 'PolNet',
                 elu=args.elu,
                 lstm=args.lstm,
-                initialized_as_zero=True if args.train == 'dqn' else False,
+                initialized_as_zero=True if 'zero_weights' in args.debug_flags else False,
                 nolu_at_final=True,
                 batch_normalization=self.batch_normalization)
 
@@ -276,7 +276,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
         return self.model.create_somenet_from_feature(hidden, 'ValNet',
                 elu=args.elu,
                 lstm=args.lstm,
-                initialized_as_zero=False,
+                initialized_as_zero=True if 'zero_weights' in args.debug_flags else False,
                 nolu_at_final=True,
                 batch_normalization=self.batch_normalization)
 
