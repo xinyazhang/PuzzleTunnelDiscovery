@@ -397,6 +397,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
             ret = np.random.choice(actionset)
         # print(pprefix, 'Action best index {} ({}) chosen index {} ({})'.format(best, actionset[best], ret, actionset[ret]))
         print(pprefix, 'Action best {} chosen {}'.format(best, ret))
+        assert ret in actionset, 'san check failed: make_decision return unselected action'
         return ret
 
     def get_artificial_reward(self, envir, sess, state_1, action, state_2, ratio, pprefix=""):
