@@ -250,12 +250,13 @@ a2c: whole system;
 QwithGT: only Q function;
 curiosity: train the forward model, expecting overfitting.
 QandFCFE: Q and Fully Connected Layers in Feature Extractors.
+q_overfit: train Q from scratch,
 InF: Train Inverse model and Forward model with samples from files.
 Ionly: Inverse model only.
 a2c_overfit: Try to overfit the RL model with Actor-Critic Method.
 dqn: Deep Q Network
 ''',
-            choices=['a2c', 'QwithGT', 'curiosity', 'QandFCFE', 'InF', 'Ionly',
+            choices=['a2c', 'QwithGT', 'curiosity', 'QandFCFE', 'q_overfit', 'InF', 'Ionly',
                      'a2c_overfit', 'a2c_overfit_qonly', 'a2c_no_critic', 'a2c_abs_critic',
                      'a2c_overfit_from_fv', 'dqn'],
             default='a2c')

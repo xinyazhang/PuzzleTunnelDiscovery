@@ -13,7 +13,8 @@ class QTrainer:
             ckpt_dir,
             period,
             global_step,
-            train_fcfe=False
+            train_fcfe=False,
+            train_everything=False
             ):
         self.gt = None
         self.advcore = advcore
@@ -29,8 +30,14 @@ class QTrainer:
         var_list=advcore.valparams
         if train_fcfe:
             var_list += advcore.model.cat_nn_vars['fc']
+        if train_everything:
+            var_list = None
         self.train_op = self.optimizer.minimize(self.loss, global_step=global_step, var_list=var_list)
         print("Training Q function over {}".format(var_list))
+
+    @property
+    def total_iter(self):
+        return self.advcore.args.iter
 
     def build_loss(self, advcore):
         self.V_tensor = tf.placeholder(tf.float32, shape=[None], name='VPh')
@@ -60,6 +67,7 @@ class QTrainer:
 
     def sample(self, envir):
         if self.gt is None:
+            assert self.advcore.args.train != 'q_overfit', 'q_overfit expects --samplein'
             states = [uw_random.gen_unit_init_state(envir.r) for i in range(self.batch)]
             values = self._analytic_q(envir, states)
             values = np.array(values, dtype=np.float)

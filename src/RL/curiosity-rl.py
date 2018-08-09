@@ -68,7 +68,7 @@ def create_trainer(args, global_step, batch_normalization):
                 args=args,
                 learning_rate=1e-4,
                 batch_normalization=bnorm)
-    elif args.train == 'QwithGT' or args.qlearning_with_gt or args.train == 'QandFCFE':
+    elif args.train in ['QwithGT', 'QandFCFE', 'q_overfit'] or args.qlearning_with_gt:
         trainer = qtrainer.QTrainer(
                 advcore=advcore,
                 batch=args.batch,
@@ -76,9 +76,12 @@ def create_trainer(args, global_step, batch_normalization):
                 ckpt_dir=args.ckptdir,
                 period=args.period,
                 global_step=global_step,
-                train_fcfe=(args.train == 'QandFCFE'))
+                train_fcfe=(args.train == 'QandFCFE'),
+                train_everything=(args.train == 'q_overfit'))
         if args.qlearning_gt_file:
             trainer.attach_gt(args.qlearning_gt_file)
+        if args.samplein:
+            trainer.attach_gt(args.samplein)
     elif args.train == 'curiosity':
         trainer = ctrainer.CTrainer(
                 advcore=advcore,
