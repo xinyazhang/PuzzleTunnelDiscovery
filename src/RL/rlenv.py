@@ -334,8 +334,11 @@ class RLSample(object):
             self.policy = None
             self.value = 0.0
         elif advcore.args.train == 'dqn':
-            [policy] = advcore.evaluate([envir.vstate], sess, [advcore.policy])
-            self.policy = policy[0][0] # Policy View from first qstate and first view
+            # Note we need to use softmax_policy to eliminate unselected actions
+            # We may have negative Q value so setting unselection actions to 0
+            # in polout is not practical
+            [policy] = advcore.evaluate([envir.vstate], sess, [advcore.softmax_policy])
+            self.policy = policy[0][0] # first qstate and first view
         else:
             # Sample Pi and V
             policy, value = advcore.evaluate([envir.vstate], sess, [advcore.softmax_policy, advcore.value])
