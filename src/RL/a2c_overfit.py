@@ -78,6 +78,7 @@ class OverfitTrainer(A2CTrainer):
 
     def train(self, envir, sess, tid=None, tmax=-1):
         advcore = self.advcore
+        GAMMA = self.gamma
         if not self.all_samples_cache:
             print("Caching samples")
             while True:
@@ -85,6 +86,20 @@ class OverfitTrainer(A2CTrainer):
                 self.all_samples_cache.append((rlsamples, final_state))
                 if rlsamples[-1].reaching_terminal:
                     break
+            if self.args.EXPLICIT_BATCH_SIZE == 1:
+                # Attach exp. value to each rlsample
+                all_rewards = [s[0].combined_reward for (s,f) in self.all_samples_cache]
+                eV = 0.0
+                all_ev = [eV]
+                for r in all_rewards[::-1]:
+                    eV = r + GAMMA * eV
+                    all_ev.append(eV)
+                all_ev.reverse()
+                all_fs = [f for (s,f) in self.all_samples_cache]
+                assert len(all_ev) - 1 == len(all_fs), "size mismatch {} {}".format(len(all_ev), len(all_fs))
+                for eV,fs in zip(all_ev[1:], all_fs):
+                    fs.exp_value = eV
+
         (rlsamples, final_state) = self.all_samples_cache[self.minibatch_index % len(self.all_samples_cache)]
         assert isinstance(rlsamples[0], rlenv.RLSample), "rlsamples[0] is not RLSample"
         assert isinstance(final_state, rlenv.RLSample), "final_state is not RLSample"
@@ -101,6 +116,8 @@ class OverfitTrainer(A2CTrainer):
         # Collect V* and V
         if final_state.is_terminal:
             V = 0.0
+        elif self.args.EXPLICIT_BATCH_SIZE == 1:
+            V = final_state.exp_value
         else:
             V = np.asscalar(advcore.evaluate([final_state.vstate], sess, tensors=[advcore.value])[0])
         V_star = V
@@ -109,7 +126,6 @@ class OverfitTrainer(A2CTrainer):
         r_rewards = rewards[::-1]
         batch_V = []
         batch_V_star = []
-        GAMMA = self.gamma
         KAPPA = 1.0 / self.num_actions
         assert GAMMA > 0, "a2c_overfit does not support linear decay"
         for r in r_rewards:
