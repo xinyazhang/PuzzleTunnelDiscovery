@@ -177,7 +177,7 @@ class QPlayer(RLVisualizer):
             TAU = []
             state = envir.qstate
             print("> Current State {}".format(state))
-            for action in range(uw_random.DISCRETE_ACTION_NUMBER):
+            for action in args.actionset:
                 envir.qstate = state # IMPORTANT: Restore the state to unpeeked condition
                 nstate, reward, terminal, ratio = envir.peek_act(action)
                 envir.qstate = nstate
