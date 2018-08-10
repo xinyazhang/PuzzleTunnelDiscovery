@@ -164,7 +164,6 @@ class QPlayer(RLVisualizer):
         sess = self.sess
         advcore = self.advcore
         envir = self.envir
-        envir.enable_perturbation()
         envir.reset()
         current_value = -1
         TRAJ = []
