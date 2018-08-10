@@ -407,3 +407,43 @@ class MiniBatchSampler(object):
         return (samples, final)
 
 
+'''
+Sample a trajectory from given --msi_file
+'''
+class CachedMiniBatchSampler(MiniBatchSampler):
+
+    def __init__(self,
+                 advcore,
+                 args):
+        assert args.msi_file, "CachedMiniBatchSampler requires --msi_file"
+        self.args = args
+        super(CachedMiniBatchSampler, self).__init__(advcore, args.batch)
+        self.all_samples_cache = []
+        self.minibatch_index = 0
+
+    def sample_minibatch(self, envir, sess, tid=None, tmax=-1):
+        if not self.all_samples_cache:
+            while True:
+                rlsamples, final_state = super(CachedMiniBatchSampler, self).sample_minibatch(envir, sess, tid, tmax)
+                self.all_samples_cache.append((rlsamples, final_state))
+                if rlsamples[-1].reaching_terminal:
+                    break
+            if self.args.EXPLICIT_BATCH_SIZE == 1:
+                # Attach exp. value to each rlsample
+                all_rewards = [s[0].combined_reward for (s,f) in self.all_samples_cache]
+                eV = 0.0
+                all_ev = [eV]
+                for r in all_rewards[::-1]:
+                    eV = r + GAMMA * eV
+                    all_ev.append(eV)
+                all_ev.reverse()
+                all_fs = [f for (s,f) in self.all_samples_cache]
+                assert len(all_ev) - 1 == len(all_fs), "size mismatch {} {}".format(len(all_ev), len(all_fs))
+                for eV,fs in zip(all_ev[1:], all_fs):
+                    fs.exp_value = eV
+        (rlsamples, final_state) = self.all_samples_cache[self.minibatch_index % len(self.all_samples_cache)]
+        assert isinstance(rlsamples[0], RLSample), "rlsamples[0] is not RLSample"
+        assert isinstance(final_state, RLSample), "final_state is not RLSample"
+
+        self.minibatch_index = (self.minibatch_index + 1) % len(self.all_samples_cache)
+        return (rlsamples, final_state)

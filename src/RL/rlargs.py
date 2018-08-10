@@ -250,15 +250,16 @@ a2c: whole system;
 QwithGT: only Q function;
 curiosity: train the forward model, expecting overfitting.
 QandFCFE: Q and Fully Connected Layers in Feature Extractors.
-q_overfit: train Q from scratch,
+q_overfit: train ValNet from scratch (i.e. w/o pretrained vision),
 InF: Train Inverse model and Forward model with samples from files.
 Ionly: Inverse model only.
 a2c_overfit: Try to overfit the RL model with Actor-Critic Method.
-dqn: Deep Q Network
+dqn: Deep Q Network.
+dqn_overfit: overfit DQN from scracth.
 ''',
             choices=['a2c', 'QwithGT', 'curiosity', 'QandFCFE', 'q_overfit', 'InF', 'Ionly',
                      'a2c_overfit', 'a2c_overfit_qonly', 'a2c_no_critic', 'a2c_abs_critic',
-                     'a2c_overfit_from_fv', 'dqn'],
+                     'a2c_overfit_from_fv', 'dqn', 'dqn_overfit'],
             default='a2c')
     parser.add_argument('--notrain',
             help='Set untrainnable segments',

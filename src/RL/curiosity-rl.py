@@ -61,7 +61,7 @@ def create_trainer(args, global_step, batch_normalization):
                 period=args.period,
                 LAMBDA=args.LAMBDA,
                 train_everything=train_everything)
-    elif args.train == 'dqn':
+    elif args.train in ['dqn', 'dqn_overfit']:
         TRAINER = dqn.DQNTrainerMP if args.localcluster_nsampler > 0 else dqn.DQNTrainer
         trainer = TRAINER(
                 advcore=advcore,

@@ -79,6 +79,9 @@ class OverfitTrainer(A2CTrainer):
     def train(self, envir, sess, tid=None, tmax=-1):
         advcore = self.advcore
         GAMMA = self.gamma
+        #
+        # FIXME: This is duplicated with rlenv.CachedMiniBatchSampler
+        #
         if not self.all_samples_cache:
             print("Caching samples")
             while True:

@@ -7,6 +7,7 @@ import numpy as np
 import multiprocessing as mp
 import cPickle as pickle
 import time
+import curiosity
 
 class DQNTrainer(object):
 
@@ -19,7 +20,10 @@ class DQNTrainer(object):
         self.action_space_dimension = int(advcore.policy.shape[-1])
         advcore.softmax_policy # create normalized policy tensor
         self.args = args
-        self.sampler = rlenv.MiniBatchSampler(advcore=advcore, tmax=args.batch)
+        if args.train == 'dqn_overfit':
+            self.sampler = rlenv.CachedMiniBatchSampler(advcore=advcore, args=args)
+        else:
+            self.sampler = rlenv.MiniBatchSampler(advcore=advcore, tmax=args.batch)
         self.batch_normalization = batch_normalization
         global_step = tf.train.get_or_create_global_step()
         self.global_step = global_step
@@ -119,12 +123,14 @@ class DQNTrainer(object):
                 advcore.action_tensor : ndic['adist'],
                 self.Q_tensor: ndic['V']
               }
+        '''
         if debug_output:
             [raw] = curiosity.sess_no_hook(sess, [self._criticism, self._log_policy, self._policy_per_sample, self._policy, advcore.value, self._flattened_value, self._raw_policy, advcore.softmax_policy], feed_dict=dic)
             print("action input {}".format(ndic['aindex']))
             print("reward output {}".format(ndic['rewards']))
             print("V {}".format(ndic['V']))
             print("policy_output_raw {}".format(raw))
+        '''
         if self.summary_op is not None:
             self._log("running training op")
             _, summary, gs = sess.run([self.train_op, self.summary_op, self.global_step], feed_dict=dic)
