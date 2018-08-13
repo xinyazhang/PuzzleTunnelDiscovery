@@ -52,6 +52,14 @@ class DQNTrainer(object):
                 self.train_op = self.optimizer.minimize(self.loss, global_step=global_step)
         else:
             self.train_op = self.optimizer.minimize(self.loss, global_step=global_step)
+        grad_op = self.optimizer.compute_gradients(self.loss)
+        '''
+        self._debug_grad_op = []
+        for tup in grad_op:
+            if tup[0] is not None:
+                self._debug_grad_op.append(tup)
+        print("self._debug_grad_op {}".format(self._debug_grad_op))
+        '''
         ckpt_dir = args.ckptdir
         if ckpt_dir is not None:
             self.summary_op = tf.summary.merge_all()
@@ -69,10 +77,12 @@ class DQNTrainer(object):
 
     def _build_loss(self, advcore):
         self.Adist_tensor = advcore.action_tensor
-        self.Q_tensor = tf.placeholder(tf.float32, shape=[advcore.batch_size], name='QPh')
-        Q_output = tf.reduce_sum(tf.multiply(self.Adist_tensor, self.dqn_out), axis=[1,2])
-        dqn_loss = tf.nn.l2_loss(self.Q_tensor - Q_output)
+        self.Q_tensor = tf.placeholder(tf.float32, shape=[advcore.batch_size, 1, self.action_space_dimension], name='QPh')
+        # Q_output = tf.reduce_sum(tf.multiply(self.Adist_tensor, self.dqn_out), axis=[1,2])
+        dqn_loss = tf.nn.l2_loss(self.Q_tensor - self.dqn_out)
         tf.summary.scalar('dqn_loss', dqn_loss)
+
+        self._debug_fvmag = tf.reduce_sum(advcore.model.cur_mvfeatvec, axis=[1,2])
         return dqn_loss
 
     def train(self, envir, sess, tid=None, tmax=-1):
@@ -99,6 +109,7 @@ class DQNTrainer(object):
             V = r + GAMMA * V if GAMMA > 0 else r + V + GAMMA
             batch_V.append(V)
         batch_V.reverse()
+        batch_Q = rlutil.actions_to_adist_array(action_indices, dim=self.action_space_dimension, hotvector=batch_V)
         # Prepare Input for Vision
         batch_rgb = [s.vstate[0] for s in rlsamples]
         batch_rgb.append(final_state.vstate[0])
@@ -112,7 +123,8 @@ class DQNTrainer(object):
                 'aindex' : action_indices,
                 'q' : np.array([s.qstate for s in rlsamples] + [final_state.qstate]),
                 'V' : batch_V,
-                'reward' : rewards,
+                'Q' : batch_Q,
+                'rewards' : rewards,
                }
         self.dispatch_training(sess, ndic)
 
@@ -124,20 +136,22 @@ class DQNTrainer(object):
                 advcore.rgb_2: ndic['rgb'][1:],
                 advcore.dep_2: ndic['dep'][1:],
                 advcore.action_tensor : ndic['adist'],
-                self.Q_tensor: ndic['V']
+                self.Q_tensor: ndic['Q']
               }
-        '''
         if debug_output:
-            [raw] = curiosity.sess_no_hook(sess, [self._criticism, self._log_policy, self._policy_per_sample, self._policy, advcore.value, self._flattened_value, self._raw_policy, advcore.softmax_policy], feed_dict=dic)
+            [raw] = curiosity.sess_no_hook(sess, [advcore.policy], feed_dict=dic)
             print("action input {}".format(ndic['aindex']))
+            print("action distribution {}".format(ndic['adist']))
             print("reward output {}".format(ndic['rewards']))
             print("V {}".format(ndic['V']))
             print("policy_output_raw {}".format(raw))
-        '''
         if self.summary_op is not None:
             self._log("running training op")
-            _, summary, gs = sess.run([self.train_op, self.summary_op, self.global_step], feed_dict=dic)
+            _, summary, gs, fvmag = sess.run([self.train_op, self.summary_op, self.global_step, self._debug_fvmag], feed_dict=dic)
             self._log("training op for gs {} finished".format(gs))
+            print("[DEBUG] fv_mag: {}".format(fvmag))
+            # grads = curiosity.sess_no_hook(sess, self._debug_grad_op, feed_dict=dic)
+            # print("[DEBUG] grads: {}".format(grads))
             self.train_writer.add_summary(summary, gs)
         else:
             sess.run(self.train_op, feed_dict=dic)
