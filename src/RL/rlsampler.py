@@ -6,6 +6,7 @@ from rlreanimator import reanimate
 import uw_random
 from six.moves import input
 import progressbar
+import rlcaction
 
 '''
 Base class to visualize/evaluate the RL training results
@@ -402,6 +403,35 @@ class MSASampler(RLVisualizer):
                     yield
                 yield rgb[self.gview] # First view
 
+class CActionPlayer(RLVisualizer):
+    def __init__(self, args, g, global_step):
+        assert args.samplein, '--samplein is mandatory for --visualize caction'
+        super(CActionPlayer, self).__init__(args, g, global_step)
+        d = np.load(args.samplein)
+        self.V = d['V']
+        self.N = d['N']
+        self.D = d['D']
+        self.mandatory_ckpt = False
+
+    def play(self):
+        reanimate(self, fps=30)
+
+    def __iter__(self):
+        envir = self.envir
+        V = self.V
+        N = self.N
+        D = self.D
+        while True:
+            for qs,crt,caa in rlcaction.caction_generator(V, N, D, self.args.amag, envir.r):
+                assert envir.r.is_valid_state(qs)
+                envir.qstate = qs
+                rgb,_ = envir.vstate
+                yield rgb[self.gview] # First view
+            assert envir.r.is_disentangled(envir.qstate)
+            print("#############################################")
+            print("##########CONGRATS TERMINAL REACHED##########")
+            print("########## PRESS ENTER TO CONTINUE ##########")
+            input("#############################################")
 
 def create_visualizer(args, g, global_step):
     if args.qlearning_with_gt:
@@ -419,4 +449,6 @@ def create_visualizer(args, g, global_step):
         return Fake3dSampler(args, g, global_step)
     elif args.visualize == 'msa':
         return MSASampler(args, g, global_step)
+    elif args.visualize == 'caction':
+        return CActionPlayer(args, g, global_step)
     assert False, '--visualize {} is not implemented yet'.format(args.visualize)

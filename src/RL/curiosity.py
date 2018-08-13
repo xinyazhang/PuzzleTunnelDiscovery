@@ -80,6 +80,10 @@ class RigidPuzzle(rlenv.IExperienceReplayEnvironment):
         self.manual_p = manual_p
         self.reset()
 
+    def disable_perturbation(self):
+        self.perturbation = False
+        self.reset()
+
     def get_perturbation(self):
         return self.r.perturbation
 

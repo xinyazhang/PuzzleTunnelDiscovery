@@ -229,7 +229,7 @@ policy: visualize the path walked by according to policy network.
 curiosity: sample the curiosity value, i.e. forward model loss.
 fake3d: sample Pi and V for fake3d cases
             ''',
-            choices=['policy', 'curiosity', 'fake3d', 'critic', 'msa'],
+            choices=['policy', 'curiosity', 'fake3d', 'critic', 'msa', 'caction'],
             default='policy')
     parser.add_argument('--msiraw',
             help='MileStone Injection (RAW state). in the same protocol as of --istateraw',
