@@ -49,13 +49,13 @@ def create_renderer(args, creating_ctx=True):
     r.views = np.array(va, dtype=np.float32)
     return r
 
-def actions_to_adist_array(actions, dim=uw_random.DISCRETE_ACTION_NUMBER):
+def actions_to_adist_array(actions, dim=uw_random.DISCRETE_ACTION_NUMBER, hotvector=None):
     n = len(actions)
     adists = np.zeros(
             shape=(n, 1, dim),
             dtype=np.float32)
     for i in range(n):
-        adists[i, 0, actions[i]] = 1.0
+        adists[i, 0, actions[i]] = 1.0 if hotvector is None else hotvector[i]
     return adists
 
 '''
