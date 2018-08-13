@@ -41,6 +41,9 @@ Eigen::Matrix3d extract_rotation_matrix(const StateVector&);
 std::tuple<StateTrans, AngleAxisVector>
 differential(const StateVector& from, const StateVector& to);
 
+StateVector
+apply(const StateVector& from, const StateTrans& tr, const AngleAxisVector& aa);
+
 StateTrans action_to_axis(int action);
 Eigen::MatrixXf get_permutation_to_world(const Eigen::MatrixXf& views, int view);
 

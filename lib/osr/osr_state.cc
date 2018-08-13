@@ -99,6 +99,23 @@ differential(const StateVector& from, const StateVector& to)
 	return std::make_tuple(tr, aav);
 }
 
+StateVector
+apply(const StateVector& from, const StateTrans& tr, const AngleAxisVector& aa)
+{
+	auto tup = decompose(from);
+	StateTrans trans = std::get<0>(tup);
+	StateQuat rot = std::get<1>(tup);
+	trans += tr;
+	double angle = aa.norm();
+	AngleAxisVector axis;
+	if (angle == 0.0)
+		axis << 1.0, 0.0, 0.0;
+	else
+		axis = aa.normalized();
+	rot = StateQuat(Eigen::AngleAxis<StateScalar>(angle, axis)) * rot;
+	return compose(trans, rot);
+}
+
 StateTrans action_to_axis(int action)
 {
 	StateTrans tfvec { StateTrans::Zero() };

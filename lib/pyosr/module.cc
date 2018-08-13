@@ -72,6 +72,8 @@ PYBIND11_PLUGIN(pyosr) {
 	      "Calculate the distance between two unit states");
 	m.def("differential", &osr::differential,
 	      "Calculate the action from one unit state to another", py::call_guard<py::gil_scoped_release>());
+	m.def("apply", &osr::apply,
+	      "Apply a continuous action to one state vector", py::call_guard<py::gil_scoped_release>());
 	m.def("get_permutation_to_world", &osr::get_permutation_to_world);
 	m.def("extract_rotation_matrix", &osr::extract_rotation_matrix);
 	using osr::UnitWorld;
