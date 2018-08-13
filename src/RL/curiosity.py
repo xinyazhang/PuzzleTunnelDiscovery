@@ -232,7 +232,8 @@ class CuriosityRL(rlenv.IAdvantageCore):
                 self.model.create_pretrain_saver()
 
         self.polout, self.polparams, self.polnets = self.create_polnet(args)
-        if args.train != 'dqn':
+        # self.polout = tf.Variable(np.zeros(dtype=np.float32, shape=(54,1,self.action_space_dimension)))
+        if 'dqn' not in args.train:
             self.valout, self.valparams, self.valnets = self.create_valnet(args)
         else:
             self.valout = tf.constant(0.0)
@@ -286,7 +287,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
         '''
         # curiosity = tf.metrics.mean_squared_error(fwd_feat, self.model.next_featvec)
         if args.curiosity_type == 0:
-            return None, None
+            return None, []
         if args.curiosity_type == 1:
             fwd_params, fwd_feat = self.model.get_forward_model(args.jointfw)
             curiosity = tf.reduce_mean(tf.squared_difference(fwd_feat, self.model.next_featvec),
@@ -435,7 +436,7 @@ class CuriosityRL(rlenv.IAdvantageCore):
             dic[self.batch_normalization] = False
         if self.args.curiosity_type == 2:
             dic[self.ratios_tensor] = ratios
-        ret = sess_no_hook(self.curiosity, feed_dict=dic)
+        ret = sess_no_hook(sess, self.curiosity, feed_dict=dic)
         return ret * self.args.curiosity_factor
 
     def train(self, sess, rgb, dep, actions):

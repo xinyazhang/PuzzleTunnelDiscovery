@@ -38,8 +38,11 @@ class DQNTrainer(object):
                     replicas_to_aggregate=args.period,
                     total_num_replicas=args.localcluster_nsampler)
         LAMBDA_1 = 1
-        LAMBDA_2 = 1
-        self.loss = LAMBDA_1 * self._build_loss(advcore) + LAMBDA_2 * advcore.build_loss()
+        self.loss = LAMBDA_1 * self._build_loss(advcore)
+        if args.train != 'dqn_overfit':
+            LAMBDA_2 = 1
+            self.loss += LAMBDA_2 * advcore.build_loss()
+
         '''
         Train everything by default
         '''
