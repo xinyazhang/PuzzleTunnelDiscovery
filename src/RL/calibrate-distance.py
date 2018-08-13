@@ -23,6 +23,7 @@ def calibrate(gtfn, cfn):
     d = np.load(gtfn)
     V=d['V']
     D=d['D']
+    N=d['N']
     pos = []
     posd = []
     neg = []
@@ -31,12 +32,32 @@ def calibrate(gtfn, cfn):
         V[i] = r.translate_to_unit_state(V[i])
         if r.is_disentangled(V[i]):
             D[i] = 0.0
+    assert len(d['N']) == len(V), "N size ({}) does not match V's ({})".format(len(d['N']), len(V))
+    print("istate {}  distance {}".format(V[0], pyosr.distance(origin, V[0])))
+    print("gstate {}  distance {}".format(V[1], pyosr.distance(origin, V[1])))
     # Trim distant samples, which usually shows nothing
+    old_to_new = {}
+    new_to_old = {}
+    NN = []
     for i in range(len(V)):
-        if pyosr.distance(origin, V[i]) > 0.75:
+        if pyosr.distance(origin, V[i]) > 0.85:
             continue
+        old_to_new[i] = len(pos)
         pos.append(V[i])
         posd.append(D[i])
+    for i in range(len(V)):
+        if pyosr.distance(origin, V[i]) > 0.85:
+            continue
+        if N[i] < 0:
+            NN.append(N[i])
+        else:
+            NN.append(old_to_new[N[i]])
+    NE = []
+    for e in d['E']:
+        if e[0] not in old_to_new or e[1] not in old_to_new:
+            continue
+        NE.append([old_to_new[e[0]], old_to_new[e[1]]])
+    assert len(NN) == len(pos), "NN size ({}) does not match pos' ({})".format(len(NN), len(pos))
     V = np.array(pos)
     D = np.array(posd)
     for i in range(len(V)):
@@ -46,12 +67,16 @@ def calibrate(gtfn, cfn):
                 break
         neg.append(s)
         negd.append(-10.0)
+        NN.append(-1)
     NV = np.array(neg)
     ND = np.array(negd)
     V = np.concatenate((V, NV))
     D = np.concatenate((D, ND))
-    p = np.random.permutation(len(V))
-    np.savez(cfn, V=V[p], E=d['E'], D=D[p], N=d['N'])
+    E = np.array(NE)
+    N = np.array(NN)
+    #p = np.random.permutation(len(V))
+    #np.savez(cfn, V=V[p], E=E, D=D[p], N=N[p])
+    np.savez(cfn, V=V, E=E, D=D, N=N)
 
 def usage():
     print('''
