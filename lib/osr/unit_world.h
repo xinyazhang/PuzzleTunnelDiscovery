@@ -68,6 +68,11 @@ public:
 	               const StateVector& to,
 	               double verify_delta) const;
 
+	bool
+	isValidTransition(const StateVector& from,
+	                  const StateVector& to,
+	                  double initial_verify_delta) const;
+
 	std::tuple<StateVector, bool, float>
 	transitStateBy(const StateVector& from,
 	               const StateTrans& tr,

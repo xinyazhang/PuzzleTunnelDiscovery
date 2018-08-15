@@ -408,6 +408,18 @@ UnitWorld::transitStateTo(const StateVector& from,
 }
 
 
+bool
+UnitWorld::isValidTransition(const StateVector& from,
+                             const StateVector& to,
+                             double initial_verify_delta) const
+{
+	double d = distance(from, to);
+	auto vdelta = std::min(d / 2.0, initial_verify_delta);
+	auto tup = transitStateTo(from, to, vdelta);
+	return std::get<1>(tup);
+}
+
+
 std::tuple<StateVector, bool, float>
 UnitWorld::transitStateBy(const StateVector& from,
 	                  const StateTrans& tr,

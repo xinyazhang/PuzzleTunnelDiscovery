@@ -91,6 +91,7 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("is_disentangled", &UnitWorld::isDisentangled, py::call_guard<py::gil_scoped_release>())
 		.def("transit_state", &UnitWorld::transitState, py::call_guard<py::gil_scoped_release>())
 		.def("transit_state_to", &UnitWorld::transitStateTo, py::call_guard<py::gil_scoped_release>())
+		.def("is_valid_transition", &UnitWorld::isValidTransition, py::call_guard<py::gil_scoped_release>())
 		.def("transit_state_by", &UnitWorld::transitStateBy, py::call_guard<py::gil_scoped_release>())
 		.def("translate_to_unit_state", &UnitWorld::translateToUnitState, py::call_guard<py::gil_scoped_release>())
 		.def("translate_from_unit_state", &UnitWorld::translateFromUnitState, py::call_guard<py::gil_scoped_release>())
