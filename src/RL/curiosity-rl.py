@@ -17,6 +17,7 @@ import a2c
 import a2c_overfit
 import a2c_mp
 import dqn
+import loco_overfit
 import random
 from six.moves import queue,input
 import qtrainer
@@ -63,6 +64,14 @@ def create_trainer(args, global_step, batch_normalization):
                 train_everything=train_everything)
     elif args.train in ['dqn', 'dqn_overfit']:
         TRAINER = dqn.DQNTrainerMP if args.localcluster_nsampler > 0 else dqn.DQNTrainer
+        trainer = TRAINER(
+                advcore=advcore,
+                args=args,
+                learning_rate=1e-4,
+                batch_normalization=bnorm)
+    elif args.train in ['loco_overfit']:
+        assert args.localcluster_nsampler <= 0, 'loco_overfit does not support MP training'
+        TRAINER = loco_overfit.LocoOverfitter
         trainer = TRAINER(
                 advcore=advcore,
                 args=args,

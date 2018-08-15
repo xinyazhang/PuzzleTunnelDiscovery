@@ -257,11 +257,12 @@ InF: Train Inverse model and Forward model with samples from files.
 Ionly: Inverse model only.
 a2c_overfit: Try to overfit the RL model with Actor-Critic Method.
 dqn: Deep Q Network.
-dqn_overfit: overfit DQN from scracth.
+dqn_overfit: overfit DQN from scratch.
+loco_overfit: overfit simplified deeploco (continuous action) from scratch
 ''',
             choices=['a2c', 'QwithGT', 'curiosity', 'QandFCFE', 'q_overfit', 'InF', 'Ionly',
                      'a2c_overfit', 'a2c_overfit_qonly', 'a2c_no_critic', 'a2c_abs_critic',
-                     'a2c_overfit_from_fv', 'dqn', 'dqn_overfit'],
+                     'a2c_overfit_from_fv', 'dqn', 'dqn_overfit', 'loco_overfit'],
             default='a2c')
     parser.add_argument('--notrain',
             help='Set untrainnable segments',
