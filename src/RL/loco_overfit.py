@@ -8,6 +8,7 @@ import multiprocessing as mp
 import cPickle as pickle
 import time
 import rlcaction
+import os
 
 class LocoOverfitter(object):
 
@@ -17,10 +18,11 @@ class LocoOverfitter(object):
                  learning_rate,
                  batch_normalization=None):
         assert args.samplein, '--train loco_overfit requires --samplein'
-        d = np.load(args.samplein)
-        self.V = d['V']
-        self.N = d['N']
-        self.D = d['D']
+        self.samplein_index = 0
+        self.samplein_max = 0
+        while os.path.exists('{}/{}.npz'.format(args.samplein, self.samplein_max)):
+            self.samplein_max += 1
+        print('... Found {} samples at {}'.format(self.samplein_max, args.samplein))
 
         self.advcore = advcore
         self.action_space_dimension = int(advcore.policy.shape[-1])
@@ -72,17 +74,18 @@ class LocoOverfitter(object):
         return loco_loss
 
     def train(self, envir, sess, tid=None, tmax=-1):
-        V = self.V
-        N = self.N
-        D = self.D
         all_vstates = []
         all_cactions = []
-        for qs,crt,caa in rlcaction.caction_generator(V, N, D, self.args.amag, envir.r):
+        args = self.args
+        fn = '{}/{}.npz'.format(args.samplein, self.samplein_index)
+        d = np.load(fn)
+        self.samplein_index = (self.samplein_index + 1) % self.samplein_max
+        for qs,ctr,caa in zip(d['QS'], d['CTR'], d['CAA']):
             assert envir.r.is_valid_state(qs)
             envir.qstate = qs
             all_vstates.append(envir.vstate)
-            all_cactions.append([np.concatenate([crt, caa], axis=-1)])
-        seg = self.args.batch
+            all_cactions.append([np.concatenate([ctr, caa], axis=-1)])
+        seg = args.batch
         for i in range(0, len(all_vstates), seg):
             vstates = all_vstates[i:i+seg]
             cactions = all_cactions[i:i+seg]
