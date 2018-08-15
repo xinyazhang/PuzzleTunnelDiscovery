@@ -123,11 +123,18 @@ def caction_generator2(uw, known_path, is_radius, amag):
         iv = known_path[ni - 1]
     else:
         while True:
-            #iv = uw_random.gen_unit_init_state(uw, is_radius)
+            # iv = uw_random.gen_unit_init_state(uw, is_radius)
             iv = _gen_unit_init_state(uw, known_path[0], is_radius)
             distances = pyosr.multi_distance(iv, known_path)
-            ni = np.argmax(distances)
+            ni = np.argmin(distances)
+            # ni = 0
+            '''
             if uw.is_valid_transition(iv, known_path[ni], amag / 8.0):
+                break
+            '''
+            fstate, done, ratio = uw.transit_state_to(known_path[ni], iv, amag / 8.0)
+            if ratio > 1e-3:
+                iv = fstate
                 break
     vs = [iv] + known_path[ni:]
     # print('VS\n{}'.format(vs))
