@@ -39,7 +39,7 @@ double distance(const StateVector& lhv, const StateVector& rhv);
 Eigen::VectorXd multi_distance(const StateVector& origin, const ArrayOfStates& targets);
 Eigen::Matrix3d extract_rotation_matrix(const StateVector&);
 
-std::tuple<StateTrans, AngleAxisVector>
+std::tuple<StateTrans, AngleAxisVector, StateVector>
 differential(const StateVector& from, const StateVector& to);
 
 StateVector

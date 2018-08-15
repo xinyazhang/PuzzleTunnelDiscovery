@@ -105,7 +105,7 @@ extract_rotation_matrix(const StateVector& state)
 	return rot.toRotationMatrix();
 }
 
-std::tuple<StateTrans, AngleAxisVector>
+std::tuple<StateTrans, AngleAxisVector, StateVector>
 differential(const StateVector& from, const StateVector& to)
 {
 	StateTrans tr = to.segment<3>(0) - from.segment<3>(0);
@@ -114,7 +114,29 @@ differential(const StateVector& from, const StateVector& to)
 	StateQuat rot_delta = rot_to * rot_from.inverse();
 	Eigen::AngleAxis<StateScalar> aa(rot_delta);
 	AngleAxisVector aav = aa.axis() * aa.angle();
-	return std::make_tuple(tr, aav);
+#if 0
+	std::cerr << "AXIS: " << aa.axis() << std::endl << "ANGLE: " << aa.angle() << std::endl;
+	std::cerr << "ROT_DELTA " << rot_delta.w() << ' ' << rot_delta.x() << ' ' << rot_delta.y() << ' ' << rot_delta.z() << std::endl;
+	if (!rot_to.isApprox(StateQuat(aa) * rot_from)) {
+		std::cerr << "PANIC: aa <-> quat error\n";
+		std::cerr << "\t EXPECT " <<  rot_to.w() << ' ' << rot_to.x() << ' ' << rot_to.y() << ' ' << rot_to.z() << std::endl;
+		Eigen::AngleAxis<StateScalar> eaa(rot_to);
+		rot_to.normalize();
+		std::cerr << "\t EXPECT (N) " <<  rot_to.w() << ' ' << rot_to.x() << ' ' << rot_to.y() << ' ' << rot_to.z() << std::endl;
+
+		std::cerr << "\t EXPECT (AA) " <<  eaa.axis() << '\t' << eaa.angle() << '\n';
+		StateQuat tquat = StateQuat(aa) * rot_from;
+		std::cerr << "\t GOT " << tquat.w() << ' ' << tquat.x() << ' ' << tquat.y() << ' ' << tquat.z() << std::endl;
+		eaa = tquat;
+		std::cerr << "\t GOT (AA) " <<  eaa.axis() << '\t' << eaa.angle() << '\n';
+		tquat.normalize();
+		std::cerr << "\t GOT (N)" << tquat.w() << ' ' << tquat.x() << ' ' << tquat.y() << ' ' << tquat.z() << std::endl;
+	}
+	if (!rot_to.isApprox(rot_delta * rot_from)) {
+		std::cerr << "PANIC: rot_delta error\n";
+	}
+#endif
+	return std::make_tuple(tr, aav, compose(tr, rot_delta));
 }
 
 StateVector
