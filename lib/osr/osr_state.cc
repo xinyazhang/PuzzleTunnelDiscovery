@@ -86,6 +86,18 @@ double distance(const StateVector& lhv, const StateVector& rhv)
 	return trdist + rotdist;
 }
 
+Eigen::VectorXd
+multi_distance(const StateVector& origin, const ArrayOfStates& targets)
+{
+	Eigen::VectorXd ret;
+	const auto N = targets.rows();
+	ret.resize(N);
+	for (int i = 0; i < N; i++) {
+		ret(i) = distance(origin, targets.row(i));
+	}
+	return ret;
+}
+
 Eigen::Matrix3d
 extract_rotation_matrix(const StateVector& state)
 {

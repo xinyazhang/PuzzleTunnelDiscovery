@@ -70,6 +70,8 @@ PYBIND11_PLUGIN(pyosr) {
 #endif
 	m.def("distance", &osr::distance,
 	      "Calculate the distance between two unit states");
+	m.def("multi_distance", &osr::multi_distance,
+	      "Calculate distances of one-vs-many.");
 	m.def("differential", &osr::differential,
 	      "Calculate the action from one unit state to another", py::call_guard<py::gil_scoped_release>());
 	m.def("apply", &osr::apply,
