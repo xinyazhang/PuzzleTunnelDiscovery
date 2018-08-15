@@ -90,6 +90,14 @@ public:
 	StateVector translateFromUnitState(const StateVector& state);
 	StateVector applyPertubation(const StateVector& state);
 	StateVector unapplyPertubation(const StateVector& state);
+
+	/*
+	 * Tunnel Finder support function: visibility matrix calculator
+	 */
+	Eigen::Matrix<int, -1, -1>
+	calculateVisibilityMatrix(ArrayOfStates qs,
+	                          bool is_unit_states,
+	                          double verify_magnitude);
 protected:
 	bool shared_ = false;
 

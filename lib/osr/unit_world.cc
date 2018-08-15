@@ -515,4 +515,30 @@ UnitWorld::unapplyPertubation(const StateVector& state)
 	return compose(tret, qret);
 }
 
+Eigen::Matrix<int, -1, -1>
+UnitWorld::calculateVisibilityMatrix(ArrayOfStates qs,
+                                     bool is_unit_states,
+                                     double verify_magnitude)
+{
+	int N = qs.rows();
+	if (!is_unit_states) {
+#pragma omp parallel for
+		for (int i = 0; i < N; i++)
+			qs.row(i) = translateToUnitState(qs.row(i)).transpose();
+	}
+	Eigen::Matrix<int, -1, -1> ret;
+	ret.resize(N, N);
+#pragma omp parallel for
+	for (int fi = 0; fi < N; fi++) {
+		for (int ti = 0; ti < N; ti++) {
+			if (fi == ti) {
+				ret(fi, ti) = 1;
+				continue;
+			}
+			ret(fi, ti) = !!isValidTransition(qs.row(fi), qs.row(ti), verify_magnitude);
+		}
+	}
+	return ret;
+}
+
 }
