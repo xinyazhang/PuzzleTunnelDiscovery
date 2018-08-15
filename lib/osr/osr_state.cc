@@ -62,10 +62,15 @@ compose(const StateTrans& base, const StateQuat& irot)
 
 double distance(const StateVector& lhv, const StateVector& rhv)
 {
-	double trdist = (lhv.segment<3>(0) - rhv.segment<3>(0)).norm();
-	double dot = lhv.segment<4>(3).dot(rhv.segment<4>(3));
-	dot = std::max(-1.0, std::min(1.0, dot)); // Theoretically we don't need to but...
-	double rotdist = std::abs(std::acos(dot)); // |theta/2|
+	auto tup0 = decompose(lhv);
+	auto tup1 = decompose(rhv);
+	double trdist = (std::get<0>(tup0) - std::get<0>(tup1)).norm();
+	double rotdist = std::get<1>(tup0).angularDistance(std::get<1>(tup1));
+	// double trdist = (lhv.segment<3>(0) - rhv.segment<3>(0)).norm();
+	// double dot = lhv.segment<4>(3).dot(rhv.segment<4>(3));
+	// dot = std::max(-1.0, std::min(1.0, dot)); // Theoretically we don't need to but...
+	// double rotdist = std::abs(std::acos(dot)); // |theta/2|
+#if 0
 	if (std::isnan(rotdist)) {
 		std::cerr.precision(20);
 		std::cerr << "[NAN] l: " << lhv.segment<4>(3) << std::endl;
@@ -77,6 +82,7 @@ double distance(const StateVector& lhv, const StateVector& rhv)
 		std::cerr << "[NAN] dot: " << dot << std::endl;
 		throw std::runtime_error(std::string("YOUR SANITY IS BLASTED ") + __func__);
 	}
+#endif
 	return trdist + rotdist;
 }
 
