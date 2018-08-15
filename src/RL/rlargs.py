@@ -17,6 +17,8 @@ def get_parser():
             default='')
     parser.add_argument('--samplein', help='Path to load generated samples',
             default='')
+    parser.add_argument('--samplein2', help='Another path to load generated samples',
+            default='')
     parser.add_argument('--sampletouse',  metavar='NUMBER',
             help='Number of samples to use during the training',
             type=int, default=-1)
@@ -229,7 +231,7 @@ policy: visualize the path walked by according to policy network.
 curiosity: sample the curiosity value, i.e. forward model loss.
 fake3d: sample Pi and V for fake3d cases
             ''',
-            choices=['policy', 'curiosity', 'fake3d', 'critic', 'msa', 'caction'],
+            choices=['policy', 'curiosity', 'fake3d', 'critic', 'msa', 'caction', 'caction_sancheck', 'caction2'],
             default='policy')
     parser.add_argument('--msiraw',
             help='MileStone Injection (RAW state). in the same protocol as of --istateraw',

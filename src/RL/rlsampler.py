@@ -8,6 +8,12 @@ from six.moves import input
 import progressbar
 import rlcaction
 
+def _press_enter():
+    print("#############################################")
+    print("##########CONGRATS TERMINAL REACHED##########")
+    print("########## PRESS ENTER TO CONTINUE ##########")
+    input("#############################################")
+
 '''
 Base class to visualize/evaluate the RL training results
 '''
@@ -47,10 +53,7 @@ class PolicyPlayer(RLVisualizer):
             rgb,_ = envir.vstate
             yield rgb[self.gview] # First view
             if reaching_terminal:
-                print("#############################################")
-                print("##########CONGRATS TERMINAL REACHED##########")
-                print("########## PRESS ENTER TO CONTINUE ##########")
-                input("#############################################")
+                _press_enter()
                 envir.reset()
             [policy, value] = advcore.evaluate([envir.vstate], sess, [advcore.softmax_policy, advcore.value])
             policy = policy[0][0]
@@ -80,10 +83,7 @@ class CriticPlayer(RLVisualizer):
             rgb,_ = envir.vstate
             yield rgb[self.gview] # First view
             if reaching_terminal:
-                print("#############################################")
-                print("##########CONGRATS TERMINAL REACHED##########")
-                print("########## PRESS ENTER TO CONTINUE ##########")
-                input("#############################################")
+                _press_enter()
                 envir.reset()
             qs_bak = envir.qstate
             vs = []
@@ -391,10 +391,7 @@ class MSASampler(RLVisualizer):
                     return
                     yield
                 if rt[ai]:
-                    print("#############################################")
-                    print("##########CONGRATS TERMINAL REACHED##########")
-                    print("##########   PRESS ENTER TO EXIT   ##########")
-                    input("#############################################")
+                    _press_enter()
                     np.savez(args.sampleout,
                              TRAJ_S=traj_s,
                              TRAJ_A=traj_a,
@@ -404,7 +401,7 @@ class MSASampler(RLVisualizer):
                 yield rgb[self.gview] # First view
 
 class CActionPlayer(RLVisualizer):
-    def __init__(self, args, g, global_step):
+    def __init__(self, args, g, global_step, sancheck=False):
         assert args.samplein, '--samplein is mandatory for --visualize caction'
         super(CActionPlayer, self).__init__(args, g, global_step)
         d = np.load(args.samplein)
@@ -412,26 +409,127 @@ class CActionPlayer(RLVisualizer):
         self.N = d['N']
         self.D = d['D']
         self.mandatory_ckpt = False
+        self.sancheck = sancheck
+
+    def play(self):
+        if self.sancheck:
+            self.sanity_check()
+        else:
+            reanimate(self, fps=30)
+
+    def __iter__(self):
+        envir = self.envir
+        uw = envir.r
+        amag = self.args.amag
+        V = self.V
+        N = self.N
+        D = self.D
+        while True:
+            if self.args.samplein2:
+                VS = np.load(self.args.samplein2)['VS']
+                vs = np.array([uw.translate_to_unit_state(v) for v in VS])
+                for qs,crt,caa in rlcaction.trajectory_to_caction(vs, uw, amag):
+                    envir.qstate = qs
+                    rgb,_ = envir.vstate
+                    yield rgb[self.gview]
+            else:
+                for qs,crt,caa in rlcaction.caction_generator(V, N, D, amag, uw):
+                    assert envir.r.is_valid_state(qs)
+                    envir.qstate = qs
+                    rgb,_ = envir.vstate
+                    yield rgb[self.gview] # First view
+            assert envir.r.is_disentangled(envir.qstate)
+            _press_enter()
+
+    def sanity_check(self):
+        envir = self.envir
+        uw = envir.r
+        amag = self.args.amag
+        V = self.V
+        N = self.N
+        D = self.D
+        for ivi in progressbar.progressbar(range(len(V))):
+            # print("IVI {}".format(ivi))
+            vs = rlcaction.ivi_to_leaving_trajectory(ivi, V, N, D, amag, uw)
+            if not vs:
+                continue
+            for qs,crt,caa in rlcaction.trajectory_to_caction(vs, uw, amag):
+                assert envir.r.is_valid_state(qs)
+
+class CActionPlayer2(RLVisualizer):
+    def __init__(self, args, g, global_step, sancheck=False):
+        assert args.samplein, '--samplein is mandatory for --visualize caction2'
+        super(CActionPlayer2, self).__init__(args, g, global_step)
+        self.mandatory_ckpt = False
+        VS = np.load(self.args.samplein)['VS']
+        # print("ALLVS {}".format(VS))
+        uw = self.envir.r
+        self.known_path = [uw.translate_to_unit_state(v) for v in VS]
+        self.out_index = 0
 
     def play(self):
         reanimate(self, fps=30)
 
     def __iter__(self):
         envir = self.envir
-        V = self.V
-        N = self.N
-        D = self.D
+        uw = envir.r
+        amag = self.args.amag
+        out_dir = self.args.sampleout
         while True:
-            for qs,crt,caa in rlcaction.caction_generator(V, N, D, self.args.amag, envir.r):
+            QS = []
+            CTR = []
+            CAA = []
+            for qs,ctr,caa in rlcaction.caction_generator2(uw, self.known_path, 0.15, amag):
+            #for qs,crt,caa in rlcaction.trajectory_to_caction(self.known_path, uw, amag):
+                QS.append(qs)
+                CTR.append(ctr)
+                CAA.append(caa)
                 assert envir.r.is_valid_state(qs)
+                # print('qs {}'.format(qs))
+                # print('ctr {}'.format(ctr))
+                # print('caa {}'.format(caa))
                 envir.qstate = qs
                 rgb,_ = envir.vstate
-                yield rgb[self.gview] # First view
-            assert envir.r.is_disentangled(envir.qstate)
-            print("#############################################")
-            print("##########CONGRATS TERMINAL REACHED##########")
-            print("########## PRESS ENTER TO CONTINUE ##########")
-            input("#############################################")
+                yield rgb[self.gview]
+            # assert envir.r.is_disentangled(envir.qstate)
+            if out_dir:
+                fn = '{}/{}.npz'.format(out_dir, self.out_index)
+                '''
+                print("QS {}".format(QS))
+                print("CTR {}".format(CTR))
+                print("CAA {}".format(CAA))
+                print("lengths {} {} {}".format(len(QS), len(CTR), len(CAA)))
+                print("### SAVING TO {}".format(fn))
+                QS = np.array(QS)
+                print("QS {}".format(QS))
+                CTR = np.array(CTR)
+                print("CTR {}".format(CTR))
+                CAA = np.array(CAA)
+                print("CAA {}".format(CAA))
+                print('sizes {} {} {}'.format(QS.shape, CTR.shape, CAA.shape))
+                '''
+                np.savez(fn, QS=QS, CTR=CTR, CAA=CAA)
+                print("### {} SAVED".format(fn))
+                self.out_index += 1
+                '''
+                if self.args.iter > 0 and self.out_index > self.args.iter:
+                    return
+                '''
+            else:
+                _press_enter()
+
+class CActionPlayer2ISFinder(RLVisualizer):
+    def __init__(self, args, g, global_step, sancheck=False):
+        assert args.samplein, '--samplein is mandatory for --visualize caction2_istate_finder'
+        assert args.sampleout, '--sampleout is mandatory for --visualize caction2_istate_finder'
+        super(CActionPlayer2ISFinder, self).__init__(args, g, global_step)
+        self.mandatory_ckpt = False
+        VS = np.load(self.args.samplein)['VS']
+        # print("ALLVS {}".format(VS))
+        uw = self.envir.r
+        self.known_path = [uw.translate_to_unit_state(v) for v in VS]
+        self.out_index = 0
+
 
 def create_visualizer(args, g, global_step):
     if args.qlearning_with_gt:
@@ -451,4 +549,10 @@ def create_visualizer(args, g, global_step):
         return MSASampler(args, g, global_step)
     elif args.visualize == 'caction':
         return CActionPlayer(args, g, global_step)
+    elif args.visualize == 'caction_sancheck':
+        return CActionPlayer(args, g, global_step, sancheck=True)
+    elif args.visualize == 'caction2':
+        return CActionPlayer2(args, g, global_step)
+    elif args.visualize == 'caction2_istate_finder':
+        return CActionPlayer2ISFinder(args, g, global_step)
     assert False, '--visualize {} is not implemented yet'.format(args.visualize)
