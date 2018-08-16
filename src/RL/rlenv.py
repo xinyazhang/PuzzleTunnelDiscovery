@@ -366,7 +366,7 @@ class RLSample(object):
         advcore.set_lstm(lstm_next) # AdvCore next frame
 
 '''
-Sample a trajectory
+Sample a trajectory, maybe incomplete
 '''
 class MiniBatchSampler(object):
 
@@ -447,3 +447,24 @@ class CachedMiniBatchSampler(MiniBatchSampler):
 
         self.minibatch_index = (self.minibatch_index + 1) % len(self.all_samples_cache)
         return (rlsamples, final_state)
+
+'''
+Sample a trajectory ending with non-zero rewards
+'''
+class WholeTrajSampler(MiniBatchSampler):
+    def __init__(self,
+                 advcore):
+        super(WholeTrajSampler, self).__init__(advcore=advcore, tmax=-1)
+
+    def sample_minibatch(self, envir, sess, tid=None, tmax=-1):
+        advcore = self.advcore
+        samples = []
+        while True:
+            s = self._sample_one(envir, sess)
+            samples.append(s)
+            if s.true_reward != 0:
+                break
+        final = RLSample(self.advcore, envir, sess, is_terminal=True)
+        if 'die' in advcore.args.gameconf:
+            envir.reset()
+        return (samples, final)

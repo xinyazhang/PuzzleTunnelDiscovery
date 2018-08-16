@@ -22,6 +22,8 @@ class DQNTrainer(object):
         self.args = args
         if args.train == 'dqn_overfit':
             self.sampler = rlenv.CachedMiniBatchSampler(advcore=advcore, args=args)
+        elif 'whole_traj' in args.debug_flags:
+            self.sampler = rlenv.WholeTrajSampler(advcore=advcore)
         else:
             self.sampler = rlenv.MiniBatchSampler(advcore=advcore, tmax=args.batch)
         self.batch_normalization = batch_normalization

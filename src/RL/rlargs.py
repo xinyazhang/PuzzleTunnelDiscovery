@@ -246,7 +246,11 @@ fake3d: sample Pi and V for fake3d cases
             help='MileStone Injection From File (unit state). Assumes the --sampleout file from --visualize msa',
             default='')
     parser.add_argument('--debug_flags',
-            choices=['zero_weights'],
+            help='''
+zero_weights: initialize weights in ValNet and PolNet to zero.
+whole_traj: generate the sample only after receving non-zero reward.
+            ''',
+            choices=['zero_weights', 'whole_traj'],
             nargs='*',
             default=[])
     parser.add_argument('--train',
