@@ -70,9 +70,13 @@ def get_parser():
     parser.add_argument('--vmag', metavar='REAL NUMBER',
             help='Magnitude of verifying action',
             type=float, default=0.0125 * 4 / 8)
-    parser.add_argument('--die',
-            help='Terminate after hitting obstacles',
-            action='store_true')
+    parser.add_argument('--gameconf',
+            help='''Various game configurations:
+die: Terminate after hitting obstacle.
+            ''',
+            nargs='*'
+            choices=['die']
+            default=[])
     parser.add_argument('-n', '--dryrun',
             help='Visualize the generated GT without training anything',
             action='store_true')

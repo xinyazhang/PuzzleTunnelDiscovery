@@ -146,7 +146,7 @@ class RigidPuzzle(rlenv.IExperienceReplayEnvironment):
             '''
             if ratio == 0.0:
                 reward += self.PEN
-                if self.args.die:
+                if 'die' in self.args.gameconf:
                     reaching_terminal = True
             self.collision_cache.update([sa])
         rgb_1, dep_1 = self.vstate
