@@ -98,6 +98,12 @@ public:
 	calculateVisibilityMatrix(ArrayOfStates qs,
 	                          bool is_unit_states,
 	                          double verify_magnitude);
+	Eigen::Matrix<int, -1, -1>
+	calculateVisibilityMatrix2(ArrayOfStates qs0,
+	                           bool qs0_is_unit_states,
+	                           ArrayOfStates qs1,
+	                           bool qs1_is_unit_states,
+	                           double verify_magnitude);
 protected:
 	bool shared_ = false;
 
