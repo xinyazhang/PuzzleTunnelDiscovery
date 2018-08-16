@@ -8,10 +8,8 @@ import pyosr
 import numpy as np
 import math
 import aniconf12 as aniconf
-import sys
-import uw_random
 
-def visibility(gtfn, cfn):
+def _create_r():
     pyosr.init()
     dpy = pyosr.create_display()
     glctx = pyosr.create_gl_context(dpy)
@@ -23,6 +21,10 @@ def visibility(gtfn, cfn):
     r.angleModel(0.0, 0.0)
     r.default_depth = 0.0
     r.views = np.array([[0.0, 0.0]], dtype=np.float32)
+    return r
+
+def visibility(gtfn, cfn):
+    r = _create_r()
     d = np.load(gtfn)
     V=d['V']
     VM=r.calculate_visibility_matrix(V, False, 0.0125 * 4 / 8)

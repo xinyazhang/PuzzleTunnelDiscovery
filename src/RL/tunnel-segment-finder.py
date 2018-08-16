@@ -1,21 +1,38 @@
 #!/usr/bin/env python2
 
+import os
 import sys
-import numpy as np
+sys.path.append(os.getcwd())
 
-def tunnel_segment_finder(gtfn, vmfn, outfn):
+import pyosr
+import numpy as np
+import math
+import aniconf12 as aniconf
+
+def _create_r():
+    pyosr.init()
+    dpy = pyosr.create_display()
+    glctx = pyosr.create_gl_context(dpy)
+    r = pyosr.Renderer()
+    r.setup()
+    r.loadModelFromFile(aniconf.env_fn)
+    r.loadRobotFromFile(aniconf.rob_fn)
+    r.scaleToUnit()
+    r.angleModel(0.0, 0.0)
+    r.default_depth = 0.0
+    r.views = np.array([[0.0, 0.0]], dtype=np.float32)
+    return r
+
+def tunnel_segment_finder(gtfn, pathfn, outfn):
+    r = _create_r()
     gtdic = np.load(gtfn)
-    V = gtdic['V']
-    VM = np.load(vmfn)['VM']
-    VPS = np.sum(VM, axis=1) #Visibility per sample
-    OVPS = np.sort(VPS)
-    thresh = OVPS[int(len(VPS) / 5)]
-    tunnel_vi = []
-    for i,vb in enumerate(VPS):
-        if vb <= thresh:
-            tunnel_vi.append(i)
-    print(V[tunnel_vi])
-    np.savez(outfn, TUNNELV=V[tunnel_vi])
+    pathdic = np.load(pathfn)
+    V0 = gtdic['V'][:4]
+    V1 = pathdic['VS'][:2]
+    VM=r.calculate_visibility_matrix2(V0, False,
+                                      V1, False,
+                                      0.0125 * 4 / 8)
+    np.savez(outfn, PATHVM=VM)
 
 def usage():
     print('''
@@ -30,4 +47,4 @@ if __name__ == '__main__':
     #tunnel_finder(sys.argv[1], sys.argv[2], sys.argv[3])
     tunnel_segment_finder('blend-low.gt.npz',
                           '../res/alpha/alpha-1.2.org.w-first.npz',
-                          'blend-low.tunnel-segment.npz')
+                          'blend-low.path-visibility.npz')
