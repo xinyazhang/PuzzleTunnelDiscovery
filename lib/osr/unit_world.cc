@@ -549,17 +549,25 @@ UnitWorld::calculateVisibilityMatrix2(ArrayOfStates qs0,
 	int M = qs0.rows();
 	int N = qs1.rows();
 	if (!qs0_is_unit_states)
-		for (int i = 0; i < N; i++)
+#pragma omp parallel for
+		for (int i = 0; i < M; i++)
 			qs0.row(i) = translateToUnitState(qs0.row(i)).transpose();
 	if (!qs1_is_unit_states)
+#pragma omp parallel for
 		for (int i = 0; i < N; i++)
 			qs1.row(i) = translateToUnitState(qs1.row(i)).transpose();
 	Eigen::Matrix<int, -1, -1> ret;
 	ret.resize(M, N);
+	std::atomic<int> prog(0);
+#pragma omp parallel for
 	for (int fi = 0; fi < M; fi++) {
-		for (int ti = fi + 1; ti < N; ti++) {
+		for (int ti = 0; ti < N; ti++) {
 			int valid = !!isValidTransition(qs0.row(fi), qs1.row(ti), verify_magnitude);
 			ret(fi, ti) = valid;
+		}
+		prog++;
+		if (omp_get_thread_num() == 0) {
+			std::cerr << "Progress: " << prog << "/" << M << std::endl;
 		}
 	}
 	return ret;
