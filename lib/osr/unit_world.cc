@@ -562,7 +562,7 @@ UnitWorld::calculateVisibilityMatrix2(ArrayOfStates qs0,
 #pragma omp parallel for
 	for (int fi = 0; fi < M; fi++) {
 		for (int ti = 0; ti < N; ti++) {
-			int valid = !!isValidTransition(qs0.row(fi), qs1.row(ti), verify_magnitude);
+			int valid = isValidTransition(qs0.row(fi), qs1.row(ti), verify_magnitude);
 			ret(fi, ti) = valid;
 		}
 		prog++;
