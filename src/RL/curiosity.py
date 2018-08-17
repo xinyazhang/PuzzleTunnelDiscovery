@@ -499,4 +499,6 @@ class FeatureVectorOverfitRL(object):
 def create_advcore(learning_rate, args, batch_normalization):
     if 'a2c_overfit_from_fv' == args.train:
         return FeatureVectorOverfitRL(learning_rate=learning_rate, args=args, batch_normalization=batch_normalization)
+    if 'tunnel' in args.train:
+        return tunnel.create_advcore(learning_rate=learning_rate, args=args, batch_normalization=batch_normalization)
     return CuriosityRL(learning_rate=learning_rate, args=args, batch_normalization=batch_normalization)

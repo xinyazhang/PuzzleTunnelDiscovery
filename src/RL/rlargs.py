@@ -189,7 +189,7 @@ die: Terminate after hitting obstacle.
     parser.add_argument('--visionformula',
             help='Load preset formulas for vision. Note this overrides other options',
             type=int,
-            choices=[1,2,3],
+            choices=[1,2,3,4],
             default=0)
     parser.add_argument('--agents',
             metavar='NUMBER',
@@ -267,10 +267,12 @@ a2c_overfit: Try to overfit the RL model with Actor-Critic Method.
 dqn: Deep Q Network.
 dqn_overfit: overfit DQN from scratch.
 loco_overfit: overfit simplified deeploco (continuous action) from scratch
+tunnel_finder: train a model to locate a milestone in the tunnel w.r.t. a given image
 ''',
             choices=['a2c', 'QwithGT', 'curiosity', 'QandFCFE', 'q_overfit', 'InF', 'Ionly',
                      'a2c_overfit', 'a2c_overfit_qonly', 'a2c_no_critic', 'a2c_abs_critic',
-                     'a2c_overfit_from_fv', 'dqn', 'dqn_overfit', 'loco_overfit'],
+                     'a2c_overfit_from_fv', 'dqn', 'dqn_overfit', 'loco_overfit',
+                     'tunnel_finder'],
             default='a2c')
     parser.add_argument('--notrain',
             help='Set untrainnable segments',
@@ -304,7 +306,7 @@ loco_overfit: overfit simplified deeploco (continuous action) from scratch
 def parse():
     parser = get_parser()
     args = parser.parse_args()
-    if args.visionformula in [1,2,3]:
+    if args.visionformula in [1,2,3,4]:
         args.elu = True
         args.res = 224
         args.avi = True
@@ -318,6 +320,9 @@ def parse():
         args.batchnorm = True
     if args.visionformula == 3:
         args.avi = False
+    if args.visionformula == 4:
+        args.ferev = 13
+        args.fehidden = [1024]
     if args.qlearning_gt_file:
         args.qlearning_with_gt = True
     if args.train == 'QwithGT' or args.train == 'QandFCFE':
