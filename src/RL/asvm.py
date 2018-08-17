@@ -35,7 +35,7 @@ def main():
         print("Load {}".format(fn))
         q0end = max(q0end, vmlocators[-1][1])
         q1end = max(q1end, vmlocators[-1][3])
-    giant = np.empty((q0end, q1end), dtype=np.int8)
+    giant = np.full((q0end, q1end), -1, dtype=np.int8)
     for i,(m,loc) in enumerate(zip(vmfrags, vmlocators)):
         [q0start, q0end, q1start, q1end] = loc
         print("Store Block {}".format(i))
