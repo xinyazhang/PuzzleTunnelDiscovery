@@ -27,11 +27,17 @@ def tunnel_segment_finder(gtfn, pathfn, outfn):
     r = _create_r()
     gtdic = np.load(gtfn)
     pathdic = np.load(pathfn)
-    V0 = gtdic['V'][:4]
-    V1 = pathdic['VS'][:2]
-    VM=r.calculate_visibility_matrix2(V0, False,
-                                      V1, False,
-                                      0.0125 * 4 / 8)
+    # V0 = gtdic['V'][:4]
+    # V1 = pathdic['VS'][:2]
+    V0 = pathdic['VS']
+    V1 = gtdic['V']
+    # print(V0)
+    # print(V1)
+    VM = r.calculate_visibility_matrix2(V0, False,
+                                        V1, False,
+                                        0.0125 * 4 / 8)
+    # print(V0)
+    # print(VM)
     np.savez(outfn, PATHVM=VM)
 
 def usage():
