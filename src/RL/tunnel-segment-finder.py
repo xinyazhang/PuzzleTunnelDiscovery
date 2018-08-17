@@ -29,6 +29,9 @@ def tunnel_segment_finder(gtfn, pathfn, outfn):
     pathdic = np.load(pathfn)
     # V0 = gtdic['V'][:4]
     # V1 = pathdic['VS'][:2]
+    '''
+    CAVEAT: blend-low.gt.npz is V*1*
+    '''
     V0 = pathdic['VS']
     V1 = gtdic['V']
     # print(V0)
