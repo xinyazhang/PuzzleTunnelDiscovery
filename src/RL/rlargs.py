@@ -233,9 +233,13 @@ die: Terminate after hitting obstacle.
 Choose which aspect of the RL system to visualize.
 policy: visualize the path walked by according to policy network.
 curiosity: sample the curiosity value, i.e. forward model loss.
-fake3d: sample Pi and V for fake3d cases
+fake3d: sample Pi and V for fake3d cases.
+tunnel_finder: locate samples in tunnel from trained network.
+loco: reanimate with continuous action prediction (trained by --train loco_overfit).
             ''',
-            choices=['policy', 'curiosity', 'fake3d', 'critic', 'msa', 'caction', 'caction_sancheck', 'caction2'],
+            choices=['policy', 'curiosity', 'fake3d', 'critic', 'msa',
+                     'caction', 'caction_sancheck', 'caction2', 'tunnel_finder',
+                     'loco'],
             default='policy')
     parser.add_argument('--msiraw',
             help='MileStone Injection (RAW state). in the same protocol as of --istateraw',

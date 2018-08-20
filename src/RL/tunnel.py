@@ -40,6 +40,13 @@ class TunnelFinderCore(object):
         self._finder_net = vision.ConvApplier(None, args.polhidden + [self.action_space_dimension], naming, args.elu)
         self._finder_params, self.finder_pred = self._finder_net.infer(self.joint_featvec)
 
+    '''
+    Stub property
+    '''
+    @property
+    def softmax_policy(self):
+        return 0
+
 class TunnelFinderTrainer(object):
 
     def __init__(self,
@@ -117,6 +124,7 @@ class TunnelFinderTrainer(object):
             self.train_writer.add_summary(summary, gs)
         else:
             sess.run(self.train_op, feed_dict=dic)
+
 
 def create_advcore(learning_rate, args, batch_normalization):
     if args.train == 'tunnel_finder':

@@ -495,7 +495,7 @@ Dummpy Advcore
 '''
 class FeatureVectorOverfitRL(object):
     def __init__(self, learning_rate, args, batch_normalization=None):
-        pass
+        raise NotImplemented()
 
 def create_advcore(learning_rate, args, batch_normalization):
     if 'a2c_overfit_from_fv' == args.train:

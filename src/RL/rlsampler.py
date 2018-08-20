@@ -1,5 +1,5 @@
-from curiosity import CuriosityRL
-from curiosity import RigidPuzzle as AlphaPuzzle
+from curiosity import sess_no_hook
+import curiosity
 import pyosr
 import numpy as np
 from rlreanimator import reanimate
@@ -22,11 +22,12 @@ class RLVisualizer(object):
         self.args = args
         self.dpy = pyosr.create_display()
         self.ctx = pyosr.create_gl_context(self.dpy)
-        self.envir = AlphaPuzzle(args, 0)
+        self.envir = curiosity.RigidPuzzle(args, 0)
         self.envir.egreedy = 0.995
         self.uw = self.envir.r
         self.r = self.envir.r
-        self.advcore = CuriosityRL(learning_rate=1e-3, args=args)
+        #self.advcore = CuriosityRL(learning_rate=1e-3, args=args)
+        self.advcore = curiosity.create_advcore(learning_rate=1e-3, args=args, batch_normalization=None)
         self.advcore.softmax_policy # Create the tensor
         self.gview = 0 if args.obview < 0 else args.obview
         if args.permutemag >= 0:
@@ -530,6 +531,76 @@ class CActionPlayer2ISFinder(RLVisualizer):
         self.known_path = [uw.translate_to_unit_state(v) for v in VS]
         self.out_index = 0
 
+class LocoPlayer(RLVisualizer):
+    def __init__(self, args, g, global_step, sancheck=False):
+        super(LocoPlayer, self).__init__(args, g, global_step)
+        self.mandatory_ckpt = True
+        self.verify_magnitude = args.vmag
+        self.loco_out = self.advcore.polout[:,:,:6]
+
+    def play(self):
+        reanimate(self)
+
+    def __iter__(self):
+        envir = self.envir
+        r = envir.r
+        sess = self.sess
+        advcore = self.advcore
+        reaching_terminal = False
+        while True:
+            rgb,_ = envir.vstate
+            yield rgb[self.gview] # First view
+            if reaching_terminal:
+                _press_enter()
+                envir.reset()
+            [loco] = advcore.evaluate([envir.vstate], sess, [self.loco_out])
+            disp_pred = loco[0][0] # first batch first view for [B,V,...]
+            cvm = self.verify_magnitude
+            while cvm >= 1e-8:
+                nstate, done, ratio = r.transit_state_by(envir.qstate,
+                        disp_pred[:3], disp_pred[3:], cvm)
+                print("[WIP] Next {} Done {} Ratio {} CVM {}".format(nstate, done, ratio, cvm))
+                if ratio == 0.0:
+                    cvm /= 2.0
+                else:
+                    break
+            if ratio < 1e-8:
+                ratio == 0.0
+                nstate = np.copy(envir.qstate)
+            print("Prediction {}".format(disp_pred))
+            reaching_terminal = r.is_disentangled(nstate)
+            envir.qstate = nstate
+
+class TunnelFinder(RLVisualizer):
+    def __init__(self, args, g, global_step):
+        super(TunnelFinder, self).__init__(args, g, global_step)
+        self.mandatory_ckpt = True
+
+    def play(self):
+        reanimate(self)
+
+    def __iter__(self):
+        envir = self.envir
+        sess = self.sess
+        advcore = self.advcore
+        while True:
+            q = uw_random.random_state(0.75)
+            envir.qstate = q
+            for i in range(3):
+                vstate = envir.vstate
+                yield vstate[0][self.gview]
+                dic = {
+                        advcore.rgb_tensor: [vstate[0]],
+                        advcore.dep_tensor: [vstate[1]],
+                      }
+                disp_pred = sess_no_hook(sess, advcore.finder_pred, feed_dict=dic)
+                disp_pred = disp_pred[0][0] # first batch first view for [B,V,...]
+                nstate_raw = pyosr.apply(envir.qstate, disp_pred[:3], disp_pred[3:])
+                nstate = envir.r.translate_to_unit_state(nstate_raw)
+                print("Prediction {}".format(disp_pred))
+                print("Next (Unit) {}".format(nstate))
+                envir.qstate = nstate
+                input("########## PRESS ENTER TO CONTINUE ##########")
 
 def create_visualizer(args, g, global_step):
     if args.qlearning_with_gt:
@@ -554,5 +625,10 @@ def create_visualizer(args, g, global_step):
     elif args.visualize == 'caction2':
         return CActionPlayer2(args, g, global_step)
     elif args.visualize == 'caction2_istate_finder':
+        assert False, 'caction2_istate_finder not implemented yet'
         return CActionPlayer2ISFinder(args, g, global_step)
+    elif args.visualize == 'loco':
+        return LocoPlayer(args, g, global_step)
+    elif args.visualize == 'tunnel_finder':
+        return TunnelFinder(args, g, global_step)
     assert False, '--visualize {} is not implemented yet'.format(args.visualize)
