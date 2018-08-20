@@ -74,8 +74,8 @@ def get_parser():
             help='''Various game configurations:
 die: Terminate after hitting obstacle.
             ''',
-            nargs='*'
-            choices=['die']
+            nargs='*',
+            choices=['die'],
             default=[])
     parser.add_argument('-n', '--dryrun',
             help='Visualize the generated GT without training anything',

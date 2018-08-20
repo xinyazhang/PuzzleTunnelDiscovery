@@ -18,6 +18,7 @@ import errno
 from cachetools import LRUCache
 # Legacy package, ResNet 18 does not need this
 import config
+import tunnel
 
 def sess_no_hook(sess, tensors, feed_dict):
     if isinstance(sess, tf.Session):

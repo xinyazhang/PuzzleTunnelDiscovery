@@ -12,9 +12,13 @@ class TunnelFinderCore(object):
 
     def __init__(self, learning_rate, args, batch_normalization=None):
         self.view_num, self.views = rlutil.get_view_cfg(args)
+        w = h = args.res
         self.args = args
         self.batch_normalization = batch_normalization
+        batch_size = None if args.EXPLICIT_BATCH_SIZE < 0 else args.EXPLICIT_BATCH_SIZE
+        self.batch_size = batch_size
 
+        common_shape = [batch_size, self.view_num, w, h]
         self.action_space_dimension = 6 # Magic number, 3D + Axis Angle
         self.action_tensor = tf.placeholder(tf.float32, shape=[batch_size, 1, self.action_space_dimension], name='CActionPh')
         self.rgb_tensor = tf.placeholder(tf.float32, shape=common_shape+[3], name='RgbPh')
@@ -33,8 +37,8 @@ class TunnelFinderCore(object):
         self.joint_featvec = tf.reshape(self.featvec, [-1, 1, int(V)*int(N)])
 
         naming = 'TunnelFinderNet'
-        self._finder_net = vision.ConvApplier(None, args.polhidden, naming, args.elu)
-        self._finder_params, self.finder_pred = self._finder_net.infer(fv)
+        self._finder_net = vision.ConvApplier(None, args.polhidden + [self.action_space_dimension], naming, args.elu)
+        self._finder_params, self.finder_pred = self._finder_net.infer(self.joint_featvec)
 
 class TunnelFinderTrainer(object):
 
@@ -44,13 +48,14 @@ class TunnelFinderTrainer(object):
                  learning_rate,
                  batch_normalization=None):
         assert args.samplein, '--train tunnel_finder needs --samplein to indicate the tunnel vertices'
-        self.tunnel_v = np.load(args.samplein)['TUNNELV']
+        self.tunnel_v = np.load(args.samplein)['TUNNEL_V']
         self.advcore = advcore
         self.args = args
         global_step = tf.train.get_or_create_global_step()
         self.global_step = global_step
+        self.optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 
-        self.loss = tf.nn.mean_squared_error(advcore.action_tensor, advcore.finder_pred)
+        self.loss = tf.losses.mean_squared_error(advcore.action_tensor, advcore.finder_pred)
         tf.summary.scalar('finder_loss', self.loss)
 
         if batch_normalization is not None:
@@ -77,14 +82,15 @@ class TunnelFinderTrainer(object):
         vstate = envir.vstate
         distances = pyosr.multi_distance(q, self.tunnel_v)
         ni = np.argmin(distances)
+        close = self.tunnel_v[ni]
         tr,aa,dq = pyosr.differential(q, close)
-        return [vstate, np.concatenate([ctr, caa], axis=-1)]
+        return [vstate, np.concatenate([tr, aa], axis=-1)]
 
     def train(self, envir, sess, tid=None, tmax=-1):
-        samples = [self._sample_one(envir) for i in range(args.batch)]
+        samples = [self._sample_one(envir) for i in range(self.args.batch)]
         batch_rgb = [s[0][0] for s in samples]
         batch_dep = [s[0][1] for s in samples]
-        batch_dq = [s[1] for s in samples]
+        batch_dq = [[s[1]] for s in samples]
         ndic = {
                 'rgb' : batch_rgb,
                 'dep' : batch_dep,
@@ -92,12 +98,15 @@ class TunnelFinderTrainer(object):
                }
         self.dispatch_training(sess, ndic)
 
+    def _log(self, text):
+        print(text)
+
     def dispatch_training(self, sess, ndic, debug_output=True):
         advcore = self.advcore
         dic = {
-                advcore.rgb: ndic['rgb'],
-                advcore.dep: ndic['dep'],
-                self.action_tensor : ndic['locomo'],
+                advcore.rgb_tensor: ndic['rgb'],
+                advcore.dep_tensor: ndic['dep'],
+                advcore.action_tensor : ndic['dq'],
               }
         if self.summary_op is not None:
             self._log("running training op")

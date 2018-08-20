@@ -18,6 +18,7 @@ import a2c_overfit
 import a2c_mp
 import dqn
 import loco_overfit
+import tunnel
 import random
 from six.moves import queue,input
 import qtrainer
@@ -82,7 +83,7 @@ def create_trainer(args, global_step, batch_normalization):
         trainer = TRAINER(
                 advcore=advcore,
                 args=args,
-                learning_rate=1e-4,
+                learning_rate=5e-5,
                 batch_normalization=bnorm)
     elif args.train in ['QwithGT', 'QandFCFE', 'q_overfit'] or args.qlearning_with_gt:
         trainer = qtrainer.QTrainer(
