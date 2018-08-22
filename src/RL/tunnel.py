@@ -55,7 +55,8 @@ class TunnelFinderTrainer(object):
                  learning_rate,
                  batch_normalization=None):
         assert args.samplein, '--train tunnel_finder needs --samplein to indicate the tunnel vertices'
-        self.tunnel_v = np.load(args.samplein)['TUNNEL_V']
+        self._tunnel_v = np.load(args.samplein)['TUNNEL_V']
+        self.unit_tunnel_v = None
         self.advcore = advcore
         self.args = args
         global_step = tf.train.get_or_create_global_step()
@@ -79,22 +80,38 @@ class TunnelFinderTrainer(object):
             self.summary_op = None
             self.train_writer = None
 
+        self.sample_index = 0
+
     @property
     def total_iter(self):
         return self.args.iter
 
     def _sample_one(self, envir):
         q = uw_random.random_state(0.75)
+        if self.unit_tunnel_v is None:
+            self.unit_tunnel_v = np.array([envir.r.translate_to_unit_state(v) for v in self._tunnel_v])
         envir.qstate = q
         vstate = envir.vstate
-        distances = pyosr.multi_distance(q, self.tunnel_v)
+        distances = pyosr.multi_distance(q, self.unit_tunnel_v)
         ni = np.argmin(distances)
-        close = self.tunnel_v[ni]
+        close = self.unit_tunnel_v[ni]
         tr,aa,dq = pyosr.differential(q, close)
-        return [vstate, np.concatenate([tr, aa], axis=-1)]
+        return [vstate, np.concatenate([tr, aa], axis=-1), q, close]
 
     def train(self, envir, sess, tid=None, tmax=-1):
         samples = [self._sample_one(envir) for i in range(self.args.batch)]
+
+        '''
+        --sampleout support
+        '''
+        if self.args.sampleout:
+            fn = '{}/{}.npz'.format(self.args.sampleout, self.sample_index)
+            qs = np.array([s[2] for s in samples])
+            dqs = np.array([s[1] for s in samples])
+            closes = np.array([s[3] for s in samples])
+            np.savez(fn, QS=qs, DQS=dqs, CLOSES=closes)
+        self.sample_index += 1
+
         batch_rgb = [s[0][0] for s in samples]
         batch_dep = [s[0][1] for s in samples]
         batch_dq = [[s[1]] for s in samples]
