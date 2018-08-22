@@ -575,6 +575,13 @@ class TunnelFinder(RLVisualizer):
     def __init__(self, args, g, global_step):
         super(TunnelFinder, self).__init__(args, g, global_step)
         self.mandatory_ckpt = True
+        '''
+        Debugging Routines
+        '''
+        #TV = np.load('../res/alpha/alpha-1.2.org.tunnel.npz')['TUNNEL_V']
+        TV = np.load('alpha-1.2.org.tunnel.npz')['TUNNEL_V']
+        self.unit_tunnel_v = np.array([self.envir.r.translate_to_unit_state(v) for v in TV])
+        self.sample_index = 0
 
     def play(self):
         reanimate(self)
@@ -586,7 +593,53 @@ class TunnelFinder(RLVisualizer):
         while True:
             q = uw_random.random_state(0.75)
             envir.qstate = q
-            for i in range(3):
+            if False:
+                for i in range(len(self.unit_tunnel_v)):
+                    envir.qstate = self.unit_tunnel_v[i]
+                    yield envir.vstate[0][self.gview]
+            DEBUG2 = False
+            if DEBUG2:
+                assert self.args.samplein, "DEBUG2=True requires --samplein"
+                fn = '{}/{}.npz'.format(self.args.samplein, self.sample_index)
+                print(fn)
+                self.sample_index += 1
+                d = np.load(fn)
+                qs = d['QS']
+                dqs = d['DQS']
+                closes = d['CLOSES']
+                for q,dq,close in zip(qs, dqs, closes):
+                    #tr,aa,_ = pyosr.differential(q, close)
+                    #dq = np.concatenate([tr, aa], axis=-1)
+                    app = pyosr.apply(q, dq[:3], dq[3:])
+                    print("q {}\ndq {}\nclose {}\napplied {}".format(q, dq, close, app))
+                    print("diff {}\n".format(dq))
+                    assert pyosr.distance(close, pyosr.apply(q, dq[:3], dq[3:])) < 1e-3
+                    # continue
+                    envir.qstate = q
+                    yield envir.vstate[0][self.gview]
+                    input("########## PRESS ENTER FOR APPLIED DQ ##########")
+                    envir.qstate = app
+                    yield envir.vstate[0][self.gview]
+                    input("########## PRESS ENTER FOR CLOSEST Q ##########")
+                    envir.qstate = close
+                    yield envir.vstate[0][self.gview]
+                    input("######## PRESS ENTER FOR THE NEXT TUPLE ########")
+                continue # Skip the remaining
+            DEBUG3 = True
+            if DEBUG3:
+                for q in self.unit_tunnel_v:
+                    envir.qstate = q
+                    yield envir.vstate[0][self.gview]
+            DEBUG = True
+            if DEBUG:
+                yield envir.vstate[0][self.gview]
+                distances = pyosr.multi_distance(q, self.unit_tunnel_v)
+                ni = np.argmin(distances)
+                close = self.unit_tunnel_v[ni]
+                envir.qstate = close
+                yield envir.vstate[0][self.gview]
+                continue
+            for i in range(5):
                 vstate = envir.vstate
                 yield vstate[0][self.gview]
                 dic = {
@@ -595,8 +648,9 @@ class TunnelFinder(RLVisualizer):
                       }
                 disp_pred = sess_no_hook(sess, advcore.finder_pred, feed_dict=dic)
                 disp_pred = disp_pred[0][0] # first batch first view for [B,V,...]
-                nstate_raw = pyosr.apply(envir.qstate, disp_pred[:3], disp_pred[3:])
-                nstate = envir.r.translate_to_unit_state(nstate_raw)
+
+                nstate = pyosr.apply(envir.qstate, disp_pred[:3], disp_pred[3:])
+                # nstate = envir.r.translate_to_unit_state(nstate_raw)
                 print("Prediction {}".format(disp_pred))
                 print("Next (Unit) {}".format(nstate))
                 envir.qstate = nstate
