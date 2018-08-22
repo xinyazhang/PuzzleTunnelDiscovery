@@ -14,7 +14,7 @@ def main():
     VM = 'giant-vm-path.npz'
     PATH_FN = '../res/alpha/alpha-1.2.org.w-first.npz'
     TUNNELV_FN = 'alpha-1.2.org.tunnel.npz'
-    RATIO = 0.001
+    RATIO = 0.01
 
     vm = np.load(VM)['VM']
     path = np.load(PATH_FN)['VS']
