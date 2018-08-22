@@ -144,7 +144,7 @@ apply(const StateVector& from, const StateTrans& tr, const AngleAxisVector& aa)
 {
 	auto tup = decompose(from);
 	StateTrans trans = std::get<0>(tup);
-	StateQuat rot = std::get<1>(tup);
+	StateQuat rot_from = std::get<1>(tup);
 	trans += tr;
 	double angle = aa.norm();
 	AngleAxisVector axis;
@@ -152,7 +152,7 @@ apply(const StateVector& from, const StateTrans& tr, const AngleAxisVector& aa)
 		axis << 1.0, 0.0, 0.0;
 	else
 		axis = aa.normalized();
-	rot = StateQuat(Eigen::AngleAxis<StateScalar>(angle, axis)) * rot;
+	StateQuat rot = StateQuat(Eigen::AngleAxis<StateScalar>(angle, axis)) * rot_from;
 	return compose(trans, rot);
 }
 

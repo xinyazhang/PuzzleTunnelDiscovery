@@ -96,6 +96,7 @@ class TunnelFinderTrainer(object):
         ni = np.argmin(distances)
         close = self.unit_tunnel_v[ni]
         tr,aa,dq = pyosr.differential(q, close)
+        assert pyosr.distance(close, pyosr.apply(q, tr, aa)) < 1e-6, "pyosr.differential is not pyosr.apply ^ -1"
         return [vstate, np.concatenate([tr, aa], axis=-1), q, close]
 
     def train(self, envir, sess, tid=None, tmax=-1):
