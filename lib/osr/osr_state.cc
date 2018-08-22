@@ -136,12 +136,28 @@ differential(const StateVector& from, const StateVector& to)
 		std::cerr << "PANIC: rot_delta error\n";
 	}
 #endif
+	if (rot_to.angularDistance(aa * rot_from) > 1e-3)
+		throw std::runtime_error("differential is buggy");
+	{
+		AngleAxisVector axis = aav.normalized();
+		double angle = aav.norm();
+		StateQuat rec_to = StateQuat(Eigen::AngleAxis<StateScalar>(angle, axis)) * rot_from;
+		if (rot_to.angularDistance(rec_to) > 1e-3)
+			throw std::runtime_error("differential is buggy in aa->quat");
+#if 0
+		std::cout << "\t aav " << aav.transpose() << std::endl;
+		std::cout << "\t rot_to " <<  rot_to.w() << ' ' << rot_to.x() << ' ' << rot_to.y() << ' ' << rot_to.z() << std::endl;
+		std::cout << "\t rec_to " <<  rec_to.w() << ' ' << rec_to.x() << ' ' << rec_to.y() << ' ' << rec_to.z() << std::endl;
+		std::cout << std::flush;
+#endif
+	}
 	return std::make_tuple(tr, aav, compose(tr, rot_delta));
 }
 
 StateVector
 apply(const StateVector& from, const StateTrans& tr, const AngleAxisVector& aa)
 {
+	std::cout << "\t apply.aav " << aa.transpose() << std::endl;
 	auto tup = decompose(from);
 	StateTrans trans = std::get<0>(tup);
 	StateQuat rot_from = std::get<1>(tup);
