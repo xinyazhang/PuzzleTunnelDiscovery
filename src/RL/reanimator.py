@@ -14,9 +14,16 @@ def reanimate():
     dpy = pyosr.create_display()
     glctx = pyosr.create_gl_context(dpy)
     r = pyosr.Renderer()
+    r.avi = True
+    r.pbufferWidth = r.pbufferHeight = 512
     r.setup()
-    r.loadModelFromFile(aniconf.env_fn)
-    r.loadRobotFromFile(aniconf.rob_fn)
+    # r.loadModelFromFile(aniconf.env_fn)
+    # r.loadRobotFromFile(aniconf.rob_fn)
+    r.loadModelFromFile(aniconf.env_wt_fn)
+    r.loadRobotFromFile(aniconf.rob_wt_fn)
+    if hasattr(aniconf, 'rob_ompl_center'):
+        r.enforceRobotCenter(aniconf.rob_ompl_center)
+
     r.scaleToUnit()
     r.angleModel(0.0, 0.0)
     r.default_depth = 0.0
@@ -72,10 +79,10 @@ def reanimate():
                 self.t += self.delta
 
     fig = plt.figure()
-    # keys = np.loadtxt(aniconf.keys_fn)
-    keys = np.loadtxt('rrt-secondhalf.path')
-    #if aniconf.keys_w_last:
-    if True:
+    keys = np.loadtxt(aniconf.keys_fn)
+    # keys = np.loadtxt('rrt-secondhalf.path')
+    if aniconf.keys_w_last:
+    # if True:
         print('before keys[0] {}'.format(keys[0]))
         keys[:, [3,4,5,6]] = keys[:,[6,3,4,5]]
         print('after keys[0] {}'.format(keys[0]))
@@ -92,7 +99,8 @@ def reanimate():
     st2 = np.array([16.242401343877191,15.371074546390151,23.775856491398514,0.38753152804205182,-0.26626876971877833,-0.75270143169934201,-0.46082622729571437], dtype=np.float64)
     ra = ReAnimator(r, [st1, st2], 0.0125/2.0)
     '''
-    ani = animation.FuncAnimation(fig, ra.perform)
+    FPS=60
+    ani = animation.FuncAnimation(fig, ra.perform, interval=1000/FPS)
     plt.show()
 
 if __name__ == '__main__':
