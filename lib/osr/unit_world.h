@@ -20,6 +20,7 @@ public:
 	void copyFrom(const UnitWorld*);
 	virtual void loadModelFromFile(const std::string& fn);
 	virtual void loadRobotFromFile(const std::string& fn);
+	void enforceRobotCenter(const StateTrans&);
 	void scaleToUnit();
 	void angleModel(float latitude, float longitude);
 	void setPerturbation(const StateVector& pert);

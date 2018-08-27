@@ -52,6 +52,7 @@ public:
 
 	void load(std::string filename, const glm::vec3* model_color = nullptr);
 	void clear();
+	void overrideCenter(glm::vec3 c) { center_ = c; }
 	glm::vec3 getCenter() const { return center_; }
 
 	/*

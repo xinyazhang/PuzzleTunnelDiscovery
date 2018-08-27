@@ -84,6 +84,16 @@ UnitWorld::loadRobotFromFile(const std::string& fn)
 
 
 void
+UnitWorld::enforceRobotCenter(const StateTrans& center)
+{
+	robot_->overrideCenter({center(0), center(1), center(2)});
+}
+
+
+/*
+ * scaleToUnit: calculate the scaling factor
+ */
+void
 UnitWorld::scaleToUnit()
 {
 	auto scene_span =  scene_->getBoundingBox().span();
@@ -94,6 +104,9 @@ UnitWorld::scaleToUnit()
 }
 
 
+/*
+ * angleModel: acutally calculate the transformation to unit world
+ */
 void
 UnitWorld::angleModel(float latitude, float longitude)
 {

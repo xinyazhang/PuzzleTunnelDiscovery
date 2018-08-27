@@ -84,6 +84,7 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("setupFrom", &UnitWorld::copyFrom)
 		.def("loadModelFromFile", &UnitWorld::loadModelFromFile)
 		.def("loadRobotFromFile", &UnitWorld::loadRobotFromFile)
+		.def("enforceRobotCenter", &UnitWorld::enforceRobotCenter)
 		.def("scaleToUnit", &UnitWorld::scaleToUnit)
 		.def("angleModel", &UnitWorld::angleModel)
 		.def("set_perturbation", &UnitWorld::setPerturbation)
