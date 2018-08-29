@@ -3,6 +3,7 @@ import numpy as np
 import tensorflow as tf
 import pyosr
 import rlutil
+import tfutil
 import vision
 import config
 import curiosity
@@ -63,7 +64,18 @@ class TunnelFinderTrainer(object):
         self.global_step = global_step
         self.optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 
-        self.loss = tf.losses.mean_squared_error(advcore.action_tensor, advcore.finder_pred)
+        if 'se3_geodesic_loss' not in args.debug_flags:
+            self.loss = tf.losses.mean_squared_error(advcore.action_tensor, advcore.finder_pred)
+        else:
+            e3_distancce = tf.nn.l2_loss(advcore.action_tensor[:,:,:3] -
+                                         advcore.finder_pred[:,:,:3])
+            e3_distancce = tf.reduce_sum(e3_distancce)
+            o3_distance = tfutil.axis_angle_geodesic_distance(advcore.action_tensor[:,:,3:],
+                                                              advcore.finder_pred[:,:,3:],
+                                                              keepdims=True)
+            o3_distance = tf.reduce_sum(o3_distance)
+            self.loss = e3_distancce + o3_distance
+
         tf.summary.scalar('finder_loss', self.loss)
 
         if batch_normalization is not None:

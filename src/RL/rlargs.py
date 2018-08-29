@@ -254,7 +254,7 @@ loco: reanimate with continuous action prediction (trained by --train loco_overf
 zero_weights: initialize weights in ValNet and PolNet to zero.
 whole_traj: generate the sample only after receving non-zero reward.
             ''',
-            choices=['zero_weights', 'whole_traj'],
+            choices=['zero_weights', 'whole_traj', 'se3_geodesic_loss'],
             nargs='*',
             default=[])
     parser.add_argument('--train',

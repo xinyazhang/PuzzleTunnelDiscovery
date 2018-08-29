@@ -11,11 +11,11 @@ Input:
     aa0: a tensor to represent axis angle in last dimension
     aa1: the same shape as aa0
 '''
-def axis_angle_geodesic_distance(aa0, aa1):
+def axis_angle_geodesic_distance(aa0, aa1, keepdims=False):
     q0 = aa_to_w_first_quaternion(aa0)
     q1 = aa_to_w_first_quaternion(aa1)
     # Notation from: https://en.wikipedia.org/wiki/Hamilton_product
     # a1,b1,c1,d1 = tf.split(q0, 1, axis=-1)
     # a2,b2,c2,d2 = tf.split(q1, 1, axis=-1)
-    cos_half_theta = tf.reduce_sum(tf.multiply(q0, q1), axis=-1, keepdims=False)
+    cos_half_theta = tf.reduce_sum(tf.multiply(q0, q1), axis=-1, keepdims=keepdims)
     return 2.0 * tf.acos(tf.clip_by_value(cos_half_theta, -1.0, 1.0))
