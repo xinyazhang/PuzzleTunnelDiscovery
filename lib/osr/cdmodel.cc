@@ -5,7 +5,7 @@
 
 namespace osr {
 struct CDModel::CDModelData {
-	using Scalar = double;
+	using Scalar = StateScalar;
 	using Vector3 = fcl::Vector3d;
 	typedef fcl::OBBRSS<Scalar> BVType;
 	typedef fcl::BVHModel<BVType> Model;
@@ -19,6 +19,25 @@ struct CDModel::CDModelData {
 	 * position.
 	 */
 	Transform uncentrializer;
+
+	VMatrix eig_cache_vertices;
+	FMatrix eig_cache_findices; // Face INDICES -> findices
+
+	void cache_eig_forms()
+	{
+		int NV = model.num_vertices;
+		int NF = model.num_tris;
+		eig_cache_vertices.resize(NV, 3);
+		eig_cache_findices.resize(NF, 3);
+		for(int i = 0; i < NV; i++) {
+			eig_cache_vertices.row(i) = model.vertices[i];
+		}
+		for(int i = 0; i < NF; i++) {
+			eig_cache_findices(i, 0) = model.tri_indices[i][0];
+			eig_cache_findices(i, 1) = model.tri_indices[i][1];
+			eig_cache_findices(i, 2) = model.tri_indices[i][2];
+		}
+	}
 };
 
 CDModel::CDModel(const Scene& scene)
@@ -43,6 +62,9 @@ CDModel::CDModel(const Scene& scene)
 	std::cerr << "SC AABB center: " << scaabb.center().transpose() << std::endl;
 	std::cerr << "SC AABB size: " << scaabb.width() << ' ' << scaabb.height() << ' ' << scaabb.depth() << std::endl;
 	std::cerr << "SC AABB's should match AABB's" << std::endl;
+
+	// Cache libigl form of (V, F) to CDModelData
+	model_->cache_eig_forms();
 }
 
 CDModel::~CDModel()
@@ -122,6 +144,51 @@ bool CDModel::collideBB(const CDModel& env,
 			req, res);
 #endif
 	return ret > 0;
+}
+
+
+bool
+CDModel::collideForDetails(const CDModel& env,
+                           const Transform& envTf,
+                           const CDModel& rob,
+                           const Transform& robTf,
+                           Eigen::Matrix<int, -1, 2>& facePairs)
+{
+	fcl::CollisionRequest<CDModelData::Scalar> req(1UL << 24, true);
+	fcl::CollisionResult<CDModelData::Scalar> res;
+	size_t ret;
+	ret = fcl::collide(&env.model_->model, envTf,
+	                   &rob.model_->model, robTf,
+	                   req, res);
+	std::vector<fcl::Contact<Scalar>> cts;
+	res.getContacts(cts);
+	facePairs.resize(cts.size(), 2);
+	for (size_t i = 0; i < cts.size(); i++) {
+		const auto& ct = cts[i];
+#if 0
+		std::cerr << "CT " << i << " (" << ct.b1 << ", " << ct.b2 << ")"
+		          << " Geo 1 OType: " << ct.o1->getObjectType()
+			  << " Geo 1 NType: " << ct.o1->getNodeType()
+			  << " Geo 2 OType: " << ct.o2->getObjectType()
+			  << " Geo 2 NType: " << ct.o2->getNodeType()
+			  << std::endl;
+#endif
+		facePairs.row(i) << ct.b1 , ct.b2;
+	}
+	return ret > 0;
+}
+
+
+const Eigen::Ref<Eigen::Matrix<CDModel::Scalar, -1, 3>>
+CDModel::vertices() const
+{
+	return model_->eig_cache_vertices;
+}
+
+const Eigen::Ref<Eigen::Matrix<int, -1, 3>>
+CDModel::faces() const
+{
+	return model_->eig_cache_findices;
 }
 
 }

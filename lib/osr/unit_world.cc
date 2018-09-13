@@ -4,7 +4,10 @@
 #include <iostream>
 #include <glm/gtx/io.hpp>
 #include <atomic>
-#include <stdexcept> 
+#include <stdexcept>
+#include <igl/doublearea.h>
+#include <meshbool/join.h>
+#include <tritri/tritri_igl.h>
 
 namespace osr {
 
@@ -584,6 +587,107 @@ UnitWorld::calculateVisibilityMatrix2(ArrayOfStates qs0,
 		}
 	}
 	return ret;
+}
+
+Eigen::Matrix<StateScalar, -1, 1>
+UnitWorld::intersectionRegionSurfaceAreas(ArrayOfStates qs,
+                                          bool qs_are_unit_states)
+{
+	ArrayOfStates qsu = ppToUnitStates(qs, qs_are_unit_states);
+	int Nq = qs.rows();
+	Eigen::Matrix<StateScalar, -1, 1> ret;
+	ret.setZero(Nq);
+
+	Transform envTf = std::get<0>(getCDTransforms(robot_state_));
+
+	CDModel::VMatrix env_V = (envTf * cd_scene_->vertices().transpose()).transpose();
+	auto env_F = cd_scene_->faces();
+
+	auto rob_F = cd_robot_->faces();
+
+	for (int i = 0; i < Nq; i++) {
+		StateVector state = qs.row(i).transpose();
+		Transform robTf = translate_state_to_transform(state);
+		CDModel::VMatrix rob_V = (robTf * cd_robot_->vertices().transpose()).transpose();
+
+		CDModel::VMatrix RV;
+		CDModel::FMatrix RF;
+		mesh_bool(env_V, env_F,
+			  rob_V, rob_F,
+			  igl::MESH_BOOLEAN_TYPE_INTERSECT,
+			  RV, RF);
+		Eigen::VectorXd areas;
+		igl::doublearea(RV, RF, areas);
+		ret(i) = areas.sum();
+	}
+	return ret;
+}
+
+std::tuple<
+	Eigen::Matrix<StateScalar, -1, kActionDimension>, // Position
+	Eigen::Matrix<StateScalar, -1, kActionDimension>, // Force vector
+	Eigen::Matrix<StateScalar, -1, 1>,                // Force magnititude
+	Eigen::Matrix<int, -1, 2>                         // Pairs of triangle indices
+>
+UnitWorld::intersectingSegments(StateVector unitq)
+{
+	Eigen::Matrix<StateScalar, -1, kActionDimension> ret_pos, ret_vec;
+	Eigen::Matrix<StateScalar, -1, 1> ret_mag;
+	Eigen::Matrix<int, -1, 2> face_pairs;
+
+	Transform env_tf;
+	Transform rob_tf;
+	std::tie(env_tf, rob_tf) = getCDTransforms(unitq);
+	if (!CDModel::collideForDetails(*cd_scene_, env_tf, *cd_robot_, rob_tf, face_pairs)) {
+		return std::tie(ret_pos, ret_vec, ret_mag, face_pairs);
+	}
+#if 0
+	std::cerr << "debug: face pairs\n" << face_pairs << std::endl;
+#endif
+	CDModel::VMatrix env_V = (env_tf * cd_scene_->vertices().transpose()).transpose();
+	CDModel::VMatrix rob_V = (rob_tf * cd_robot_->vertices().transpose()).transpose();
+	auto env_F = cd_scene_->faces();
+	auto rob_F = cd_robot_->faces();
+	Eigen::Matrix<StateScalar, -1, 6> col_segs;
+	Eigen::Matrix<int, -1, 1> coplanars;
+	// NOTE: The (rob, env) order should be the same as calling
+	// CDModel::collideForDetails
+	tritri::TriTri(env_V, env_F,
+	               rob_V, rob_F,
+	               face_pairs,
+	               col_segs, coplanars);
+	int m = col_segs.rows();
+	ret_pos = col_segs.block(0, 0, m, 3);
+	ret_vec = col_segs.block(0, 3, m, 3);
+	ret_mag = (ret_vec - ret_pos).array().square().rowwise().sum().sqrt().matrix(); // L2 norm per row
+#if 0
+	ret_pos = 0.5 * (col_segs.block(0, 0, m, 3) + col_segs.block(0, 3, m, 3));
+	ret_vec = col_segs.block(0, 0, m, 3) - col_segs.block(0, 3, m, 3);
+	for (int i = 0; i < m; i++) {
+		// Face Normals (UNnormalized)
+		Eigen::Vector3i rob_face = rob_F.row(face_pairs(i, 0));
+		Eigen::Vector3i env_face = env_F.row(face_pairs(i, 0));
+		Eigen::Vector3d rob_fn = (rob_V.row(rob_face(1)) - rob_V.row(rob_face(0))).cross(rob_V.row(rob_face(2)) - rob_V.row(rob_face(0)));
+		Eigen::Vector3d env_fn = (env_V.row(env_face(1)) - env_V.row(env_face(0))).cross(env_V.row(env_face(2)) - env_V.row(env_face(0)));
+		// Rational: force should be orthogonal w.r.t. intersecting
+		// line segment and the robot's face normal (since robot is
+		// movable)
+		ret_vec.row(i) = rob_fn.cross(ret_vec.row(i)).normalized();
+	}
+#endif
+	return std::tie(ret_pos, ret_vec, ret_mag, face_pairs);
+}
+
+ArrayOfStates
+UnitWorld::ppToUnitStates(const ArrayOfStates& qs,
+                          bool qs_are_unit_states)
+{
+	if (qs_are_unit_states)
+		return qs;
+	ArrayOfStates qsu(qs.rows(), qs.cols());
+	for (int i = 0; i < qs.rows(); i++)
+		qsu.row(i) = translateToUnitState(qs.row(i));
+	return qsu;
 }
 
 }

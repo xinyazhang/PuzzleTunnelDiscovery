@@ -100,6 +100,8 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("translate_from_unit_state", &UnitWorld::translateFromUnitState, py::call_guard<py::gil_scoped_release>())
 		.def("calculate_visibility_matrix", &UnitWorld::calculateVisibilityMatrix, py::call_guard<py::gil_scoped_release>())
 		.def("calculate_visibility_matrix2", &UnitWorld::calculateVisibilityMatrix2, py::call_guard<py::gil_scoped_release>())
+		.def("intersection_region_surface_areas", &UnitWorld::intersectionRegionSurfaceAreas, py::call_guard<py::gil_scoped_release>())
+		.def("intersecting_segments", &UnitWorld::intersectingSegments, py::call_guard<py::gil_scoped_release>())
 		.def_property_readonly("scene_matrix", &UnitWorld::getSceneMatrix)
 		.def_property_readonly("robot_matrix", &UnitWorld::getRobotMatrix);
 #if GPU_ENABLED

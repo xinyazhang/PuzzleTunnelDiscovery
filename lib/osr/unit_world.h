@@ -105,6 +105,18 @@ public:
 	                           ArrayOfStates qs1,
 	                           bool qs1_is_unit_states,
 	                           double verify_magnitude);
+
+	Eigen::Matrix<StateScalar, -1, 1>
+	intersectionRegionSurfaceAreas(ArrayOfStates qs,
+	                               bool qs_are_unit_states);
+
+	std::tuple<
+		Eigen::Matrix<StateScalar, -1, kActionDimension>, // Position
+		Eigen::Matrix<StateScalar, -1, kActionDimension>, // Force vector
+		Eigen::Matrix<StateScalar, -1, 1>,                // Force magnititude
+		Eigen::Matrix<int, -1, 2>                         // Pairs of triangle indices
+	>
+	intersectingSegments(StateVector unitq);
 protected:
 	bool shared_ = false;
 
@@ -121,6 +133,10 @@ protected:
 	Transform perturbate_tf_;
 	Eigen::Vector3d world_rebase_;
 	float scene_scale_ = 1.0f;
+
+	// pp: PreProcess
+	ArrayOfStates ppToUnitStates(const ArrayOfStates& qs,
+	                             bool qs_are_unit_states);
 };
 
 auto glm2Eigen(const glm::mat4& m);
