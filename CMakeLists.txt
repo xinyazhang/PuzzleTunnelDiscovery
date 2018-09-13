@@ -193,6 +193,7 @@ EASYLIB(geopick)
 EASYLIB(mazeinfo)
 EASYLIB(omplaux)
 EASYLIB(goct)
+EASYLIB(tritri)
 
 TARGET_LINK_LIBRARIES(mazeinfo vertcolorply)
 
