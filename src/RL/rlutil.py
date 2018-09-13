@@ -38,6 +38,8 @@ def create_renderer(args, creating_ctx=True):
     r.scaleToUnit()
     r.angleModel(0.0, 0.0)
     r.default_depth = 0.0
+    if args.robcenter is not None:
+        r.enforceRobotCenter(args.robcenter)
 
     if args.view >= 0:
         if args.obview >= 0:

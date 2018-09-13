@@ -579,18 +579,68 @@ class TunnelFinder(RLVisualizer):
         Debugging Routines
         '''
         #TV = np.load('../res/alpha/alpha-1.2.org.tunnel.npz')['TUNNEL_V']
-        TV = np.load('alpha-1.2.org.tunnel.npz')['TUNNEL_V']
+        #TV = np.load('alpha-1.2.org.tunnel.npz')['TUNNEL_V']
+        TV = np.load('alpha-1.2.org.tunnel-more.npz')['TUNNEL_V']
         self.unit_tunnel_v = np.array([self.envir.r.translate_to_unit_state(v) for v in TV])
         self.sample_index = 0
+        np.set_printoptions(precision=18)
+
+        dt = args.amag
+        da = dt
+
+        self.delta_tr = np.array(
+                [
+                    [ dt, 0.0, 0.0],
+                    [-dt, 0.0, 0.0],
+                    [0.0,  dt, 0.0],
+                    [0.0, -dt, 0.0],
+                    [0.0, 0.0,  dt],
+                    [0.0, 0.0, -dt],
+                    [0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0],
+                ])
+        self.delta_aa = np.array(
+                [
+                    [0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0],
+                    [ da, 0.0, 0.0],
+                    [-da, 0.0, 0.0],
+                    [0.0,  da, 0.0],
+                    [0.0, -da, 0.0],
+                    [0.0, 0.0,  da],
+                    [0.0, 0.0, -da],
+                ])
+        self.cr_noneed = 0
+        self.cr_success = 0
+        self.cr_fail = 0
+        self.cr_states = []
+        self.to_cr_states = []
+        self.cr_state_indicators = []
 
     def play(self):
         reanimate(self)
+
+    def sample_generator(self):
+        if self.args.iter > 0:
+            for i in range(self.args.iter):
+                yield i
+        else:
+            while True:
+                yield
 
     def __iter__(self):
         envir = self.envir
         sess = self.sess
         advcore = self.advcore
-        while True:
+        for _ in self.sample_generator():
             q = uw_random.random_state(0.75)
             envir.qstate = q
             if False:
@@ -625,12 +675,13 @@ class TunnelFinder(RLVisualizer):
                     yield envir.vstate[0][self.gview]
                     input("######## PRESS ENTER FOR THE NEXT TUPLE ########")
                 continue # Skip the remaining
-            DEBUG3 = True
+            DEBUG3 = False
             if DEBUG3:
                 for q in self.unit_tunnel_v:
                     envir.qstate = q
                     yield envir.vstate[0][self.gview]
-            DEBUG = True
+                continue
+            DEBUG = False
             if DEBUG:
                 yield envir.vstate[0][self.gview]
                 distances = pyosr.multi_distance(q, self.unit_tunnel_v)
@@ -639,9 +690,54 @@ class TunnelFinder(RLVisualizer):
                 envir.qstate = close
                 yield envir.vstate[0][self.gview]
                 continue
-            for i in range(5):
+            assert self.args.sampleout, '--sampleout is required for checking CR results'
+            for i in range(3):
                 vstate = envir.vstate
                 yield vstate[0][self.gview]
+                if envir.r.is_valid_state(envir.qstate):
+                    print("===== Current State is Valid ====")
+                    if i == 1: # Only capture the state after first movement
+                        self.cr_noneed += 1
+                else:
+                    print("!!!!! Current State is not Valid ====")
+                    print("!DEBUG UNIT: {}".format(envir.qstate))
+                    nustate = envir.r.translate_from_unit_state(envir.qstate)
+                    print("!DEBUG ORIGINAL: {}".format(nustate))
+                    SEARCH_NUMERICAL = False
+                    SEARCH_SA_FORCE = True
+                    if SEARCH_NUMERICAL and i == 1: # Only capture the state after first movement
+                        early_exit = False
+                        current = envir.qstate
+                        self.to_cr_states.append(current)
+                        for k in range(32):
+                            nexts = []
+                            for tr,aa in zip(self.delta_tr, self.delta_aa):
+                                nexts.append(pyosr.apply(current, tr, aa))
+                            nexts = np.array(nexts)
+                            SAs = envir.r.intersection_region_surface_areas(nexts, True)
+                            print(SAs)
+                            min_index = np.argmin(SAs)
+                            current = nexts[min_index]
+                            envir.qstate = current
+                            vstate = envir.vstate
+                            yield vstate[0][self.gview]
+                            if envir.r.is_valid_state(envir.qstate):
+                                early_exit = True
+                                break
+                        if early_exit:
+                            self.cr_success += 1
+                            self.cr_state_indicators.append(1)
+                        else:
+                            self.cr_fail += 1
+                            self.cr_state_indicators.append(-1)
+                        self.cr_states.append(envir.qstate)
+                        self.sample_index += 1
+                    if SEARCH_SA_FORCE and i == 1: # Force from optimizing surface area
+                        # TODO: Unfinished, just print the force mag and direction
+                        tup = envir.r.force_from_intersecting_surface_area(envir.qstate)
+                        print('Force Pos:\n{}'.format(tup[0]))
+                        print('Force Direction:\n{}'.format(tup[1]))
+                        print('Force Mag:\n{}'.format(tup[2]))
                 dic = {
                         advcore.rgb_tensor: [vstate[0]],
                         advcore.dep_tensor: [vstate[1]],
@@ -650,11 +746,17 @@ class TunnelFinder(RLVisualizer):
                 disp_pred = disp_pred[0][0] # first batch first view for [B,V,...]
 
                 nstate = pyosr.apply(envir.qstate, disp_pred[:3], disp_pred[3:])
+                distances = pyosr.multi_distance(q, self.unit_tunnel_v)
+                ni = np.argmin(distances)
+                close = self.unit_tunnel_v[ni]
                 # nstate = envir.r.translate_to_unit_state(nstate_raw)
                 print("Prediction {}".format(disp_pred))
                 print("Next (Unit) {}".format(nstate))
+                print("Error {}".format(pyosr.distance(nstate, close)))
                 envir.qstate = nstate
-                input("########## PRESS ENTER TO CONTINUE ##########")
+                # input("########## PRESS ENTER TO CONTINUE ##########")
+        print("CR No Need {}\nCR SUCCESS {}\nCR FAIL{}".format(self.cr_noneed, self.cr_success, self.cr_fail))
+        np.savez(self.args.sampleout, CRQS=self.cr_states, TOCRQS=self.to_cr_states, CRI=self.cr_state_indicators)
 
 def create_visualizer(args, g, global_step):
     if args.qlearning_with_gt:

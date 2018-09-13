@@ -3,7 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import math
-import aniconf12 as aniconf
+# import aniconf12 as aniconf
+import aniconf_elk1_0 as aniconf
 import uw_random
 
 def interpolate(pkey, nkey, tau):
@@ -17,10 +18,12 @@ def reanimate():
     r.avi = True
     r.pbufferWidth = r.pbufferHeight = 512
     r.setup()
-    # r.loadModelFromFile(aniconf.env_fn)
-    # r.loadRobotFromFile(aniconf.rob_fn)
-    r.loadModelFromFile(aniconf.env_wt_fn)
-    r.loadRobotFromFile(aniconf.rob_wt_fn)
+    if not hasattr(aniconf, 'env_wt_fn'):
+        r.loadModelFromFile(aniconf.env_fn)
+        r.loadRobotFromFile(aniconf.rob_fn)
+    else:
+        r.loadModelFromFile(aniconf.env_wt_fn)
+        r.loadRobotFromFile(aniconf.rob_wt_fn)
     if hasattr(aniconf, 'rob_ompl_center'):
         r.enforceRobotCenter(aniconf.rob_ompl_center)
 

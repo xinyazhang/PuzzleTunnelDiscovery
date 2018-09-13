@@ -9,6 +9,10 @@ def get_parser():
             default=aniconf.env_fn)
     parser.add_argument('--robgeo', help='Path to robot geometry',
             default=aniconf.rob_fn)
+    parser.add_argument('--robcenter', help='Center of robot geometry',
+            type=float,
+            nargs='*',
+            default=None)
     parser.add_argument('--ckptdir', help='Path for checkpoint files',
             default=None)
     parser.add_argument('--sampleout', help='Path to store generated samples',
@@ -310,6 +314,7 @@ tunnel_finder: train a model to locate a milestone in the tunnel w.r.t. a given 
 def parse():
     parser = get_parser()
     args = parser.parse_args()
+    assert args.robcenter is None or len(args.robcenter) == 3, "--robcenter must be none or 3"
     if args.visionformula in [1,2,3,4]:
         args.elu = True
         args.res = 224
