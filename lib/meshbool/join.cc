@@ -13,3 +13,15 @@ void mesh_bool(
 			boolean_type,
 			VC,FC);
 }
+
+void mesh_bool(const Eigen::Matrix<double, -1, 3>& VA, const Eigen::Matrix<int, -1, 3>& FA,
+               const Eigen::Matrix<double, -1, 3>& VB, const Eigen::Matrix<int, -1, 3>& FB,
+               igl::MeshBooleanType boolean_type,
+               Eigen::Matrix<double, -1, 3>& VC, Eigen::Matrix<int, -1, 3>& FC)
+{
+	igl::copyleft::cgal::mesh_boolean(
+			VA,FA,
+			VB,FB,
+			boolean_type,
+			VC,FC);
+}

@@ -10,4 +10,9 @@ void mesh_bool(
 		igl::MeshBooleanType,
 		Eigen::MatrixXd& VC, Eigen::MatrixXi& FC);
 
+void mesh_bool(const Eigen::Matrix<double, -1, 3>& VA, const Eigen::Matrix<int, -1, 3>& FA,
+               const Eigen::Matrix<double, -1, 3>& VB, const Eigen::Matrix<int, -1, 3>& FB,
+               igl::MeshBooleanType,
+               Eigen::Matrix<double, -1, 3>& VC, Eigen::Matrix<int, -1, 3>& FC);
+
 #endif
