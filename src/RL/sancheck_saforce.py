@@ -1,0 +1,41 @@
+#!/usr/bin/env python2
+
+import os
+import sys
+sys.path.append(os.getcwd())
+
+import pyosr
+import numpy as np
+import math
+import aniconf12 as aniconf
+
+def _create_r():
+    pyosr.init()
+    dpy = pyosr.create_display()
+    glctx = pyosr.create_gl_context(dpy)
+    r = pyosr.Renderer()
+    r.setup()
+    r.loadModelFromFile(aniconf.env_wt_fn)
+    r.loadRobotFromFile(aniconf.rob_wt_fn)
+    r.enforceRobotCenter(aniconf.rob_ompl_center)
+    r.scaleToUnit()
+    r.angleModel(0.0, 0.0)
+    r.default_depth = 0.0
+    r.views = np.array([[0.0, 0.0]], dtype=np.float32)
+    return r
+
+def main():
+    r = _create_r()
+    q = np.array([0.19084715098142624, 0.41685351729393005, 0.23655708134174347, 0.9332677282828477, -0.18945885280431052, 0.20543615363339196, -0.2256383770996524])
+    print(r.intersecting_segments(q))
+
+"""
+def usage():
+    print('''
+Calculate the visibility matrix of given input files.
+    ''')
+    print("Usage: visibility-finder.py <npz file outputed from rl-precalcmap.py> <output npz file>")
+"""
+
+if __name__ == '__main__':
+    main()
