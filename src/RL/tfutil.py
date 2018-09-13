@@ -19,3 +19,11 @@ def axis_angle_geodesic_distance(aa0, aa1, keepdims=False):
     # a2,b2,c2,d2 = tf.split(q1, 1, axis=-1)
     cos_half_theta = tf.reduce_sum(tf.multiply(q0, q1), axis=-1, keepdims=keepdims)
     return 2.0 * tf.acos(tf.clip_by_value(cos_half_theta, -1.0, 1.0))
+
+def axis_angle_geodesic_distance_debug(aa0, aa1):
+    q0 = aa_to_w_first_quaternion(aa0)
+    q1 = aa_to_w_first_quaternion(aa1)
+    cos_half_theta = tf.reduce_sum(tf.multiply(q0, q1), axis=-1, keepdims=False)
+    distance = 2.0 * tf.acos(tf.clip_by_value(cos_half_theta, -1.0, 1.0))
+    # distance = 2.0 * tf.acos(cos_half_theta)
+    return distance, q0, q1, cos_half_theta
