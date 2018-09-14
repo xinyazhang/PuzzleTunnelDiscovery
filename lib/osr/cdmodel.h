@@ -49,6 +49,9 @@ public:
 
 	const Eigen::Ref<FMatrix>
 	faces() const;
+
+	VMatrix
+	faceNormals(const Eigen::Matrix<int, -1, 1>&) const;
 };
 
 }

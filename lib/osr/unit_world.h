@@ -111,12 +111,31 @@ public:
 	                               bool qs_are_unit_states);
 
 	std::tuple<
-		Eigen::Matrix<StateScalar, -1, kActionDimension>, // Position
-		Eigen::Matrix<StateScalar, -1, kActionDimension>, // Force vector
-		Eigen::Matrix<StateScalar, -1, 1>,                // Force magnititude
-		Eigen::Matrix<int, -1, 2>                         // Pairs of triangle indices
+		Eigen::Matrix<StateScalar, -1, kActionDimension>, // Segment beginnings
+		Eigen::Matrix<StateScalar, -1, kActionDimension>, // Segment ends
+		Eigen::Matrix<StateScalar, -1, 1>,                // Segment magnititudes
+		Eigen::Matrix<int, -1, 2>                         // (env, rob) face indices
 	>
 	intersectingSegments(StateVector unitq);
+
+	Eigen::Matrix<StateScalar, -1, kActionDimension>
+	getRobotFaceNormalsFromIndices(const Eigen::Matrix<int, -1, 1>&);
+	Eigen::Matrix<StateScalar, -1, kActionDimension>
+	getRobotFaceNormalsFromIndices(const Eigen::Matrix<int, -1, 2>&);
+
+	Eigen::Matrix<StateScalar, -1, kActionDimension>
+	getSceneFaceNormalsFromIndices(const Eigen::Matrix<int, -1, 1>&);
+	Eigen::Matrix<StateScalar, -1, kActionDimension>
+	getSceneFaceNormalsFromIndices(const Eigen::Matrix<int, -1, 2>&);
+
+	std::tuple<
+		Eigen::Matrix<StateScalar, -1, kActionDimension>, // Force apply position
+		Eigen::Matrix<StateScalar, -1, kActionDimension>  // Force direction
+	>
+	forceDirectionFromIntersectingSegments(
+		const Eigen::Matrix<StateScalar, -1, kActionDimension>& sbegins,
+		const Eigen::Matrix<StateScalar, -1, kActionDimension>& sends,
+		const Eigen::Matrix<int, -1, 2> faces);
 protected:
 	bool shared_ = false;
 

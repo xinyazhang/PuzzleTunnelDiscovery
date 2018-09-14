@@ -2,6 +2,7 @@
 #include "scene.h"
 #include <iostream>
 #include <fcl/fcl.h>
+#include <igl/per_face_normals.h>
 
 namespace osr {
 struct CDModel::CDModelData {
@@ -22,6 +23,7 @@ struct CDModel::CDModelData {
 
 	VMatrix eig_cache_vertices;
 	FMatrix eig_cache_findices; // Face INDICES -> findices
+	VMatrix eig_cache_fnormals;
 
 	void cache_eig_forms()
 	{
@@ -37,6 +39,9 @@ struct CDModel::CDModelData {
 			eig_cache_findices(i, 1) = model.tri_indices[i][1];
 			eig_cache_findices(i, 2) = model.tri_indices[i][2];
 		}
+		igl::per_face_normals(eig_cache_vertices,
+		                      eig_cache_findices,
+		                      eig_cache_fnormals);
 	}
 };
 
@@ -189,6 +194,27 @@ const Eigen::Ref<Eigen::Matrix<int, -1, 3>>
 CDModel::faces() const
 {
 	return model_->eig_cache_findices;
+}
+
+CDModel::VMatrix
+CDModel::faceNormals(const Eigen::Matrix<int, -1, 1>& fi) const
+{
+	size_t NF = fi.rows();
+	VMatrix ret;
+	ret.resize(NF, 3);
+#if 0
+	const auto& V = model_->eig_cache_vertices;
+	const auto& F = model_->eig_cache_findices;
+	for (size_t i = 0; i < N; i++) {
+		Eigen::Vector3i vi = F.row(fi(i));
+		ret.row(i) = (V.row(vi(1)) - V.row(vi(0))).cross(V.row(vi(2)) - V.row(vi(0))).normalized();
+	}
+#else
+	const auto& N = model_->eig_cache_fnormals;
+	for (size_t i = 0; i < NF; i++)
+		ret.row(i) = N.row(fi(i));
+#endif
+	return ret;
 }
 
 }

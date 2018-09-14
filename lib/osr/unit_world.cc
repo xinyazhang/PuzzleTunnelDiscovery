@@ -6,6 +6,7 @@
 #include <atomic>
 #include <stdexcept>
 #include <igl/doublearea.h>
+#include <igl/cross.h>
 #include <meshbool/join.h>
 #include <tritri/tritri_igl.h>
 
@@ -676,6 +677,51 @@ UnitWorld::intersectingSegments(StateVector unitq)
 	}
 #endif
 	return std::tie(ret_pos, ret_vec, ret_mag, face_pairs);
+}
+
+Eigen::Matrix<StateScalar, -1, kActionDimension>
+UnitWorld::getRobotFaceNormalsFromIndices(const Eigen::Matrix<int, -1, 1>& faces)
+{
+	return cd_robot_->faceNormals(faces);
+}
+
+Eigen::Matrix<StateScalar, -1, kActionDimension>
+UnitWorld::getRobotFaceNormalsFromIndices(const Eigen::Matrix<int, -1, 2>& faces)
+{
+	return cd_robot_->faceNormals(faces.col(1));
+}
+
+Eigen::Matrix<StateScalar, -1, kActionDimension>
+UnitWorld::getSceneFaceNormalsFromIndices(const Eigen::Matrix<int, -1, 1>& faces)
+{
+	return cd_scene_->faceNormals(faces);
+}
+
+Eigen::Matrix<StateScalar, -1, kActionDimension>
+UnitWorld::getSceneFaceNormalsFromIndices(const Eigen::Matrix<int, -1, 2>& faces)
+{
+	return cd_scene_->faceNormals(faces.col(0));
+}
+
+std::tuple<
+	Eigen::Matrix<StateScalar, -1, kActionDimension>, // Force apply position
+	Eigen::Matrix<StateScalar, -1, kActionDimension>  // Force direction
+>
+UnitWorld::forceDirectionFromIntersectingSegments(
+	const Eigen::Matrix<StateScalar, -1, kActionDimension>& sbegins,
+	const Eigen::Matrix<StateScalar, -1, kActionDimension>& sends,
+	const Eigen::Matrix<int, -1, 2> faces)
+{
+	Eigen::Matrix<StateScalar, -1, kActionDimension> ret_pos, ret_dir;
+	ret_pos = (sbegins + sends) * 0.5;
+	Eigen::Matrix<StateScalar, -1, kActionDimension> svec = sends - sbegins;
+	igl::cross(svec, getRobotFaceNormalsFromIndices(faces), ret_dir);
+	Eigen::Matrix<StateScalar, -1, 3> enormal = getSceneFaceNormalsFromIndices(faces);
+	Eigen::Array<StateScalar, -1, 1> dots = (ret_dir.array() * enormal.array()).rowwise().sum().sign();
+
+	ret_dir = ret_dir.array().colwise() * dots;
+
+	return std::tie(ret_pos, ret_dir);
 }
 
 ArrayOfStates

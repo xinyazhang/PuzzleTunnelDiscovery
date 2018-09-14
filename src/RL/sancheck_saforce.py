@@ -27,7 +27,20 @@ def _create_r():
 def main():
     r = _create_r()
     q = np.array([0.19084715098142624, 0.41685351729393005, 0.23655708134174347, 0.9332677282828477, -0.18945885280431052, 0.20543615363339196, -0.2256383770996524])
-    print(r.intersecting_segments(q))
+    tup = r.intersecting_segments(q)
+    print(tup[2])
+    fposs,fdirs = r.force_direction_from_intersecting_segments(tup[0], tup[1], tup[3])
+    print(fposs)
+    print(fdirs)
+    env_normals = r.scene_face_normals_from_index_pairs(tup[3])
+    wrong_direction = False
+    for fdir,en in zip(fdirs, env_normals):
+        if np.dot(fdir, en) < 0.0:
+            print("San check 1: force direction w.r.t. face normal failed.")
+            wrong_direction = True
+            break
+    if not wrong_direction:
+        print("San check 1: force direction w.r.t. face normal passed.")
 
 """
 def usage():
