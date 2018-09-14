@@ -121,9 +121,11 @@ void fat::mkfatter(
 	auto F = convert3<Vec3I>(inF);
 	
 	auto tf = Transform::createLinearTransform(1.0/scale_factor);
-	double halfwidth = width * scale_factor;
+	double halfwidth = std::abs(width) * scale_factor;
+#if 0
 	if (halfwidth <= 0.0)
 		halfwidth = 2.0;
+#endif
 	auto grid = meshToLevelSet<openvdb::FloatGrid>(*tf, V, F, halfwidth);
 	std::vector<Vec3s> OV;
 	std::vector<Vec3I> OF;
