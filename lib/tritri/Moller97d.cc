@@ -14,9 +14,9 @@
  * Here is a version withouts divisions (a little faster)
  * int NoDivTriTriIsect(double V0[3],double V1[3],double V2[3],
  *                      double U0[3],double U1[3],double U2[3]);
- * 
+ *
  * This version computes the line of intersection as well (if they are not coplanar):
- * int tri_tri_intersect_with_isectline(double V0[3],double V1[3],double V2[3], 
+ * int tri_tri_intersect_with_isectline(double V0[3],double V1[3],double V2[3],
  *				        double U0[3],double U1[3],double U2[3],int *coplanar,
  *				        double isectpt1[3],double isectpt2[3]);
  * coplanar returns whether the tris are coplanar
@@ -28,7 +28,7 @@
 //#define FABS(x) ((double)fabs(x))        /* implement as is fastest on your machine */
 #define FABS(x) (x>=0?x:-x)        /* implement as is fastest on your machine */
 
-/* if USE_EPSILON_TEST is true then we do a check: 
+/* if USE_EPSILON_TEST is true then we do a check:
          if |dv|<EPSILON then dv=0.0;
    else no check is done (which is less robust)
 */
@@ -44,13 +44,13 @@
 
 #define DOT(v1,v2) (v1[0]*v2[0]+v1[1]*v2[1]+v1[2]*v2[2])
 
-#define SUB(dest,v1,v2) dest[0]=v1[0]-v2[0]; dest[1]=v1[1]-v2[1]; dest[2]=v1[2]-v2[2]; 
+#define SUB(dest,v1,v2) dest[0]=v1[0]-v2[0]; dest[1]=v1[1]-v2[1]; dest[2]=v1[2]-v2[2];
 
-#define ADD(dest,v1,v2) dest[0]=v1[0]+v2[0]; dest[1]=v1[1]+v2[1]; dest[2]=v1[2]+v2[2]; 
+#define ADD(dest,v1,v2) dest[0]=v1[0]+v2[0]; dest[1]=v1[1]+v2[1]; dest[2]=v1[2]+v2[2];
 
 #define MULT(dest,v,factor) dest[0]=factor*v[0]; dest[1]=factor*v[1]; dest[2]=factor*v[2];
 
-#define SET(dest,src) dest[0]=src[0]; dest[1]=src[1]; dest[2]=src[2]; 
+#define SET(dest,src) dest[0]=src[0]; dest[1]=src[1]; dest[2]=src[2];
 
 /* sort so that a<=b */
 #define SORT(a,b)       \
@@ -102,7 +102,7 @@
 
 /* this edge to edge test is based on Franlin Antonio's gem:
    "Faster Line Segment Intersection", in Graphics Gems III,
-   pp. 199-202 */ 
+   pp. 199-202 */
 #define EDGE_EDGE_TEST(V0,U0,U1)                      \
   Bx=U0[i0]-U1[i0];                                   \
   By=U0[i1]-U1[i1];                                   \
@@ -121,7 +121,7 @@
     {                                                 \
       if(e<=0 && e>=f) return 1;                      \
     }                                                 \
-  }                                
+  }
 
 #define EDGE_AGAINST_TRI_EDGES(V0,V1,U0,U1,U2) \
 {                                              \
@@ -174,7 +174,7 @@ int coplanar_tri_tri(const double N[3],
    A[2]=FABS(N[2]);
    if(A[0]>A[1])
    {
-      if(A[0]>A[2])  
+      if(A[0]>A[2])
       {
           i0=1;      /* A[0] is greatest */
           i1=2;
@@ -190,20 +190,20 @@ int coplanar_tri_tri(const double N[3],
       if(A[2]>A[1])
       {
           i0=0;      /* A[2] is greatest */
-          i1=1;                                           
+          i1=1;
       }
       else
       {
           i0=0;      /* A[1] is greatest */
           i1=2;
       }
-    }               
-                
+    }
+
     /* test all edges of triangle 1 against the edges of triangle 2 */
     EDGE_AGAINST_TRI_EDGES(V0,V1,U0,U1,U2);
     EDGE_AGAINST_TRI_EDGES(V1,V2,U0,U1,U2);
     EDGE_AGAINST_TRI_EDGES(V2,V0,U0,U1,U2);
-                
+
     /* finally, test if tri1 is totally contained in tri2 or vice versa */
     POINT_IN_TRI(V0,U0,U1,U2);
     POINT_IN_TRI(U0,V0,V1,V2);
@@ -270,7 +270,7 @@ int tri_tri_intersect(const double V0[3], const double V1[3], const double V2[3]
 
   dv0dv1=dv0*dv1;
   dv0dv2=dv0*dv2;
-        
+
   if(dv0dv1>0.0f && dv0dv2>0.0f) /* same sign on all of them + not equal 0 ? */
     return 0;                    /* no intersection occurs */
 
@@ -289,7 +289,7 @@ int tri_tri_intersect(const double V0[3], const double V1[3], const double V2[3]
   vp0=V0[index];
   vp1=V1[index];
   vp2=V2[index];
-  
+
   up0=U0[index];
   up1=U1[index];
   up2=U2[index];
@@ -468,19 +468,19 @@ int NoDivTriTriIsect(const double V0[3], const double V1[3], const double V2[3],
 
 void isect2(const double VTX0[3], const double VTX1[3], const double VTX2[3],
             double VV0,double VV1,double VV2,
-	    double D0,double D1,double D2, double *isect0, double *isect1, double isectpoint0[3], double isectpoint1[3]) 
+	    double D0,double D1,double D2, double *isect0, double *isect1, double isectpoint0[3], double isectpoint1[3])
 {
-  double tmp=D0/(D0-D1);          
+  double tmp=D0/(D0-D1);
   double diff[3];
-  *isect0=VV0+(VV1-VV0)*tmp;         
-  SUB(diff,VTX1,VTX0);              
-  MULT(diff,diff,tmp);               
-  ADD(isectpoint0,diff,VTX0);        
-  tmp=D0/(D0-D2);                    
-  *isect1=VV0+(VV2-VV0)*tmp;          
-  SUB(diff,VTX2,VTX0);                   
-  MULT(diff,diff,tmp);                 
-  ADD(isectpoint1,VTX0,diff);          
+  *isect0=VV0+(VV1-VV0)*tmp;
+  SUB(diff,VTX1,VTX0);
+  MULT(diff,diff,tmp);
+  ADD(isectpoint0,diff,VTX0);
+  tmp=D0/(D0-D2);
+  *isect1=VV0+(VV2-VV0)*tmp;
+  SUB(diff,VTX2,VTX0);
+  MULT(diff,diff,tmp);
+  ADD(isectpoint1,VTX0,diff);
 }
 
 
@@ -490,8 +490,8 @@ void isect2(const double VTX0[3], const double VTX1[3], const double VTX2[3],
               isect0=VV0+(VV1-VV0)*tmp;          \
 	      SUB(diff,VTX1,VTX0);               \
 	      MULT(diff,diff,tmp);               \
-              ADD(isectpoint0,diff,VTX0);        \ 
-              tmp=D0/(D0-D2);                    
+              ADD(isectpoint0,diff,VTX0);        \
+              tmp=D0/(D0-D2);
 /*              isect1=VV0+(VV2-VV0)*tmp;          \ */
 /*              SUB(diff,VTX2,VTX0);               \     */
 /*              MULT(diff,diff,tmp);               \   */
@@ -505,33 +505,33 @@ int compute_intervals_isectline(const double VERT0[3], const double VERT1[3], co
                                 double *isect0,double *isect1,
                                 double isectpoint0[3],double isectpoint1[3])
 {
-  if(D0D1>0.0f)                                        
-  {                                                    
-    /* here we know that D0D2<=0.0 */                  
+  if(D0D1>0.0f)
+  {
+    /* here we know that D0D2<=0.0 */
     /* that is D0, D1 are on the same side, D2 on the other or on the plane */
     isect2(VERT2,VERT0,VERT1,VV2,VV0,VV1,D2,D0,D1,isect0,isect1,isectpoint0,isectpoint1);
-  } 
-  else if(D0D2>0.0f)                                   
-    {                                                   
-    /* here we know that d0d1<=0.0 */             
+  }
+  else if(D0D2>0.0f)
+    {
+    /* here we know that d0d1<=0.0 */
     isect2(VERT1,VERT0,VERT2,VV1,VV0,VV2,D1,D0,D2,isect0,isect1,isectpoint0,isectpoint1);
-  }                                                  
-  else if(D1*D2>0.0f || D0!=0.0f)   
-  {                                   
+  }
+  else if(D1*D2>0.0f || D0!=0.0f)
+  {
     /* here we know that d0d1<=0.0 or that D0!=0.0 */
-    isect2(VERT0,VERT1,VERT2,VV0,VV1,VV2,D0,D1,D2,isect0,isect1,isectpoint0,isectpoint1);   
-  }                                                  
-  else if(D1!=0.0f)                                  
-  {                                               
-    isect2(VERT1,VERT0,VERT2,VV1,VV0,VV2,D1,D0,D2,isect0,isect1,isectpoint0,isectpoint1); 
-  }                                         
-  else if(D2!=0.0f)                                  
-  {                                                   
-    isect2(VERT2,VERT0,VERT1,VV2,VV0,VV1,D2,D0,D1,isect0,isect1,isectpoint0,isectpoint1);     
-  }                                                 
-  else                                               
-  {                                                   
-    /* triangles are coplanar */    
+    isect2(VERT0,VERT1,VERT2,VV0,VV1,VV2,D0,D1,D2,isect0,isect1,isectpoint0,isectpoint1);
+  }
+  else if(D1!=0.0f)
+  {
+    isect2(VERT1,VERT0,VERT2,VV1,VV0,VV2,D1,D0,D2,isect0,isect1,isectpoint0,isectpoint1);
+  }
+  else if(D2!=0.0f)
+  {
+    isect2(VERT2,VERT0,VERT1,VV2,VV0,VV1,D2,D0,D1,isect0,isect1,isectpoint0,isectpoint1);
+  }
+  else
+  {
+    /* triangles are coplanar */
     return 1;
   }
   return 0;
@@ -543,7 +543,7 @@ int compute_intervals_isectline(const double VERT0[3], const double VERT1[3], co
     /* here we know that D0D2<=0.0 */                   \
     /* that is D0, D1 are on the same side, D2 on the other or on the plane */ \
     isect2(VERT2,VERT0,VERT1,VV2,VV0,VV1,D2,D0,D1,&isect0,&isect1,isectpoint0,isectpoint1);          \
-  }                                                     
+  }
 #if 0
   else if(D0D2>0.0f)                                    \
   {                                                     \
@@ -590,7 +590,7 @@ int tri_tri_intersect_with_isectline(const double V0[3], const double V1[3], con
   double b,c,max;
   double tmp,diff[3];
   int smallest1,smallest2;
-  
+
   /* compute plane equation of triangle(V0,V1,V2) */
   SUB(E1,V1,V0);
   SUB(E2,V2,V0);
@@ -635,7 +635,7 @@ int tri_tri_intersect_with_isectline(const double V0[3], const double V1[3], con
 
   dv0dv1=dv0*dv1;
   dv0dv2=dv0*dv2;
-        
+
   if(dv0dv1>0.0f && dv0dv2>0.0f) /* same sign on all of them + not equal 0 ? */
     return 0;                    /* no intersection occurs */
 
@@ -654,7 +654,7 @@ int tri_tri_intersect_with_isectline(const double V0[3], const double V1[3], con
   vp0=V0[index];
   vp1=V1[index];
   vp2=V2[index];
-  
+
   up0=U0[index];
   up1=U1[index];
   up2=U2[index];
@@ -662,7 +662,7 @@ int tri_tri_intersect_with_isectline(const double V0[3], const double V1[3], con
   /* compute interval for triangle 1 */
   *coplanar=compute_intervals_isectline(V0,V1,V2,vp0,vp1,vp2,dv0,dv1,dv2,
 				       dv0dv1,dv0dv2,&isect1[0],&isect1[1],isectpointA1,isectpointA2);
-  if(*coplanar) return coplanar_tri_tri(N1,V0,V1,V2,U0,U1,U2);     
+  if(*coplanar) return coplanar_tri_tri(N1,V0,V1,V2,U0,U1,U2);
 
 
   /* compute interval for triangle 2 */
@@ -700,12 +700,12 @@ int tri_tri_intersect_with_isectline(const double V0[3], const double V1[3], con
     if(isect2[1]>isect1[1])
     {
       if(smallest1==0) { SET(isectpt2,isectpointA2); }
-      else { SET(isectpt2,isectpointA1); }      
+      else { SET(isectpt2,isectpointA1); }
     }
     else
     {
       if(smallest2==0) { SET(isectpt2,isectpointB2); }
-      else { SET(isectpt2,isectpointB1); } 
+      else { SET(isectpt2,isectpointB1); }
     }
   }
   return 1;
