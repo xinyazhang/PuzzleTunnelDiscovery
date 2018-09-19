@@ -78,8 +78,11 @@ def create_trainer(args, global_step, batch_normalization):
                 args=args,
                 learning_rate=1e-4,
                 batch_normalization=bnorm)
-    elif args.train in ['tunnel_finder']:
-        TRAINER = tunnel.TunnelFinderTrainer
+    elif args.train in ['tunnel_finder', 'tunnel_finder_twin1']:
+        if args.train == 'tunnel_finder':
+            TRAINER = tunnel.TunnelFinderTrainer
+        else:
+            TRAINER = tunnel.TunnelFinderTwinTrainer
         trainer = TRAINER(
                 advcore=advcore,
                 args=args,

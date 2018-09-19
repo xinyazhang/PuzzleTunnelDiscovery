@@ -26,7 +26,7 @@ class TunnelFinderCore(object):
         self.dep_tensor = tf.placeholder(tf.float32, shape=common_shape+[1], name='DepPh')
 
         assert self.view_num == 1 or args.sharedmultiview, "must be shared multiview, or single view"
-        assert args.ferev == 13, 'Assumes --ferev 13 (implied by --visionformula 4)'
+        assert args.ferev in [11, 13], 'Assumes --ferev 11 or 13 (implied by --visionformula )'
         # Let's try ResNet 18 True
         self.feature_extractor = vision.FeatureExtractorResNet(
                 config.SV_RESNET18_TRUE,
@@ -54,7 +54,8 @@ class TunnelFinderTrainer(object):
                  advcore,
                  args,
                  learning_rate,
-                 batch_normalization=None):
+                 batch_normalization=None,
+                 build_summary_op=True):
         assert args.samplein, '--train tunnel_finder needs --samplein to indicate the tunnel vertices'
         self._tunnel_v = np.load(args.samplein)['TUNNEL_V']
         self.unit_tunnel_v = None
@@ -84,7 +85,13 @@ class TunnelFinderTrainer(object):
                 self.train_op = self.optimizer.minimize(self.loss, global_step=global_step)
         else:
             self.train_op = self.optimizer.minimize(self.loss, global_step=global_step)
-        ckpt_dir = args.ckptdir
+        if build_summary_op:
+            self.build_summary_op()
+
+        self.sample_index = 0
+
+    def build_summary_op(self):
+        ckpt_dir = self.args.ckptdir
         if ckpt_dir is not None:
             self.summary_op = tf.summary.merge_all()
             self.train_writer = tf.summary.FileWriter(ckpt_dir + '/summary', tf.get_default_graph())
@@ -92,14 +99,15 @@ class TunnelFinderTrainer(object):
             self.summary_op = None
             self.train_writer = None
 
-        self.sample_index = 0
-
     @property
     def total_iter(self):
         return self.args.iter
 
-    def _sample_one(self, envir):
-        q = uw_random.random_state(0.75)
+    def _sample_one(self, envir, istate=None):
+        if istate is None:
+            q = uw_random.random_state(0.75)
+        else:
+            q = istate
         if self.unit_tunnel_v is None:
             self.unit_tunnel_v = np.array([envir.r.translate_to_unit_state(v) for v in self._tunnel_v])
         envir.qstate = q
@@ -155,8 +163,120 @@ class TunnelFinderTrainer(object):
         else:
             sess.run(self.train_op, feed_dict=dic)
 
+class TunnelFinderTwin1(TunnelFinderCore):
+
+    def __init__(self, learning_rate, args, batch_normalization=None):
+        super(TunnelFinderTwin1, self).__init__(learning_rate=learning_rate,
+                args=args, batch_normalization=batch_normalization)
+
+        self.coarse_action = self.action_tensor
+        self.coarse_rgb = self.rgb_tensor
+        self.coarse_dep = self.dep_tensor
+        self.fine_action = self.action_tensor
+        self.fine_rgb = self.rgb_tensor
+        self.fine_dep = self.dep_tensor
+
+        self._coarse_net = self._finder_net
+        self.coarse_pred = self.finder_pred
+        naming = 'TunnelFinderNet_Fine'
+        self._fine_net = vision.ConvApplier(None, args.polhidden + [self.action_space_dimension], naming, args.elu)
+        self._fine_params, self.fine_pred = self._fine_net.infer(self.joint_featvec)
+
+    '''
+    Stub property
+    '''
+    @property
+    def softmax_policy(self):
+        return 0
+
+class TunnelFinderTwinTrainer(TunnelFinderTrainer):
+
+    def __init__(self,
+                 advcore,
+                 args,
+                 learning_rate,
+                 batch_normalization=None):
+        super(TunnelFinderTwinTrainer, self).__init__(
+                advcore=advcore,
+                args=args,
+                learning_rate=learning_rate,
+                batch_normalization=batch_normalization,
+                build_summary_op=False) # Do not build summary in super class
+
+        self.coarse_bag = {
+                'rgb': advcore.coarse_rgb,
+                'dep': advcore.coarse_dep,
+                'dq': advcore.coarse_action,
+                }
+        self.fine_bag = {
+                'rgb': advcore.fine_rgb,
+                'dep': advcore.fine_dep,
+                'dq': advcore.fine_action,
+                }
+        self.coarse_loss = self.loss
+        self.fine_loss = tf.losses.mean_squared_error(advcore.fine_action, advcore.fine_pred)
+        tf.summary.scalar('coarse_loss', self.coarse_loss)
+        tf.summary.scalar('fine_loss', self.fine_loss)
+        self.coarse_train_op = self.train_op
+        assert batch_normalization is None
+        self.fine_train_op = self.optimizer.minimize(self.fine_loss, global_step=self.global_step)
+        self.build_summary_op() # build summary op here
+
+    def ndic_bag_inner_join(self, ndic, bag):
+        dic = {}
+        for k in bag.keys():
+            dic[bag[k]] = ndic[k]
+        return dic
+
+    def train(self, envir, sess, tid=None, tmax=-1):
+        advcore = self.advcore
+        '''
+        Train coarse net
+        '''
+        samples = [self._sample_one(envir) for i in range(self.args.batch)]
+
+        batch_rgb = [s[0][0] for s in samples]
+        batch_dep = [s[0][1] for s in samples]
+        batch_dq = [[s[1]] for s in samples]
+        ndic = {
+                'rgb' : batch_rgb,
+                'dep' : batch_dep,
+                'dq' : batch_dq
+               }
+        self.dispatch_training_to(sess, ndic, self.coarse_bag, self.coarse_train_op)
+        dic = self.ndic_bag_inner_join(ndic, self.coarse_bag)
+        [pred1] = curiosity.sess_no_hook(sess, [advcore.fine_pred], feed_dict=dic)
+
+        '''
+        Train fine net
+        '''
+        samples2 = [self._sample_one(envir, istate=pyosr.apply(samples[i][2], pred1[i,0,:3], pred1[i,0,3:])) for i in range(self.args.batch)]
+        batch_rgb = [s[0][0] for s in samples2]
+        batch_dep = [s[0][1] for s in samples2]
+        batch_dq = [[s[1]] for s in samples2]
+        ndic = {
+                'rgb' : batch_rgb,
+                'dep' : batch_dep,
+                'dq' : batch_dq
+               }
+        self.dispatch_training_to(sess, ndic, self.fine_bag, self.fine_train_op)
+
+    def dispatch_training_to(self, sess, ndic, tensorbag, train_op, debug_output=True):
+        advcore = self.advcore
+        dic = self.ndic_bag_inner_join(ndic, tensorbag)
+        if self.summary_op is not None:
+            self._log("running training op")
+            _, summary, gs = sess.run([train_op, self.summary_op, self.global_step], feed_dict=dic)
+            self._log("training op for gs {} finished".format(gs))
+            # grads = curiosity.sess_no_hook(sess, self._debug_grad_op, feed_dict=dic)
+            # print("[DEBUG] grads: {}".format(grads))
+            self.train_writer.add_summary(summary, gs)
+        else:
+            sess.run(train_op, feed_dict=dic)
 
 def create_advcore(learning_rate, args, batch_normalization):
     if args.train == 'tunnel_finder':
         return TunnelFinderCore(learning_rate=learning_rate, args=args, batch_normalization=batch_normalization)
+    if args.train == 'tunnel_finder_twin1':
+        return TunnelFinderTwin1(learning_rate=learning_rate, args=args, batch_normalization=batch_normalization)
     assert False, "tunnel.create_advcore: unimplemented advcore factory for --train {}".format(args.train)
