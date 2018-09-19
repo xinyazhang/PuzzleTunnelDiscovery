@@ -10,6 +10,10 @@ struct CDModel::CDModelData {
 	using Vector3 = fcl::Vector3d;
 	typedef fcl::OBBRSS<Scalar> BVType;
 	typedef fcl::BVHModel<BVType> Model;
+	/*
+	 * Note: this object in practice stores the geometry in the unit form.
+	 *       Hence eig_cache_vertices is also in unit form.
+	 */
 	Model model;
 
 	std::unique_ptr<fcl::Box<Scalar>> bbox;
@@ -43,6 +47,31 @@ struct CDModel::CDModelData {
 		                      eig_cache_findices,
 		                      eig_cache_fnormals);
 	}
+
+	Eigen::Matrix<Scalar, 3, 3> MI_world, MI_center;
+
+	void cache_MI(const Vector3& center)
+	{
+		MI_world = model.computeMomentofInertia();
+		const auto& C = MI_world;
+		auto com = center;
+		auto V = model.computeVolume();
+
+		auto& m = MI_center;
+
+		// MI rebase code from FCL:
+		// include/fcl/geometry/collision_geometry-inl.h:142-160
+		m << C(0, 0) - V * (com[1] * com[1] + com[2] * com[2]),
+		     C(0, 1) + V * com[0] * com[1],
+		     C(0, 2) + V * com[0] * com[2],
+		     C(1, 0) + V * com[1] * com[0],
+		     C(1, 1) - V * (com[0] * com[0] + com[2] * com[2]),
+		     C(1, 2) + V * com[1] * com[2],
+		     C(2, 0) + V * com[2] * com[0],
+		     C(2, 1) + V * com[2] * com[1],
+		     C(2, 2) - V * (com[0] * com[0] + com[1] * com[1]);
+
+	}
 };
 
 CDModel::CDModel(const Scene& scene)
@@ -70,6 +99,10 @@ CDModel::CDModel(const Scene& scene)
 
 	// Cache libigl form of (V, F) to CDModelData
 	model_->cache_eig_forms();
+	Eigen::Matrix<Scalar, 3, 1> ecenter;
+	auto gcenter = scene.getCenter();
+	ecenter << gcenter[0], gcenter[1], gcenter[2];
+	model_->cache_MI(ecenter);
 }
 
 CDModel::~CDModel()
@@ -215,6 +248,25 @@ CDModel::faceNormals(const Eigen::Matrix<int, -1, 1>& fi) const
 		ret.row(i) = N.row(fi(i));
 #endif
 	return ret;
+}
+
+Eigen::Matrix<CDModel::Scalar, 3, 3>
+CDModel::inertiaTensor() const
+{
+	return model_->MI_world;
+}
+
+
+Eigen::Matrix<CDModel::Scalar, 3, 3>
+CDModel::inertiaTensorForCenter() const
+{
+	return model_->MI_center;
+}
+
+Eigen::Matrix<CDModel::Scalar, 3, 1>
+CDModel::centerOfMass() const
+{
+	return model_->model.computeCOM();
 }
 
 }

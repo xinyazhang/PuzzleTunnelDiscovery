@@ -110,32 +110,44 @@ public:
 	intersectionRegionSurfaceAreas(ArrayOfStates qs,
 	                               bool qs_are_unit_states);
 
+	using ArrayOfPoints = Eigen::Matrix<StateScalar, -1, kActionDimension>;
+
 	std::tuple<
-		Eigen::Matrix<StateScalar, -1, kActionDimension>, // Segment beginnings
-		Eigen::Matrix<StateScalar, -1, kActionDimension>, // Segment ends
+		ArrayOfPoints, // Segment beginnings
+		ArrayOfPoints, // Segment ends
 		Eigen::Matrix<StateScalar, -1, 1>,                // Segment magnititudes
 		Eigen::Matrix<int, -1, 2>                         // (env, rob) face indices
 	>
 	intersectingSegments(StateVector unitq);
 
-	Eigen::Matrix<StateScalar, -1, kActionDimension>
+	ArrayOfPoints
 	getRobotFaceNormalsFromIndices(const Eigen::Matrix<int, -1, 1>&);
-	Eigen::Matrix<StateScalar, -1, kActionDimension>
+	ArrayOfPoints
 	getRobotFaceNormalsFromIndices(const Eigen::Matrix<int, -1, 2>&);
 
-	Eigen::Matrix<StateScalar, -1, kActionDimension>
+	ArrayOfPoints
 	getSceneFaceNormalsFromIndices(const Eigen::Matrix<int, -1, 1>&);
-	Eigen::Matrix<StateScalar, -1, kActionDimension>
+	ArrayOfPoints
 	getSceneFaceNormalsFromIndices(const Eigen::Matrix<int, -1, 2>&);
 
 	std::tuple<
-		Eigen::Matrix<StateScalar, -1, kActionDimension>, // Force apply position
-		Eigen::Matrix<StateScalar, -1, kActionDimension>  // Force direction
+		ArrayOfPoints, // Force apply position
+		ArrayOfPoints  // Force direction
 	>
 	forceDirectionFromIntersectingSegments(
-		const Eigen::Matrix<StateScalar, -1, kActionDimension>& sbegins,
-		const Eigen::Matrix<StateScalar, -1, kActionDimension>& sends,
+		const ArrayOfPoints& sbegins,
+		const ArrayOfPoints& sends,
 		const Eigen::Matrix<int, -1, 2> faces);
+
+	StateVector
+	pushRobot(const StateVector& unitq,
+	          const ArrayOfPoints& fpos,                     // Force apply position
+	          const ArrayOfPoints& fdir,                     // Force direction
+	          const Eigen::Matrix<StateScalar, -1, 1>& fmag, // Force magnititude
+	          StateScalar mass,
+	          StateScalar dtime,                             // Durition
+	          bool resetVelocity                             // Reset the stored velocity
+	         );
 protected:
 	bool shared_ = false;
 
@@ -156,6 +168,10 @@ protected:
 	// pp: PreProcess
 	ArrayOfStates ppToUnitStates(const ArrayOfStates& qs,
 	                             bool qs_are_unit_states);
+
+	struct OdeData;
+
+	std::unique_ptr<OdeData> ode_;
 };
 
 auto glm2Eigen(const glm::mat4& m);

@@ -52,6 +52,15 @@ public:
 
 	VMatrix
 	faceNormals(const Eigen::Matrix<int, -1, 1>&) const;
+
+	Eigen::Matrix<Scalar, 3, 3>
+	inertiaTensor() const;
+
+	Eigen::Matrix<Scalar, 3, 3>
+	inertiaTensorForCenter() const;
+
+	Eigen::Matrix<Scalar, 3, 1>
+	centerOfMass() const;
 };
 
 }

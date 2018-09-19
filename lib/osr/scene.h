@@ -81,6 +81,7 @@ public:
 		xform_= glm::rotate(xform_, rad, glm::vec3(x, y, z));
 	}
 
+	// Add the transformed geometry to CDModel
 	void addToCDModel(CDModel& ) const;
 private:
 	void updateBoundingBox(Node* node, glm::mat4 m);

@@ -9,10 +9,12 @@
 #include <igl/cross.h>
 #include <meshbool/join.h>
 #include <tritri/tritri_igl.h>
+#include <ode/ode.h>
 
 namespace osr {
 
 using std::tie;
+using ArrayOfPoints = UnitWorld::ArrayOfPoints;
 
 auto glm2Eigen(const glm::mat4& m)
 {
@@ -37,6 +39,106 @@ auto glm2Eigen(const glm::mat4& m)
 	       m[0][3], m[1][3], m[2][3], m[3][3];
 	return ret;
 }
+
+struct UnitWorld::OdeData {
+	static void init_ode()
+	{
+		static bool initialized = false;
+		if (initialized)
+			return ;
+		dInitODE();
+		dQuaternion q;
+		dQSetIdentity(q);
+		if (q[0] != 1.0) {
+			throw std::runtime_error("ODE is not using W-first quaterion anymore!");
+		}
+		initialized = true;
+	}
+
+	OdeData(const CDModel& robot)
+	{
+		init_ode();
+
+		world = dWorldCreate();
+		space = dHashSpaceCreate(0);
+		body = dBodyCreate(world);
+		/*
+		 * Note: alternatively we can pretend every robot is a solid
+		 * sphere, which could simplify the concept and the process.
+		 * 
+		 * But let's try this first.
+		 */
+		setMass(1.0, robot);
+	}
+
+	void setMass(StateScalar mass, 
+	             const CDModel& robot)
+	{
+#if 0
+		auto com = robot.centerOfMass();
+		auto MI = robot.inertiaTensor();
+		dMassSetParameters(&m, 1.0, 
+		                   com(0), com(1), com(2),
+		                   MI(0,0), MI(1,1), MI(2,2),
+		                   MI(0,1), MI(0,2), MI(1,2));
+#endif
+		dMassSetSphere(&m, mass, 1.0); // mass is density, radius = 1.0
+		dBodySetMass(body, &m);
+	}
+
+	~OdeData()
+	{
+		dBodyDestroy(body);
+		dSpaceDestroy(space);
+		dWorldDestroy(world);
+	}
+
+	dWorldID world;
+	dSpaceID space;
+	dBodyID body;
+	dMass m;
+
+	void setState(const StateVector& q)
+	{
+		dBodySetPosition(body, q(0), q(1), q(2));
+		// Note: ODE also use w-first notation
+		dBodySetQuaternion(body, &q(3));
+	}
+
+	void applyForce(const ArrayOfPoints& fpos,
+	                const ArrayOfPoints& fdir,
+	                const Eigen::Matrix<StateScalar, -1, 1>& fmag
+	               )
+	{
+		int N = fpos.rows();
+		for (int i = 0; i < N; i++) {
+			Eigen::Matrix<StateScalar, 3, 1> force;
+			force = (fmag(i) * fdir.row(i)).transpose();
+			dBodyAddForceAtPos(body,
+			                   force(0), force(1), force(2),
+			                   fpos(i,0), fpos(i,1), fpos(i,2)
+			                  ); 
+		}
+	}
+
+	StateVector
+	stepping(StateScalar dt)
+	{
+		dWorldStep(world, dt);
+		auto pos = dBodyGetPosition(body);
+		auto quat = dBodyGetQuaternion(body);
+		StateVector ret;
+		ret << pos[0], pos[1], pos[2],
+		       quat[0], quat[1], quat[2], quat[3];
+		return ret;
+	}
+
+	void resetVelocity()
+	{
+		dBodySetLinearVel(body, 0, 0, 0);
+		dBodySetAngularVel(body, 0, 0, 0);
+	}
+};
 
 
 UnitWorld::UnitWorld()
@@ -625,14 +727,14 @@ UnitWorld::intersectionRegionSurfaceAreas(ArrayOfStates qs,
 }
 
 std::tuple<
-	Eigen::Matrix<StateScalar, -1, kActionDimension>, // Position
-	Eigen::Matrix<StateScalar, -1, kActionDimension>, // Force vector
+	ArrayOfPoints, // Position
+	ArrayOfPoints, // Force vector
 	Eigen::Matrix<StateScalar, -1, 1>,                // Force magnititude
 	Eigen::Matrix<int, -1, 2>                         // Pairs of triangle indices
 >
 UnitWorld::intersectingSegments(StateVector unitq)
 {
-	Eigen::Matrix<StateScalar, -1, kActionDimension> ret_pos, ret_vec;
+	ArrayOfPoints ret_pos, ret_vec;
 	Eigen::Matrix<StateScalar, -1, 1> ret_mag;
 	Eigen::Matrix<int, -1, 2> face_pairs;
 
@@ -679,42 +781,42 @@ UnitWorld::intersectingSegments(StateVector unitq)
 	return std::tie(ret_pos, ret_vec, ret_mag, face_pairs);
 }
 
-Eigen::Matrix<StateScalar, -1, kActionDimension>
+ArrayOfPoints
 UnitWorld::getRobotFaceNormalsFromIndices(const Eigen::Matrix<int, -1, 1>& faces)
 {
 	return cd_robot_->faceNormals(faces);
 }
 
-Eigen::Matrix<StateScalar, -1, kActionDimension>
+ArrayOfPoints
 UnitWorld::getRobotFaceNormalsFromIndices(const Eigen::Matrix<int, -1, 2>& faces)
 {
 	return cd_robot_->faceNormals(faces.col(1));
 }
 
-Eigen::Matrix<StateScalar, -1, kActionDimension>
+ArrayOfPoints
 UnitWorld::getSceneFaceNormalsFromIndices(const Eigen::Matrix<int, -1, 1>& faces)
 {
 	return cd_scene_->faceNormals(faces);
 }
 
-Eigen::Matrix<StateScalar, -1, kActionDimension>
+ArrayOfPoints
 UnitWorld::getSceneFaceNormalsFromIndices(const Eigen::Matrix<int, -1, 2>& faces)
 {
 	return cd_scene_->faceNormals(faces.col(0));
 }
 
 std::tuple<
-	Eigen::Matrix<StateScalar, -1, kActionDimension>, // Force apply position
-	Eigen::Matrix<StateScalar, -1, kActionDimension>  // Force direction
+	ArrayOfPoints, // Force apply position
+	ArrayOfPoints  // Force direction
 >
 UnitWorld::forceDirectionFromIntersectingSegments(
-	const Eigen::Matrix<StateScalar, -1, kActionDimension>& sbegins,
-	const Eigen::Matrix<StateScalar, -1, kActionDimension>& sends,
+	const ArrayOfPoints& sbegins,
+	const ArrayOfPoints& sends,
 	const Eigen::Matrix<int, -1, 2> faces)
 {
-	Eigen::Matrix<StateScalar, -1, kActionDimension> ret_pos, ret_dir;
+	ArrayOfPoints ret_pos, ret_dir;
 	ret_pos = (sbegins + sends) * 0.5;
-	Eigen::Matrix<StateScalar, -1, kActionDimension> svec = sends - sbegins;
+	ArrayOfPoints svec = sends - sbegins;
 	igl::cross(svec, getRobotFaceNormalsFromIndices(faces), ret_dir);
 	Eigen::Matrix<StateScalar, -1, 3> enormal = getSceneFaceNormalsFromIndices(faces);
 	Eigen::Array<StateScalar, -1, 1> dots = (ret_dir.array() * enormal.array()).rowwise().sum().sign();
@@ -734,6 +836,27 @@ UnitWorld::ppToUnitStates(const ArrayOfStates& qs,
 	for (int i = 0; i < qs.rows(); i++)
 		qsu.row(i) = translateToUnitState(qs.row(i));
 	return qsu;
+}
+
+StateVector
+UnitWorld::pushRobot(const StateVector& unitq,
+                     const ArrayOfPoints& fpos,                     // Force apply position
+                     const ArrayOfPoints& fdir,                     // Force direction
+                     const Eigen::Matrix<StateScalar, -1, 1>& fmag, // Force magnititude
+                     StateScalar mass,
+                     StateScalar dtime,                             // Durition
+                     bool resetVelocity
+                    )
+{
+	if (!ode_) {
+		ode_.reset(new OdeData(*cd_robot_));
+	}
+	if (resetVelocity)
+		ode_->resetVelocity();
+	ode_->setMass(mass, *cd_robot_);
+	ode_->setState(unitq);
+	ode_->applyForce(fpos, fdir, fmag);
+	return ode_->stepping(dtime);
 }
 
 }

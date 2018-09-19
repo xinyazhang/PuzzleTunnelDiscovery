@@ -55,6 +55,10 @@ else (GLFW3_FOUND)
 	SET(USE_GPU FALSE)
 endif(GLFW3_FOUND)
 
+pkg_search_module(ODE ode-double)
+message("ODE_INCLUDE_DIRS ${ODE_INCLUDE_DIRS}")
+message("ODE_CFLAGS ${ODE_CFLAGS}")
+
 message(STATUS "Using GPU ${USE_GPU}")
 
 # Include Eigen3 and IGL
@@ -327,16 +331,22 @@ TARGET_LINK_LIBRARIES(trmap omplaux fcl)
 # Off-Screen Renderer for RL (reinforcement learning)
 # However if OpenGL is disabled, then the renderer part is not compiled.
 EASYLIB(osr)
+TARGET_LINK_LIBRARIES(osr assimp fcl ${Boost_LIBRARIES} ompl tritri)
+## Link osr to ode
+TARGET_LINK_LIBRARIES(osr ${ODE_LIBRARIES})
+TARGET_INCLUDE_DIRECTORIES(osr BEFORE PRIVATE ${ODE_INCLUDE_DIRS})
+TARGET_COMPILE_DEFINITIONS(osr PRIVATE ${ODE_CFLAGS}) # Required, float or double
+## Optional rendering function
 if (USE_GPU)
 TARGET_COMPILE_DEFINITIONS(osr PRIVATE GPU_ENABLED=1)
-TARGET_LINK_LIBRARIES(osr gbm EGL assimp fcl ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${Boost_LIBRARIES} ompl tritri)
+TARGET_LINK_LIBRARIES(osr gbm EGL ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${Boost_LIBRARIES})
 
+### sancheck_osr checks its rendering functions
 SANCHECK(osr)
 TARGET_LINK_LIBRARIES(sancheck_osr osr)
 TARGET_COMPILE_DEFINITIONS(sancheck_osr PRIVATE GPU_ENABLED=1)
 else (USE_GPU)
 TARGET_COMPILE_DEFINITIONS(osr PRIVATE GPU_ENABLED=0)
-TARGET_LINK_LIBRARIES(osr assimp fcl ${Boost_LIBRARIES} ompl tritri)
 endif (USE_GPU)
 
 # Blender PRM and RRT for RL's GT (Ground Truth)
@@ -345,6 +355,11 @@ EASYADD(mtblender)
 TARGET_LINK_LIBRARIES(mtblender ompl fcl)
 
 EASYADD(maze2to3)
+
+SANCHECK(ode)
+TARGET_LINK_LIBRARIES(sancheck_ode ${ODE_LIBRARIES})
+TARGET_INCLUDE_DIRECTORIES(sancheck_ode BEFORE PRIVATE ${ODE_INCLUDE_DIRS})
+TARGET_COMPILE_DEFINITIONS(sancheck_ode PRIVATE ${ODE_CFLAGS}) # Required, float or double
 
 # PYOSR
 # FIND_PACKAGE(pybind11 REQUIRED)

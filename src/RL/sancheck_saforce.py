@@ -5,9 +5,11 @@ import sys
 sys.path.append(os.getcwd())
 
 import pyosr
+import phyutil
 import numpy as np
 import math
 import aniconf12 as aniconf
+import rlreanimator
 
 def _create_r():
     pyosr.init()
@@ -22,6 +24,7 @@ def _create_r():
     r.angleModel(0.0, 0.0)
     r.default_depth = 0.0
     r.views = np.array([[0.0, 0.0]], dtype=np.float32)
+    r.avi = True
     return r
 
 def main():
@@ -41,6 +44,19 @@ def main():
             break
     if not wrong_direction:
         print("San check 1: force direction w.r.t. face normal passed.")
+    def imager(q):
+        QS = []
+        for q in phyutil.cr_traj_generator(r, q):
+            QS.append(q)
+            r.state = q
+            r.render_mvrgbd()
+            rgb = np.copy(r.mvrgb.reshape((r.pbufferWidth, r.pbufferHeight, 3)))
+            yield rgb # First view
+            print('state {}'.format(q))
+        QS.append(q)
+        print("Total: {} steps".format(len(QS)))
+        np.savez('saforce_process.npz', QS=QS)
+    rlreanimator.reanimate(imager(q), fps=20)
 
 """
 def usage():
