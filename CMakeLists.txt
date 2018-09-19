@@ -55,7 +55,11 @@ else (GLFW3_FOUND)
 	SET(USE_GPU FALSE)
 endif(GLFW3_FOUND)
 
-pkg_search_module(ODE ode-double)
+pkg_search_module(ODE QUIET ode-double)
+if (NOT ODE_FOUND)
+	pkg_search_module(ODE REQUIRED ode)
+endif(ODE_FOUND)
+
 message("ODE_INCLUDE_DIRS ${ODE_INCLUDE_DIRS}")
 message("ODE_CFLAGS ${ODE_CFLAGS}")
 
