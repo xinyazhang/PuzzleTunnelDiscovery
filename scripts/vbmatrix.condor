@@ -1,0 +1,12 @@
++Group = "GRAD"
++Project = "GRAPHICS_VISUALIZATION"
++ProjectDescription = "Solve hard Alpha Puzzle"
+
+universe = vanilla
+requirements = InMastodon
+Executable = condor-visibility-matrix.py
+Error = vm-path.io/$(Process).err
+Output = vm-path.io/$(Process).out
+Log = vm-path.io/$(Process).log
+arguments = 2048 $(Process) vm-path
+Queue 972

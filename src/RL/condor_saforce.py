@@ -34,17 +34,20 @@ def part():
     with open(cfgfile) as f:
         cfg = json.load(f)
     task = []
+    total = 0
     for (fn,n) in cfg:
         fn_dir = os.path.dirname(fn)
         fn_base = os.path.basename(fn)
         fn_bare = os.path.splitext(fn_base)[0]
-        total = 0
+        file_index = 0
         for i in range(0, n, gran):
-            ofn = '{}/{}-task-{}.npz'.format(fn_dir, fn_bare, total) if fn_dir else '{}-task-{}.npz'.format(fn_bare, total)
+            ofn = '{}/{}-task-{}.npz'.format(fn_dir, fn_bare, file_index) if fn_dir else '{}-task-{}.npz'.format(fn_bare, file_index)
             task.append((fn, i, i+gran, ofn))
+            file_index += 1
             total += 1
     with open(taskfile, 'w') as f:
         json.dump(task, fp=f)
+    print("Total tasks {}".format(total))
 
 def run():
     taskfile = sys.argv[2]

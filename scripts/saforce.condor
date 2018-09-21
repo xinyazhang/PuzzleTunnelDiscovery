@@ -1,0 +1,12 @@
++Group = "GRAD"
++Project = "GRAPHICS_VISUALIZATION"
++ProjectDescription = "Solve hard Alpha Puzzle"
+
+universe = vanilla
+requirements = InMastodon
+Executable = ./condor_saforce.py
+Error = saforce_data.out/$(Process).err
+Output = saforce_data.out/$(Process).out
+Log = saforce_data.out/$(Process).log
+arguments = run saforce_data.out/task.json $(Process)
+Queue 185
