@@ -46,7 +46,7 @@ def main():
         print("San check 1: force direction w.r.t. face normal passed.")
     def imager(q):
         QS = []
-        for q in phyutil.cr_traj_generator(r, q):
+        for q in phyutil.collision_resolve(r, q):
             QS.append(q)
             r.state = q
             r.render_mvrgbd()

@@ -3,7 +3,7 @@ import itertools
 uw: pyosr.UnitWorld object
 q: Initial state (aka configuration) of the robot
 '''
-def cr_traj_generator(uw, q, iter_limit=None):
+def collision_resolve(uw, q, iter_limit=None):
     STIFFNESS = 1e6
     D_TIME = 0.001
     for x in itertools.count():
