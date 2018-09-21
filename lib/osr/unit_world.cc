@@ -692,6 +692,7 @@ UnitWorld::calculateVisibilityMatrix2(ArrayOfStates qs0,
 	return ret;
 }
 
+#ifndef PYOSR_NO_CGAL
 Eigen::Matrix<StateScalar, -1, 1>
 UnitWorld::intersectionRegionSurfaceAreas(ArrayOfStates qs,
                                           bool qs_are_unit_states)
@@ -725,6 +726,7 @@ UnitWorld::intersectionRegionSurfaceAreas(ArrayOfStates qs,
 	}
 	return ret;
 }
+#endif
 
 std::tuple<
 	ArrayOfPoints, // Position

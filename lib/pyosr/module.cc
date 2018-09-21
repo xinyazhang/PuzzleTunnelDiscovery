@@ -100,7 +100,9 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("translate_from_unit_state", &UnitWorld::translateFromUnitState, py::call_guard<py::gil_scoped_release>())
 		.def("calculate_visibility_matrix", &UnitWorld::calculateVisibilityMatrix, py::call_guard<py::gil_scoped_release>())
 		.def("calculate_visibility_matrix2", &UnitWorld::calculateVisibilityMatrix2, py::call_guard<py::gil_scoped_release>())
+#ifndef PYOSR_NO_CGAL
 		.def("intersection_region_surface_areas", &UnitWorld::intersectionRegionSurfaceAreas, py::call_guard<py::gil_scoped_release>())
+#endif
 		.def("intersecting_segments", &UnitWorld::intersectingSegments, py::call_guard<py::gil_scoped_release>())
 		.def("robot_face_normals_from_indices", py::overload_cast<const Eigen::Matrix<int, -1, 1>&>(&UnitWorld::getRobotFaceNormalsFromIndices), py::call_guard<py::gil_scoped_release>())
 		.def("scene_face_normals_from_indices", py::overload_cast<const Eigen::Matrix<int, -1, 1>&>(&UnitWorld::getSceneFaceNormalsFromIndices), py::call_guard<py::gil_scoped_release>())
