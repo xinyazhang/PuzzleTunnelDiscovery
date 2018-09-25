@@ -32,11 +32,8 @@ class TunnelFinderCore(object):
         common_shape = [batch_size, self.view_num, w, h]
         self.action_space_dimension = 6 # Magic number, 3D + Axis Angle
         self.pred_action_size = self.action_space_dimension * self.get_number_of_predictions()
-        self.action_input_size = 3 if self._debug_trans_only else self.action_space_dimension
-        if self.get_number_of_predictions() == 1:
-            self.action_tensor = tf.placeholder(tf.float32, shape=[batch_size, 1, self.action_input_size], name='CActionPh')
-        else:
-            self.action_tensor = tf.placeholder(tf.float32, shape=[batch_size, 1, self.get_number_of_predictions(), self.action_input_size], name='CActionPh')
+        action_shape = self._get_action_placeholder_shape(batch_size)
+        self.action_tensor = tf.placeholder(tf.float32, shape=action_shape, name='CActionPh')
         self.rgb_tensor = tf.placeholder(tf.float32, shape=common_shape+[3], name='RgbPh')
         self.dep_tensor = tf.placeholder(tf.float32, shape=common_shape+[1], name='DepPh')
 
@@ -57,6 +54,9 @@ class TunnelFinderCore(object):
                 args.polhidden + [self.pred_action_size],
                 naming, args.elu)
         self._finder_params, self.finder_pred = self._finder_net.infer(self.joint_featvec)
+
+    def _get_action_placeholder_shape(self, batch_size):
+        return [batch_size, 1, self.action_space_dimension]
 
     def get_number_of_predictions(self):
         return 1
@@ -79,7 +79,7 @@ class TunnelFinderTrainer(object):
         self._debug_trans_only = 'tunnel_finder_trans_only' in args.debug_flags
 
         assert args.samplein, '--train tunnel_finder needs --samplein to indicate the tunnel vertices'
-        self._tunnel_v = np.load(args.samplein)['TUNNEL_V']
+        self._tunnel_v = np.load(args.samplein)['TUNNEL_V'][:args.sampletouse]
         self.unit_tunnel_v = None
         self.advcore = advcore
         self.args = args
@@ -333,7 +333,7 @@ class TunnelFinderForEach1(TunnelFinderCore):
 
     def __init__(self, learning_rate, args, batch_normalization=None):
         assert args.samplein, '--train tunnel_finder_foreach1 needs --samplein to determine the size of prediction network'
-        tunnel_v = np.load(args.samplein)['TUNNEL_V']
+        tunnel_v = np.load(args.samplein)['TUNNEL_V'][:args.sampletouse]
         self._pred_num = len(tunnel_v)
         super(TunnelFinderForEach1, self).__init__(learning_rate=learning_rate,
                 args=args, batch_normalization=batch_normalization)
@@ -344,6 +344,9 @@ class TunnelFinderForEach1(TunnelFinderCore):
             self.finder_pred_foreach = self.finder_pred_foreach[:, :, :, :3]
         print('ForEach1: original prediction shape {}'.format(self.finder_pred.shape))
         print('ForEach1: output shape {}'.format(self.finder_pred_foreach.shape))
+
+    def _get_action_placeholder_shape(self, batch_size):
+        return [batch_size, 1, self.get_number_of_predictions(), self.action_space_dimension]
 
     def get_number_of_predictions(self):
         return self._pred_num
