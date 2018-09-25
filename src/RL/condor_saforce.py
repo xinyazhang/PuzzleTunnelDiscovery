@@ -7,20 +7,36 @@ import numpy as np
 import saforce
 
 def usage():
-    print('''
+    print('''Collision resolution through force defined by surface area, distributed version for HTCondor.
 Usage: condor_saforce.py <command> [<args>]
+
 Commands:
-1. gen
-    condor_saforce.py gen <[npz files]>
-    print the task set configure files as json format to stdout
+1. define
+    condor_saforce.py define <[npz files]>
+    Setup the taskset definition from input files. The definition is printed to stdout.
+    The output should be redirected to a file for `part` command to use
 2. part
-    condor_saforce.py part <task set file> <tasks per process> <partitioned task file>
-    Partition the tasks in the task set, and print the results to partitioned task file.
+    condor_saforce.py part <taskset definition file> <tasks per process> <task partition file>
+    Partition the tasks in the taskset definition, and print the results to task partition file.
     This also prints the number of tasks to stdout
 3. run
-    condor_saforce.py run <partitioned task file> <task index>''')
+    condor_saforce.py run <task partition file> <task index>
 
-def gen():
+# Input:
+    A set of .npz files given to `define` command.
+
+# Output:
+    For each INPUT.npz, a set of corresponding INPUT-task-#.npz will be defineerated by `run` command.
+    This naming scheme is implemented by `part` command.
+
+# Post-processing
+
+1. Use condor_visibility_mc.py to calculate visibility of defineerated samples
+    - condor_visibility_mc.py requires the task partition file outputed by `part` command
+2. After 1, use assaforcevm.py to assembly the visibility matrix and correponding samples
+''')
+
+def define():
     cfg = []
     for fn in sys.argv[2:]:
         d = np.load(fn)
@@ -33,7 +49,7 @@ def part():
     taskfile = sys.argv[4]
     with open(cfgfile) as f:
         cfg = json.load(f)
-    task = []
+    tasks = []
     total = 0
     for (fn,n) in cfg:
         fn_dir = os.path.dirname(fn)
@@ -42,11 +58,12 @@ def part():
         file_index = 0
         for i in range(0, n, gran):
             ofn = '{}/{}-task-{}.npz'.format(fn_dir, fn_bare, file_index) if fn_dir else '{}-task-{}.npz'.format(fn_bare, file_index)
-            task.append((fn, i, i+gran, ofn))
+            task = (fn, i, i+gran, ofn)
+            tasks.append(task)
             file_index += 1
             total += 1
     with open(taskfile, 'w') as f:
-        json.dump(task, fp=f)
+        json.dump(tasks, fp=f)
     print("Total tasks {}".format(total))
 
 def run():
@@ -59,8 +76,10 @@ def run():
 
 def main():
     cmd = sys.argv[1]
-    if cmd == 'gen':
-        gen()
+    if cmd in ['-h', 'help']:
+        usage()
+    elif cmd == 'define':
+        define()
     elif cmd == 'part':
         part()
     elif cmd == 'run':
