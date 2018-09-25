@@ -9,6 +9,22 @@ import aniconf12 as aniconf
 import numpy as np
 import phyutil
 
+'''
+solve: read a segment of configurations from .npz file, and write the solving
+       trajectory to an output .npz file.
+
+Input:
+    fn_pred     : .npz file that stores predicted (by NN) Configurations (Qs) in 'TOCRQS'
+    start       : start index in TOCRQS
+    end         : end index in TOCRQS
+    fn_resolved : output .npz file with elements:
+                  ALL_RQS: a list of np.array of the solving trajectory
+                           (including the input and the solved state)
+                  ALL_IS_RESOLVED: a binary array indicating the final state is
+                                   collision free or not.
+                  RANGE: (start, end) tuple according to the input, clamped to
+                         the size of TOCRQS.
+'''
 def solve(fn_pred, start, end, fn_resolved):
     r = pyosr.UnitWorld() # pyosr.Renderer is not avaliable in HTCondor
     r.loadModelFromFile(aniconf.env_wt_fn)
