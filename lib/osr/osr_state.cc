@@ -154,6 +154,25 @@ differential(const StateVector& from, const StateVector& to)
 	return std::make_tuple(tr, aav, compose(tr, rot_delta));
 }
 
+Eigen::Matrix<StateScalar, -1, -1>
+multi_differential(const StateVector& from, const ArrayOfStates& tos, bool with_se3)
+{
+	Eigen::Matrix<StateScalar, -1, -1> ret;
+	size_t ROW = tos.rows();
+	size_t COL = kActionDimension * 2; // Trans + Rotation, assume dim(Rotation) == dim(Trans)
+	if (with_se3)
+		COL += kStateDimension;
+	ret.resize(ROW, COL);
+	for (size_t i = 0; i < ROW; i++) {
+		auto tup = differential(from, tos.row(i).transpose());
+		ret.block<1,3>(i, 0) = std::get<0>(tup).transpose();
+		ret.block<1,3>(i, 3) = std::get<1>(tup).transpose();
+		if (with_se3)
+			ret.block<1,kStateDimension>(i, 6) = std::get<2>(tup).transpose();
+	}
+	return ret;
+}
+
 StateVector
 apply(const StateVector& from, const StateTrans& tr, const AngleAxisVector& aa)
 {

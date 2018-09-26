@@ -74,6 +74,11 @@ PYBIND11_PLUGIN(pyosr) {
 	      "Calculate distances of one-vs-many.");
 	m.def("differential", &osr::differential,
 	      "Calculate the action from one unit state to another", py::call_guard<py::gil_scoped_release>());
+	m.def("multi_differential", &osr::multi_differential,
+	      py::arg("from"),
+	      py::arg("tos"),
+	      py::arg("with_se3") = false,
+	      "Calculate the action from one unit state to another group", py::call_guard<py::gil_scoped_release>());
 	m.def("apply", &osr::apply,
 	      "Apply a continuous action to one state vector", py::call_guard<py::gil_scoped_release>());
 	m.def("get_permutation_to_world", &osr::get_permutation_to_world);

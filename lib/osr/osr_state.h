@@ -42,6 +42,9 @@ Eigen::Matrix3d extract_rotation_matrix(const StateVector&);
 std::tuple<StateTrans, AngleAxisVector, StateVector>
 differential(const StateVector& from, const StateVector& to);
 
+Eigen::Matrix<StateScalar, -1, -1>
+multi_differential(const StateVector& from, const ArrayOfStates& tos, bool with_se3 = false);
+
 StateVector
 apply(const StateVector& from, const StateTrans& tr, const AngleAxisVector& aa);
 
