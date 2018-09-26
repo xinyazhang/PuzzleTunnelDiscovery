@@ -9,6 +9,12 @@ import config
 import curiosity
 import uw_random
 
+'''
+TunnelFinderCore:
+    Class similar to IAdvantageCore for tunnel_finder approaches.
+
+    Note: we do not need full IAdvantageCore instance since tunnel_finder approaches are not RL.
+'''
 class TunnelFinderCore(object):
 
     def __init__(self, learning_rate, args, batch_normalization=None):
@@ -18,10 +24,16 @@ class TunnelFinderCore(object):
         self.batch_normalization = batch_normalization
         batch_size = None if args.EXPLICIT_BATCH_SIZE < 0 else args.EXPLICIT_BATCH_SIZE
         self.batch_size = batch_size
+        # tf.reshape does not accept None as dimension
+        self.reshape_batch_size = -1 if batch_size is None else batch_size
 
         common_shape = [batch_size, self.view_num, w, h]
         self.action_space_dimension = 6 # Magic number, 3D + Axis Angle
-        self.action_tensor = tf.placeholder(tf.float32, shape=[batch_size, 1, self.action_space_dimension], name='CActionPh')
+        self.pred_action_size = self.action_space_dimension * self.get_number_of_predictions()
+        if self.get_number_of_predictions() == 1:
+            self.action_tensor = tf.placeholder(tf.float32, shape=[batch_size, 1, self.action_space_dimension], name='CActionPh')
+        else:
+            self.action_tensor = tf.placeholder(tf.float32, shape=[batch_size, 1, self.get_number_of_predictions(), self.action_space_dimension], name='CActionPh')
         self.rgb_tensor = tf.placeholder(tf.float32, shape=common_shape+[3], name='RgbPh')
         self.dep_tensor = tf.placeholder(tf.float32, shape=common_shape+[1], name='DepPh')
 
@@ -38,8 +50,13 @@ class TunnelFinderCore(object):
         self.joint_featvec = tf.reshape(self.featvec, [-1, 1, int(V)*int(N)])
 
         naming = 'TunnelFinderNet'
-        self._finder_net = vision.ConvApplier(None, args.polhidden + [self.action_space_dimension], naming, args.elu)
+        self._finder_net = vision.ConvApplier(None,
+                args.polhidden + [self.pred_action_size],
+                naming, args.elu)
         self._finder_params, self.finder_pred = self._finder_net.infer(self.joint_featvec)
+
+    def get_number_of_predictions(self):
+        return 1
 
     '''
     Stub property
@@ -65,17 +82,7 @@ class TunnelFinderTrainer(object):
         self.global_step = global_step
         self.optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 
-        if 'se3_geodesic_loss' not in args.debug_flags:
-            self.loss = tf.losses.mean_squared_error(advcore.action_tensor, advcore.finder_pred)
-        else:
-            e3_distancce = tf.nn.l2_loss(advcore.action_tensor[:,:,:3] -
-                                         advcore.finder_pred[:,:,:3])
-            e3_distancce = tf.reduce_sum(e3_distancce)
-            o3_distance = tfutil.axis_angle_geodesic_distance(advcore.action_tensor[:,:,3:],
-                                                              advcore.finder_pred[:,:,3:],
-                                                              keepdims=True)
-            o3_distance = tf.reduce_sum(o3_distance)
-            self.loss = e3_distancce + o3_distance
+        self._build_loss(advcore)
 
         tf.summary.scalar('finder_loss', self.loss)
 
@@ -90,6 +97,19 @@ class TunnelFinderTrainer(object):
 
         self.sample_index = 0
 
+    def _build_loss(self, advcore):
+        if 'se3_geodesic_loss' not in self.args.debug_flags:
+            self.loss = tf.losses.mean_squared_error(advcore.action_tensor, advcore.finder_pred)
+        else:
+            e3_distancce = tf.nn.l2_loss(advcore.action_tensor[:,:,:3] -
+                                         advcore.finder_pred[:,:,:3])
+            e3_distancce = tf.reduce_sum(e3_distancce)
+            o3_distance = tfutil.axis_angle_geodesic_distance(advcore.action_tensor[:,:,3:],
+                                                              advcore.finder_pred[:,:,3:],
+                                                              keepdims=True)
+            o3_distance = tf.reduce_sum(o3_distance)
+            self.loss = e3_distancce + o3_distance
+
     def build_summary_op(self):
         ckpt_dir = self.args.ckptdir
         if ckpt_dir is not None:
@@ -103,6 +123,14 @@ class TunnelFinderTrainer(object):
     def total_iter(self):
         return self.args.iter
 
+    def _get_gt_action_from_sample(self, q):
+        distances = pyosr.multi_distance(q, self.unit_tunnel_v)
+        ni = np.argmin(distances)
+        close = self.unit_tunnel_v[ni]
+        tr,aa,dq = pyosr.differential(q, close)
+        assert pyosr.distance(close, pyosr.apply(q, tr, aa)) < 1e-6, "pyosr.differential is not pyosr.apply ^ -1"
+        return np.concatenate([tr, aa], axis=-1), close
+
     def _sample_one(self, envir, istate=None):
         if istate is None:
             q = uw_random.random_state(0.75)
@@ -112,12 +140,8 @@ class TunnelFinderTrainer(object):
             self.unit_tunnel_v = np.array([envir.r.translate_to_unit_state(v) for v in self._tunnel_v])
         envir.qstate = q
         vstate = envir.vstate
-        distances = pyosr.multi_distance(q, self.unit_tunnel_v)
-        ni = np.argmin(distances)
-        close = self.unit_tunnel_v[ni]
-        tr,aa,dq = pyosr.differential(q, close)
-        assert pyosr.distance(close, pyosr.apply(q, tr, aa)) < 1e-6, "pyosr.differential is not pyosr.apply ^ -1"
-        return [vstate, np.concatenate([tr, aa], axis=-1), q, close]
+        tr_and_aa, close = self._get_gt_action_from_sample(q)
+        return [vstate, tr_and_aa, q, close]
 
     def train(self, envir, sess, tid=None, tmax=-1):
         samples = [self._sample_one(envir) for i in range(self.args.batch)]
@@ -203,6 +227,12 @@ class TunnelFinderTwinTrainer(TunnelFinderTrainer):
                 batch_normalization=batch_normalization,
                 build_summary_op=False) # Do not build summary in super class
 
+        '''
+        BAG objects: guiding object from np.array to tensor
+
+            We are training multiple networks, and this class is introduced to
+        avoid duplicated code in training different networks (esp. for distrubited TF)
+        '''
         self.coarse_bag = {
                 'rgb': advcore.coarse_rgb,
                 'dep': advcore.coarse_dep,
@@ -274,9 +304,61 @@ class TunnelFinderTwinTrainer(TunnelFinderTrainer):
         else:
             sess.run(train_op, feed_dict=dic)
 
+'''
+Below are classes of ForEach1 Approach
+'''
+class TunnelFinderForEach1(TunnelFinderCore):
+
+    def __init__(self, learning_rate, args, batch_normalization=None):
+        assert args.samplein, '--train tunnel_finder_foreach1 needs --samplein to determine the size of prediction network'
+        tunnel_v = np.load(args.samplein)['TUNNEL_V']
+        self._pred_num = len(tunnel_v)
+        super(TunnelFinderForEach1, self).__init__(learning_rate=learning_rate,
+                args=args, batch_normalization=batch_normalization)
+        # Helper output tensor
+        self.finder_pred_foreach = tf.reshape(self.finder_pred,
+                [-1, 1, self.get_number_of_predictions(), self.action_space_dimension])
+        print('ForEach1: original prediction shape {}'.format(self.finder_pred.shape))
+        print('ForEach1: output shape {}'.format(self.finder_pred_foreach.shape))
+
+    def get_number_of_predictions(self):
+        return self._pred_num
+
+'''
+TunnelFinderForEach1Trainer:
+    Trainer of tunnel_finder_foreach1.
+'''
+class TunnelFinderForEach1Trainer(TunnelFinderTrainer):
+    def __init__(self,
+                 advcore,
+                 args,
+                 learning_rate,
+                 batch_normalization=None):
+        assert isinstance(advcore, TunnelFinderForEach1), 'advcore must be TunnelFinderForEach1'
+        super(TunnelFinderForEach1Trainer, self).__init__(
+                advcore=advcore,
+                args=args,
+                learning_rate=learning_rate,
+                batch_normalization=batch_normalization,
+                build_summary_op=True)
+
+    def _build_loss(self, advcore):
+        assert'se3_geodesic_loss' not in self.args.debug_flags, "se3_geodesic_loss is not supported by TunnelFinderForEach1Trainer"
+        action_per_tunnel_v = advcore.action_tensor # No need to reshape here
+        self.loss = tf.losses.mean_squared_error(advcore.action_tensor, advcore.finder_pred_foreach)
+        self._log('!!! action_per_tunnel_v {}'.format(action_per_tunnel_v.shape))
+
+    def _get_gt_action_from_sample(self, q):
+        dq = pyosr.multi_differential(q, self.unit_tunnel_v, with_se3=False)
+        return dq, 0
+
 def create_advcore(learning_rate, args, batch_normalization):
+    CTOR=None
     if args.train == 'tunnel_finder':
-        return TunnelFinderCore(learning_rate=learning_rate, args=args, batch_normalization=batch_normalization)
+        CTOR=TunnelFinderCore
     if args.train == 'tunnel_finder_twin1':
-        return TunnelFinderTwin1(learning_rate=learning_rate, args=args, batch_normalization=batch_normalization)
-    assert False, "tunnel.create_advcore: unimplemented advcore factory for --train {}".format(args.train)
+        CTOR=TunnelFinderTwin1
+    if args.train == 'tunnel_finder_foreach1':
+        CTOR=TunnelFinderForEach1
+    assert CTOR is not None, "tunnel.create_advcore: unimplemented advcore factory for --train {}".format(args.train)
+    return CTOR(learning_rate=learning_rate, args=args, batch_normalization=batch_normalization)
