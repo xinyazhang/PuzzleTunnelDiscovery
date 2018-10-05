@@ -34,6 +34,8 @@ class Camera;
  */
 class Renderer : public UnitWorld {
 public:
+	static const uint32_t NO_SCENE_RENDERING = (1 << 0);
+	static const uint32_t NO_ROBOT_RENDERING = (1 << 1);
 	/*
 	 * Define type for framebuffer attributes.
 	 */
@@ -53,7 +55,7 @@ public:
 	void render_depth_to(std::ostream& fout);
 	Eigen::VectorXf render_depth_to_buffer();
 	RMMatrixXf render_mvdepth_to_buffer();
-	void render_mvrgbd();
+	void render_mvrgbd(uint32_t flags);
 
 	RMMatrixXb mvrgb;
 	RMMatrixXf mvdepth;
@@ -89,7 +91,7 @@ private:
 	std::shared_ptr<SceneRenderer> robot_renderer_;
 
 	void render_depth();
-	void render_rgbd();
+	void render_rgbd(uint32_t flags);
 	Camera setup_camera();
 
 	glm::mat4 camera_rot_;

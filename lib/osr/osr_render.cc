@@ -42,6 +42,9 @@ glm::mat4 translate_state_to_matrix(const StateVector& state)
 }
 
 namespace osr {
+const uint32_t Renderer::NO_SCENE_RENDERING;
+const uint32_t Renderer::NO_ROBOT_RENDERING;
+
 Renderer::Renderer()
 {
 	camera_rot_ = glm::mat4(1.0f);
@@ -260,14 +263,14 @@ Renderer::RMMatrixXf Renderer::render_mvdepth_to_buffer()
 }
 
 
-void Renderer::render_mvrgbd()
+void Renderer::render_mvrgbd(uint32_t flags)
 {
 	mvrgb.resize(views.rows(), pbufferWidth * pbufferHeight * 3);
 	mvdepth.resize(views.rows(), pbufferWidth * pbufferHeight);
 
 	for(int i = 0; i < views.rows(); i++) {
 		angleCamera(views(i, 0), views(i, 1));
-		render_rgbd();
+		render_rgbd(flags);
 		CHECK_GL_ERROR(glReadBuffer(GL_COLOR_ATTACHMENT0));
 		CHECK_GL_ERROR(glReadPixels(0, 0, pbufferWidth, pbufferHeight,
 					    GL_RED, GL_FLOAT, mvdepth.row(i).data()));
@@ -303,7 +306,7 @@ void Renderer::render_depth()
 	CHECK_GL_ERROR(glFlush());
 }
 
-void Renderer::render_rgbd()
+void Renderer::render_rgbd(uint32_t flags)
 {
 	glm::mat4 perturbation_mat = translate_state_to_matrix(perturbate_);
 	Camera camera = setup_camera();
@@ -335,8 +338,10 @@ void Renderer::render_rgbd()
 	CHECK_GL_ERROR(glUniform1i(16, avi));
 	CHECK_GL_ERROR(glUniform3fv(17, 1, light_position.data()));
 
-	scene_renderer_->render(rgbdShaderProgram, camera, perturbation_mat);
-	if (robot_) {
+	if (!(flags & NO_SCENE_RENDERING)) {
+		scene_renderer_->render(rgbdShaderProgram, camera, perturbation_mat);
+	}
+	if (!(flags & NO_ROBOT_RENDERING) && robot_) {
 		auto mat = translate_state_to_matrix(robot_state_);
 		robot_renderer_->render(rgbdShaderProgram, camera, mat);
 	}

@@ -98,8 +98,16 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("is_valid_state", &UnitWorld::isValid, py::call_guard<py::gil_scoped_release>())
 		.def("is_disentangled", &UnitWorld::isDisentangled, py::call_guard<py::gil_scoped_release>())
 		.def("transit_state", &UnitWorld::transitState, py::call_guard<py::gil_scoped_release>())
-		.def("transit_state_to", &UnitWorld::transitStateTo, py::call_guard<py::gil_scoped_release>())
-		.def("is_valid_transition", &UnitWorld::isValidTransition, py::call_guard<py::gil_scoped_release>())
+		.def("transit_state_to", &UnitWorld::transitStateTo,
+		     py::arg("from"),
+		     py::arg("to"),
+		     py::arg("verify_delta"),
+		     py::call_guard<py::gil_scoped_release>())
+		.def("is_valid_transition", &UnitWorld::isValidTransition,
+		     py::arg("from"),
+		     py::arg("to"),
+		     py::arg("initial_verify_delta"),
+		     py::call_guard<py::gil_scoped_release>())
 		.def("transit_state_by", &UnitWorld::transitStateBy, py::call_guard<py::gil_scoped_release>())
 		.def("translate_to_unit_state", &UnitWorld::translateToUnitState, py::call_guard<py::gil_scoped_release>())
 		.def("translate_from_unit_state", &UnitWorld::translateFromUnitState, py::call_guard<py::gil_scoped_release>())
@@ -129,6 +137,8 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("render_depth_to_buffer", &Renderer::render_depth_to_buffer)
 		.def("render_mvdepth_to_buffer", &Renderer::render_mvdepth_to_buffer)
 		.def("render_mvrgbd", &Renderer::render_mvrgbd, py::call_guard<py::gil_scoped_release>())
+		.def_readonly_static("NO_SCENE_RENDERING", &Renderer::NO_SCENE_RENDERING)
+		.def_readonly_static("NO_ROBOT_RENDERING", &Renderer::NO_ROBOT_RENDERING)
 		.def_readwrite("pbufferWidth", &Renderer::pbufferWidth)
 		.def_readwrite("pbufferHeight", &Renderer::pbufferHeight)
 		.def_readwrite("default_depth", &Renderer::default_depth)
