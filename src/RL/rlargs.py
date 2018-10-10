@@ -257,8 +257,9 @@ loco: reanimate with continuous action prediction (trained by --train loco_overf
             help='''
 zero_weights: initialize weights in ValNet and PolNet to zero.
 whole_traj: generate the sample only after receving non-zero reward.
+tunnel_finder_trans_only: For --train tunnel_finder*, only predict translations.
             ''',
-            choices=['zero_weights', 'whole_traj', 'se3_geodesic_loss'],
+            choices=['zero_weights', 'whole_traj', 'se3_geodesic_loss', 'tunnel_finder_trans_only'],
             nargs='*',
             default=[])
     parser.add_argument('--train',
