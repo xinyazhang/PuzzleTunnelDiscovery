@@ -291,10 +291,10 @@ def generate_minibatch(r, batch_size):
     for i in range(batch_size):
         q, aq = random_state(0.5)
         r.state = q
-        r.render_mvrgbd()
+        r.render_mvrgbd(pyosr.Renderer.NO_SCENE_RENDERING)
         X.append(np.concatenate((r.mvrgb.reshape(rgb_shape), r.mvdepth.reshape(dep_shape)), axis=2))
         r.state = aq
-        r.render_mvrgbd()
+        r.render_mvrgbd(pyosr.Renderer.NO_SCENE_RENDERING)
         Y.append(np.concatenate((r.mvrgb.reshape(rgb_shape), r.mvdepth.reshape(dep_shape)), axis=2))
     return X, Y
 
