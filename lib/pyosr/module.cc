@@ -136,7 +136,9 @@ PYBIND11_PLUGIN(pyosr) {
 		// .def("loadRobotFromFile", &Renderer::loadRobotFromFile)
 		.def("render_depth_to_buffer", &Renderer::render_depth_to_buffer)
 		.def("render_mvdepth_to_buffer", &Renderer::render_mvdepth_to_buffer)
-		.def("render_mvrgbd", &Renderer::render_mvrgbd, py::call_guard<py::gil_scoped_release>())
+		.def("render_mvrgbd", &Renderer::render_mvrgbd,
+		     py::arg("flags") = 0,
+		     py::call_guard<py::gil_scoped_release>())
 		.def_readonly_static("NO_SCENE_RENDERING", &Renderer::NO_SCENE_RENDERING)
 		.def_readonly_static("NO_ROBOT_RENDERING", &Renderer::NO_ROBOT_RENDERING)
 		.def_readwrite("pbufferWidth", &Renderer::pbufferWidth)

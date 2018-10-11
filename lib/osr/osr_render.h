@@ -55,7 +55,7 @@ public:
 	void render_depth_to(std::ostream& fout);
 	Eigen::VectorXf render_depth_to_buffer();
 	RMMatrixXf render_mvdepth_to_buffer();
-	void render_mvrgbd(uint32_t flags);
+	void render_mvrgbd(uint32_t flags = 0);
 
 	RMMatrixXb mvrgb;
 	RMMatrixXf mvdepth;
