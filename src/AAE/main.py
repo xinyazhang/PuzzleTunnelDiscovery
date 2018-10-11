@@ -24,6 +24,7 @@ def parse_args():
     parser.add_argument('--ae', action='store_true', help='Train autoencoder instead of classifier')
     parser.add_argument('--aae', action='store_true', help='Tran augmented autoencoder')
     parser.add_argument('--iteration', type=int, default=-1, help='Total number of iterations per epoch')
+    parser.add_argument('--out', default=None, help='Output file/directory')
 
     return check_args(parser.parse_args())
 

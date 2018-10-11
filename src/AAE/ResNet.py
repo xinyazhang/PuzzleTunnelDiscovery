@@ -1,6 +1,7 @@
 import time
 from ops import *
 from utils import *
+from scipy.misc import imsave
 
 class ResNet(object):
     def __init__(self, sess, args):
@@ -66,6 +67,8 @@ class ResNet(object):
         if self.is_ae and not self.is_aae:
             self.train_y = self.train_x
             self.test_y = self.test_x
+
+        self.out_dir = args.out
 
 
     ##################################################################################
@@ -349,11 +352,30 @@ class ResNet(object):
         else:
             print(" [!] Load failed...")
 
-        test_feed_dict = {
-            self.test_inptus: self.test_x,
-            self.test_labels: self.test_y
-        }
+        if not self.is_generator_dataset:
+            test_feed_dict = {
+                self.test_inptus: self.test_x,
+                self.test_labels: self.test_y
+            }
 
-
-        test_accuracy = self.sess.run(self.test_accuracy, feed_dict=test_feed_dict)
-        print("test_accuracy: {}".format(test_accuracy))
+            test_accuracy = self.sess.run(self.test_accuracy, feed_dict=test_feed_dict)
+            print("test_accuracy: {}".format(test_accuracy))
+        else:
+            assert could_load
+            assert self.out_dir is not None
+            index = 0
+            for i in range(self.iteration):
+                batch_x, batch_y = generate_minibatch(self.r, self.batch_size)
+                test_feed_dict = {
+                    self.test_inptus : batch_x,
+                    self.test_labels : batch_y
+                }
+                test_loss, test_y = self.sess.run(
+                    [self.test_loss, self.test_logits], feed_dict=test_feed_dict)
+                # Input Image, Expected Image and Output Image
+                for ii,ei,oi in zip(batch_x, batch_y, test_y):
+                    ft = '{}/{}-{}.png'.format(self.out_dir, index, '{}')
+                    imsave(ft.format('ii'), ii[:,:,:3])
+                    imsave(ft.format('ei'), ei[:,:,:3])
+                    imsave(ft.format('oi'), oi[:,:,:3])
+                    index += 1
