@@ -1,6 +1,7 @@
 #if GPU_ENABLED
 
 #include "mesh_renderer.h"
+#include "osr_render.h"
 #include "camera.h"
 #include "mesh.h"
 
@@ -58,6 +59,15 @@ MeshRenderer::uploadData(const shared_ptr<Mesh>& mesh)
 	                            sizeof(uint32_t) * mesh->getIndices().size(),
 	                            mesh->getIndices().data(), GL_STATIC_DRAW));
 	CHECK_GL_ERROR(glBindVertexArray(0));
+
+	if (mesh->hasUV()) {
+		CHECK_GL_ERROR(glGenBuffers(1, &uv_vbo_));
+		CHECK_GL_ERROR(glBindBuffer(GL_ARRAY_BUFFER, uv_vbo_));
+		CHECK_GL_ERROR(glBufferData(GL_ARRAY_BUFFER,
+		                            sizeof(float) * mesh->getUV().size(),
+		                            mesh->getUV().data(), GL_STATIC_DRAW));
+		CHECK_GL_ERROR(glBindBuffer(GL_ARRAY_BUFFER, 0));
+	}
 }
 
 void
@@ -85,18 +95,37 @@ MeshRenderer::bindAttributes()
 	CHECK_GL_ERROR(glBindBuffer(GL_ARRAY_BUFFER, 0));
 
 	CHECK_GL_ERROR(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_));
+
+	if (uv_vbo_) {
+		CHECK_GL_ERROR(glBindBuffer(GL_ARRAY_BUFFER, uv_vbo_));
+		CHECK_GL_ERROR(glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE,
+		                                     sizeof(float) * 2,
+		                                     0));  // vertex color
+		CHECK_GL_ERROR(glEnableVertexAttribArray(3));
+		CHECK_GL_ERROR(glBindBuffer(GL_ARRAY_BUFFER, 0));
+	} else {
+		CHECK_GL_ERROR(glDisableVertexAttribArray(3));
+	}
+
 	CHECK_GL_ERROR(glBindVertexArray(0));
 }
 
 
 void
-MeshRenderer::render(GLuint program, Camera& camera, glm::mat4 globalXform)
+MeshRenderer::render(GLuint program, Camera& camera, glm::mat4 globalXform, uint32_t flags)
 {
 	camera.uniform(program, globalXform);
 	CHECK_GL_ERROR(glBindVertexArray(vao_));
 
+#if 0
 	CHECK_GL_ERROR(glBindAttribLocation(program, 0, "inPosition"));
 	CHECK_GL_ERROR(glBindAttribLocation(program, 1, "inColor"));
+#endif
+	if (uv_vbo_ && (flags & Renderer::HAS_NTR_RENDERING)) {
+		CHECK_GL_ERROR(glEnableVertexAttribArray(3));
+	} else {
+		CHECK_GL_ERROR(glDisableVertexAttribArray(3));
+	}
 
 	CHECK_GL_ERROR(glDrawElements(GL_TRIANGLES, number_of_faces_,
 	                              GL_UNSIGNED_INT, 0));

@@ -44,6 +44,7 @@ glm::mat4 translate_state_to_matrix(const StateVector& state)
 namespace osr {
 const uint32_t Renderer::NO_SCENE_RENDERING;
 const uint32_t Renderer::NO_ROBOT_RENDERING;
+const uint32_t Renderer::HAS_NTR_RENDERING;
 
 Renderer::Renderer()
 {
@@ -199,6 +200,7 @@ void Renderer::loadRobotFromFile(const std::string& fn)
 {
 	UnitWorld::loadRobotFromFile(fn);
 	robot_renderer_.reset(new SceneRenderer(robot_));
+	robot_renderer_->probe_texture(fn);
 }
 
 
@@ -296,10 +298,10 @@ void Renderer::render_depth()
 	CHECK_GL_ERROR(glClear(GL_DEPTH_BUFFER_BIT));
 
 	CHECK_GL_ERROR(glUseProgram(shaderProgram));
-	scene_renderer_->render(shaderProgram, camera, glm::mat4());
+	scene_renderer_->render(shaderProgram, camera, glm::mat4(), 0);
 	if (robot_) {
 		auto mat = translate_state_to_matrix(robot_state_);
-		robot_renderer_->render(shaderProgram, camera, mat);
+		robot_renderer_->render(shaderProgram, camera, mat, 0);
 	}
 	CHECK_GL_ERROR(glUseProgram(0));
 
@@ -339,11 +341,11 @@ void Renderer::render_rgbd(uint32_t flags)
 	CHECK_GL_ERROR(glUniform3fv(17, 1, light_position.data()));
 
 	if (!(flags & NO_SCENE_RENDERING)) {
-		scene_renderer_->render(rgbdShaderProgram, camera, perturbation_mat);
+		scene_renderer_->render(rgbdShaderProgram, camera, perturbation_mat, flags);
 	}
 	if (!(flags & NO_ROBOT_RENDERING) && robot_) {
 		auto mat = translate_state_to_matrix(robot_state_);
-		robot_renderer_->render(rgbdShaderProgram, camera, mat);
+		robot_renderer_->render(rgbdShaderProgram, camera, mat, flags);
 	}
 	CHECK_GL_ERROR(glUseProgram(0));
 

@@ -19,7 +19,8 @@ Mesh::Mesh(std::shared_ptr<Mesh> other)
 Mesh::Mesh(aiMesh* mesh, glm::vec3 color)
 	:shared_from_(nullptr)
 {
-	for (size_t i = 0; i < mesh->mNumVertices; i++) {
+	size_t NV = mesh->mNumVertices;
+	for (size_t i = 0; i < NV; i++) {
 		vertices_.emplace_back(
 		        to_glm_vec3(mesh->mVertices[i]),  // position
 		        color,
@@ -27,6 +28,16 @@ Mesh::Mesh(aiMesh* mesh, glm::vec3 color)
 		        );
 		// std::cerr << "Mesh Normal: " << to_glm_vec3(mesh->mNormals[i]) << '\n';
 	}
+	if (mesh->HasTextureCoords(0)) {
+		uv_.resize(NV, 2);
+		for (size_t i = 0; i < NV; i++) {
+			uv_(i,0) = mesh->mTextureCoords[0][i][0];
+			uv_(i,1) = mesh->mTextureCoords[0][i][1]; 
+		}
+	} else {
+		uv_.resize(0, Eigen::NoChange);
+	}
+	uv_.resize(mesh->mNumVertices, 2);
 	for (size_t i = 0; i < mesh->mNumFaces; i++) {
 		aiFace& face = mesh->mFaces[i];
 		if (face.mNumIndices == 3) {

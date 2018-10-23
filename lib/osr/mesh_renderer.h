@@ -36,12 +36,14 @@ private:
 	void initVAO();
 	void uploadData(const shared_ptr<Mesh>& mesh);
 	void bindAttributes();
+
+	GLuint uv_vbo_ = 0;
 public:
 	MeshRenderer(shared_ptr<Mesh> mesh);
 	MeshRenderer(shared_ptr<MeshRenderer> other);
 	~MeshRenderer();
 	
-	void render(GLuint program, Camera& camera, glm::mat4 globalXform);
+	void render(GLuint program, Camera& camera, glm::mat4 globalXform, uint32_t flags);
 };
 
 }

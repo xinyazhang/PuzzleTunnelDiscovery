@@ -2,9 +2,12 @@
 
 #include "scene_renderer.h"
 #include "mesh_renderer.h"
+#include "osr_render.h"
 #include "node.h"
 #include "camera.h"
 #include "scene.h"
+#include "pngimage.h"
+#include <strman/suffix.h>
 
 namespace osr {
 
@@ -40,11 +43,46 @@ SceneRenderer::SceneRenderer(shared_ptr<SceneRenderer> other)
 
 SceneRenderer::~SceneRenderer()
 {
+	if (tex_)
+		glDeleteTextures(1, &tex_);
+}
+
+void SceneRenderer::probe_texture(const std::string& fn)
+{
+	std::string tex_fn = strman::replace_suffix(fn, ".ply", ".png");
+	if (tex_fn.empty()) {
+		tex_data_.clear();
+		return;
+	}
+	tex_data_ = readPNG(tex_fn.c_str(), tex_w_, tex_h_);
+	if (!tex_) {
+		CHECK_GL_ERROR(glGenTextures(1, &tex_));
+	}
+	CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D, tex_));
+	CHECK_GL_ERROR(glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, tex_w_, tex_h_));
+	CHECK_GL_ERROR(glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, tex_w_, tex_h_,
+				       GL_RGBA, GL_UNSIGNED_BYTE,
+				       tex_data_.data()));
+	CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D, 0));
+	if (!sam_) {
+		CHECK_GL_ERROR(glGenSamplers(1, &sam_));
+		CHECK_GL_ERROR(glSamplerParameteri(sam_, GL_TEXTURE_WRAP_S, GL_REPEAT));
+		CHECK_GL_ERROR(glSamplerParameteri(sam_, GL_TEXTURE_WRAP_T, GL_REPEAT));
+		CHECK_GL_ERROR(glSamplerParameteri(sam_, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+		CHECK_GL_ERROR(glSamplerParameteri(sam_, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
+	}
 }
 
 void
-SceneRenderer::render(GLuint program, Camera& camera, glm::mat4 m)
+SceneRenderer::render(GLuint program, Camera& camera, glm::mat4 m, uint32_t flags)
 {
+	if (tex_ && (flags & Renderer::HAS_NTR_RENDERING)) {
+		CHECK_GL_ERROR(glActiveTexture(GL_TEXTURE0));
+		CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D, tex_));
+		CHECK_GL_ERROR(glBindSampler(0, sam_));
+	} else {
+		CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D, 0));
+	}
 	// render(program, camera, m * xform, root);
 	for (const auto& mr : renderers_) {
 		/*
@@ -53,12 +91,16 @@ SceneRenderer::render(GLuint program, Camera& camera, glm::mat4 m)
 		if (!mr)
 			continue;
 		mr->render(program, camera,
-		           m * scene_->getCalibrationTransform());
+		           m * scene_->getCalibrationTransform(),
+		           flags);
+	}
+	if (tex_ && (flags & Renderer::HAS_NTR_RENDERING)) {
+		CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D, 0));
 	}
 }
 
 void
-SceneRenderer::render(GLuint program, Camera& camera, glm::mat4 m, Node* node)
+SceneRenderer::render(GLuint program, Camera& camera, glm::mat4 m, Node* node, uint32_t flags)
 {
 	glm::mat4 xform = m * node->xform;
 #if 0
@@ -67,10 +109,10 @@ SceneRenderer::render(GLuint program, Camera& camera, glm::mat4 m, Node* node)
 #endif
 	for (auto i : node->meshes) {
 		auto mr = renderers_[i];
-		mr->render(program, camera, xform);
+		mr->render(program, camera, xform, flags);
 	}
 	for (auto child : node->nodes) {
-		render(program, camera, xform, child.get());
+		render(program, camera, xform, child.get(), flags);
 	}
 }
 

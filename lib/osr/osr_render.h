@@ -36,6 +36,7 @@ class Renderer : public UnitWorld {
 public:
 	static const uint32_t NO_SCENE_RENDERING = (1 << 0);
 	static const uint32_t NO_ROBOT_RENDERING = (1 << 1);
+	static const uint32_t HAS_NTR_RENDERING = (1 << 2);
 	/*
 	 * Define type for framebuffer attributes.
 	 */

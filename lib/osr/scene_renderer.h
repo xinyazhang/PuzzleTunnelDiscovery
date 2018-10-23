@@ -5,7 +5,7 @@
 
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
-#include <GL/glew.h>
+#include "quickgl.h"
 #include <memory>
 #include <vector>
 
@@ -31,9 +31,15 @@ public:
 	SceneRenderer(shared_ptr<SceneRenderer> other);
 	~SceneRenderer();
 
-	void render(GLuint program, Camera& camera, glm::mat4 globalXform);
+	void probe_texture(const std::string& fn);
+	void render(GLuint program, Camera& camera, glm::mat4 globalXform, uint32_t flags);
 private:
-	void render(GLuint program, Camera& camera, glm::mat4 m, Node* node);
+	void render(GLuint program, Camera& camera, glm::mat4 m, Node* node, uint32_t flags);
+
+	std::vector<uint8_t> tex_data_;
+	int tex_w_, tex_h_;
+	GLuint tex_ = 0;
+	GLuint sam_ = 0;
 };
 
 }

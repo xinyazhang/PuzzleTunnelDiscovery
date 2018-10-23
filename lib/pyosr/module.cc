@@ -141,6 +141,7 @@ PYBIND11_PLUGIN(pyosr) {
 		     py::call_guard<py::gil_scoped_release>())
 		.def_readonly_static("NO_SCENE_RENDERING", &Renderer::NO_SCENE_RENDERING)
 		.def_readonly_static("NO_ROBOT_RENDERING", &Renderer::NO_ROBOT_RENDERING)
+		.def_readonly_static("HAS_NTR_RENDERING", &Renderer::HAS_NTR_RENDERING)
 		.def_readwrite("pbufferWidth", &Renderer::pbufferWidth)
 		.def_readwrite("pbufferHeight", &Renderer::pbufferHeight)
 		.def_readwrite("default_depth", &Renderer::default_depth)

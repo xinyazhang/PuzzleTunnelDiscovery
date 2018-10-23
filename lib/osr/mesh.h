@@ -8,6 +8,7 @@
 
 #include <assimp/scene.h>
 #include <assimp/Importer.hpp>
+#include <Eigen/Core>
 
 #include "bbox.h"
 #include "geometry.h"
@@ -23,6 +24,7 @@ class Mesh {
 	std::vector<uint32_t> indices_;
 	std::shared_ptr<Mesh> shared_from_;
 	bool empty_mesh_ = false;
+	Eigen::Matrix<float, -1, 2, Eigen::RowMajor> uv_;
 public:
 	Mesh(std::shared_ptr<Mesh> other);
 	Mesh(aiMesh* mesh, glm::vec3 color);
@@ -34,6 +36,8 @@ public:
 	size_t getNumberOfFaces() const;
 	void addToCDModel(const glm::mat4&, CDModel&) const;
 	bool isEmpty() const { return empty_mesh_; }
+	bool hasUV() const { return uv_.rows() > 0; }
+	Eigen::Matrix<float, -1, 2, Eigen::RowMajor>& getUV() { return uv_; }
 private:
 	void init();
 };
