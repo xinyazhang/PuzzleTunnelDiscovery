@@ -298,7 +298,7 @@ def data_augmentation(batch, img_size, dataset_name):
 from math import sqrt,pi,sin,cos
 
 def random_state(scale=1.0):
-    tr = scale * (np.random.rand(3) - 0.5)
+    tr = scale * (np.random.rand(3) - 0.5 + 0.25)
     u1,u2,u3 = np.random.rand(3)
     quat = [sqrt(1-u1)*sin(2*pi*u2),
             sqrt(1-u1)*cos(2*pi*u2),
