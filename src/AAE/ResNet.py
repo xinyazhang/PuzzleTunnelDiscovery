@@ -222,8 +222,18 @@ class ResNet(object):
         self.summary_test_loss = tf.summary.scalar("test_loss", self.test_loss)
         self.summary_test_accuracy = tf.summary.scalar("test_accuracy", self.test_accuracy)
 
-        self.train_summary = tf.summary.merge([self.summary_train_loss, self.summary_train_accuracy])
-        self.test_summary = tf.summary.merge([self.summary_test_loss, self.summary_test_accuracy])
+        train_summary_list = [self.summary_train_loss, self.summary_train_accuracy]
+        test_summary_list = [self.summary_test_loss, self.summary_test_accuracy]
+
+        if self.is_ae:
+            self.summary_train_ae = tf.summary.image('train_ae', self.train_logits)
+            self.summary_test_ae = tf.summary.image('test_ae', self.test_logits)
+
+            train_summary_list.append(self.summary_train_ae)
+            test_summary_list.append(self.summary_test_ae)
+
+        self.train_summary = tf.summary.merge(train_summary_list)
+        self.test_summary = tf.summary.merge(test_summary_list)
 
     ##################################################################################
     # Train
