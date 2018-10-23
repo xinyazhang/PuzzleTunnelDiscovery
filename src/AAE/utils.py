@@ -1,6 +1,7 @@
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 import os
+import errno
 from keras.datasets import cifar10, cifar100, mnist, fashion_mnist
 from keras.utils import to_categorical
 import numpy as np
@@ -197,6 +198,32 @@ def load_alpha_puzzle():
     keys_w_first_npz = '../res/alpha/alpha-1.2.org.w-first.npz'
     env_wt_fn = '../res/alpha/alpha_env-1.2.wt.obj'
     rob_wt_fn = '../res/alpha/alpha-1.2.wt.obj'
+    # rob_wt_fn = '../res/alpha/double-alpha-1.2.wt.obj'
+    rob_ompl_center = np.array([16.973146438598633, 1.2278236150741577, 10.204807281494141])
+    r.loadModelFromFile(env_wt_fn)
+    r.loadRobotFromFile(rob_wt_fn)
+    r.scaleToUnit()
+    r.angleModel(0.0, 0.0)
+    r.default_depth = 0.0
+    r.enforceRobotCenter(rob_ompl_center)
+    r.views = np.array([[0.0,0.0]], dtype=np.float32)
+
+    return r
+
+def load_double_alpha_puzzle():
+    pyosr.init()
+    dpy = pyosr.create_display()
+    glctx = pyosr.create_gl_context(dpy)
+    r = pyosr.Renderer()
+    r.avi = True
+    res = 224
+    r.pbufferWidth = res
+    r.pbufferHeight = res
+    r.setup()
+
+    keys_w_first_npz = '../res/alpha/alpha-1.2.org.w-first.npz'
+    env_wt_fn = '../res/alpha/alpha_env-1.2.wt.obj'
+    rob_wt_fn = '../res/alpha/double-alpha-1.2.wt.obj'
     rob_ompl_center = np.array([16.973146438598633, 1.2278236150741577, 10.204807281494141])
     r.loadModelFromFile(env_wt_fn)
     r.loadRobotFromFile(rob_wt_fn)
@@ -298,3 +325,11 @@ def generate_minibatch(r, batch_size):
         Y.append(np.concatenate((r.mvrgb.reshape(rgb_shape), r.mvdepth.reshape(dep_shape)), axis=2))
     return X, Y
 
+def mkdir_p(path):
+    try:
+        os.makedirs(path)
+    except OSError as exc:  # Python >2.5
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else:
+            raise

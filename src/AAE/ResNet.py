@@ -47,6 +47,13 @@ class ResNet(object):
             self.c_dim = 4
             self.label_dim = None
 
+        if self.dataset_name == 'double_alpha_puzzle' :
+            self.is_generator_dataset = True
+            self.r = load_double_alpha_puzzle()
+            self.img_size = self.r.pbufferWidth
+            self.c_dim = 4
+            self.label_dim = None
+
         self.checkpoint_dir = args.checkpoint_dir
         self.log_dir = args.log_dir
 
