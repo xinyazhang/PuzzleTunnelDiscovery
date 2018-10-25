@@ -235,6 +235,32 @@ def load_double_alpha_puzzle():
 
     return r
 
+def load_alpha_ntr():
+    pyosr.init()
+    dpy = pyosr.create_display()
+    glctx = pyosr.create_gl_context(dpy)
+    r = pyosr.Renderer()
+    r.avi = True
+    res = 224
+    r.pbufferWidth = res
+    r.pbufferHeight = res
+    r.setup()
+
+    keys_w_first_npz = '../res/alpha/alpha-1.2.org.w-first.npz'
+    env_wt_fn = '../res/alpha/alpha_env-1.2.wt.obj'
+    rob_wt_fn = '../res/alpha/alpha-1.2.wt.tcp.ply'
+    # rob_wt_fn = '../res/alpha/double-alpha-1.2.wt.obj'
+    rob_ompl_center = np.array([16.973146438598633, 1.2278236150741577, 10.204807281494141])
+    r.loadModelFromFile(env_wt_fn)
+    r.loadRobotFromFile(rob_wt_fn)
+    r.scaleToUnit()
+    r.angleModel(0.0, 0.0)
+    r.default_depth = 0.0
+    r.enforceRobotCenter(rob_ompl_center)
+    r.views = np.array([[0.0,0.0]], dtype=np.float32)
+
+    return r
+
 def normalize(X_train, X_test):
 
     mean = np.mean(X_train, axis=(0, 1, 2, 3))
@@ -321,7 +347,22 @@ def generate_minibatch(r, batch_size):
         r.render_mvrgbd(pyosr.Renderer.NO_SCENE_RENDERING)
         X.append(np.concatenate((r.mvrgb.reshape(rgb_shape), r.mvdepth.reshape(dep_shape)), axis=2))
         r.state = aq
+        r.render_mvrgbd(pyosr.Renderer.NO_SCENE_RENDERING|pyosr.Renderer.HAS_NTR_RENDERING)
+        Y.append(np.concatenate((r.mvrgb.reshape(rgb_shape), r.mvdepth.reshape(dep_shape)), axis=2))
+    return X, Y
+
+def generate_minibatch_ntr(r, batch_size):
+    res = r.pbufferWidth
+    rgb_shape = (res,res,3)
+    dep_shape = (res,res,1)
+    X = []
+    Y = []
+    for i in range(batch_size):
+        q, aq = random_state(0.5)
+        r.state = q
         r.render_mvrgbd(pyosr.Renderer.NO_SCENE_RENDERING)
+        X.append(np.concatenate((r.mvrgb.reshape(rgb_shape), r.mvdepth.reshape(dep_shape)), axis=2))
+        r.render_mvrgbd(pyosr.Renderer.NO_SCENE_RENDERING|pyosr.Renderer.HAS_NTR_RENDERING)
         Y.append(np.concatenate((r.mvrgb.reshape(rgb_shape), r.mvdepth.reshape(dep_shape)), axis=2))
     return X, Y
 

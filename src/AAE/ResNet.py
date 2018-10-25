@@ -46,6 +46,7 @@ class ResNet(object):
             self.img_size = self.r.pbufferWidth
             self.c_dim = 4
             self.label_dim = None
+            self.generator = generate_minibatch
 
         if self.dataset_name == 'double_alpha_puzzle' :
             self.is_generator_dataset = True
@@ -53,6 +54,15 @@ class ResNet(object):
             self.img_size = self.r.pbufferWidth
             self.c_dim = 4
             self.label_dim = None
+            self.generator = generate_minibatch
+
+        if self.dataset_name == 'alpha_ntr' :
+            self.is_generator_dataset = True
+            self.r = load_alpha_ntr()
+            self.img_size = self.r.pbufferWidth
+            self.c_dim = 4
+            self.label_dim = None
+            self.generator = generate_minibatch_ntr
 
         self.checkpoint_dir = args.checkpoint_dir
         self.log_dir = args.log_dir
@@ -70,10 +80,15 @@ class ResNet(object):
         self.init_lr = args.lr
         self.is_ae = args.ae
         self.is_aae = args.aae
+        self.is_hg = args.hourglass
 
         if self.is_ae and not self.is_aae:
             self.train_y = self.train_x
             self.test_y = self.test_x
+            self.model_name += 'AE'
+
+        if self.is_hg:
+            self.model_name += 'Hg'
 
         self.out_dir = args.out
 
@@ -96,30 +111,42 @@ class ResNet(object):
 
             ch = 32 # paper is 64
             x = conv(x, channels=ch, kernel=3, stride=1, scope='conv')
+            hg_out_0 = x
+
+            ########################################################################################################
+
+            hg_out_1 = []
 
             for i in range(residual_list[0]) :
                 x = residual_block(x, channels=ch, is_training=is_training, downsample=False, scope='resblock_0_' + str(i))
+                hg_out_1 = [x] + hg_out_1
 
             ########################################################################################################
 
             x = residual_block(x, channels=ch*2, is_training=is_training, downsample=True, scope='resblock_1_0')
 
+            hg_out_2 = [x]
             for i in range(1, residual_list[1]) :
                 x = residual_block(x, channels=ch*2, is_training=is_training, downsample=False, scope='resblock_1_' + str(i))
+                hg_out_2 = [x] + hg_out_2
 
             ########################################################################################################
 
             x = residual_block(x, channels=ch*4, is_training=is_training, downsample=True, scope='resblock_2_0')
 
+            hg_out_3 = [x]
             for i in range(1, residual_list[2]) :
                 x = residual_block(x, channels=ch*4, is_training=is_training, downsample=False, scope='resblock2_' + str(i))
+                hg_out_3 = [x] + hg_out_3
 
             ########################################################################################################
 
             x = residual_block(x, channels=ch*8, is_training=is_training, downsample=True, scope='resblock_3_0')
 
+            hg_out_4 = [x]
             for i in range(1, residual_list[3]) :
                 x = residual_block(x, channels=ch*8, is_training=is_training, downsample=False, scope='resblock_3_' + str(i))
+                hg_out_4 = [x] + hg_out_4
 
             ########################################################################################################
 
@@ -127,7 +154,7 @@ class ResNet(object):
             x = batch_norm(x, is_training, scope='batch_norm')
             x = relu(x)
 
-            if not self.is_ae:
+            if not self.is_ae and not self.is_hg:
                 x = global_avg_pooling(x)
                 x = fully_conneted(x, units=self.label_dim, scope='logit')
                 return x
@@ -150,29 +177,37 @@ class ResNet(object):
             ########################################################################################################
 
             for i in range(1, residual_list[3]) :
+                x = x + hg_out_4[i-1] if self.is_hg else x
                 x = residual_decoder_block(x, channels=ch*8, is_training=is_training, downsample=False, scope='resdecblock_3_' + str(i))
 
+            x = x + hg_out_4[-1] if self.is_hg else x
             x = residual_decoder_block(x, channels=ch*4, is_training=is_training, downsample=True, scope='resdecblock_3_0')
 
             ########################################################################################################
 
             for i in range(1, residual_list[2]) :
+                x = x + hg_out_3[i-1] if self.is_hg else x
                 x = residual_decoder_block(x, channels=ch*4, is_training=is_training, downsample=False, scope='resdecblock_2_' + str(i))
 
+            x = x + hg_out_3[-1] if self.is_hg else x
             x = residual_decoder_block(x, channels=ch*2, is_training=is_training, downsample=True, scope='resdecblock_2_0')
 
             ########################################################################################################
 
             for i in range(1, residual_list[1]) :
+                x = x + hg_out_2[i-1] if self.is_hg else x
                 x = residual_decoder_block(x, channels=ch*2, is_training=is_training, downsample=False, scope='resdecblock_1_' + str(i))
 
+            x = x + hg_out_2[-1] if self.is_hg else x
             x = residual_decoder_block(x, channels=ch, is_training=is_training, downsample=True, scope='resdecblock_1_0')
 
             ########################################################################################################
 
             for i in range(residual_list[0]) :
+                x = x + hg_out_1[i] if self.is_hg else x
                 x = residual_decoder_block(x, channels=ch, is_training=is_training, downsample=False, scope='resdecblock_0_' + str(i))
 
+            x = x + hg_out_0 if self.is_hg else x
             x = deconv(x, channels=self.c_dim, kernel=3, stride=1, scope='deconv')
             print('AE output shape {}'.format(x.shape))
 
@@ -185,7 +220,7 @@ class ResNet(object):
     def build_model(self):
         """ Graph Input """
 
-        if not self.is_ae:
+        if not self.is_ae and not self.is_hg:
             self.train_inptus = tf.placeholder(tf.float32, [self.batch_size, self.img_size, self.img_size, self.c_dim], name='train_inputs')
             self.test_labels = tf.placeholder(tf.float32, [len(self.test_y), self.label_dim], name='test_labels')
             self.train_labels = tf.placeholder(tf.float32, [self.batch_size, self.label_dim], name='train_labels')
@@ -202,7 +237,7 @@ class ResNet(object):
         self.train_logits = self.network(self.train_inptus)
         self.test_logits = self.network(self.test_inptus, is_training=False, reuse=True)
 
-        if self.is_ae:
+        if self.is_ae or self.is_hg:
             LOSS = mse_loss
         else:
             LOSS = classification_loss
@@ -225,7 +260,7 @@ class ResNet(object):
         train_summary_list = [self.summary_train_loss, self.summary_train_accuracy]
         test_summary_list = [self.summary_test_loss, self.summary_test_accuracy]
 
-        if self.is_ae:
+        if self.is_ae or self.is_hg:
             self.summary_train_ae = tf.summary.image('train_ae', self.train_logits)
             self.summary_test_ae = tf.summary.image('test_ae', self.test_logits)
 
@@ -283,7 +318,7 @@ class ResNet(object):
                     batch_x = self.train_x[idx*self.batch_size:(idx+1)*self.batch_size]
                     batch_y = self.train_y[idx*self.batch_size:(idx+1)*self.batch_size]
                 else:
-                    batch_x, batch_y = generate_minibatch(self.r, self.batch_size)
+                    batch_x, batch_y = self.generator(self.r, self.batch_size)
 
                 batch_x = data_augmentation(batch_x, self.img_size, self.dataset_name)
 
@@ -300,7 +335,7 @@ class ResNet(object):
                         self.test_labels : self.test_y[sel*test_nbatch:(sel+1)*test_nbatch]
                     }
                 else:
-                    test_x, test_y = generate_minibatch(self.r, self.batch_size)
+                    test_x, test_y = self.generator(self.r, self.batch_size)
                     test_feed_dict = {
                         self.test_inptus : test_x,
                         self.test_labels : test_y
@@ -333,7 +368,10 @@ class ResNet(object):
 
     @property
     def model_dir(self):
-        return "{}{}_{}_{}_{}".format(self.model_name, self.res_n, self.dataset_name, self.batch_size, self.init_lr)
+        if not self.is_hg:
+            return "{}{}_{}_{}_{}".format(self.model_name, self.res_n, self.dataset_name, self.batch_size, self.init_lr)
+        else:
+            return "{}{}_{}_hg".format(self.model_name, self.res_n, self.dataset_name)
 
     def save(self, checkpoint_dir, step):
         checkpoint_dir = os.path.join(checkpoint_dir, self.model_dir)
@@ -382,7 +420,7 @@ class ResNet(object):
             assert self.out_dir is not None
             index = 0
             for i in range(self.iteration):
-                batch_x, batch_y = generate_minibatch(self.r, self.batch_size)
+                batch_x, batch_y = self.generator(self.r, self.batch_size)
                 test_feed_dict = {
                     self.test_inptus : batch_x,
                     self.test_labels : batch_y
