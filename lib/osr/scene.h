@@ -63,7 +63,7 @@ public:
 	BoundingBox getBoundingBox() const { return bbox_; }
 
 	void moveToCenter();
-	void resetTransform() { xform_= glm::mat4(); }
+	void resetTransform() { xform_= glm::mat4(1.0); }
 	void translate(glm::vec3 offset) {
 		xform_= glm::translate(xform_, offset);
 	}

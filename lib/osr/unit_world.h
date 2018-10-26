@@ -160,7 +160,6 @@ protected:
 	std::shared_ptr<CDModel> cd_robot_;
 
 	StateVector robot_state_;
-	glm::mat4 the_world_;
 	Eigen::Matrix4d calib_mat_, inv_calib_mat_;
 	StateVector perturbate_;
 	Transform perturbate_tf_;

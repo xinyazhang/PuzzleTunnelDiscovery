@@ -298,7 +298,7 @@ void Renderer::render_depth()
 	CHECK_GL_ERROR(glClear(GL_DEPTH_BUFFER_BIT));
 
 	CHECK_GL_ERROR(glUseProgram(shaderProgram));
-	scene_renderer_->render(shaderProgram, camera, glm::mat4(), 0);
+	scene_renderer_->render(shaderProgram, camera, glm::mat4(1.0), 0);
 	if (robot_) {
 		auto mat = translate_state_to_matrix(robot_state_);
 		robot_renderer_->render(shaderProgram, camera, mat, 0);

@@ -3,6 +3,7 @@
 #include <iostream>
 #include <fcl/fcl.h>
 #include <igl/per_face_normals.h>
+#include <glm/gtx/io.hpp>
 
 namespace osr {
 struct CDModel::CDModelData {
@@ -118,12 +119,16 @@ void CDModel::addVF(const glm::mat4& m,
 	std::vector<fcl::Triangle> triangles;
 	glm::dmat4 mm(m);
 	// glm::dmat4 mm(1.0);
+	std::cerr << m << std::endl;
+	std::cerr << mm << std::endl;
 #if 1
 	for (const auto& vert: verts) {
 		glm::dvec4 oldp(vert.position, 1.0);
 		glm::dvec4 newp = mm * oldp;
 		vertices.emplace_back(newp[0], newp[1], newp[2]);
-		// std::cerr << vertices.back().transpose() << '\n';
+#if 0
+		std::cerr << vertices.back().transpose() << '\n';
+#endif
 	}
 #else
 	vertices.emplace_back(1.0, 0.0, 0.0);

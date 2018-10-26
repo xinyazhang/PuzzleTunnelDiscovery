@@ -7,7 +7,7 @@ namespace osr {
 Scene::Scene()
 	:xform_(xform_data_)
 {
-	// do nothing
+	clear();
 }
 
 Scene::Scene(std::shared_ptr<Scene> other)
@@ -68,7 +68,7 @@ void Scene::load(std::string filename, const glm::vec3* model_color)
 
 	center_ = glm::vec3(0.0f);
 	vertex_total_number_ = 0;
-	updateBoundingBox(root_.get(), glm::mat4());
+	updateBoundingBox(root_.get(), glm::mat4(1.0));
 	center_ = center_ / vertex_total_number_;
 }
 
@@ -106,8 +106,8 @@ void Scene::moveToCenter()
 
 void Scene::clear()
 {
-	xform_ = glm::mat4();
-	center_ = glm::vec3();
+	xform_ = glm::mat4(1.0);
+	center_ = glm::vec3(0.0);
 	bbox_ = BoundingBox();
 	root_.reset();
 	meshes_.clear();

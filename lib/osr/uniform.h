@@ -12,9 +12,9 @@ struct UniformMatrix {
     glm::mat4 proj;
 
     UniformMatrix() {
-        model = glm::mat4();
-        view = glm::mat4();
-        proj = glm::mat4();
+        model = glm::mat4(1.0);
+        view = glm::mat4(1.0);
+        proj = glm::mat4(1.0);
     }
 
     UniformMatrix(UniformMatrix& rhs) {

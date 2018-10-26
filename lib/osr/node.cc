@@ -3,6 +3,7 @@
 
 namespace osr {
 Node::Node(aiNode* node)
+	:xform(1.0)
 {
 	// meshes in current nodes
 	for (size_t i = 0; i < node->mNumMeshes; i++) {
