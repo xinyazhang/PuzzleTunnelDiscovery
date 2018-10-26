@@ -366,6 +366,47 @@ def generate_minibatch_ntr(r, batch_size):
         Y.append(np.concatenate((r.mvrgb.reshape(rgb_shape), r.mvdepth.reshape(dep_shape)), axis=2))
     return X, Y
 
+def generate_minibatch_ntr2(r, batch_size):
+    '''
+    ntr2: only keeps green channel as indication pixels
+    Note: avi should be disabled to eliminiate shadows.
+    '''
+    res = r.pbufferWidth
+    rgb_shape = (res,res,3)
+    dep_shape = (res,res,1)
+    X = []
+    Y = []
+    for i in range(batch_size):
+        r.avi = True
+        q, aq = random_state(0.5)
+        r.state = q
+        r.render_mvrgbd(pyosr.Renderer.NO_SCENE_RENDERING)
+        X.append(np.concatenate((r.mvrgb.reshape(rgb_shape), r.mvdepth.reshape(dep_shape)), axis=2))
+        r.avi = False
+        r.render_mvrgbd(pyosr.Renderer.NO_SCENE_RENDERING|pyosr.Renderer.HAS_NTR_RENDERING)
+        Y.append(np.copy(r.mvrgb.reshape(rgb_shape)[:,:,1:2]))
+    return X, Y
+
+def generate_minibatch_ntr3(r, batch_size):
+    '''
+    GT Without AVI, we just want masks
+    '''
+    res = r.pbufferWidth
+    rgb_shape = (res,res,3)
+    dep_shape = (res,res,1)
+    X = []
+    Y = []
+    for i in range(batch_size):
+        r.avi = True
+        q, aq = random_state(0.5)
+        r.state = q
+        r.render_mvrgbd(pyosr.Renderer.NO_SCENE_RENDERING)
+        X.append(np.concatenate((r.mvrgb.reshape(rgb_shape), r.mvdepth.reshape(dep_shape)), axis=2))
+        r.avi = False
+        r.render_mvrgbd(pyosr.Renderer.NO_SCENE_RENDERING|pyosr.Renderer.HAS_NTR_RENDERING)
+        Y.append(np.copy(r.mvrgb.reshape(rgb_shape)))
+    return X, Y
+
 def mkdir_p(path):
     try:
         os.makedirs(path)

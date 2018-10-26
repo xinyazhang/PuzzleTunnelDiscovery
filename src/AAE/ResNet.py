@@ -64,6 +64,28 @@ class ResNet(object):
             self.label_dim = None
             self.generator = generate_minibatch_ntr
 
+        if self.dataset_name == 'alpha_ntr2' :
+            self.is_generator_dataset = True
+            self.r = load_alpha_ntr()
+            self.img_size = self.r.pbufferWidth
+            self.c_dim = 4
+            self.d_dim = 1
+            self.label_dim = None
+            self.generator = generate_minibatch_ntr2
+
+        if self.dataset_name == 'alpha_ntr3' :
+            self.is_generator_dataset = True
+            self.r = load_alpha_ntr()
+            self.img_size = self.r.pbufferWidth
+            self.c_dim = 4
+            self.d_dim = 3
+            self.label_dim = None
+            self.generator = generate_minibatch_ntr3
+
+
+        if not hasattr(self, 'd_dim'):
+            self.d_dim = self.c_dim
+
         self.checkpoint_dir = args.checkpoint_dir
         self.log_dir = args.log_dir
 
@@ -208,7 +230,7 @@ class ResNet(object):
                 x = residual_decoder_block(x, channels=ch, is_training=is_training, downsample=False, scope='resdecblock_0_' + str(i))
 
             x = x + hg_out_0 if self.is_hg else x
-            x = deconv(x, channels=self.c_dim, kernel=3, stride=1, scope='deconv')
+            x = deconv(x, channels=self.d_dim, kernel=3, stride=1, scope='deconv')
             print('AE output shape {}'.format(x.shape))
 
             return x
@@ -227,9 +249,9 @@ class ResNet(object):
             self.test_inptus = tf.placeholder(tf.float32, [len(self.test_x), self.img_size, self.img_size, self.c_dim], name='test_inputs')
         else:
             self.train_inptus = tf.placeholder(tf.float32, [None, self.img_size, self.img_size, self.c_dim], name='train_inputs')
-            self.test_labels = tf.placeholder(tf.float32, [None, self.img_size, self.img_size, self.c_dim], name='test_labels')
-            self.train_labels = tf.placeholder(tf.float32, [None, self.img_size, self.img_size, self.c_dim], name='train_labels')
             self.test_inptus = tf.placeholder(tf.float32, [None, self.img_size, self.img_size, self.c_dim], name='test_inputs')
+            self.train_labels = tf.placeholder(tf.float32, [None, self.img_size, self.img_size, self.d_dim], name='train_labels')
+            self.test_labels = tf.placeholder(tf.float32, [None, self.img_size, self.img_size, self.d_dim], name='test_labels')
 
         self.lr = tf.placeholder(tf.float32, name='learning_rate')
 
@@ -430,7 +452,10 @@ class ResNet(object):
                 # Input Image, Expected Image and Output Image
                 for ii,ei,oi in zip(batch_x, batch_y, test_y):
                     ft = '{}/{}-{}.png'.format(self.out_dir, index, '{}')
+                    # imsave(ft.format('ii'), ii[:,:,:3])
+                    # imsave(ft.format('ei'), ei[:,:,:3])
+                    # imsave(ft.format('oi'), oi[:,:,:3])
                     imsave(ft.format('ii'), ii[:,:,:3])
-                    imsave(ft.format('ei'), ei[:,:,:3])
-                    imsave(ft.format('oi'), oi[:,:,:3])
+                    imsave(ft.format('ei'), ei[:,:,0])
+                    imsave(ft.format('oi'), oi[:,:,0])
                     index += 1
