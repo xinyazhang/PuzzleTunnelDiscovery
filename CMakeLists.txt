@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.0)
 
 project(mkobs3d CXX)
-SET(CMAKE_BUILD_TYPE Debug) # Seems CMAKE does not recognize -DCMAKE_BUILD_TYPE
+# SET(CMAKE_BUILD_TYPE Debug) # Seems CMAKE does not recognize -DCMAKE_BUILD_TYPE
 set (mkobs3d_VERSION_MAJOR 0)
 set (mkobj3d_VERSION_MINOR 2)
 
@@ -184,12 +184,13 @@ ENDIF (NOT CGAL_FOUND)
 
 # FCL (Flexible Collision Library) support
 SET(FCL_BUILD_TESTS OFF CACHE BOOL "Disable testcases for fcl" FORCE)
-SET(CMAKE_BUILD_TYPE Debug)
+# SET(CMAKE_BUILD_TYPE Debug)
 ADD_SUBDIRECTORY(third-party/fcl/)
 # Prioritize bundled fcl.
 INCLUDE_DIRECTORIES(BEFORE SYSTEM ${CMAKE_BINARY_DIR}/third-party/fcl/include/)
 INCLUDE_DIRECTORIES(BEFORE SYSTEM ${CMAKE_SOURCE_DIR}/third-party/fcl/include/)
-SET(CMAKE_BUILD_TYPE Debug)
+
+# SET(CMAKE_BUILD_TYPE Debug)
 
 # Main program
 ADD_EXECUTABLE(blend src/boolean/main.cc)
@@ -348,6 +349,7 @@ TARGET_LINK_LIBRARIES(trmap omplaux fcl)
 
 # Off-Screen Renderer for RL (reinforcement learning)
 # However if OpenGL is disabled, then the renderer part is not compiled.
+ADD_DEFINITIONS(-DGLM_ENABLE_EXPERIMENTAL -DGLM_FORCE_SIZE_FUNC=1 -DGLM_FORCE_RADIANS=1)
 EASYLIB(osr)
 TARGET_LINK_LIBRARIES(osr assimp fcl ${Boost_LIBRARIES} ompl tritri)
 ## Link osr to ode

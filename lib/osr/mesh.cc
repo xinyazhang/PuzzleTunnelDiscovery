@@ -1,7 +1,7 @@
 #include "mesh.h"
 #include "cdmodel.h"
 #include <algorithm>
-#include <fcl/collision.h>
+#include <fcl/narrowphase/collision.h>
 #include <glm/gtx/io.hpp>
 
 namespace osr {
