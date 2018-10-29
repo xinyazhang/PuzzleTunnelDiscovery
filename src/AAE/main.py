@@ -18,6 +18,8 @@ def parse_args():
 
     parser.add_argument('--checkpoint_dir', type=str, default='checkpoint',
                         help='Directory name to save the checkpoints')
+    parser.add_argument('--bootstrap_dir', type=str, default=None,
+                        help='Directory name to load the checkpoints')
     parser.add_argument('--log_dir', type=str, default='logs',
                         help='Directory name to save training logs')
 

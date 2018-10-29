@@ -40,6 +40,8 @@ class ResNet(object):
             self.label_dim = 200
 
         self.is_generator_dataset = False
+        self.test_only = False
+
         if self.dataset_name == 'alpha_puzzle' :
             self.is_generator_dataset = True
             self.r = load_alpha_puzzle()
@@ -82,12 +84,22 @@ class ResNet(object):
             self.label_dim = None
             self.generator = generate_minibatch_ntr3
 
+        if self.dataset_name == 'double_alpha_ntr3' :
+            self.is_generator_dataset = True
+            self.r = load_double_alpha_puzzle()
+            self.img_size = self.r.pbufferWidth
+            self.c_dim = 4
+            self.d_dim = 3
+            self.label_dim = None
+            self.generator = generate_minibatch_ntr3
+            self.test_only = True
 
         if not hasattr(self, 'd_dim'):
             self.d_dim = self.c_dim
 
         self.checkpoint_dir = args.checkpoint_dir
         self.log_dir = args.log_dir
+        self.bootstrap_dir = args.bootstrap_dir
 
         self.res_n = args.res_n
 
@@ -297,6 +309,7 @@ class ResNet(object):
     ##################################################################################
 
     def train(self):
+        assert not self.test_only, "dataset {} is test only".format(self.dataset_name)
         # initialize all variables
         tf.global_variables_initializer().run()
 
@@ -403,9 +416,10 @@ class ResNet(object):
 
         self.saver.save(self.sess, os.path.join(checkpoint_dir, self.model_name+'.model'), global_step=step)
 
-    def load(self, checkpoint_dir):
+    def load(self, checkpoint_dir, full=False):
         print(" [*] Reading checkpoints...")
-        checkpoint_dir = os.path.join(checkpoint_dir, self.model_dir)
+        if not full:
+            checkpoint_dir = os.path.join(checkpoint_dir, self.model_dir)
 
         ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
         if ckpt and ckpt.model_checkpoint_path:
@@ -422,7 +436,10 @@ class ResNet(object):
         tf.global_variables_initializer().run()
 
         self.saver = tf.train.Saver()
-        could_load, checkpoint_counter = self.load(self.checkpoint_dir)
+        if self.bootstrap_dir is not None:
+            could_load, checkpoint_counter = self.load(self.bootstrap_dir, full=True)
+        else:
+            could_load, checkpoint_counter = self.load(self.checkpoint_dir)
 
         if could_load:
             print(" [*] Load SUCCESS")
@@ -452,10 +469,13 @@ class ResNet(object):
                 # Input Image, Expected Image and Output Image
                 for ii,ei,oi in zip(batch_x, batch_y, test_y):
                     ft = '{}/{}-{}.png'.format(self.out_dir, index, '{}')
-                    # imsave(ft.format('ii'), ii[:,:,:3])
-                    # imsave(ft.format('ei'), ei[:,:,:3])
-                    # imsave(ft.format('oi'), oi[:,:,:3])
                     imsave(ft.format('ii'), ii[:,:,:3])
-                    imsave(ft.format('ei'), ei[:,:,0])
-                    imsave(ft.format('oi'), oi[:,:,0])
+                    if self.d_dim == 3:
+                        imsave(ft.format('ei'), ei[:,:,:3])
+                        imsave(ft.format('oi'), oi[:,:,:3])
+                    elif self.d_dim == 1:
+                        imsave(ft.format('ei'), ei[:,:,0])
+                        imsave(ft.format('oi'), oi[:,:,0])
+                    else:
+                        assert False, "Unrecognized d_dim {}".format(d_dim)
                     index += 1
