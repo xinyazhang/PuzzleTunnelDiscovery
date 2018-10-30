@@ -414,6 +414,89 @@ def feedback_labling(input_image, expect_image, predict_image):
 
     return np.stack([red_in, pred, blue_in], axis=2)
 
+'''
+Return a 2xD np.array `bb` to indicate the bounding box
+  bb[0]: smallest coefficients
+  bb[1]: largest coefficients
+
+  both index tuples are inclusive
+'''
+def calculate_bb_2d(img):
+    nz = np.nonzero(img)
+    nz_x = nz[0]
+    nz_y = nz[1]
+    if nz_x.size == 0 or nz_y.size == 0:
+        return None
+    return np.array([[min(nz_x), min(nz_y)], [max(nz_x), max(nz_y)]], dtype=np.int32)
+
+def intersect_bb(bb1, bb2):
+    if bb1 is None or bb2 is None:
+        return False # BB intersect NOT A BB is False (No Intersection)
+    x_left = max(bb1[0,0], bb2[0,0])
+    y_top = max(bb1[0,1], bb2[0,1])
+    x_right = min(bb1[1,0], bb2[1,0])
+    y_bottom = min(bb1[1,1], bb2[1,1])
+
+    if x_right < x_left or y_bottom < y_top:
+        return False
+    return True
+
+def random_bb(res):
+    x = np.sort(np.random.randint(res, size=(2)))
+    y = np.sort(np.random.randint(res, size=(2)))
+    return np.array([[x[0],y[0]],[x[1],y[1]]], dtype=np.int32)
+
+def patch_bb(img, bb, default=0.0):
+    mins = bb[0]
+    maxs = bb[1]
+    # +1 is necessary since numpy's broadcasting is [inclusive, exclusive)
+    img[mins[0]:maxs[0]+1, mins[1]:maxs[1]+1,:] = default
+    return img
+
+def random_blackout(rgb, green, dep, default_depth):
+    red = rgb[:,:,0:1]
+    red_bb = calculate_bb_2d(red)
+    green_bb = calculate_bb_2d(green)
+    res = int(red.shape[0])
+    while True:
+        bb = random_bb(res)
+        '''
+        bb must cover red region, and must not cover green region
+        '''
+        if intersect_bb(bb, green_bb):
+            continue
+        if not intersect_bb(bb, red_bb):
+            continue
+        break
+    return patch_bb(rgb, bb), patch_bb(dep, bb, default_depth)
+
+def generate_minibatch_ntr4(r, batch_size):
+    '''
+    ntr2: only keeps green channel as indication pixels
+    Note: avi should be disabled to eliminiate shadows.
+    '''
+    res = r.pbufferWidth
+    rgb_shape = (res,res,3)
+    dep_shape = (res,res,1)
+    X = []
+    Y = []
+    for i in range(batch_size):
+        r.avi = True
+        q, aq = random_state(0.5)
+        r.state = q
+        r.render_mvrgbd(pyosr.Renderer.NO_SCENE_RENDERING)
+        red = np.copy(r.mvrgb.reshape(rgb_shape))
+        dep = np.copy(r.mvdepth.reshape(dep_shape))
+        r.avi = False
+        r.render_mvrgbd(pyosr.Renderer.NO_SCENE_RENDERING|pyosr.Renderer.HAS_NTR_RENDERING)
+        greend = np.copy(r.mvrgb.reshape(rgb_shape))
+        patched_rgb, patched_dep = random_blackout(red, greend[:,:,1:2], dep, r.default_depth)
+        X.append(np.concatenate((patched_rgb, patched_dep), axis=2))
+        r.avi = False
+        r.render_mvrgbd(pyosr.Renderer.NO_SCENE_RENDERING|pyosr.Renderer.HAS_NTR_RENDERING)
+        Y.append(np.copy(r.mvrgb.reshape(rgb_shape)[:,:,1:2]))
+    return X, Y
+
 def mkdir_p(path):
     try:
         os.makedirs(path)

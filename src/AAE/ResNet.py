@@ -77,6 +77,16 @@ class ResNet(object):
             self.generator = generate_minibatch_ntr2
             self.image_post_processing_func = feedback_labling
 
+        if self.dataset_name == 'alpha_ntr4' :
+            self.is_generator_dataset = True
+            self.r = load_alpha_ntr()
+            self.img_size = self.r.pbufferWidth
+            self.c_dim = 4
+            self.d_dim = 1
+            self.label_dim = None
+            self.generator = generate_minibatch_ntr4
+            self.image_post_processing_func = feedback_labling
+
         if self.dataset_name == 'double_alpha_ntr2' :
             self.is_generator_dataset = True
             self.r = load_double_alpha_puzzle()
@@ -350,6 +360,11 @@ class ResNet(object):
             start_batch_id = 0
             counter = 1
             print(" [!] Load failed...")
+            '''
+            Bootstrap from another pre-trained network
+            Note: do not care the returns
+            '''
+            self.load(self.bootstrap_dir, fullpath=True)
 
         # loop for epoch
         start_time = time.time()
@@ -428,9 +443,9 @@ class ResNet(object):
 
         self.saver.save(self.sess, os.path.join(checkpoint_dir, self.model_name+'.model'), global_step=step)
 
-    def load(self, checkpoint_dir, full=False):
+    def load(self, checkpoint_dir, fullpath=False):
         print(" [*] Reading checkpoints...")
-        if not full:
+        if not fullpath:
             checkpoint_dir = os.path.join(checkpoint_dir, self.model_dir)
 
         ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
@@ -449,7 +464,7 @@ class ResNet(object):
 
         self.saver = tf.train.Saver()
         if self.bootstrap_dir is not None:
-            could_load, checkpoint_counter = self.load(self.bootstrap_dir, full=True)
+            could_load, checkpoint_counter = self.load(self.bootstrap_dir, fullpath=True)
         else:
             could_load, checkpoint_counter = self.load(self.checkpoint_dir)
 
@@ -480,16 +495,29 @@ class ResNet(object):
                     [self.test_loss, self.test_logits], feed_dict=test_feed_dict)
                 # Input Image, Expected Image and Output Image
                 for ii,ei,oi in zip(batch_x, batch_y, test_y):
-                    ft = '{}/{}-{}.png'.format(self.out_dir, index, '{}')
-                    imsave(ft.format('ii'), ii[:,:,:3])
-                    if self.d_dim == 3:
-                        imsave(ft.format('ei'), ei[:,:,:3])
-                        imsave(ft.format('oi'), oi[:,:,:3])
-                    elif self.d_dim == 1:
-                        imsave(ft.format('ei'), ei[:,:,0])
-                        imsave(ft.format('oi'), oi[:,:,0])
-                    else:
-                        assert False, "Unrecognized d_dim {}".format(d_dim)
-                    if self.image_post_processing_func is not None:
-                        imsave(ft.format('pi'), self.image_post_processing_func(ii, ei, oi))
+                    self._imsave(ii, ei, oi)
                     index += 1
+
+    def _imsave(self, index, ii, ei, oi):
+        ft = '{}/{}-{}.png'.format(self.out_dir, index, '{}')
+        imsave(ft.format('ii'), ii[:,:,:3])
+        if self.d_dim == 3:
+            imsave(ft.format('ei'), ei[:,:,:3])
+            if oi is not None:
+                imsave(ft.format('oi'), oi[:,:,:3])
+        elif self.d_dim == 1:
+            imsave(ft.format('ei'), ei[:,:,0])
+            if oi is not None:
+                imsave(ft.format('oi'), oi[:,:,0])
+        else:
+            assert False, "Unrecognized d_dim {}".format(d_dim)
+        if self.image_post_processing_func is not None and oi is not None:
+            imsave(ft.format('pi'), self.image_post_processing_func(ii, ei, oi))
+
+    def peek(self):
+        index = 0
+        for i in range(self.iteration):
+            batch_x, batch_y = self.generator(self.r, self.batch_size)
+            for ii,ei in zip(batch_x, batch_y):
+                self._imsave(index, ii, ei, None)
+                index += 1

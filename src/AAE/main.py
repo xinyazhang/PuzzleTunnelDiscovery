@@ -82,10 +82,13 @@ def main():
 
             cnn.test()
             print(" [*] Test finished!")
-
-        if args.phase == 'test' :
+        elif args.phase == 'test' :
             cnn.test()
             print(" [*] Test finished!")
+        elif args.phase == 'peek':
+            cnn.peek()
+        else:
+            assert False, "unknonw phase {}".format(args.phase)
 
 if __name__ == '__main__':
     main()
