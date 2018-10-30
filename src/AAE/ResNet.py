@@ -41,6 +41,7 @@ class ResNet(object):
 
         self.is_generator_dataset = False
         self.test_only = False
+        self.image_post_processing_func = None
 
         if self.dataset_name == 'alpha_puzzle' :
             self.is_generator_dataset = True
@@ -74,6 +75,17 @@ class ResNet(object):
             self.d_dim = 1
             self.label_dim = None
             self.generator = generate_minibatch_ntr2
+            self.image_post_processing_func = feedback_labling
+
+        if self.dataset_name == 'double_alpha_ntr2' :
+            self.is_generator_dataset = True
+            self.r = load_double_alpha_puzzle()
+            self.img_size = self.r.pbufferWidth
+            self.c_dim = 4
+            self.d_dim = 1
+            self.label_dim = None
+            self.generator = generate_minibatch_ntr2
+            self.image_post_processing_func = feedback_labling
 
         if self.dataset_name == 'alpha_ntr3' :
             self.is_generator_dataset = True
@@ -478,4 +490,6 @@ class ResNet(object):
                         imsave(ft.format('oi'), oi[:,:,0])
                     else:
                         assert False, "Unrecognized d_dim {}".format(d_dim)
+                    if self.image_post_processing_func is not None:
+                        imsave(ft.format('pi'), self.image_post_processing_func(ii, ei, oi))
                     index += 1

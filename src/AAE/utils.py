@@ -407,6 +407,13 @@ def generate_minibatch_ntr3(r, batch_size):
         Y.append(np.copy(r.mvrgb.reshape(rgb_shape)))
     return X, Y
 
+def feedback_labling(input_image, expect_image, predict_image):
+    red_in = input_image[:,:,0]
+    blue_in = input_image[:,:,2]
+    pred = predict_image[:,:,0]
+
+    return np.stack([red_in, pred, blue_in], axis=2)
+
 def mkdir_p(path):
     try:
         os.makedirs(path)
