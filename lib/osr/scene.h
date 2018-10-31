@@ -8,7 +8,6 @@
 #include <assimp/scene.h>
 #include <assimp/Importer.hpp>
 
-#define GLM_FORCE_RADIANS
 #include <glm/ext.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>

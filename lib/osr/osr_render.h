@@ -12,7 +12,6 @@
 #include <stdint.h>
 #include <tuple>
 
-#define GLM_FORCE_RADIANS
 #include <glm/mat4x4.hpp>
 
 namespace osr {
@@ -60,6 +59,7 @@ public:
 
 	RMMatrixXb mvrgb;
 	RMMatrixXf mvdepth;
+	RMMatrixXf mvuv;
 
 	int pbufferWidth = 224;
 	int pbufferHeight = 224;
@@ -75,8 +75,11 @@ public:
 	 *        Column 1: longitude
 	 */
 	Eigen::MatrixXf views;
-	
+
 	Eigen::MatrixXf getPermutationToWorld(int view);
+
+	void setUVFeedback(bool);
+	bool getUVFeedback() const;
 private:
 	void setupNonSharedObjects();
 
@@ -96,6 +99,9 @@ private:
 	Camera setup_camera();
 
 	glm::mat4 camera_rot_;
+
+	GLuint uv_texture_ = 0;
+	bool uvfeedback_enabled_ = false;
 };
 
 }

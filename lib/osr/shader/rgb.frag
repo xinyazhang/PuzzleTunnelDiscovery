@@ -7,6 +7,7 @@ in vec4 world_position;
 in vec2 uv;
 layout(location=0) out float outDepth;
 layout(location=1) out vec4 outColor;
+layout(location=2) out vec2 outUV;
 const float far = 20.0;
 const float near = 1.0;
 layout(location=16) uniform bool phong;
@@ -30,6 +31,7 @@ void main() {
     } else {
         outColor = vec4(mColor, 1.0);
     }
+    outUV = uv;
     outDepth = linearZ;
 }
 )zzz";

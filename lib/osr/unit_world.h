@@ -1,7 +1,6 @@
 #ifndef OSR_UNIT_WORLD_H
 #define OSR_UNIT_WORLD_H
 
-#define GLM_FORCE_RADIANS
 #include <glm/mat4x4.hpp>
 
 #include <memory>

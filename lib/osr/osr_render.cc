@@ -22,6 +22,9 @@ const char* rgbdFragShaderSrc =
 
 const GLenum drawBuffers[1] = { GL_COLOR_ATTACHMENT0 };
 const GLenum rgbdDrawBuffers[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+const GLenum rgbduvDrawBuffers[3] = { GL_COLOR_ATTACHMENT0,
+	                              GL_COLOR_ATTACHMENT1,
+				      GL_COLOR_ATTACHMENT2 };
 
 using Renderer = osr::Renderer;
 using StateScalar = osr::StateScalar;
@@ -181,6 +184,7 @@ void Renderer::teardown()
 	CHECK_GL_ERROR(glDeleteRenderbuffers(1, &depthbufferID));
 	CHECK_GL_ERROR(glDeleteTextures(1, &renderTarget));
 	CHECK_GL_ERROR(glDeleteTextures(1, &rgbTarget));
+	CHECK_GL_ERROR(glDeleteTextures(1, &uv_texture_));
 	CHECK_GL_ERROR(glDeleteProgram(shaderProgram));
 	CHECK_GL_ERROR(glDeleteProgram(rgbdShaderProgram));
 
@@ -269,6 +273,10 @@ void Renderer::render_mvrgbd(uint32_t flags)
 {
 	mvrgb.resize(views.rows(), pbufferWidth * pbufferHeight * 3);
 	mvdepth.resize(views.rows(), pbufferWidth * pbufferHeight);
+	if (uvfeedback_enabled_)
+		mvuv.resize(views.rows(), pbufferWidth * pbufferHeight * 2);
+	else
+		mvuv.resize(0, 0);
 
 	for(int i = 0; i < views.rows(); i++) {
 		angleCamera(views(i, 0), views(i, 1));
@@ -279,6 +287,11 @@ void Renderer::render_mvrgbd(uint32_t flags)
 		CHECK_GL_ERROR(glReadBuffer(GL_COLOR_ATTACHMENT1));
 		CHECK_GL_ERROR(glReadPixels(0, 0, pbufferWidth, pbufferHeight,
 					    GL_RGB, GL_UNSIGNED_BYTE, mvrgb.row(i).data()));
+		if (uvfeedback_enabled_) {
+			CHECK_GL_ERROR(glReadBuffer(GL_COLOR_ATTACHMENT2));
+			CHECK_GL_ERROR(glReadPixels(0, 0, pbufferWidth, pbufferHeight,
+			                            GL_RG, GL_FLOAT, mvuv.row(i).data()));
+		}
 	}
 }
 
@@ -321,6 +334,10 @@ void Renderer::render_rgbd(uint32_t flags)
 #endif
 	CHECK_GL_ERROR(glClearTexImage(rgbTarget, 0, GL_RGB, GL_UNSIGNED_BYTE, &black));
 	CHECK_GL_ERROR(glClearTexImage(renderTarget, 0, GL_RED, GL_FLOAT, &default_depth));
+	if (uv_texture_) {
+		static const float invalid_uv[] = {-1.0f, -1.0f};
+		CHECK_GL_ERROR(glClearTexImage(uv_texture_, 0, GL_RG, GL_FLOAT, invalid_uv));
+	}
 	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, rgbdFramebuffer));
 #if 0
 	CHECK_GL_ERROR(glFlush());
@@ -339,6 +356,7 @@ void Renderer::render_rgbd(uint32_t flags)
 	CHECK_GL_ERROR(glUseProgram(rgbdShaderProgram));
 	CHECK_GL_ERROR(glUniform1i(16, avi));
 	CHECK_GL_ERROR(glUniform3fv(17, 1, light_position.data()));
+	CHECK_GL_ERROR(glUniform1i(18, 0));
 
 	if (!(flags & NO_SCENE_RENDERING)) {
 		scene_renderer_->render(rgbdShaderProgram, camera, perturbation_mat, flags);
@@ -351,6 +369,44 @@ void Renderer::render_rgbd(uint32_t flags)
 
 	CHECK_GL_ERROR(glFlush());
 }
+
+
+void Renderer::setUVFeedback(bool enable)
+{
+	if (uv_texture_ == 0 && enable) {
+		CHECK_GL_ERROR(glGenTextures(1, &uv_texture_));
+		CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D, uv_texture_));
+		CHECK_GL_ERROR(glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, pbufferWidth, pbufferHeight, 0, GL_RG, GL_FLOAT, 0));
+		CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
+		CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+		CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D, 0));
+	}
+	if (enable) {
+		CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, rgbdFramebuffer));
+		CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, renderTarget, 0));
+		CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, rgbTarget, 0));
+		CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, uv_texture_, 0));
+		CHECK_GL_ERROR(glDrawBuffers(3, rgbduvDrawBuffers));
+	} else {
+		CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, rgbdFramebuffer));
+		CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, renderTarget, 0));
+		CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, rgbTarget, 0));
+		CHECK_GL_ERROR(glDrawBuffers(2, rgbdDrawBuffers));
+	}
+
+	/*
+	 * Switch back to depth-only FB
+	 */
+	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, framebufferID));
+	uvfeedback_enabled_ = enable;
+}
+
+
+bool Renderer::getUVFeedback() const
+{
+	return uvfeedback_enabled_;
+}
+
 
 Camera Renderer::setup_camera()
 {
