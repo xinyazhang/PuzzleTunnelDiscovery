@@ -223,7 +223,7 @@ def load_double_alpha_puzzle():
 
     keys_w_first_npz = '../res/alpha/alpha-1.2.org.w-first.npz'
     env_wt_fn = '../res/alpha/alpha_env-1.2.wt.obj'
-    rob_wt_fn = '../res/alpha/double-alpha-1.2.wt.obj'
+    rob_wt_fn = '../res/alpha/double-alpha-1.2.wt.tcp.ply'
     rob_ompl_center = np.array([16.973146438598633, 1.2278236150741577, 10.204807281494141])
     r.loadModelFromFile(env_wt_fn)
     r.loadRobotFromFile(rob_wt_fn)
@@ -386,6 +386,30 @@ def generate_minibatch_ntr2(r, batch_size):
         r.render_mvrgbd(pyosr.Renderer.NO_SCENE_RENDERING|pyosr.Renderer.HAS_NTR_RENDERING)
         Y.append(np.copy(r.mvrgb.reshape(rgb_shape)[:,:,1:2]))
     return X, Y
+
+def generate_minibatch_ntr2_withuv(r, batch_size):
+    '''
+    ntr2: only keeps green channel as indication pixels
+    Note: avi should be disabled to eliminiate shadows.
+    '''
+    res = r.pbufferWidth
+    rgb_shape = (res,res,3)
+    dep_shape = (res,res,1)
+    uv_shape = (res,res,2)
+    X = []
+    Y = []
+    UV = []
+    for i in range(batch_size):
+        r.avi = True
+        q, aq = random_state(0.5)
+        r.state = q
+        r.render_mvrgbd(pyosr.Renderer.NO_SCENE_RENDERING)
+        X.append(np.concatenate((r.mvrgb.reshape(rgb_shape), r.mvdepth.reshape(dep_shape)), axis=2))
+        r.avi = False
+        r.render_mvrgbd(pyosr.Renderer.NO_SCENE_RENDERING|pyosr.Renderer.HAS_NTR_RENDERING)
+        Y.append(np.copy(r.mvrgb.reshape(rgb_shape)[:,:,1:2]))
+        UV.append(np.copy(r.mvuv.reshape(uv_shape)))
+    return X, Y, UV
 
 def generate_minibatch_ntr3(r, batch_size):
     '''

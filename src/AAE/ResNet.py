@@ -42,6 +42,7 @@ class ResNet(object):
         self.is_generator_dataset = False
         self.test_only = False
         self.image_post_processing_func = None
+        self.advanced_testing = None
 
         if self.dataset_name == 'alpha_puzzle' :
             self.is_generator_dataset = True
@@ -91,11 +92,13 @@ class ResNet(object):
             self.is_generator_dataset = True
             self.r = load_double_alpha_puzzle()
             self.img_size = self.r.pbufferWidth
+            self.r.uv_feedback = True
             self.c_dim = 4
             self.d_dim = 1
             self.label_dim = None
             self.generator = generate_minibatch_ntr2
             self.image_post_processing_func = feedback_labling
+            self.advanced_testing = self._test_double_alpha_ntr2
 
         if self.dataset_name == 'alpha_ntr3' :
             self.is_generator_dataset = True
@@ -484,6 +487,9 @@ class ResNet(object):
         else:
             assert could_load
             assert self.out_dir is not None
+            if self.advanced_testing is not None:
+                self.advanced_testing()
+                return
             index = 0
             for i in range(self.iteration):
                 batch_x, batch_y = self.generator(self.r, self.batch_size)
@@ -521,3 +527,33 @@ class ResNet(object):
             for ii,ei in zip(batch_x, batch_y):
                 self._imsave(index, ii, ei, None)
                 index += 1
+
+    def _test_double_alpha_ntr2(self):
+        tres = 1024
+        atex = np.zeros(shape=(tres,tres), dtype=np.float32) # accumulator texture
+        index = 0
+        for i in range(self.iteration):
+            batch_x, batch_y, batch_uv = generate_minibatch_ntr2_withuv(self.r, self.batch_size)
+            test_feed_dict = {
+                self.test_inptus : batch_x,
+                self.test_labels : batch_y
+            }
+            test_loss, test_y = self.sess.run([self.test_loss, self.test_logits],
+                                              feed_dict=test_feed_dict)
+            for ii,uvi,labeli in zip(batch_x, batch_uv, test_y):
+                np.clip(labeli, 0.0, 1.0, out=labeli)
+                labeli = np.reshape(labeli, (self.img_size,self.img_size))
+                nz = np.nonzero(labeli)
+                scores = labeli[nz]
+                uvs = uvi[nz]
+                us = 1.0 - uvs[:,1]
+                us = np.array(tres * us, dtype=int)
+                vs = uvs[:,0]
+                vs = np.array(tres * vs, dtype=int)
+                for iu,iv,s in zip(us,vs,scores):
+                    if iu < 0 or iu >= tres or iv < 0 or iv > tres:
+                        continue
+                    atex[iu,iv] += s
+        np.savez('{}/atex.npz'.format(self.out_dir), ATEX=atex)
+        natex = atex / np.amax(atex)
+        imsave('{}/atex.png'.format(self.out_dir), natex)
