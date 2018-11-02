@@ -1,6 +1,6 @@
 #include <readtet.h>
 #include <heatio/readheat.h>
-#include <vertcolorply/ply_write_vfc.h>
+#include <advplyio/ply_write_vfc.h>
 #include <unistd.h>
 #include <string>
 #include <unordered_map>

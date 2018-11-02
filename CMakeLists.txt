@@ -207,7 +207,7 @@ IF (CGAL_FOUND)
 ENDIF (CGAL_FOUND)
 
 EASYLIB(tetio)
-EASYLIB(vertcolorply)
+EASYLIB(advplyio)
 EASYLIB(heatio)
 EASYLIB(vecio)
 EASYLIB(geopick)
@@ -216,7 +216,7 @@ EASYLIB(omplaux)
 EASYLIB(goct)
 EASYLIB(tritri)
 
-TARGET_LINK_LIBRARIES(mazeinfo vertcolorply)
+TARGET_LINK_LIBRARIES(mazeinfo advplyio)
 
 if (USE_GPU)
 EASYLIB(renderer)
@@ -271,7 +271,7 @@ TARGET_LINK_LIBRARIES(mass tetio vecio)
 
 if (USE_GPU)
 EASYADD(visheat)
-TARGET_LINK_LIBRARIES(visheat vertcolorply ${CMAKE_THREAD_LIBS_INIT} ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY} tetio heatio)
+TARGET_LINK_LIBRARIES(visheat advplyio ${CMAKE_THREAD_LIBS_INIT} ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY} tetio heatio)
 endif (USE_GPU)
 
 EASYADD(follow)
