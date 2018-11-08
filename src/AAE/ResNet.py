@@ -541,7 +541,7 @@ class ResNet(object):
             test_loss, test_y = self.sess.run([self.test_loss, self.test_logits],
                                               feed_dict=test_feed_dict)
             for ii,uvi,labeli in zip(batch_x, batch_uv, test_y):
-                np.clip(labeli, 0.0, 1.0, out=labeli)
+                # np.clip(labeli, 0.0, 1.0, out=labeli)
                 labeli = np.reshape(labeli, (self.img_size,self.img_size))
                 nz = np.nonzero(labeli)
                 scores = labeli[nz]
