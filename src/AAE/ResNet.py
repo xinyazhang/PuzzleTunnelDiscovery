@@ -100,6 +100,17 @@ class ResNet(object):
             self.image_post_processing_func = feedback_labling
             self.advanced_testing = self._test_double_alpha_ntr2
 
+        if self.dataset_name == 'alpha_ntr2_atex' :
+            self.is_generator_dataset = True
+            self.r = load_alpha_ntr()
+            self.img_size = self.r.pbufferWidth
+            self.r.uv_feedback = True
+            self.c_dim = 4
+            self.d_dim = 1
+            self.label_dim = None
+            self.generator = generate_minibatch_ntr2
+            self.advanced_testing = self._test_double_alpha_ntr2
+
         if self.dataset_name == 'alpha_ntr3' :
             self.is_generator_dataset = True
             self.r = load_alpha_ntr()
