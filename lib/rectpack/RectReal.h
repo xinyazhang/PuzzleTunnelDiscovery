@@ -22,6 +22,7 @@ namespace rbp {
 
 struct RectSize
 {
+	RectSize(double _w, double _h):width(_w), height(_h) {}
 	double width;
 	double height;
 

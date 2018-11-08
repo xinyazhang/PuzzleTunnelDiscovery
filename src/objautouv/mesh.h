@@ -2,8 +2,13 @@
 #define OBJAUTOUV_MESH_H
 
 #include <Eigen/Core>
+#include <vector>
+
+struct UVBox;
 
 struct Mesh {
+	Mesh();
+	~Mesh();
 	// Vertex attributes
 	Eigen::MatrixXd V;
 	Eigen::MatrixXd UV;
@@ -29,8 +34,6 @@ struct Mesh {
 	// Intermediate routines
 	void PairWithLongEdge();
 
-	struct UVBox;
-
 	std::vector<UVBox> boxes;
 	UVBox CreateBB(int f, int other_f = -1);
 
@@ -38,6 +41,8 @@ struct Mesh {
 	//   After calling PairWithLongEdge to set boxes,
 	//   call lib/rectpack to pack these boxes.
 	void Program();
+
+	double rec_u_size, rec_v_size;
 };
 
 #endif

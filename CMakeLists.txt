@@ -375,6 +375,10 @@ else (USE_GPU)
 TARGET_COMPILE_DEFINITIONS(osr PRIVATE GPU_ENABLED=0)
 endif (USE_GPU)
 
+EASYLIB(rectpack)
+EASYADD(objautouv)
+TARGET_LINK_LIBRARIES(objautouv rectpack)
+
 # Blender PRM and RRT for RL's GT (Ground Truth)
 EASYADD(mtblender)
 ## Note: do not use ompl_LIBRARIES, which pulls into too many denpendencies.

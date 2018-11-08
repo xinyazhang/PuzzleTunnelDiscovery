@@ -40,10 +40,10 @@ public:
 	};
 
 	/// Inserts the given list of rectangles in an offline/batch mode, possibly rotated.
-	/// @param rects The list of rectangles to insert. This vector will be destroyed in the process.
+	/// @param rects The list of rectangles to insert. This vector is passed by value because internally it will be destroyed in the process.
 	/// @param dst [out] This list will contain the packed rectangles. The indices will not correspond to that of rects.
 	/// @param method The rectangle placement rule to use when packing.
-	void Insert(std::vector<RectSize> &rects, std::vector<Rect> &dst, FreeRectChoiceHeuristic method);
+	void Insert(std::vector<RectSize> rects, std::vector<Rect> &dst, FreeRectChoiceHeuristic method);
 
 	/// Inserts a single rectangle into the bin, possibly rotated.
 	Rect Insert(double width, double height, FreeRectChoiceHeuristic method, void *cookie = nullptr);
