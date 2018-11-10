@@ -33,11 +33,13 @@ Mesh::Mesh(aiMesh* mesh, glm::vec3 color)
 		for (size_t i = 0; i < NV; i++) {
 			uv_(i,0) = mesh->mTextureCoords[0][i][0];
 			uv_(i,1) = mesh->mTextureCoords[0][i][1]; 
+			std::cerr << "Loading UV " << uv_.row(i) << std::endl;
 		}
+		std::cerr << "Load UV: " << uv_.rows() << std::endl;
 	} else {
 		uv_.resize(0, Eigen::NoChange);
+		std::cerr << "UV Not Found" << std::endl;
 	}
-	uv_.resize(mesh->mNumVertices, 2);
 	for (size_t i = 0; i < mesh->mNumFaces; i++) {
 		aiFace& face = mesh->mFaces[i];
 		if (face.mNumIndices == 3) {

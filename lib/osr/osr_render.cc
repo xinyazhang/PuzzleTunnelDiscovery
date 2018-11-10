@@ -48,6 +48,7 @@ namespace osr {
 const uint32_t Renderer::NO_SCENE_RENDERING;
 const uint32_t Renderer::NO_ROBOT_RENDERING;
 const uint32_t Renderer::HAS_NTR_RENDERING;
+const uint32_t Renderer::UV_MAPPINNG_RENDERING;
 
 Renderer::Renderer()
 {
@@ -271,6 +272,13 @@ Renderer::RMMatrixXf Renderer::render_mvdepth_to_buffer()
 
 void Renderer::render_mvrgbd(uint32_t flags)
 {
+	int is_render_uv_mapping = !!(flags & UV_MAPPINNG_RENDERING);
+
+	setupUVFeedbackBuffer();
+	if (is_render_uv_mapping) {
+		enablePidBuffer();
+	}
+
 	mvrgb.resize(views.rows(), pbufferWidth * pbufferHeight * 3);
 	mvdepth.resize(views.rows(), pbufferWidth * pbufferHeight);
 	if (uvfeedback_enabled_)
@@ -292,13 +300,18 @@ void Renderer::render_mvrgbd(uint32_t flags)
 			CHECK_GL_ERROR(glReadPixels(0, 0, pbufferWidth, pbufferHeight,
 			                            GL_RG, GL_FLOAT, mvuv.row(i).data()));
 		}
+		if (is_render_uv_mapping) {
+			CHECK_GL_ERROR(glReadBuffer(GL_COLOR_ATTACHMENT3));
+			CHECK_GL_ERROR(glReadPixels(0, 0, pbufferWidth, pbufferHeight,
+			                            GL_RED_INTEGER, GL_INT, mvpid.row(i).data()));
+		}
 	}
 }
 
 
 void Renderer::render_depth()
 {
-	Camera camera = setup_camera();
+	Camera camera = setup_camera(0);
 	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 	CHECK_GL_ERROR(glClearTexImage(renderTarget, 0, GL_RED, GL_FLOAT, &default_depth));
 	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, framebufferID));
@@ -323,8 +336,11 @@ void Renderer::render_depth()
 
 void Renderer::render_rgbd(uint32_t flags)
 {
+	int is_render_uv_mapping = !!(flags & UV_MAPPINNG_RENDERING);
+	std::cerr << "is_render_uv_mapping " << is_render_uv_mapping << "\n";
+
 	glm::mat4 perturbation_mat = translate_state_to_matrix(perturbate_);
-	Camera camera = setup_camera();
+	Camera camera = setup_camera(flags);
 	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 #if 0
 	static const uint8_t black[] = {0, 0, 255, 0};
@@ -354,9 +370,22 @@ void Renderer::render_rgbd(uint32_t flags)
 	CHECK_GL_ERROR(glClear(GL_DEPTH_BUFFER_BIT));
 
 	CHECK_GL_ERROR(glUseProgram(rgbdShaderProgram));
-	CHECK_GL_ERROR(glUniform1i(16, avi));
+	// AVI is disabled when rendering UV
+	CHECK_GL_ERROR(glUniform1i(16, is_render_uv_mapping ? 0 : avi));
 	CHECK_GL_ERROR(glUniform3fv(17, 1, light_position.data()));
 	CHECK_GL_ERROR(glUniform1i(18, 0));
+	CHECK_GL_ERROR(glUniform1i(19, is_render_uv_mapping));
+	CHECK_GL_ERROR(glUniform1i(20, pbufferWidth));
+
+#if 1
+	if (is_render_uv_mapping) {
+		glDisable(GL_CULL_FACE);
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	} else {
+		glEnable(GL_CULL_FACE);
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	}
+#endif
 
 	if (!(flags & NO_SCENE_RENDERING)) {
 		scene_renderer_->render(rgbdShaderProgram, camera, perturbation_mat, flags);
@@ -373,6 +402,24 @@ void Renderer::render_rgbd(uint32_t flags)
 
 void Renderer::setUVFeedback(bool enable)
 {
+	uvfeedback_enabled_ = enable;
+
+	/*
+	 * Switch back to depth-only FB
+	 */
+	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, framebufferID));
+}
+
+
+bool Renderer::getUVFeedback() const
+{
+	return uvfeedback_enabled_;
+}
+
+
+void Renderer::setupUVFeedbackBuffer()
+{
+	bool enable = uvfeedback_enabled_;
 	if (uv_texture_ == 0 && enable) {
 		CHECK_GL_ERROR(glGenTextures(1, &uv_texture_));
 		CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D, uv_texture_));
@@ -393,23 +440,54 @@ void Renderer::setUVFeedback(bool enable)
 		CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, rgbTarget, 0));
 		CHECK_GL_ERROR(glDrawBuffers(2, rgbdDrawBuffers));
 	}
+}
 
-	/*
-	 * Switch back to depth-only FB
-	 */
+
+void Renderer::enablePidBuffer()
+{
+	if (!pid_texture_) {
+		CHECK_GL_ERROR(glGenTextures(1, &pid_texture_));
+		CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D, pid_texture_));
+		CHECK_GL_ERROR(glTexImage2D(GL_TEXTURE_2D, 0, GL_R32I, pbufferWidth, pbufferHeight, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, 0));
+		CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
+		CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+		CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D, 0));
+	}
+	mvpid.resize(views.rows(), pbufferWidth * pbufferHeight);
+	static const GLenum draw_buffers[3] = {
+		GL_COLOR_ATTACHMENT0,
+		GL_COLOR_ATTACHMENT1,
+		// GL_COLOR_ATTACHMENT2, // UV_MAPPINNG_RENDERING disables uv_feedback
+		GL_COLOR_ATTACHMENT3,
+	};
+
+	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, rgbdFramebuffer));
+	CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, renderTarget, 0));
+	CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, rgbTarget, 0));
+	CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, pid_texture_, 0));
+	CHECK_GL_ERROR(glDrawBuffers(3, draw_buffers));
+
+	// Switch back to depth-only FB
 	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, framebufferID));
-	uvfeedback_enabled_ = enable;
 }
 
 
-bool Renderer::getUVFeedback() const
+Camera Renderer::setup_camera(uint32_t flags)
 {
-	return uvfeedback_enabled_;
-}
-
-
-Camera Renderer::setup_camera()
-{
+#if 0
+	if (flags & UV_MAPPINNG_RENDERING) {
+		Camera cam;
+		cam.lookAt(glm::vec3(0.5, 0.5, -1.0),
+			   glm::vec3(0.5, 0.5, 0.0),
+			   glm::vec3(0.0, 1.0, 0.0));
+		// cam.ortho2D(0.0, 1.0, 0.0, 1.0);
+		// cam.ortho(-5, 5, -5, 5, -5, 5);
+		cam.ortho(-0.5, 0.5, -0.5, 0.5, -5, 5);
+		// cam.ortho2D(-2, 2, -2, 2);
+		// cam.ortho2D(-5, 5, -5, 5);
+		return cam;
+	}
+#endif
 	const float eyeDist = 2.0f;
 	const float minDist = 0.01f;
 	Camera cam;

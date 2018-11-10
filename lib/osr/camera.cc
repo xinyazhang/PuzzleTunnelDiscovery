@@ -153,6 +153,11 @@ Camera::uniform(GLuint program, glm::mat4 xform)
 	// std::cerr << "Render with\n" << matrix.model * xform << "\n";
 	CHECK_GL_ERROR(glUniformMatrix4fv(viewLoc,  1, GL_FALSE, glm::value_ptr(matrix.view)));
 	CHECK_GL_ERROR(glUniformMatrix4fv(projLoc,  1, GL_FALSE, glm::value_ptr(matrix.proj)));
+#if 1
+	std::cerr << "debug: project (1,1,1,1) to " << 
+		 matrix.proj * matrix.view * matrix.model * xform *
+		 glm::vec4(1.0, 1.0, 1.0, 1.0) << std::endl;
+#endif
 }
 
 }

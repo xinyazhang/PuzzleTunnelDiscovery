@@ -66,6 +66,7 @@ MeshRenderer::uploadData(const shared_ptr<Mesh>& mesh)
 		CHECK_GL_ERROR(glBufferData(GL_ARRAY_BUFFER,
 		                            sizeof(float) * mesh->getUV().size(),
 		                            mesh->getUV().data(), GL_STATIC_DRAW));
+		std::cerr << "Upload " << mesh->getUV().size() << " elements to UV VBO\n";
 		CHECK_GL_ERROR(glBindBuffer(GL_ARRAY_BUFFER, 0));
 	}
 }
@@ -103,6 +104,7 @@ MeshRenderer::bindAttributes()
 		                                     0));  // vertex color
 		CHECK_GL_ERROR(glEnableVertexAttribArray(3));
 		CHECK_GL_ERROR(glBindBuffer(GL_ARRAY_BUFFER, 0));
+		std::cerr << "Bind UV VBO\n";
 	} else {
 		CHECK_GL_ERROR(glDisableVertexAttribArray(3));
 	}
@@ -121,7 +123,7 @@ MeshRenderer::render(GLuint program, Camera& camera, glm::mat4 globalXform, uint
 	CHECK_GL_ERROR(glBindAttribLocation(program, 0, "inPosition"));
 	CHECK_GL_ERROR(glBindAttribLocation(program, 1, "inColor"));
 #endif
-	if (uv_vbo_ && (flags & Renderer::HAS_NTR_RENDERING)) {
+	if (uv_vbo_) {
 		CHECK_GL_ERROR(glEnableVertexAttribArray(3));
 	} else {
 		CHECK_GL_ERROR(glDisableVertexAttribArray(3));

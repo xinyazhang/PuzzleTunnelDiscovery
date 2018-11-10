@@ -36,11 +36,13 @@ public:
 	static const uint32_t NO_SCENE_RENDERING = (1 << 0);
 	static const uint32_t NO_ROBOT_RENDERING = (1 << 1);
 	static const uint32_t HAS_NTR_RENDERING = (1 << 2);
+	static const uint32_t UV_MAPPINNG_RENDERING = (1 << 3);
 	/*
 	 * Define type for framebuffer attributes.
 	 */
 	typedef Eigen::Matrix<float, -1, -1, Eigen::RowMajor> RMMatrixXf;
 	typedef Eigen::Matrix<uint8_t, -1, -1, Eigen::RowMajor> RMMatrixXb;
+	typedef Eigen::Matrix<int32_t, -1, -1, Eigen::RowMajor> RMMatrixXi;
 
 	Renderer();
 	~Renderer();
@@ -60,6 +62,7 @@ public:
 	RMMatrixXb mvrgb;
 	RMMatrixXf mvdepth;
 	RMMatrixXf mvuv;
+	RMMatrixXi mvpid;
 
 	int pbufferWidth = 224;
 	int pbufferHeight = 224;
@@ -96,12 +99,16 @@ private:
 
 	void render_depth();
 	void render_rgbd(uint32_t flags);
-	Camera setup_camera();
+	Camera setup_camera(uint32_t flags);
 
 	glm::mat4 camera_rot_;
 
 	GLuint uv_texture_ = 0;
 	bool uvfeedback_enabled_ = false;
+	void setupUVFeedbackBuffer();
+
+	GLuint pid_texture_ = 0;
+	void enablePidBuffer();
 };
 
 }
