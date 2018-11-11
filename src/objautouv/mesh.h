@@ -32,7 +32,7 @@ struct Mesh {
 	Eigen::VectorXi adjface_longedge;  // ID of adjacenct face
 
 	// Intermediate routines
-	void PairWithLongEdge();
+	void PairWithLongEdge(bool do_pairing = true);
 
 	std::vector<UVBox> boxes;
 	UVBox CreateBB(int f, int other_f = -1);
@@ -40,7 +40,7 @@ struct Mesh {
 	// Final routine
 	//   After calling PairWithLongEdge to set boxes,
 	//   call lib/rectpack to pack these boxes.
-	void Program();
+	void Program(int res);
 
 	double rec_u_size, rec_v_size;
 };

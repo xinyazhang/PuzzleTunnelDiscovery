@@ -25,8 +25,10 @@ Mesh::~Mesh()
 {
 }
 
-void Mesh::PairWithLongEdge()
+void Mesh::PairWithLongEdge(bool do_pairing)
 {
+	boxes.clear();
+
 	Eigen::MatrixXi igl_tta_face;
 	igl::triangle_triangle_adjacency(F, igl_tta_face);
 	// Translate convention from [0,1] [1,2] [2,3] to
@@ -35,19 +37,26 @@ void Mesh::PairWithLongEdge()
 	tta_face.col(0) = igl_tta_face.col(1);
 	tta_face.col(1) = igl_tta_face.col(2);
 	tta_face.col(2) = igl_tta_face.col(0);
-	std::cerr << "tta_face\n" << tta_face << std::endl;;
+	// std::cerr << "tta_face\n" << tta_face << std::endl;;
 
 	igl::mat_max(el, 2, face_longedge, face_longedge_id);
-	std::cerr << "face long edge\n" << face_longedge << std::endl;;
-	std::cerr << "face long edge id\n" << face_longedge_id << std::endl;;
+	// std::cerr << "face long edge\n" << face_longedge << std::endl;;
+	// std::cerr << "face long edge id\n" << face_longedge_id << std::endl;;
 	adjface_longedge.resize(tta_face.rows());
 	for (int i = 0; i < tta_face.rows(); i++) {
 		adjface_longedge(i) = tta_face(i, face_longedge_id(i));
 	}
 
-	boxes.clear();
-
 	face_pair = Eigen::MatrixXi::Constant(F.rows(), 2, -1);
+
+	if (!do_pairing) {
+		for (int f = 0; f < F.rows(); f++) {
+			face_pair(boxes.size(), 0) = f;
+			boxes.emplace_back(CreateBB(f));
+		}
+		return ;
+	}
+
 	Eigen::VectorXi paired = Eigen::VectorXi::Constant(F.rows(), 1, 0);
 	for (int f = 0; f < tta_face.rows(); f++) {
 		int other_f = adjface_longedge(f);
@@ -73,8 +82,8 @@ void Mesh::PairWithLongEdge()
 	// Add unpaired triangles.
 	for (int f = 0; f < tta_face.rows(); f++) {
 		if (paired(f) == 0) {
-			boxes.emplace_back(CreateBB(f));
 			face_pair(boxes.size(), 0) = f;
+			boxes.emplace_back(CreateBB(f));
 		}
 	}
 	std::cerr << "pairing results\n" << face_pair << std::endl;
@@ -178,14 +187,15 @@ UVBox Mesh::CreateBB(int f, int other_f)
 	box.face_id[0] = f;
 	box.face_id[1] = other_f;
 	// TODO: sancheck: col(2,3) are close to 0.0
-	ArrayXd mins = rel_uv.colwise().minCoeff();
-	Matrix<double, 1, 2> origin;
-	origin << mins(0), mins(1);
+	double mins_0 = rel_uv.col(0).minCoeff();
+	double mins_1 = rel_uv.col(1).minCoeff();
 #if 0
 	rel_uv.col(0) += origin(0);
 	rel_uv.col(1) += origin(1);
 #else
-	rel_uv.block(0, 0, rel_uv.rows(), 2).rowwise() -= origin;
+	// rel_uv.block(0, 0, rel_uv.rows(), 2).rowwise() -= origin;
+	rel_uv.col(0) = rel_uv.col(0).array() - mins_0;
+	rel_uv.col(1) = rel_uv.col(1).array() - mins_1;
 #endif
 	ArrayXd sizes = rel_uv.colwise().maxCoeff();
 
@@ -197,7 +207,13 @@ UVBox Mesh::CreateBB(int f, int other_f)
 }
 
 
-void Mesh::Program()
+bool in(const Eigen::Vector2d& uv, const rbp::Rect& rect)
+{
+	return uv(0) >= rect.x && uv(0) <= rect.x + rect.width &&
+	       uv(1) >= rect.y && uv(1) <= rect.y + rect.height;
+}
+
+void Mesh::Program(int res)
 {
 	double total_area = 0;
 	double max_edge = 0.0;
@@ -205,18 +221,26 @@ void Mesh::Program()
 	std::vector<rbp::Rect> rects_out;
 	for (const auto& box :boxes) {
 		total_area += box.area();
-		std::cerr << "Box size: " << box.size_u << '\t' << box.size_v << std::endl;
+#if 1
+		std::cerr << "Box " << rects_in.size() << " size: " << box.size_u << '\t' << box.size_v << std::endl;
+		// std::cerr << "rel_uv: " << box.rel_uv << std::endl;
+#endif
 		max_edge = std::max(max_edge, box.size_u);
 		max_edge = std::max(max_edge, box.size_v);
 		rects_in.emplace_back(box.size_u, box.size_v);
+		rects_in.back().cookie = reinterpret_cast<void*>(rects_in.size() - 1);
+#if 0
 		std::cerr << "Box size input: " << rects_in.back().width
 		          << '\t' << rects_in.back().height << std::endl;
+#endif
 	}
 	double edges[2];
-	edges[0] = edges[1] = std::max(max_edge, std::sqrt(total_area) * 1.125);
+	// edges[0] = edges[1] = std::max(max_edge, std::sqrt(total_area) * 1.501);
+	edges[0] = edges[1] = max_edge;
 	std::cerr << "Init guessed sizes " << edges[0] << '\t' << edges[1] << std::endl;
 	rbp::MaxRectsBinPack bin;
 	while (rects_out.size() != rects_in.size()) {
+#if 0
 		for (int axis = 0; axis < 2; axis++) {
 			bin.Init(edges[0], edges[1]);
 			bin.Insert(rects_in, rects_out, rbp::MaxRectsBinPack::RectBestShortSideFit);
@@ -237,10 +261,28 @@ void Mesh::Program()
 			}
 			edges[axis] *= 2;
 		}
+#else
+		bin.Init(edges[0], edges[1]);
+		// bin.Insert(rects_in, rects_out, rbp::MaxRectsBinPack::RectBestShortSideFit);
+		bin.Insert(rects_in, rects_out, rbp::MaxRectsBinPack::RectBestLongSideFit);
+		// bin.Insert(rects_in, rects_out, rbp::MaxRectsBinPack::RectBestAreaFit);
+		// bin.Insert(rects_in, rects_out, rbp::MaxRectsBinPack::RectBottomLeftRule);
+		// bin.Insert(rects_in, rects_out, rbp::MaxRectsBinPack::RectContactPointRule);
+		if (rects_out.size() == rects_in.size()) {
+			break;
+		} else {
+			std::cerr << "Guessed sizes failed: " << edges[0] <<
+				  '\t' << edges[1] << std::endl;
+		}
+		edges[0] *= 1.25;
+		edges[1] *= 1.25;
+#endif
 	}
-	rec_u_size = edges[0];
-	rec_v_size = edges[1];
-	std::cerr << "Recommended sizes " << rec_u_size << '\t' << rec_v_size << std::endl;
+	std::cerr << "Bounding sizes " << edges[0] << '\t' << edges[1] << std::endl;
+	for (const auto& rect : rects_out) {
+		std::cerr << "\tBox size (" << rect.width <<  ", " << rect.height
+		          << ") at (" << rect.x <<  ", " << rect.y << ")\n";
+	}
 
 	size_t total_uv = 0;
 	for (size_t i = 0; i < face_pair.rows(); i++) {
@@ -254,7 +296,8 @@ void Mesh::Program()
 	size_t uv_iter = 0;
 	for (size_t i = 0; i < rects_out.size(); i++) {
 		const auto& rect = rects_out[i];
-		const auto& box = boxes[i];
+		int rect_in_id = reinterpret_cast<intptr_t>(rect.cookie);
+		const auto& box = boxes[rect_in_id];
 		Eigen::MatrixXd uv = box.rel_uv;
 		if (rect.rotated) {
 			// swap u and v
@@ -264,16 +307,40 @@ void Mesh::Program()
 		Eigen::Matrix<double, 1, 2> base(rect.x, rect.y);
 		uv.rowwise() += base;
 		UV.block(uv_iter, 0, uv.rows(), 2) = uv;
-		FUV(box.face_id[0], box.vertex_index[0][0]) = uv_iter + 0;
-		FUV(box.face_id[0], box.vertex_index[0][1]) = uv_iter + 1;
-		FUV(box.face_id[0], box.vertex_index[0][2]) = uv_iter + 3;
-		if (face_pair(i, 1) >= 0) {
+		if (face_pair(rect_in_id, 1) >= 0) {
+			FUV(box.face_id[0], box.vertex_index[0][0]) = uv_iter + 0;
+			FUV(box.face_id[0], box.vertex_index[0][1]) = uv_iter + 1;
+			FUV(box.face_id[0], box.vertex_index[0][2]) = uv_iter + 3;
+
 			FUV(box.face_id[1], box.vertex_index[1][0]) = uv_iter + 2;
 			FUV(box.face_id[1], box.vertex_index[1][1]) = uv_iter + 3;
 			FUV(box.face_id[1], box.vertex_index[1][2]) = uv_iter + 1;
+		} else {
+			FUV(box.face_id[0], box.vertex_index[0][0]) = uv_iter + 0;
+			FUV(box.face_id[0], box.vertex_index[0][1]) = uv_iter + 1;
+			FUV(box.face_id[0], box.vertex_index[0][2]) = uv_iter + 2;
+		}
+		for (int j = 0; j < uv.rows(); j++) {
+			if (!in(uv.row(j).transpose(), rect)) {
+				std::cerr << uv.row(j) << " not in rect " << rect_in_id << " ("
+					<< rect.width <<  ", " << rect.height
+					<< ") at (" << rect.x <<  ", " <<
+					rect.y << ") "
+					<< (rect.rotated ? "rotated": "not rotated")
+					<< "\n";
+			}
 		}
 		uv_iter += uv.rows();
 	}
+	if (uv_iter != UV.rows()) {
+		throw std::runtime_error("San check failed. uv_iter != UV.rows()");
+	}
+	rec_u_size = rec_v_size = UV.maxCoeff();
+	std::cerr << "Recommended sizes " << rec_u_size << '\t' << rec_v_size << std::endl;
+	UV.col(0) /= rec_u_size;
+	UV.col(1) /= rec_v_size;
+#if 0
 	std::cerr << "UV\n" << UV << std::endl;
 	std::cerr << "FUV\n" << FUV << std::endl;
+#endif
 }
