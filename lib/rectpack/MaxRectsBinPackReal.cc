@@ -183,6 +183,7 @@ Rect MaxRectsBinPack::FindPositionForNewNodeBottomLeft(double width, double heig
 				bestNode.y = freeRectangles[i].y;
 				bestNode.width = width;
 				bestNode.height = height;
+				bestNode.rotated = false;
 				bestY = topSideY;
 				bestX = freeRectangles[i].x;
 			}
@@ -230,6 +231,7 @@ Rect MaxRectsBinPack::FindPositionForNewNodeBestShortSideFit(double width, doubl
 				bestNode.y = freeRectangles[i].y;
 				bestNode.width = width;
 				bestNode.height = height;
+				bestNode.rotated = false;
 				bestShortSideFit = shortSideFit;
 				bestLongSideFit = longSideFit;
 			}
@@ -282,6 +284,7 @@ Rect MaxRectsBinPack::FindPositionForNewNodeBestLongSideFit(double width, double
 				bestNode.y = freeRectangles[i].y;
 				bestNode.width = width;
 				bestNode.height = height;
+				bestNode.rotated = false;
 				bestShortSideFit = shortSideFit;
 				bestLongSideFit = longSideFit;
 			}
@@ -335,6 +338,7 @@ Rect MaxRectsBinPack::FindPositionForNewNodeBestAreaFit(double width, double hei
 				bestNode.y = freeRectangles[i].y;
 				bestNode.width = width;
 				bestNode.height = height;
+				bestNode.rotated = false;
 				bestShortSideFit = shortSideFit;
 				bestAreaFit = areaFit;
 			}
@@ -407,6 +411,7 @@ Rect MaxRectsBinPack::FindPositionForNewNodeContactPoint(double width, double he
 				bestNode.y = freeRectangles[i].y;
 				bestNode.width = width;
 				bestNode.height = height;
+				bestNode.rotated = false;
 				bestContactScore = score;
 			}
 		}
