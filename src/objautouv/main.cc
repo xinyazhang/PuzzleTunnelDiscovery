@@ -5,21 +5,65 @@
 #include <igl/per_face_normals.h>
 #include <iostream>
 #include <fstream>
+#include <getopt.h>
+
+namespace {
+int res = 1024;;
+double boxw = -1;
+double boxh = -1;
+int margin = 0;
+};
+
+void usage()
+{
+	std::cerr << R"xxx(Usage objautouv [OPTIONS] <INPUT OBJ> <OUTPUT OBJ>
+Options:
+	-r <resolution> Default: 1024
+	-w <box width>  Default: -1 (probing)
+	-h <box height> Default: -1 (probing)
+	-m <margin>     Unit: pixel. Requires -r -w and -h. Default: 0
+	-f              Overwrite the output obj.
+)xxx";
+	std::cerr << "\tDefault Resolution: " << res << "\n";
+}
 
 int main(int argc, char* argv[])
 {
-	int res = 1024;
-	if (argc < 3) {
-		std::cerr << "Usage objautouv <INPUT OBJ> <OUTPUT OBJ> [Target Resolution]\n";
-		std::cerr << "\tDefault Resolution: " << res << "\n";
+	int opt;
+	bool overwrite = false;
+	while ((opt = getopt(argc, argv, "r:w:h:m:f")) != -1) {
+		switch (opt) {
+			case 'r':
+				res = std::atoi(optarg);
+				break;
+			case 'w':
+				boxw = std::atof(optarg);
+				break;
+			case 'h':
+				boxh = std::atof(optarg);
+				break;
+			case 'm':
+				margin = std::atoi(optarg);
+				break;
+			case 'f':
+				overwrite = true;
+				break;
+			default:
+				std::cerr << "Unrecognized argument -" << char(opt) << std::endl;
+				usage();
+				return -1;
+		}
+	}
+	if (argc < optind + 2) {
+		usage();
 		return -1;
 	}
-	if (argc >= 4) {
-		res = std::atoi(argv[3]);
-		std::cerr << "Change Target Resolution to " << res << std::endl;
+	if (boxw * boxh <= 0) {
+		throw std::runtime_error("boxw and boxh must have the same sign");
 	}
-	std::string ifn(argv[1]), ofn(argv[2]);
-	{
+	std::cerr << "Configuration res: " << res << "\tboxw: " << boxw << "\tboxh: " << boxh << std::endl;
+	std::string ifn(argv[optind]), ofn(argv[optind + 1]);
+	if (!overwrite) {
 		std::ifstream infile(ofn);
 		if (infile.good()) {
 			std::cerr << ofn << " already existed\n";
@@ -47,7 +91,7 @@ int main(int argc, char* argv[])
 	// std::cerr << "m.F\n" << m.F << std::endl;
 	igl::per_face_normals(m.V, m.F, m.face_normals);
 	m.PairWithLongEdge();
-	m.Program(res);
+	m.Program(res, boxw, boxh, margin);
 	igl::writeOBJ(ofn, m.V, m.F, m.N, m.FN, m.UV, m.FUV);
 	std::ofstream fout("out.svg");
 	fout << "<svg height=\"" << res << "\" width=\"" << res << "\">\n";

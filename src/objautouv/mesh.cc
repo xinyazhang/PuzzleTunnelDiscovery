@@ -213,12 +213,22 @@ bool in(const Eigen::Vector2d& uv, const rbp::Rect& rect)
 	       uv(1) >= rect.y && uv(1) <= rect.y + rect.height;
 }
 
-void Mesh::Program(int res)
+void Mesh::Program(int res, double boxw, double boxh, int margin_pix)
 {
+	assert(boxw * boxh > 0); // boxw and boxh must have the same sign
 	double total_area = 0;
 	double max_edge = 0.0;
 	std::vector<rbp::RectSize> rects_in;
 	std::vector<rbp::Rect> rects_out;
+	double margin_u = 0.0, margin_v = 0.0;
+	if (margin_pix > 0) {
+		if (res > 0 && boxw > 0) {
+			margin_u = (boxw * margin_pix) / res;
+			margin_v = (boxh * margin_pix) / res;
+		} else {
+			throw std::runtime_error("margin_pix requires pre-defined res, boxw and boxh");
+		}
+	}
 	for (const auto& box :boxes) {
 		total_area += box.area();
 #if 1
@@ -227,7 +237,7 @@ void Mesh::Program(int res)
 #endif
 		max_edge = std::max(max_edge, box.size_u);
 		max_edge = std::max(max_edge, box.size_v);
-		rects_in.emplace_back(box.size_u, box.size_v);
+		rects_in.emplace_back(box.size_u + 2 * margin_u, box.size_v + 2 * margin_v);
 		rects_in.back().cookie = reinterpret_cast<void*>(rects_in.size() - 1);
 #if 0
 		std::cerr << "Box size input: " << rects_in.back().width
@@ -235,8 +245,16 @@ void Mesh::Program(int res)
 #endif
 	}
 	double edges[2];
+	bool probe_box_size = true;
+	if (boxw > 0) {
+		edges[0] = boxw;
+		edges[1] = boxh;
+		probe_box_size = false;
+	} else {
+		edges[0] = edges[1] = max_edge;
+		probe_box_size = true;
+	}
 	// edges[0] = edges[1] = std::max(max_edge, std::sqrt(total_area) * 1.501);
-	edges[0] = edges[1] = max_edge;
 	std::cerr << "Init guessed sizes " << edges[0] << '\t' << edges[1] << std::endl;
 	rbp::MaxRectsBinPack bin;
 	while (rects_out.size() != rects_in.size()) {
@@ -250,7 +268,7 @@ void Mesh::Program(int res)
 					  << " with size (" << p.width << ", " << p.height << ")"
 					  << std::endl;
 			}
-			std::cerr << "rects io size: " << rects_out.size() 
+			std::cerr << "rects io size: " << rects_out.size()
 			          << " " << rects_in.size() << std::endl;
 #endif
 			if (rects_out.size() == rects_in.size()) {
@@ -264,15 +282,17 @@ void Mesh::Program(int res)
 #else
 		bin.Init(edges[0], edges[1]);
 		// bin.Insert(rects_in, rects_out, rbp::MaxRectsBinPack::RectBestShortSideFit);
-		bin.Insert(rects_in, rects_out, rbp::MaxRectsBinPack::RectBestLongSideFit);
-		// bin.Insert(rects_in, rects_out, rbp::MaxRectsBinPack::RectBestAreaFit);
+		// bin.Insert(rects_in, rects_out, rbp::MaxRectsBinPack::RectBestLongSideFit);
+		bin.Insert(rects_in, rects_out, rbp::MaxRectsBinPack::RectBestAreaFit);
 		// bin.Insert(rects_in, rects_out, rbp::MaxRectsBinPack::RectBottomLeftRule);
 		// bin.Insert(rects_in, rects_out, rbp::MaxRectsBinPack::RectContactPointRule);
 		if (rects_out.size() == rects_in.size()) {
 			break;
-		} else {
-			std::cerr << "Guessed sizes failed: " << edges[0] <<
-				  '\t' << edges[1] << std::endl;
+		}
+		std::cerr << "Guessed sizes failed: " << edges[0] <<
+			  '\t' << edges[1] << std::endl;
+		if (!probe_box_size) {
+			throw std::runtime_error("Fail to fit into the required size of box.");
 		}
 		edges[0] *= 1.25;
 		edges[1] *= 1.25;
@@ -304,7 +324,7 @@ void Mesh::Program(int res)
 			uv.col(0) = box.rel_uv.col(1);
 			uv.col(1) = box.rel_uv.col(0);
 		}
-		Eigen::Matrix<double, 1, 2> base(rect.x, rect.y);
+		Eigen::Matrix<double, 1, 2> base(rect.x + margin_u, rect.y + margin_v);
 		uv.rowwise() += base;
 		UV.block(uv_iter, 0, uv.rows(), 2) = uv;
 		if (face_pair(rect_in_id, 1) >= 0) {
