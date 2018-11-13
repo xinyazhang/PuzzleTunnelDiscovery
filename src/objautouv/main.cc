@@ -31,7 +31,8 @@ int main(int argc, char* argv[])
 {
 	int opt;
 	bool overwrite = false;
-	while ((opt = getopt(argc, argv, "r:w:h:m:f")) != -1) {
+	bool pair = true;
+	while ((opt = getopt(argc, argv, "r:w:h:m:fs")) != -1) {
 		switch (opt) {
 			case 'r':
 				res = std::atoi(optarg);
@@ -47,6 +48,9 @@ int main(int argc, char* argv[])
 				break;
 			case 'f':
 				overwrite = true;
+				break;
+			case 's': // -s == single
+				pair = false;
 				break;
 			default:
 				std::cerr << "Unrecognized argument -" << char(opt) << std::endl;
@@ -90,7 +94,7 @@ int main(int argc, char* argv[])
 	igl::edge_lengths(m.V, m.F, m.el);
 	// std::cerr << "m.F\n" << m.F << std::endl;
 	igl::per_face_normals(m.V, m.F, m.face_normals);
-	m.PairWithLongEdge();
+	m.PairWithLongEdge(pair);
 	m.Program(res, boxw, boxh, margin);
 	igl::writeOBJ(ofn, m.V, m.F, m.N, m.FN, m.UV, m.FUV);
 	std::ofstream fout("out.svg");
