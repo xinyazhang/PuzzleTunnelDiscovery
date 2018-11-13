@@ -375,7 +375,6 @@ void Renderer::render_rgbd(uint32_t flags)
 	CHECK_GL_ERROR(glUniform3fv(17, 1, light_position.data()));
 	CHECK_GL_ERROR(glUniform1i(18, 0));
 	CHECK_GL_ERROR(glUniform1i(19, is_render_uv_mapping));
-	CHECK_GL_ERROR(glUniform1i(20, pbufferWidth));
 
 #if 1
 	if (is_render_uv_mapping) {

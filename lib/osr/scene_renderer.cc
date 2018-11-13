@@ -50,9 +50,13 @@ SceneRenderer::~SceneRenderer()
 void SceneRenderer::probe_texture(const std::string& fn)
 {
 	std::string tex_fn = strman::replace_suffix(fn, ".ply", ".png");
+	std::string tex2_fn = strman::replace_suffix(fn, ".obj", ".png");
 	if (tex_fn.empty()) {
-		tex_data_.clear();
-		return;
+		if (tex2_fn.empty()) {
+			tex_data_.clear();
+			return;
+		}
+		tex_fn = tex2_fn;
 	}
 	tex_data_ = readPNG(tex_fn.c_str(), tex_w_, tex_h_);
 	if (!tex_) {
