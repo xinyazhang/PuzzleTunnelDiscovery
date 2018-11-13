@@ -9,12 +9,24 @@ struct UVBox {
 	int vertex_id [4];
 	int vertex_index [2][4];
 	int face_id [2];
-	Eigen::MatrixXd rel_uv;
+	Eigen::MatrixXd rel_uv; // also igl standard: vertex per row
 	double size_u, size_v;
 
 	double area() const {
 		return size_u * size_v;
-	};
+	}
+
+	void calibrate(Eigen::MatrixXd rel_uv) {
+		double mins_0 = rel_uv.col(0).minCoeff();
+		double mins_1 = rel_uv.col(1).minCoeff();
+		rel_uv.col(0) = rel_uv.col(0).array() - mins_0;
+		rel_uv.col(1) = rel_uv.col(1).array() - mins_1;
+		Eigen::ArrayXd sizes = rel_uv.colwise().maxCoeff();
+
+		this->rel_uv = rel_uv.block(0,0, rel_uv.rows(), 2);
+		size_u = sizes(0);
+		size_v = sizes(1);
+	}
 };
 
 Mesh::Mesh()
@@ -186,6 +198,7 @@ UVBox Mesh::CreateBB(int f, int other_f)
 	}
 	box.face_id[0] = f;
 	box.face_id[1] = other_f;
+#if 0
 	// TODO: sancheck: col(2,3) are close to 0.0
 	double mins_0 = rel_uv.col(0).minCoeff();
 	double mins_1 = rel_uv.col(1).minCoeff();
@@ -202,6 +215,8 @@ UVBox Mesh::CreateBB(int f, int other_f)
 	box.rel_uv = rel_uv.block(0,0, rel_uv.rows(), 2);
 	box.size_u = sizes(0);
 	box.size_v = sizes(1);
+#endif
+	box.calibrate(rel_uv);
 
 	return box;
 }
@@ -213,7 +228,7 @@ UVBox Mesh::CreateOptimalBB(int f)
 	using Eigen::ArrayXd;
 	using Eigen::Vector4d;
 
-	UVBox boxes[3];
+	std::vector<UVBox> boxes(3);
 	for (int i = 0; i < 3; i++) {
 		auto& box = boxes[i];
 		int vi0 = i;
@@ -244,20 +259,25 @@ UVBox Mesh::CreateOptimalBB(int f)
 		box.vertex_id[2] = v2;
 		box.face_id[0] = f;
 		box.face_id[1] = -1;
-		double mins_0 = rel_uv.col(0).minCoeff();
-		double mins_1 = rel_uv.col(1).minCoeff();
-		rel_uv.col(0) = rel_uv.col(0).array() - mins_0;
-		rel_uv.col(1) = rel_uv.col(1).array() - mins_1;
-		ArrayXd sizes = rel_uv.colwise().maxCoeff();
 
-		box.rel_uv = rel_uv.block(0,0, rel_uv.rows(), 2);
-		box.size_u = sizes(0);
-		box.size_v = sizes(1);
+		box.calibrate(rel_uv);
+	}
+	for (int i = 15; i < 360; i += 15) {
+		double theta = i / 180.0 * M_PI;
+		UVBox box = boxes[0];
+		MatrixXd rel_uv = box.rel_uv;
+		Eigen::Matrix2d rot;
+		rot << std::cos(theta), -std::sin(theta),
+		       std::sin(theta),  std::cos(theta);
+		rel_uv = (rot * rel_uv.transpose()).transpose();
+		box.calibrate(rel_uv);
+
+		boxes.emplace_back(box);
 	}
 	double min_area = boxes[0].area();
-	int min_box = 0;
-	for (int i = 1; i < 3; i++) {
-		if (min_area < boxes[i].area()) {
+	size_t min_box = 0;
+	for (size_t i = 1; i < boxes.size(); i++) {
+		if (min_area > boxes[i].area()) {
 			min_area = boxes[i].area();
 			min_box = i;
 		}
