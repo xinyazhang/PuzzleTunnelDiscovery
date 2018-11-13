@@ -36,6 +36,7 @@ struct Mesh {
 
 	std::vector<UVBox> boxes;
 	UVBox CreateBB(int f, int other_f = -1);
+	UVBox CreateOptimalBB(int f);
 
 	// Final routine
 	//   After calling PairWithLongEdge to set boxes,

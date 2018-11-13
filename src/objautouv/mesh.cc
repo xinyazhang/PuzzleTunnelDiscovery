@@ -66,10 +66,10 @@ void Mesh::PairWithLongEdge(bool do_pairing)
 		// Criterion 2: circular consisitancy
 		if (f != adjface_longedge(other_f))
 			continue;
-		// Criterion 3: actually saved space
+		// Criterion 3: actually saves space
 		auto unioned_bb = CreateBB(f, other_f);
-		auto bb1 = CreateBB(f);
-		auto bb2 = CreateBB(other_f);
+		auto bb1 = CreateOptimalBB(f);
+		auto bb2 = CreateOptimalBB(other_f);
 		if (unioned_bb.area() > bb1.area() + bb2.area())
 			continue;
 		paired(f) = 1;
@@ -83,7 +83,7 @@ void Mesh::PairWithLongEdge(bool do_pairing)
 	for (int f = 0; f < tta_face.rows(); f++) {
 		if (paired(f) == 0) {
 			face_pair(boxes.size(), 0) = f;
-			boxes.emplace_back(CreateBB(f));
+			boxes.emplace_back(CreateOptimalBB(f));
 		}
 	}
 	std::cerr << "pairing results\n" << face_pair << std::endl;
@@ -206,6 +206,65 @@ UVBox Mesh::CreateBB(int f, int other_f)
 	return box;
 }
 
+UVBox Mesh::CreateOptimalBB(int f)
+{
+	using Eigen::Matrix;
+	using Eigen::MatrixXd;
+	using Eigen::ArrayXd;
+	using Eigen::Vector4d;
+
+	UVBox boxes[3];
+	for (int i = 0; i < 3; i++) {
+		auto& box = boxes[i];
+		int vi0 = i;
+		int vi1 = (vi0 + 1) % 3;
+		int vi2 = (vi0 + 2) % 3;
+		int v0 = F(f, vi0);
+		int v1 = F(f, vi1);
+		int v2 = F(f, vi2);
+		Matrix<double, 3, 4> base = Matrix<double, 3, 4>::Zero();
+		base.col(0) = (V.row(v1) - V.row(v0)).normalized();
+		base.col(2) = face_normals.row(f);
+		base.col(1) = base.col(2).cross(base.col(0));
+		base.col(3) = V.row(v1); // Shared vertex of the other_f as origin
+		auto tx = makeAffine(base);
+		auto itx = tx.inverse();
+
+		box.vertex_index[0][0] = vi0;
+		box.vertex_index[0][1] = vi1;
+		box.vertex_index[0][2] = vi2;
+
+		MatrixXd rel_uv; // temp relative uv
+		rel_uv.resize(3, 4);
+		rel_uv.row(0) = itx * affinePoint(V.row(v0));
+		rel_uv.row(1) = itx * affinePoint(V.row(v1));
+		rel_uv.row(2) = itx * affinePoint(V.row(v2));
+		box.vertex_id[0] = v0;
+		box.vertex_id[1] = v1;
+		box.vertex_id[2] = v2;
+		box.face_id[0] = f;
+		box.face_id[1] = -1;
+		double mins_0 = rel_uv.col(0).minCoeff();
+		double mins_1 = rel_uv.col(1).minCoeff();
+		rel_uv.col(0) = rel_uv.col(0).array() - mins_0;
+		rel_uv.col(1) = rel_uv.col(1).array() - mins_1;
+		ArrayXd sizes = rel_uv.colwise().maxCoeff();
+
+		box.rel_uv = rel_uv.block(0,0, rel_uv.rows(), 2);
+		box.size_u = sizes(0);
+		box.size_v = sizes(1);
+	}
+	double min_area = boxes[0].area();
+	int min_box = 0;
+	for (int i = 1; i < 3; i++) {
+		if (min_area < boxes[i].area()) {
+			min_area = boxes[i].area();
+			min_box = i;
+		}
+	}
+	return boxes[min_box];
+}
+
 
 bool in(const Eigen::Vector2d& uv, const rbp::Rect& rect)
 {
@@ -282,8 +341,8 @@ void Mesh::Program(int res, double boxw, double boxh, int margin_pix)
 #else
 		bin.Init(edges[0], edges[1]);
 		// bin.Insert(rects_in, rects_out, rbp::MaxRectsBinPack::RectBestShortSideFit);
-		// bin.Insert(rects_in, rects_out, rbp::MaxRectsBinPack::RectBestLongSideFit);
-		bin.Insert(rects_in, rects_out, rbp::MaxRectsBinPack::RectBestAreaFit);
+		bin.Insert(rects_in, rects_out, rbp::MaxRectsBinPack::RectBestLongSideFit);
+		// bin.Insert(rects_in, rects_out, rbp::MaxRectsBinPack::RectBestAreaFit);
 		// bin.Insert(rects_in, rects_out, rbp::MaxRectsBinPack::RectBottomLeftRule);
 		// bin.Insert(rects_in, rects_out, rbp::MaxRectsBinPack::RectContactPointRule);
 		if (rects_out.size() == rects_in.size()) {
