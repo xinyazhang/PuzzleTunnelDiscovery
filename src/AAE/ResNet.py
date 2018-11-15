@@ -540,7 +540,7 @@ class ResNet(object):
                 index += 1
 
     def _test_double_alpha_ntr2(self):
-        tres = 1024
+        tres = 2048
         atex = np.zeros(shape=(tres,tres), dtype=np.float32) # accumulator texture
         index = 0
         for i in range(self.iteration):
