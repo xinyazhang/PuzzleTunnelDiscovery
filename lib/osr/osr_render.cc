@@ -337,7 +337,9 @@ void Renderer::render_depth()
 void Renderer::render_rgbd(uint32_t flags)
 {
 	int is_render_uv_mapping = !!(flags & UV_MAPPINNG_RENDERING);
+#if 0
 	std::cerr << "is_render_uv_mapping " << is_render_uv_mapping << "\n";
+#endif
 
 	glm::mat4 perturbation_mat = translate_state_to_matrix(perturbate_);
 	Camera camera = setup_camera(flags);
