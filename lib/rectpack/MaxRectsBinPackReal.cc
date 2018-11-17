@@ -81,9 +81,10 @@ void MaxRectsBinPack::Insert(std::vector<RectSize> rects, std::vector<Rect> &dst
 	{
 		double bestScore1 = std::numeric_limits<double>::max();
 		double bestScore2 = std::numeric_limits<double>::max();
-		double bestRectIndex = -1;
+		int bestRectIndex = -1;
 		Rect bestNode;
 
+#if 0
 		for(size_t i = 0; i < rects.size(); ++i)
 		{
 			double score1;
@@ -101,6 +102,28 @@ void MaxRectsBinPack::Insert(std::vector<RectSize> rects, std::vector<Rect> &dst
 
 		if (bestRectIndex == -1)
 			return;
+#else
+		std::vector<double> score1s(rects.size());
+		std::vector<double> score2s(rects.size());
+#pragma omp parallel for
+		for(size_t i = 0; i < rects.size(); ++i) {
+			ScoreRect(rects[i].width, rects[i].height, method, score1s[i], score2s[i]);
+		}
+
+		for(size_t i = 0; i < rects.size(); ++i) {
+			auto score1 = score1s[i];
+			auto score2 = score2s[i];
+			if (score1 < bestScore1 || (score1 == bestScore1 && score2 < bestScore2)) {
+				bestScore1 = score1;
+				bestScore2 = score2;
+				bestRectIndex = i;
+			}
+		}
+		if (bestRectIndex == -1)
+			return;
+		double score1, score2;
+		bestNode = ScoreRect(rects[bestRectIndex].width, rects[bestRectIndex].height, method, score1, score2);
+#endif
 
 		bestNode.cookie = rects[bestRectIndex].cookie;
 		PlaceRect(bestNode);
