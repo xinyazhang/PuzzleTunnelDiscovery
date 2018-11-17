@@ -55,7 +55,7 @@ void Scene::load(std::string filename, const glm::vec3* model_color)
 
 	// generate all meshes
 	for (size_t i = 0; i < scene->mNumMeshes; i++) {
-		glm::vec3 color;
+		glm::vec3 color(1.0);
 		if (model_color)
 			color = *model_color;
 		else
@@ -92,8 +92,21 @@ void Scene::updateBoundingBox(Node* node, glm::mat4 m)
 
 void Scene::addToCDModel(CDModel& model) const
 {
+	auto visitor = [&model, this] (std::shared_ptr<const Mesh> mesh) {
+		mesh->addToCDModel(xform_, model);
+	};
+	visitMesh(visitor);
+#if 0
 	for (auto mesh : meshes_) {
 		mesh->addToCDModel(xform_, model);
+	}
+#endif
+}
+
+void Scene::visitMesh(std::function<void(std::shared_ptr<const Mesh>)> visitor) const
+{
+	for (auto mesh : meshes_) {
+		visitor(mesh);
 	}
 }
 

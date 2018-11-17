@@ -379,6 +379,9 @@ EASYLIB(rectpack)
 EASYADD(objautouv)
 TARGET_LINK_LIBRARIES(objautouv rectpack)
 
+EASYADD(vistexture)
+TARGET_LINK_LIBRARIES(vistexture osr ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY})
+
 # Blender PRM and RRT for RL's GT (Ground Truth)
 EASYADD(mtblender)
 ## Note: do not use ompl_LIBRARIES, which pulls into too many denpendencies.

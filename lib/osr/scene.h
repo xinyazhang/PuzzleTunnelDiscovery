@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <functional>
 
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
@@ -82,6 +83,9 @@ public:
 
 	// Add the transformed geometry to CDModel
 	void addToCDModel(CDModel& ) const;
+
+	size_t getNumberOfMeshes() const { return meshes_.size(); }
+	void visitMesh(std::function<void(std::shared_ptr<const Mesh>)> ) const;
 private:
 	void updateBoundingBox(Node* node, glm::mat4 m);
 };

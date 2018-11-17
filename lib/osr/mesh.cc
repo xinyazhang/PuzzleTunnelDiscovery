@@ -33,7 +33,7 @@ Mesh::Mesh(aiMesh* mesh, glm::vec3 color)
 		for (size_t i = 0; i < NV; i++) {
 			uv_(i,0) = mesh->mTextureCoords[0][i][0];
 			uv_(i,1) = mesh->mTextureCoords[0][i][1]; 
-			std::cerr << "Loading UV " << uv_.row(i) << std::endl;
+			// std::cerr << "Loading UV " << uv_.row(i) << std::endl;
 		}
 		std::cerr << "Load UV: " << uv_.rows() << std::endl;
 	} else {
@@ -66,6 +66,16 @@ std::vector<uint32_t>& Mesh::getIndices()
 	if (shared_from_)
 		return shared_from_->indices_;
 	return indices_;
+}
+
+const std::vector<Vertex>& Mesh::getVertices() const
+{
+	return const_cast<Mesh*>(this)->getVertices();
+}
+
+const std::vector<uint32_t>& Mesh::getIndices() const
+{
+	return const_cast<Mesh*>(this)->getIndices();
 }
 
 size_t Mesh::getNumberOfFaces() const

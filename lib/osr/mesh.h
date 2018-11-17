@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <functional>
 
 #include <assimp/scene.h>
 #include <assimp/Importer.hpp>
@@ -32,12 +33,15 @@ public:
 
 	std::vector<Vertex>& getVertices();
 	std::vector<uint32_t>& getIndices();
+	const std::vector<Vertex>& getVertices() const;
+	const std::vector<uint32_t>& getIndices() const;
 
 	size_t getNumberOfFaces() const;
 	void addToCDModel(const glm::mat4&, CDModel&) const;
 	bool isEmpty() const { return empty_mesh_; }
 	bool hasUV() const { return uv_.rows() > 0; }
 	Eigen::Matrix<float, -1, 2, Eigen::RowMajor>& getUV() { return uv_; }
+	const Eigen::Matrix<float, -1, 2, Eigen::RowMajor>& getUV() const { return uv_; }
 private:
 	void init();
 };
