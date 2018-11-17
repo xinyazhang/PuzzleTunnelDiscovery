@@ -1,29 +1,29 @@
 # -*- coding: utf-8 -*-
 """
 Deep Human Pose Estimation
- 
+
 Project by Walid Benbihi
 MSc Individual Project
 Imperial College
 Created on Wed Jul 12 15:53:44 2017
- 
+
 @author: Walid Benbihi
 @mail : w.benbihi(at)gmail.com
 @github : https://github.com/wbenbihi/hourglasstensorlfow/
- 
+
 Abstract:
         This python code creates a Stacked Hourglass Model
         (Credits : A.Newell et al.)
         (Paper : https://arxiv.org/abs/1603.06937)
-        
+
         Code translated from 'anewell' github
         Torch7(LUA) --> TensorFlow(PYTHON)
         (Code : https://github.com/anewell/pose-hg-train)
-        
+
         Modification are made and explained in the report
         Goal : Achieve Real Time detection (Webcam)
         ----- Modifications made to obtain faster results (trade off speed/accuracy)
-        
+
         This work is free of use, please cite the author if you use it!
 
 """
@@ -36,9 +36,13 @@ import time
 from skimage import transform
 import scipy.misc as scm
 
+import pyosr
+
 class DataGenerator():
+        c_dim = 3
+
 	""" DataGenerator Class : To generate Train, Validatidation and Test sets
-	for the Deep Human Pose Estimation Model 
+	for the Deep Human Pose Estimation Model
 	Formalized DATA:
 		Inputs:
 			Inputs have a shape of (Number of Image) X (Height: 256) X (Width: 256) X (Channels: 3)
@@ -64,22 +68,22 @@ class DataGenerator():
 			14 - Left Elbow
 			15 - Left Wrist
 	# TODO : Modify selection of joints for Training
-	
+
 	How to generate Dataset:
 		Create a TEXT file with the following structure:
 			image_name.jpg[LETTER] box_xmin box_ymin box_xmax b_ymax joints
 			[LETTER]:
 				One image can contain multiple person. To use the same image
-				finish the image with a CAPITAL letter [A,B,C...] for 
+				finish the image with a CAPITAL letter [A,B,C...] for
 				first/second/third... person in the image
- 			joints : 
+			joints :
 				Sequence of x_p y_p (p being the p-joint)
 				/!\ In case of missing values use -1
-				
+
 	The Generator will read the TEXT file to create a dictionnary
 	Then 2 options are available for training:
 		Store image/heatmap arrays (numpy file stored in a folder: need disk space but faster reading)
-		Generate image/heatmap arrays when needed (Generate arrays while training, increase training time - Need to compute arrays at every iteration) 
+		Generate image/heatmap arrays when needed (Generate arrays while training, increase training time - Need to compute arrays at every iteration)
 	"""
 	def __init__(self, joints_name = None, img_dir=None, train_data_file = None, remove_joints = None):
 		""" Initializer
@@ -97,15 +101,15 @@ class DataGenerator():
 		if remove_joints is not None:
 			self.toReduce = True
 			self.weightJ = remove_joints
-		
+
 		self.letter = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N']
 		self.img_dir = img_dir
 		self.train_data_file = train_data_file
 		self.images = os.listdir(img_dir)
-	
+
 	# --------------------Generator Initialization Methods ---------------------
-	
-	
+
+
 	def _reduce_joints(self, joints):
 		""" Select Joints of interest from self.weightJ
 		"""
@@ -115,7 +119,7 @@ class DataGenerator():
 				j.append(joints[2*i])
 				j.append(joints[2*i + 1])
 		return j
-	
+
 	def _create_train_table(self):
 		""" Create Table of samples from TEXT file
 		"""
@@ -143,22 +147,22 @@ class DataGenerator():
 				self.data_dict[name] = {'box' : box, 'joints' : joints, 'weights' : w}
 				self.train_table.append(name)
 		input_file.close()
-	
+
 	def _randomize(self):
 		""" Randomize the set
 		"""
 		random.shuffle(self.train_table)
-	
+
 	def _complete_sample(self, name):
 		""" Check if a sample has no missing value
 		Args:
-			name 	: Name of the sample
+			name    : Name of the sample
 		"""
 		for i in range(self.data_dict[name]['joints'].shape[0]):
 			if np.array_equal(self.data_dict[name]['joints'][i],[-1,-1]):
 				return False
 		return True
-	
+
 	def _give_batch_name(self, batch_size = 16, set = 'train'):
 		""" Returns a List of Samples
 		Args:
@@ -175,10 +179,10 @@ class DataGenerator():
 				print('Set must be : train/valid')
 				break
 		return list_file
-		
-	
+
+
 	def _create_sets(self, validation_rate = 0.1):
-		""" Select Elements to feed training and validation set 
+		""" Select Elements to feed training and validation set
 		Args:
 			validation_rate		: Percentage of validation data (in ]0,1[, don't waste time use 0.1)
 		"""
@@ -198,7 +202,7 @@ class DataGenerator():
 		np.save('Dataset-Training-Set', self.train_set)
 		print('--Training set :', len(self.train_set), ' samples.')
 		print('--Validation set :', len(self.valid_set), ' samples.')
-	
+
 	def generateSet(self, rand = False):
 		""" Generate the training and validation set
 		Args:
@@ -208,10 +212,10 @@ class DataGenerator():
 		if rand:
 			self._randomize()
 		self._create_sets()
-	
-	# ---------------------------- Generating Methods --------------------------	
-	
-	
+
+	# ---------------------------- Generating Methods --------------------------
+
+
 	def _makeGaussian(self, height, width, sigma = 3, center=None):
 		""" Make a square gaussian kernel.
 		size is the length of a side of the square
@@ -227,7 +231,7 @@ class DataGenerator():
 			x0 = center[0]
 			y0 = center[1]
 		return np.exp(-4*np.log(2) * ((x-x0)**2 + (y-y0)**2) / sigma**2)
-	
+
 	def _generate_hm(self, height, width ,joints, maxlenght, weight):
 		""" Generate a full Heap Map for every joints in an array
 		Args:
@@ -245,7 +249,7 @@ class DataGenerator():
 			else:
 				hm[:,:,i] = np.zeros((height,width))
 		return hm
-		
+
 	def _crop_data(self, height, width, box, joints, boxp = 0.05):
 		""" Automatically returns a padding vector and a bounding box given
 		the size of the image and a list of joints.
@@ -284,7 +288,7 @@ class DataGenerator():
 		crop_box[0] += padding[1][0]
 		crop_box[1] += padding[0][0]
 		return padding, crop_box
-	
+
 	def _crop_img(self, img, padding, crop_box):
 		""" Given a bounding box and padding values return cropped image
 		Args:
@@ -296,7 +300,7 @@ class DataGenerator():
 		max_lenght = max(crop_box[2], crop_box[3])
 		img = img[crop_box[1] - max_lenght //2:crop_box[1] + max_lenght //2, crop_box[0] - max_lenght // 2:crop_box[0] + max_lenght //2]
 		return img
-		
+
 	def _crop(self, img, hm, padding, crop_box):
 		""" Given a bounding box and padding values return cropped image and heatmap
 		Args:
@@ -311,12 +315,12 @@ class DataGenerator():
 		img = img[crop_box[1] - max_lenght //2:crop_box[1] + max_lenght //2, crop_box[0] - max_lenght // 2:crop_box[0] + max_lenght //2]
 		hm = hm[crop_box[1] - max_lenght //2:crop_box[1] + max_lenght//2, crop_box[0] - max_lenght // 2:crop_box[0] + max_lenght // 2]
 		return img, hm
-	
+
 	def _relative_joints(self, box, padding, joints, to_size = 64):
 		""" Convert Absolute joint coordinates to crop box relative joint coordinates
 		(Used to compute Heat Maps)
 		Args:
-			box			: Bounding Box 
+			box			: Bounding Box
 			padding	: Padding Added to the original Image
 			to_size	: Heat Map wanted Size
 		"""
@@ -326,19 +330,19 @@ class DataGenerator():
 		new_j = new_j - [box[0] - max_l //2,box[1] - max_l //2]
 		new_j = new_j * to_size / (max_l + 0.0000001)
 		return new_j.astype(np.int32)
-		
-		
+
+
 	def _augment(self,img, hm, max_rotation = 30):
-		""" # TODO : IMPLEMENT DATA AUGMENTATION 
+		""" # TODO : IMPLEMENT DATA AUGMENTATION
 		"""
-		if random.choice([0,1]): 
+		if random.choice([0,1]):
 			r_angle = np.random.randint(-1*max_rotation, max_rotation)
 			img = 	transform.rotate(img, r_angle, preserve_range = True)
 			hm = transform.rotate(hm, r_angle)
 		return img, hm
-	
+
 	# ----------------------- Batch Generator ----------------------------------
-	
+
 	def _generator(self, batch_size = 16, stacks = 4, set = 'train', stored = False, normalize = True, debug = False):
 		""" Create Generator for Training
 		Args:
@@ -348,9 +352,9 @@ class DataGenerator():
 			stored			: Use stored Value # TODO: Not implemented yet
 			normalize		: True to return Image Value between 0 and 1
 			_debug			: Boolean to test the computation time (/!\ Keep False)
-		# Done : Optimize Computation time 
+		# Done : Optimize Computation time
 			16 Images --> 1.3 sec (on i7 6700hq)
-		""" 
+		"""
 		while True:
 			if debug:
 				t = time.time()
@@ -397,7 +401,7 @@ class DataGenerator():
 			if debug:
 				print('Batch : ',time.time() - t, ' sec.')
 			yield train_img, train_gtmap
-			
+
 	def _aux_generator(self, batch_size = 16, stacks = 4, normalize = True, sample_set = 'train'):
 		""" Auxiliary Generator
 		Args:
@@ -417,7 +421,7 @@ class DataGenerator():
 					joints = self.data_dict[name]['joints']
 					box = self.data_dict[name]['box']
 					weight = np.asarray(self.data_dict[name]['weights'])
-					train_weights[i] = weight 
+					train_weights[i] = weight
 					img = self.open_img(name)
 					padd, cbox = self._crop_data(img.shape[0], img.shape[1], box, joints, boxp = 0.2)
 					new_j = self._relative_joints(cbox,padd, joints, to_size=64)
@@ -437,20 +441,20 @@ class DataGenerator():
 				except :
 					print('error file: ', name)
 			yield train_img, train_gtmap, train_weights
-					
+
 	def generator(self, batchSize = 16, stacks = 4, norm = True, sample = 'train'):
 		""" Create a Sample Generator
 		Args:
-			batchSize 	: Number of image per batch 
-			stacks 	 	: Stacks in HG model
-			norm 	 	 	: (bool) True to normalize the batch
-			sample 	 	: 'train'/'valid' Default: 'train'
+			batchSize       : Number of image per batch
+			stacks          : Stacks in HG model
+			norm            : (bool) True to normalize the batch
+			sample          : 'train'/'valid' Default: 'train'
 		"""
 		return self._aux_generator(batch_size=batchSize, stacks=stacks, normalize=norm, sample_set=sample)
-	
-	# ---------------------------- Image Reader --------------------------------				
+
+	# ---------------------------- Image Reader --------------------------------
 	def open_img(self, name, color = 'RGB'):
-		""" Open an image 
+		""" Open an image
 		Args:
 			name	: Name of the sample
 			color	: Color Mode (RGB/BGR/GRAY)
@@ -467,7 +471,7 @@ class DataGenerator():
 			img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 		else:
 			print('Color mode supported: RGB/BGR. If you need another mode do it yourself :p')
-	
+
 	def plot_img(self, name, plot = 'cv2'):
 		""" Plot an image
 		Args:
@@ -481,7 +485,7 @@ class DataGenerator():
 			img = self.open_img(name, color = 'RGB')
 			plt.imshow(img)
 			plt.show()
-	
+
 	def test(self, toWait = 0.2):
 		""" TESTING METHOD
 		You can run it to see if the preprocessing is well done.
@@ -513,9 +517,9 @@ class DataGenerator():
 				print('Ended')
 				cv2.destroyAllWindows()
 				break
-	
-	
-	
+
+
+
 	# ------------------------------- PCK METHODS-------------------------------
 	def pck_ready(self, idlh = 3, idrs = 12, testSet = None):
 		""" Creates a list with all PCK ready samples
@@ -537,14 +541,14 @@ class DataGenerator():
 					wIntel = np.unique(self.data_dict[s]['weights'], return_counts = True)
 					self.total_joints += dict(zip(wIntel[0], wIntel[1]))[1]
 		print('PCK PREPROCESS DONE: \n --Samples:', len(self.pck_samples), '\n --Num.Joints', self.total_joints)
-	
+
 	def getSample(self, sample = None):
 		""" Returns information of a sample
 		Args:
 			sample : (str) Name of the sample
 		Returns:
 			img: RGB Image
-			new_j: Resized Joints 
+			new_j: Resized Joints
 			w: Weights of Joints
 			joint_full: Raw Joints
 			max_l: Maximum Size of Input Image
@@ -569,6 +573,91 @@ class DataGenerator():
 				return False
 		else:
 			print('Specify a sample name')
-				
-		
-		
+
+
+class OsrDataSet(object):
+
+    def __init__(self, env, rob, center=None, res=224):
+        pyosr.init()
+        self.dpy = pyosr.create_display()
+        self.glctx = pyosr.create_gl_context(self.dpy)
+
+        r = pyosr.Renderer()
+        r.avi = True
+        r.pbufferWidth = res
+        r.pbufferHeight = res
+        r.setup()
+
+        r.loadModelFromFile(env)
+        r.loadRobotFromFile(rob)
+        r.scaleToUnit()
+        r.angleModel(0.0, 0.0)
+        r.default_depth=0.0
+        if center is not None:
+            r.enforceRobotCenter(rob_ompl_center)
+        r.views = np.array([[0.0,0.0]], dtype=np.float32)
+
+        self.r = r
+        self.rgb_shape = (res,res,3)
+        self.dep_shape = (res,res,1)
+
+    def render_rgbd(self, q, flags=):
+        r = self.r
+
+        r.state = q
+        r.render_mvrgbd(flags)
+        tup = (r.mvrgb.reshape(self.rgb_shape), r.mvdepth.reshape(self.dep_shape))
+        return np.concatenate(tup,
+                              axis=2)
+
+def random_state(scale=1.0):
+    tr = scale * (np.random.rand(3) - 0.5 + 0.25)
+    u1,u2,u3 = np.random.rand(3)
+    quat = [sqrt(1-u1)*sin(2*pi*u2),
+            sqrt(1-u1)*cos(2*pi*u2),
+            sqrt(u1)*sin(2*pi*u3),
+            sqrt(u1)*cos(2*pi*u3)]
+    part1 = np.array(tr, dtype=np.float32)
+    part2 = np.array(quat, dtype=np.float32)
+    part1_0 = np.array([0.0,0.0,0.0], dtype=np.float32)
+    return np.concatenate((part1, part2)), np.concatenate((part1_0, part2))
+
+class NarrowTunnelRegionDataSet(OsrDataSet):
+    c_dim = 4
+    d_dim = 1
+
+    def __init__(self, rob, env, center=None, res=256):
+        super(NarrowTunnelRegionDataSet, self).__init__(rob=rob,
+                                                        env=env,
+                                                        center=center,
+                                                        res=res)
+
+    def _aux_generator(self, batch_size=16, stacks=4, normalize=True, sample_set='train'):
+        '''
+        _aux_generator is the only interface used by HourglassModel class
+        This generator should yield image, gt and weight (???)
+
+        image: (batch_size, 256, 256, 3)
+        '''
+        r = self.r
+        while True:
+            train_img = np.zeros((batch_size, 256, 256, self.c_dim), dtype = np.float32)
+            train_gtmap = np.zeros((batch_size, stacks, 64, 64, self.d_dim), np.float32)
+            train_weights = None
+            for i in range(batch_size):
+                q,aq = random_state(0.5)
+                train_img[i] = self.render_rgbd(q, pyosr.Renderer.NO_SCENE_RENDERING)
+                r.avi = False
+                r.render_mvrgbd(pyosr.Renderer.NO_SCENE_RENDERING|pyosr.Renderer.HAS_NTR_RENDERING)
+                hm = r.mvrgb.reshape(self.rgb_shape)[:,:,1:2]
+                hm = hm.reshape(256//4,4,256//4,4,self.d_dim).mean(axis=(1,3)) # Downscale to
+                hm = np.expand_dims(hm, axis=0)
+                train_gtmap[i] = np.repeat(hm, stacks, axis=0)
+            yield train_img, train_gtmap, train_weights
+
+def create_dataset(ds_name):
+    if ds_name == 'alpah_ntr':
+        return NarrowTunnelRegionDataSet(rob='../res/alpha/alpha-1.2.wt2.tcp.obj',
+                                         env='../res/alpha/alpha_env-1.2.wt.obj',
+                                         res=256,
+                                         center=np.array([16.973146438598633, 1.2278236150741577, 10.204807281494141]))

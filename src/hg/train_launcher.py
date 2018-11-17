@@ -5,7 +5,9 @@ TRAIN LAUNCHER
 
 import configparser
 from hourglass_tiny import HourglassModel
-from datagen import DataGenerator
+import datagen
+import sys
+DataGenerator = datagen.DataGenerator
 
 def process_config(conf_file):
 	"""
@@ -33,16 +35,42 @@ def process_config(conf_file):
 
 
 if __name__ == '__main__':
-	print('--Parsing Config File')
-	params = process_config('config.cfg')
+	cfile = 'config.cfg' if len(sys.argv) < 2 else sys.argv[1]
+	print('--Parsing Config File {}'.format(cfile))
+	params = process_config(cfile)
 
 	print('--Creating Dataset')
-	dataset = DataGenerator(params['joint_list'], params['img_directory'], params['training_txt_file'], remove_joints=params['remove_joints'])
-	dataset._create_train_table()
-	dataset._randomize()
-	dataset._create_sets()
+        if 'new_dataset' not in params:
+            dataset = DataGenerator(params['joint_list'], params['img_directory'], params['training_txt_file'], remove_joints=params['remove_joints'])
+            dataset._create_train_table()
+            dataset._randomize()
+            dataset._create_sets()
+        else:
+            ds_name = params['new_dataset']
+            dataset = datagen.create_dataset(ds_name)
+            params['num_joints'] = dataset.d_dim
+            assert params['weighted_loss'] is False, "No support for weighted loss for now"
 
-	model = HourglassModel(nFeat=params['nfeats'], nStack=params['nstacks'], nModules=params['nmodules'], nLow=params['nlow'], outputDim=params['num_joints'], batch_size=params['batch_size'], attention = params['mcam'],training=True, drop_rate= params['dropout_rate'], lear_rate=params['learning_rate'], decay=params['learning_rate_decay'], decay_step=params['decay_step'], dataset=dataset, name=params['name'], logdir_train=params['log_dir_train'], logdir_test=params['log_dir_test'], tiny= params['tiny'], w_loss=params['weighted_loss'] , joints= params['joint_list'],modif=False)
+	model = HourglassModel(nFeat=params['nfeats'],
+                               nStack=params['nstacks'],
+                               nModules=params['nmodules'],
+                               nLow=params['nlow'],
+                               outputDim=params['num_joints'],
+                               batch_size=params['batch_size'],
+                               attention=params['mcam'],
+                               training=True,
+                               drop_rate=params['dropout_rate'],
+                               lear_rate=params['learning_rate'],
+                               decay=params['learning_rate_decay'],
+                               decay_step=params['decay_step'],
+                               dataset=dataset,
+                               name=params['name'],
+                               logdir_train=params['log_dir_train'],
+                               logdir_test=params['log_dir_test'],
+                               tiny=params['tiny'],
+                               w_loss=params['weighted_loss'],
+                               joints= params['joint_list'],
+                               modif=False)
 	model.generate_model()
 	model.training_init(nEpochs=params['nepochs'], epochSize=params['epoch_size'], saveStep=params['saver_step'], dataset = None)
 

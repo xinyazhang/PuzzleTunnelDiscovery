@@ -82,13 +82,14 @@ class HourglassModel():
 		self.logdir_test = logdir_test
 		self.joints = joints
 		self.w_loss = w_loss
+		self.c_dim = dataset.c_dim
 
 	# ACCESSOR
 
 	def get_input(self):
 		""" Returns Input (Placeholder) Tensor
 		Image Input :
-			Shape: (None,256,256,3)
+			Shape: (None,256,256,c_dim)
 			Type : tf.float32
 		Warning:
 			Be sure to build the model first
@@ -138,7 +139,7 @@ class HourglassModel():
 		with tf.device(self.gpu):
 			with tf.name_scope('inputs'):
 				# Shape Input Image - batchSize: None, height: 256, width: 256, channel: 3 (RGB)
-				self.img = tf.placeholder(dtype= tf.float32, shape= (None, 256, 256, 3), name = 'input_img')
+				self.img = tf.placeholder(dtype= tf.float32, shape= (None, 256, 256, self.c_dim), name = 'input_img')
 				if self.w_loss:
 					self.weights = tf.placeholder(dtype = tf.float32, shape = (None, self.outDim))
 				# Shape Ground Truth Map: batchSize x nStack x 64 x 64 x outDim
@@ -382,7 +383,7 @@ class HourglassModel():
 	def _graph_hourglass(self, inputs):
 		"""Create the Network
 		Args:
-			inputs : TF Tensor (placeholder) of shape (None, 256, 256, 3) #TODO : Create a parameter for customize size
+			inputs : TF Tensor (placeholder) of shape (None, 256, 256, c_dim) #TODO : Create a parameter for customize size
 		"""
 		with tf.name_scope('model'):
 			with tf.name_scope('preprocessing'):
@@ -803,7 +804,7 @@ class HourglassModel():
 					drop = tf.layers.dropout(ll2, rate=0.1, training = self.training)
 					if i > self.nStack // 2:
 						att = self._attention_part_crf(drop, 1, 3, 0)
-						tmpOut = self._attention_part_crf( att, 1, 3, 1)
+						tmpOut = self._attention_part_crf(att, 1, 3, 1)
 					else:
 						att = self._attention_part_crf(ll2, 1, 3, 0)
 						tmpOut = self._conv(att, filters = self.outDim, kernel_size = 1, strides = 1)
