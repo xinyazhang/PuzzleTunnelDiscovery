@@ -158,6 +158,11 @@ blend-low.map.verified.merged:
 test-blend-low.gt.npz:
 	./rl-precalcmap.sh blend-low.map.verified.merged test-blend-low.gt
 
-.PHONY: follow nvis vispath tp tetp blend-low.map.verified blend-low.map.verified.merged test-blend-low.gt.npz
+alpha-1.2.wt.tcp.obj:
+	make objautouv
+	rm -f alpha-1.2.wt.tcp.obj
+	./objautouv ../res/alpha/alpha-1.2.wt.obj alpha-1.2.wt.tcp.obj
+
+.PHONY: follow nvis vispath tp tetp blend-low.map.verified blend-low.map.verified.merged test-blend-low.gt.npz alpha-1.2.wt.tcp.obj
 
 # vim: tw=0
