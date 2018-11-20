@@ -58,14 +58,21 @@ void SceneRenderer::probe_texture(const std::string& fn)
 		}
 		tex_fn = tex2_fn;
 	}
-	tex_data_ = readPNG(tex_fn.c_str(), tex_w_, tex_h_);
+	int pc;
+	tex_data_ = readPNG(tex_fn.c_str(), tex_w_, tex_h_, &pc);
+	auto iformat = GL_RGBA8;
+	auto dformat = GL_RGBA;
+	if (pc == 3) {
+		iformat = GL_RGB8;
+		dformat = GL_RGB;
+	}
 	if (!tex_) {
 		CHECK_GL_ERROR(glGenTextures(1, &tex_));
 	}
 	CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D, tex_));
-	CHECK_GL_ERROR(glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, tex_w_, tex_h_));
+	CHECK_GL_ERROR(glTexStorage2D(GL_TEXTURE_2D, 1, iformat, tex_w_, tex_h_));
 	CHECK_GL_ERROR(glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, tex_w_, tex_h_,
-				       GL_RGBA, GL_UNSIGNED_BYTE,
+				       dformat, GL_UNSIGNED_BYTE,
 				       tex_data_.data()));
 	CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D, 0));
 	if (!sam_) {

@@ -195,7 +195,7 @@ void png_version_info(void)
 }
 
 
-std::vector<uint8_t> readPNG(const char *fname, int& width, int& height)
+std::vector<uint8_t> readPNG(const char *fname, int& width, int& height, int *pchannels)
 {
 	PNGReader reader;
 	if (reader.init(fname) != 0)
@@ -208,13 +208,15 @@ std::vector<uint8_t> readPNG(const char *fname, int& width, int& height)
 	unsigned char* indata = reader.get_image(gamma, channels, rowBytes);
 	if (!indata)
 		return std::vector<uint8_t>(); 
+	if (pchannels)
+		*pchannels = channels;
 	int bufsize = rowBytes * height;
 	std::vector<uint8_t> data(bufsize);
 	for (int j = 0; j < height; j++)
 		for (int i = 0; i < rowBytes; i += channels)
 			for (int k = 0; k < channels; k++)
 				data[k + i + j * rowBytes] = indata[k + i + (height - j - 1) * rowBytes];
-	
+	free(indata);
 	return data;
 }
 

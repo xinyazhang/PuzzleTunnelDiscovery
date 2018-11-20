@@ -75,16 +75,16 @@ int main(int argc, const char* argv[])
 	};
 	scene.visitMesh(visitor);
 
-	int tex_w, tex_h;
-	auto tex_data = osr::readPNG(tex_fn.c_str(), tex_w, tex_h);
+	int tex_w, tex_h, pc;
+	auto tex_data = osr::readPNG(tex_fn.c_str(), tex_w, tex_h, &pc);
 
 	using EiTex = Eigen::Matrix<uint8_t, -1, -1, Eigen::RowMajor>;
-	using EiTexRGBA = Eigen::Matrix<uint8_t, -1, 4, Eigen::RowMajor>;
+	using EiTexRGBA = Eigen::Matrix<uint8_t, -1, -1, Eigen::RowMajor>;
 	using EiTexFloat = Eigen::Matrix<float, -1, -1, Eigen::RowMajor>;
 	EiTex r_ch = EiTex::Constant(tex_w, tex_h, 32);
 	EiTex b_ch = EiTex::Constant(tex_w, tex_h, 32);
 
-	EiTexRGBA rgba = EiTexRGBA::Map(tex_data.data(), tex_w * tex_h, 4);
+	EiTexRGBA rgba = EiTexRGBA::Map(tex_data.data(), tex_w * tex_h, pc);
 	EiTex g_ch_vector = rgba.col(1);
 	Eigen::Map<EiTex> g_ch_map(g_ch_vector.data(), tex_w, tex_h);
 	EiTex g_ch = g_ch_map;
