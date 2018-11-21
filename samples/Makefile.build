@@ -155,8 +155,17 @@ blend-low.map.verified.merged:
 	echo "e 0 23100" >> blend-low.map.verified.merged
 	echo "e 1 23531" >> blend-low.map.verified.merged
 	
+# This is how we get blend-low.gt.npz 
 test-blend-low.gt.npz:
 	./rl-precalcmap.sh blend-low.map.verified.merged test-blend-low.gt
+
+# Find narrow tunnel vertices.
+# This implicitly takes giant-vm-path.npz and ../res/alpha/alpha-1.2.org.w-first.npz as input files
+# Note: giant-vm-path comes from
+#       1. HTCondor runs condor-visibility-matrix.py over blend-low.gt.npz and ../res/alpha/alpha-1.2.org.w-first.npz
+#       2. runs asvm.py to assembly all output files from 1.
+alpha-1.2.org.tunnel.npz:
+	./tunnel-vertex-locator.py
 
 alpha-1.2.wt.tcp.obj:
 	make objautouv
