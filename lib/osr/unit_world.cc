@@ -465,6 +465,16 @@ UnitWorld::transitStateTo(const StateVector& from,
                           const StateVector& to,
                           double verify_delta) const
 {
+	auto tup = transitStateToWithContact(from, to, verify_delta);
+	return std::make_tuple(std::get<0>(tup), std::get<2>(tup), std::get<3>(tup));
+}
+
+
+std::tuple<StateVector, StateVector, bool, float, float>
+UnitWorld::transitStateToWithContact(const StateVector& from,
+                                     const StateVector& to,
+                                     double verify_delta) const
+{
 	double dist = distance(from, to);
 	// std::cerr << "\t\tNSeg: " << nseg << std::endl;
 #if 0 // Parallel Version
@@ -500,30 +510,35 @@ UnitWorld::transitStateTo(const StateVector& from,
 		}
 	}
 #else
+	if (verify_delta >= dist) {
+		return std::make_tuple(from, to, false, 0.0, 1.0);
+	}
 	StateVector last_free = from;
 	double delta = verify_delta;
-	if (verify_delta >= dist) {
-		return std::make_tuple(from, false, 0.0);
-	}
 	double inv_dist = 1.0/dist;
 	double last_tau = 0.0;
+	double tau = 0.0;
+	StateVector state = from;
 	while (delta <= dist) {
 		double tau = delta * inv_dist;
-		auto state = interpolate(from, to, tau);
+		state = interpolate(from, to, tau);
 		if (!isValid(state)) {
-			return std::make_tuple(last_free, false, last_tau);
+			return std::make_tuple(last_free, state, false, last_tau, tau);
 		}
 		last_tau = tau;
 		last_free = state;
 		if (delta < dist) {
+			// make sure tau = 1.0 is checked.
 			delta += verify_delta;
 			delta = std::min(dist, delta);
 		} else {
+			// make sure tau = 1.0 is NOT double-checked.
 			delta += verify_delta;
 		}
 	}
 #endif
-	return std::make_tuple(last_free, delta > dist, last_tau);
+	// We may assert (delta > dist) == true
+	return std::make_tuple(last_free, state, delta > dist, last_tau, tau);
 }
 
 

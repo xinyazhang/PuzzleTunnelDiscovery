@@ -103,6 +103,11 @@ PYBIND11_PLUGIN(pyosr) {
 		     py::arg("to"),
 		     py::arg("verify_delta"),
 		     py::call_guard<py::gil_scoped_release>())
+		.def("transit_state_to_with_contact", &UnitWorld::transitStateToWithContact,
+		     py::arg("from"),
+		     py::arg("to"),
+		     py::arg("verify_delta"),
+		     py::call_guard<py::gil_scoped_release>())
 		.def("is_valid_transition", &UnitWorld::isValidTransition,
 		     py::arg("from"),
 		     py::arg("to"),

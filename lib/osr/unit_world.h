@@ -63,10 +63,30 @@ public:
                      double transit_magnitude,
                      double verify_delta) const;
 
+	// Returns:
+	//      0: last free configuration
+	//      1: is trajectory collision free
+	//      2: free/total length of trajectory
+	// Note: this function returns (from, false, 0.0) if verify_delta >= |from - to|
 	std::tuple<StateVector, bool, float>
 	transitStateTo(const StateVector& from,
 	               const StateVector& to,
 	               double verify_delta) const;
+
+	// Returns:
+	//      0: last_free configuration
+	//      1: first colliding configuration
+	//      2: is trajectory collision free
+	//      3: free/total length of trajectory
+	//      4: first colliding/total length of trajectory
+	// Note: this function returns
+	//      a) (from, to, false, 0.0, 1.0) if verify_delta >= |from - to|
+	//      b) (to, to, true, 1.0, 1.0) if from -- to is collision-free.
+	//           b.1) so do not use <1> without checking <2>
+	std::tuple<StateVector, StateVector, bool, float, float>
+	transitStateToWithContact(const StateVector& from,
+	                          const StateVector& to,
+	                          double verify_delta) const;
 
 	bool
 	isValidTransition(const StateVector& from,
