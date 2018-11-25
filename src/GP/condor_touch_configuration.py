@@ -15,9 +15,10 @@ def usage():
     print('''Usage:
 1. condor_touch_configuration.py show
     Show the number of tunnel vertices
-2. condor_touch_configuration.py run <Vertex ID> <Batch ID> <Batch Size> <Output Dir>
+2. condor_touch_configuration.py run <Batch ID> <Batch Size> <Output Dir>
     Shoot <Batch Size> rays in configuration space originated from <Vertex ID>, and
-    store the first collision configurations as one `<Batch ID>.npz` file in Output Dir.''')
+    store the first collision configurations as one `<Batch ID>.npz` file in Output Dir.
+    <Vertex ID> is defined as <Batch ID> mod <Total number of tunnel vertices>.''')
 
 def _create_uw():
     r = pyosr.UnitWorld() # pyosr.Renderer is not avaliable in HTCondor
@@ -46,6 +47,9 @@ def calc_touch(uw, vertex, batch_size):
     return rets
 
 def main():
+    if len(sys.argv) < 2:
+        usage()
+        return
     cmd = sys.argv[1]
     if cmd in ['-h', '--help', 'help']:
         usage()
@@ -55,16 +59,16 @@ def main():
         print("# of tunnel vertices is {}".format(len(tunnel_v)))
         return
     assert cmd == 'run'
-    vert_id = int(sys.argv[2])
+    task_id = int(sys.argv[2])
+    batch_id, vert_id = divmod(task_id, len(tunnel_v))
     vertex = tunnel_v[vert_id]
-    batch_id = int(sys.argv[3])
-    batch_size = int(sys.argv[4])
-    out_dir = sys.argv[5]
+    batch_size = int(sys.argv[3])
+    out_dir = sys.argv[4]
 
     uw = _create_uw()
 
     free_vertices, touch_vertices, to_inf, free_tau, touch_tau = calc_touch(uw, vertex, batch_size)
-    np.savez("{}/{}-{}.npz".format(out_dir, vert_id, batch_id),
+    np.savez("{}/touchq-{}-{}.npz".format(out_dir, vert_id, batch_id),
              FROM_V=np.repeat(np.array([vertex]), batch_size, axis=0),
              FREE_V=free_vertices,
              TOUCH_V=touch_vertices,
