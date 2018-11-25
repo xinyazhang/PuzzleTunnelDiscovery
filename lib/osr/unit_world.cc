@@ -725,7 +725,7 @@ UnitWorld::intersectionRegionSurfaceAreas(ArrayOfStates qs,
 	auto rob_F = cd_robot_->faces();
 
 	for (int i = 0; i < Nq; i++) {
-		StateVector state = qs.row(i).transpose();
+		StateVector state = qsu.row(i).transpose();
 		Transform robTf = translate_state_to_transform(state);
 		CDModel::VMatrix rob_V = (robTf * cd_robot_->vertices().transpose()).transpose();
 
