@@ -21,3 +21,5 @@
         a) saforce.py: simulation
         b) sancheck_saforce.py: visualize the saforce process
         c) condor_saforce.py: run on distributed system like HTCondor.
+4. Labling the touch surface
+	a) condor_touch_configuration.py: calculate the touch configuration
