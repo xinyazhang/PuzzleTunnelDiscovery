@@ -1,3 +1,5 @@
+#if GPU_ENABLED
+
 #include "pngimage.h"
 #include <zlib.h>
 #include <png.h>
@@ -290,3 +292,5 @@ void writePNG(const char *fname, int width, int height, const void *data)
 }
 
 }
+
+#endif

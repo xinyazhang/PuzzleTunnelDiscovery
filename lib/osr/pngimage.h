@@ -1,6 +1,7 @@
 #ifndef FILEIO_PNGIMAGE_H
 #define FILEIO_PNGIMAGE_H
 
+#if GPU_ENABLED
 #include <vector>
 #include <stdint.h>
 
@@ -12,5 +13,6 @@ std::vector<uint8_t> readPNG(const char *fname, int& width, int& height, int *pc
 void writePNG(const char *iname, int width, int height, const void* data); 
 
 }
+#endif
 
 #endif
