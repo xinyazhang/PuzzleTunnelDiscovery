@@ -15,15 +15,15 @@ Abstract:
 	This python code creates a Stacked Hourglass Model
 	(Credits : A.Newell et al.)
 	(Paper : https://arxiv.org/abs/1603.06937)
-	
+
 	Code translated from 'anewell' github
 	Torch7(LUA) --> TensorFlow(PYTHON)
 	(Code : https://github.com/anewell/pose-hg-train)
-	
+
 	Modification are made and explained in the report
 	Goal : Achieve Real Time detection (Webcam)
 	----- Modifications made to obtain faster results (trade off speed/accuracy)
-	
+
 	This work is free of use, please cite the author if you use it!
 
 """
@@ -49,7 +49,7 @@ class PredictProcessor():
 	PredictProcessor class: Give the tools to open and use a trained model for
 	prediction.
 	Dependency: OpenCV or PIL (OpenCV prefered)
-	
+
 	Comments:
 		Every CAPITAL LETTER methods are to be modified with regard to your needs and dataset
 	"""
@@ -60,17 +60,17 @@ class PredictProcessor():
 			config_dict	: config_dict
 		"""
 		self.params = config_dict
-		self.HG = HourglassModel(nFeat= self.params['nfeats'], nStack = self.params['nstacks'], 
-						nModules = self.params['nmodules'], nLow = self.params['nlow'], outputDim = self.params['num_joints'], 
+		self.HG = HourglassModel(nFeat= self.params['nfeats'], nStack = self.params['nstacks'],
+						nModules = self.params['nmodules'], nLow = self.params['nlow'], outputDim = self.params['num_joints'],
 						batch_size = self.params['batch_size'], drop_rate = self.params['dropout_rate'], lear_rate = self.params['learning_rate'],
 						decay = self.params['learning_rate_decay'], decay_step = self.params['decay_step'], dataset = None, training = False,
 						w_summary = True, logdir_test = self.params['log_dir_test'],
-						logdir_train = self.params['log_dir_test'], tiny = self.params['tiny'], 
+						logdir_train = self.params['log_dir_test'], tiny = self.params['tiny'],
 						modif = False, name = self.params['name'], attention = self.params['mcam'], w_loss=self.params['weighted_loss'] , joints= self.params['joint_list'])
 		self.graph = tf.Graph()
 		self.src = 0
 		self.cam_res = (480,640)
-		
+
 	def color_palette(self):
 		""" Creates a color palette dictionnary
 		Drawing Purposes
@@ -80,7 +80,7 @@ class PredictProcessor():
 		/!\ Make sure those 2 lists have the same size
 		"""
 		#BGR COLOR CODE
-		self.color = [(241,242,224), (196,203,128), (136,150,0), (64,77,0), 
+		self.color = [(241,242,224), (196,203,128), (136,150,0), (64,77,0),
 				(201,230,200), (132,199,129), (71,160,67), (32,94,27),
 				(130,224,255), (7,193,255), (0,160,255), (0,111,255),
 				(220,216,207), (174,164,144), (139,125,96), (100,90,69),
@@ -105,7 +105,7 @@ class PredictProcessor():
 		self.palette = {}
 		for i, name in enumerate(self.color_name):
 			self.palette[name] = self.color[i]
-			
+
 	def LINKS_JOINTS(self):
 		""" Defines links to be joined for visualization
 		Drawing Purposes
@@ -124,17 +124,17 @@ class PredictProcessor():
 		# LINKS = [(0,1),(1,2),(3,4),(4,5),(6,8),(8,9),(13,14),(14,15),(12,11),(11,10)]
 		for i in range(len(LINKS)):
 			self.links[i] = {'link' : LINKS[i], 'color' : self.palette[self.color_name[color_id[i]]]}
-	
+
 	# ----------------------------TOOLS----------------------------------------
 	def col2RGB(self, col):
-		""" 
+		"""
 		Args:
 			col 	: (int-tuple) Color code in BGR MODE
 		Returns
 			out 	: (int-tuple) Color code in RGB MODE
 		"""
 		return col[::-1]
-	
+
 	def givePixel(self, link, joints):
 		""" Returns the pixel corresponding to a link
 		Args:
@@ -144,7 +144,7 @@ class PredictProcessor():
 			out		: (tuple) Tuple of joints position
 		"""
 		return (joints[link[0]].astype(np.int), joints[link[1]].astype(np.int))
-	
+
 	# ---------------------------MODEL METHODS---------------------------------
 	def model_init(self):
 		""" Initialize the Hourglass Model
@@ -153,7 +153,7 @@ class PredictProcessor():
 		with self.graph.as_default():
 			self.HG.generate_model()
 		print('Graph Generated in ', int(time() - t), ' sec.')
-	
+
 	def load_model(self, load = None):
 		""" Load pretrained weights (See README)
 		Args:
@@ -161,7 +161,7 @@ class PredictProcessor():
 		"""
 		with self.graph.as_default():
 			self.HG.restore(load)
-		
+
 	def _create_joint_tensor(self, tensor, name = 'joint_tensor',debug = False):
 		""" TensorFlow Computation of Joint Position
 		Args:
@@ -169,7 +169,7 @@ class PredictProcessor():
 			name		: name of the tensor
 		Returns:
 			out			: Tensor of joints position
-		
+
 		Comment:
 			Genuinely Agreeing this tensor is UGLY. If you don't trust me, look at
 			'prediction' node in TensorBoard.
@@ -198,7 +198,7 @@ class PredictProcessor():
 				j = tf.expand_dims(tf.stack([arg // tf.to_int64(shape[1]), arg % tf.to_int64(shape[1])], axis = -1), axis = 0)
 				joints = tf.concat([joints, j], axis = 0)
 			return tf.identity(joints, name = 'joints')
-			
+
 	def _create_prediction_tensor(self):
 		""" Create Tensor for prediction purposes
 		"""
@@ -209,9 +209,9 @@ class PredictProcessor():
 				self.HG.joint_tensor = self._create_joint_tensor(self.HG.output[0], name = 'joint_tensor')
 				self.HG.joint_tensor_final = self._create_joint_tensor(self.HG.output[0,-1] , name = 'joint_tensor_final')
 		print('Prediction Tensors Ready!')
-	
-	
-	
+
+
+
 	#----------------------------PREDICTION METHODS----------------------------
 	def predict_coarse(self, img, debug = False, sess = None):
 		""" Given a 256 x 256 image, Returns prediction Tensor
@@ -236,7 +236,7 @@ class PredictProcessor():
 		if debug:
 			print('Pred: ', time() - t, ' sec.')
 		return out
-	
+
 	def pred(self, img, debug = False, sess = None):
 		""" Given a 256 x 256 image, Returns prediction Tensor
 		This prediction method returns values in [0,1]
@@ -260,11 +260,11 @@ class PredictProcessor():
 		if debug:
 			print('Pred: ', time() - t, ' sec.')
 		return out
-	
+
 	def joints_pred(self, img, coord = 'hm', debug = False, sess = None):
 		""" Given an Image, Returns an array with joints position
 		Args:
-			img		: Image -Shape (256 x 256 x 3) -Type : float32 
+			img		: Image -Shape (256 x 256 x 3) -Type : float32
 			coord	: 'hm'/'img' Give pixel coordinates relative to heatMap('hm') or Image('img')
 			debug	: (bool) True to output prediction time
 		Returns
@@ -300,7 +300,7 @@ class PredictProcessor():
 				return j * self.params['img_size'] / self.params['hm_size']
 			else:
 				print("Error: 'coord' argument different of ['hm','img']")
-				
+
 	def joints_pred_numpy(self, img, coord = 'hm', thresh = 0.2, sess = None):
 		""" Create Tensor for joint position prediction
 		NON TRAINABLE
@@ -321,7 +321,7 @@ class PredictProcessor():
 				elif coord == 'img':
 					joints[i] = np.array(index) * self.params['img_size'] / self.params['hm_size']
 		return joints
-			
+
 	def batch_pred(self, batch, debug = False):
 		""" Given a 256 x 256 images, Returns prediction Tensor
 		This prediction method returns values in [0,1]
@@ -342,8 +342,8 @@ class PredictProcessor():
 		if debug:
 			print('Pred: ', time() - t, ' sec.')
 		return out
-	
-	
+
+
 	#-------------------------------PLOT FUNCTION------------------------------
 	def plt_skeleton(self, img, tocopy = True, debug = False, sess = None):
 		""" Given an Image, returns Image with plotted limbs (TF VERSION)
@@ -361,7 +361,7 @@ class PredictProcessor():
 			cv2.line(img, tuple(position[0])[::-1], tuple(position[1])[::-1], self.links[i]['color'][::-1], thickness = 2)
 		if tocopy:
 			return img
-		
+
 	def plt_skeleton_numpy(self, img, tocopy = True, thresh = 0.2, sess = None, joint_plt = True):
 		""" Given an Image, returns Image with plotted limbs (NUMPY VERSION)
 		Args:
@@ -389,7 +389,7 @@ class PredictProcessor():
 					cv2.circle(img, (int(joints[p,1]), int(joints[p,0])), radius = 3, color = self.color[p][::-1], thickness = -1)
 		if tocopy:
 			return img
-		
+
 	def pltSkeleton(self, img, thresh = 0.2, pltJ = True, pltL = True, tocopy = True, norm = True):
 		""" Plot skeleton on Image (Single Detection)
 		Args:
@@ -425,7 +425,7 @@ class PredictProcessor():
 						cv2.line(img, tuple(pos[0])[::-1], tuple(pos[1])[::-1], self.links[i]['color'][::-1], thickness = 5)
 		if tocopy:
 			return img
-		
+
 	#------------------------Visualiazing Methods------------------------------
 	def jointsToMat(self, joints):
 		""" Given a 16 Joints Matrix, returns a 13 joints Matrix
@@ -442,7 +442,7 @@ class PredictProcessor():
 		position[7:,:] = joints[10:,:]
 		position = np.reshape(position,(26,1),order = 'F')
 		return position
-	
+
 	def computeErr(self, history, frame = 3):
 		""" Given frames, compute error vector to project into new basis
 		Args:
@@ -463,9 +463,9 @@ class PredictProcessor():
 			y = yf / abs(yf[rsho] - yf[lhip] + eps) - ys / abs(ys[rsho] - ys[lhip] + eps)
 			err[26*(i):26*(i)+26,:] = np.concatenate([x,y],axis = 0)
 		return err
-	
+
 	def errToJoints(self, err, frame, hFrame):
-		""" Given an error vector and the frame considered, compute the joint's 
+		""" Given an error vector and the frame considered, compute the joint's
 		location from the error
 		Args:
 			err			: Error Vector
@@ -490,7 +490,7 @@ class PredictProcessor():
 		y = (y + (yh /np.abs(yh[rsho,:] - yh[lhip,:] + eps))) * np.abs(yf[rsho,:] - yf[lhip,:] + eps)
 		joints = np.concatenate([x,y], axis = 1).astype(np.int64)
 		return joints
-	
+
 	def reconstructACPVideo(self, load = 'F:/Cours/DHPE/DHPE/hourglass_tiny/withyolo/p4frames.mat',n = 5):
 		""" Single Person Detection with Principle Componenent Analysis (PCA)
 		This method reconstructs joints given an error matrix (computed on MATLAB and available on GitHub)
@@ -563,8 +563,8 @@ class PredictProcessor():
 		cv2.destroyAllWindows()
 		cam.release()
 
-	
-	
+
+
 	def _singleDetection(self, plt_j = True, plt_l = True):
 		""" /!\/!\DO NOT USE THIS FUNCTION/!\/!\
 		/!\/!\METHOD FOR TEST PURPOSES ONLY/!\/!\
@@ -606,8 +606,8 @@ class PredictProcessor():
 				break
 		cv2.destroyAllWindows()
 		cam.release()
-			
-			
+
+
 	def hpeWebcam(self, thresh = 0.6, plt_j = True, plt_l = True, plt_hm = False, debug = True):
 		""" Single Person Detector
 		Args:
@@ -664,7 +664,7 @@ class PredictProcessor():
 		cam.release()
 		if debug:
 			return framerate
-	
+
 	def mpe(self, j_thresh = 0.5, nms_thresh = 0.5, plt_l = True, plt_j = True, plt_b = True, img_size = 800,  skeleton = False):
 		""" Multiple Person Estimation (WebCam usage)
 		Args:
@@ -749,11 +749,11 @@ class PredictProcessor():
 				break
 		cv2.destroyAllWindows()
 		cam.release()
-	
-	
-	
-	
-	
+
+
+
+
+
 	# ---------------------------------MPE MULTITHREAD--------------------------
 	def threadProcessing(self, box, img_size, j_thresh, plt_l, plt_j, plt_b):
 		#if not coord.should_stop():
@@ -798,15 +798,15 @@ class PredictProcessor():
 	#	self.pprocessed += 1
 	#	if self.pprocessed == self.pnum:
 	#		coord.request_stop()
-	
-	
+
+
 	def imgPrepare(self, img, res):
 		img = cv2.flip(img,1)
 		img[:, self.cam_res[1]//2 - self.cam_res[0]//2:self.cam_res[1]//2 + self.cam_res[0]//2]
 		self.img_res = cv2.resize(img, (res,res))
 		self.img_yolo = np.copy(self.img_res)
 		self.img_yolo = cv2.cvtColor(self.img_yolo, cv2.COLOR_BGR2RGB)
-	
+
 	def yoloPrepare(self, nms):
 		results = self.detect(self.img_yolo)
 		results_person = []
@@ -815,7 +815,7 @@ class PredictProcessor():
 				results_person.append(results[i])
 		results_person = self.nms(results_person, nms)
 		return results_person
-	
+
 	def mpeThread(self, jThresh = 0.2, nms = 0.5, plt_l = True, plt_j = True, plt_b = True, img_size = 800, wait = 0.07):
 		cam = cv2.VideoCapture(self.src)
 		res = img_size
@@ -845,11 +845,11 @@ class PredictProcessor():
 				break
 		cv2.destroyAllWindows()
 		cam.release()
-	
-	
-	
+
+
+
 	#---------------------------Conversion Method------------------------------
-	
+
 	def videoDetection(self, src = None, outName = None, codec = 'DIVX', j_thresh = 0.5, nms_thresh = 0.5, show = True, plt_j = True, plt_l = True, plt_b = True):
 		""" Process Video with Pose Estimation
 		Args:
@@ -948,7 +948,7 @@ class PredictProcessor():
 				RECONSTRUCT_IMG = img_square.astype(np.uint8)
 			RECONSTRUCT_IMG = RECONSTRUCT_IMG.astype(np.uint8)
 			outVid.write(np.uint8(RECONSTRUCT_IMG))
-			cur_frame = cur_frame + 1		
+			cur_frame = cur_frame + 1
 			if frames != -1:
 				percent = ((cur_frame+1)/frames) * 100
 				num = np.int(20*percent/100)
@@ -970,11 +970,11 @@ class PredictProcessor():
 			print(outVid.isOpened())
 			outVid.release()
 			print(outVid.isOpened())
-		print(time() - startT)	
+		print(time() - startT)
 
-	
+
 	 #-------------------------Benchmark Methods (PCK)-------------------------
-	
+
 	def pcki(self, joint_id, gtJ, prJ, idlh = 3, idrs = 12):
 		""" Compute PCK accuracy on a given joint
 		Args:
@@ -987,7 +987,7 @@ class PredictProcessor():
 			(float) NORMALIZED L2 ERROR
 		"""
 		return np.linalg.norm(gtJ[joint_id]-prJ[joint_id][::-1]) / np.linalg.norm(gtJ[idlh]-gtJ[idrs])
-		
+
 	def pck(self, weight, gtJ, prJ, gtJFull, boxL, idlh = 3, idrs = 12):
 		""" Compute PCK accuracy for a sample
 		Args:
@@ -1004,7 +1004,7 @@ class PredictProcessor():
 				self.ratio_pck.append(self.pcki(i, gtJ, prJ, idlh=idlh, idrs = idrs))
 				self.ratio_pck_full.append(self.pcki(i, gtJFull, np.asarray(prJ / 255 * boxL)))
 				self.pck_id.append(i)
-	
+
 	def compute_pck(self, datagen, idlh = 3, idrs = 12, testSet = None):
 		""" Compute PCK on dataset
 		Args:
@@ -1030,9 +1030,9 @@ class PredictProcessor():
 				prJoints = self.joints_pred_numpy(np.expand_dims(img/255, axis = 0), coord = 'img', thresh = 0)
 				self.pck(w, gtJoints, prJoints, gtJFull, boxL, idlh=idlh, idrs = idrs)
 		print('Done in ', int(time() - startT), 'sec.')
-			
+
 	#-------------------------Object Detector (YOLO)-------------------------
-	
+
 	# YOLO MODEL
 	# Source : https://github.com/hizhangp/yolo_tensorflow
 	# Author : Peng Zhang (https://github.com/hizhangp/)
@@ -1055,7 +1055,7 @@ class PredictProcessor():
 		with self.graph.as_default():
 			self.net = YOLONet(is_training=False)
 		print('YOLO created: ', time() - t, ' sec.')
-	
+
 	def restore_yolo(self, load = 'yolo_small.ckpt'):
 		""" Restore Weights
 		Args:
@@ -1068,8 +1068,8 @@ class PredictProcessor():
 			self.saver = tf.train.Saver(tf.contrib.framework.get_trainable_variables(scope='yolo'))
 			self.saver.restore(self.HG.Session, load)
 		print('Trained YOLO Loaded: ', time() - t, ' sec.')
-	
-	
+
+
 	def iou(self, box1, box2):
 		""" Intersection over Union (IoU)
 		Args:
@@ -1085,7 +1085,7 @@ class PredictProcessor():
 		else:
 			intersection = tb * lr
 		return intersection / (box1[2] * box1[3] + box2[2] * box2[3] - intersection)
-	
+
 	def detect(self, img):
 		""" Method for Object Detection
 		Args:
@@ -1105,7 +1105,7 @@ class PredictProcessor():
 			result[i][3] *= (1.0 * img_w / self.image_size)
 			result[i][4] *= (1.0 * img_h / self.image_size)
 		return result
-	
+
 	def detect_from_cvmat(self, inputs):
 		""" Runs detection on Session (TENSORFLOW RELATED)
 		"""
@@ -1114,7 +1114,7 @@ class PredictProcessor():
 		for i in range(net_output.shape[0]):
 			results.append(self.interpret_output(net_output[i]))
 		return results
-	
+
 	def interpret_output(self, output):
 		""" Post Process the Output of the network
 		Args:
@@ -1156,7 +1156,7 @@ class PredictProcessor():
 		for i in range(len(boxes_filtered)):
 			result.append([self.classes[classes_num_filtered[i]], boxes_filtered[i][0], boxes_filtered[i][1], boxes_filtered[i][2], boxes_filtered[i][3], probs_filtered[i]])
 		return result
-	
+
 	def nms(self, boxes, overlapThresh):
 		""" Non Maxima Suppression
 		Args:
@@ -1198,7 +1198,7 @@ class PredictProcessor():
 		for i in pick:
 			ret.append(boxes[i])
 		return ret
-	
+
 	def camera_detector(self, cap, wait=10, mirror = True):
 		""" YOLO Webcam Detector
 		Args:
@@ -1234,7 +1234,7 @@ class PredictProcessor():
 				cap.release()
 		cv2.destroyAllWindows()
 		cap.release()
-		
+
 	def person_detector(self, wait=10, mirror = True, plot = True):
 		""" YOLO Webcam Detector
 		Args:
@@ -1276,7 +1276,7 @@ class PredictProcessor():
 				cap.release()
 		cv2.destroyAllWindows()
 		cap.release()
-		
+
 if __name__ == '__main__':
 	t = time()
 	params = process_config('configTiny.cfg')

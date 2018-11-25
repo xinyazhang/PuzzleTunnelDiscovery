@@ -33,6 +33,7 @@ import numpy as np
 import sys
 import datetime
 import os
+from scipy.misc import imsave
 
 class HourglassModel():
 	""" HourglassModel class: (to be renamed)
@@ -81,8 +82,10 @@ class HourglassModel():
 		self.logdir_train = logdir_train
 		self.logdir_test = logdir_test
 		self.joints = joints
+		self.njoints = len(self.joints)
 		self.w_loss = w_loss
 		self.c_dim = dataset.c_dim
+		assert self.njoints == dataset.d_dim, 'Number of joints ({}) does not match output dimensions ({})'.format(self.njoints, dataset.d_dim)
 
 	# ACCESSOR
 
@@ -174,14 +177,16 @@ class HourglassModel():
 			lrTime = time.time()
 			print('---LR : Done (' + str(int(abs(accurTime-lrTime))) + ' sec.)')
 		with tf.device(self.gpu):
-			with tf.name_scope('rmsprop'):
-				self.rmsprop = tf.train.RMSPropOptimizer(learning_rate= self.lr)
+			#with tf.name_scope('rmsprop'):
+				#self.optimizer = tf.train.RMSPropOptimizer(learning_rate= self.lr)
+			with tf.name_scope('adam'):
+				self.optimizer = tf.train.AdamOptimizer(learning_rate=self.lr)
 			optimTime = time.time()
 			print('---Optim : Done (' + str(int(abs(optimTime-lrTime))) + ' sec.)')
 			with tf.name_scope('minimizer'):
 				self.update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 				with tf.control_dependencies(self.update_ops):
-					self.train_rmsprop = self.rmsprop.minimize(self.loss, self.train_step)
+					self.train_optimize = self.optimizer.minimize(self.loss, self.train_step)
 			minimTime = time.time()
 			print('---Minimizer : Done (' + str(int(abs(optimTime-minimTime))) + ' sec.)')
 		self.init = tf.global_variables_initializer()
@@ -191,6 +196,8 @@ class HourglassModel():
 			with tf.name_scope('training'):
 				tf.summary.scalar('loss', self.loss, collections = ['train'])
 				tf.summary.scalar('learning_rate', self.lr, collections = ['train'])
+                                tf.summary.image('gt_img', self.get_label()[:,0,:,:,:], collections = ['train'])
+                                tf.summary.image('pred_img', self.output[:,0,:,:,:], collections = ['train'])
 			with tf.name_scope('summary'):
 				for i in range(len(self.joints)):
 					tf.summary.scalar(self.joints[i], self.joint_accur[i], collections = ['train', 'test'])
@@ -239,25 +246,25 @@ class HourglassModel():
 				for i in range(epochSize):
 					# DISPLAY PROGRESS BAR
 					# TODO : Customize Progress Bar
-					percent = ((i+1)/epochSize) * 100
+					percent = (float(i+1)/float(epochSize)) * 100
 					num = np.int(20*percent/100)
 					tToEpoch = int((time.time() - epochstartTime) * (100 - percent)/(percent))
 					sys.stdout.write('\r Train: {0}>'.format("="*num) + "{0}>".format(" "*(20-num)) + '||' + str(percent)[:4] + '%' + ' -cost: ' + str(cost)[:6] + ' -avg_loss: ' + str(avg_cost)[:5] + ' -timeToEnd: ' + str(tToEpoch) + ' sec.')
 					sys.stdout.flush()
 					img_train, gt_train, weight_train = next(self.generator)
-					if i % saveStep == 0:
+					if saveStep >= 0 and i % saveStep == 0:
 						if self.w_loss:
-							_, c, summary = self.Session.run([self.train_rmsprop, self.loss, self.train_op], feed_dict = {self.img : img_train, self.gtMaps: gt_train, self.weights: weight_train})
+							_, c, summary = self.Session.run([self.train_optimize, self.loss, self.train_op], feed_dict = {self.img : img_train, self.gtMaps: gt_train, self.weights: weight_train})
 						else:
-							_, c, summary = self.Session.run([self.train_rmsprop, self.loss, self.train_op], feed_dict = {self.img : img_train, self.gtMaps: gt_train})
+							_, c, summary = self.Session.run([self.train_optimize, self.loss, self.train_op], feed_dict = {self.img : img_train, self.gtMaps: gt_train})
 						# Save summary (Loss + Accuracy)
 						self.train_summary.add_summary(summary, epoch*epochSize + i)
 						self.train_summary.flush()
 					else:
 						if self.w_loss:
-							_, c, = self.Session.run([self.train_rmsprop, self.loss], feed_dict = {self.img : img_train, self.gtMaps: gt_train, self.weights: weight_train})
+							_, c, = self.Session.run([self.train_optimize, self.loss], feed_dict = {self.img : img_train, self.gtMaps: gt_train, self.weights: weight_train})
 						else:
-							_, c, = self.Session.run([self.train_rmsprop, self.loss], feed_dict = {self.img : img_train, self.gtMaps: gt_train})
+							_, c, = self.Session.run([self.train_optimize, self.loss], feed_dict = {self.img : img_train, self.gtMaps: gt_train})
 					cost += c
 					avg_cost += c/epochSize
 				epochfinishTime = time.time()
@@ -291,6 +298,64 @@ class HourglassModel():
 			print('  Final Loss: ' + str(cost) + '\n' + '  Relative Loss: ' + str(100*self.resume['loss'][-1]/(self.resume['loss'][0] + 0.1)) + '%' )
 			print('  Relative Improvement: ' + str((self.resume['err'][-1] - self.resume['err'][0]) * 100) +'%')
 			print('  Training Time: ' + str( datetime.timedelta(seconds=time.time() - startTime)))
+
+	def testing_init(self, nEpochs = 1, epochSize = 1000, saveStep = 0, dataset=None, load=None):
+            with tf.name_scope('Session'):
+                with tf.device(self.gpu):
+                    self._init_weight()
+                    self._define_saver_summary()
+                    assert load is not None
+
+                    ckpt = tf.train.get_checkpoint_state(load)
+                    assert ckpt and ckpt.model_checkpoint_path
+                    ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
+                    self.saver.restore(self.Session, os.path.join(load, ckpt_name))
+                    self._test(nEpochs=1, epochSize=epochSize, saveStep=0, out_dir=load)
+
+	def _test(self, nEpochs = 1, epochSize = 1000, saveStep = 500, out_dir=None):
+            assert nEpochs == 1
+            assert self.w_loss is False
+            assert out_dir is not None
+            assert saveStep <= 0
+            tres = 2048
+            atex = np.zeros(shape=(tres,tres), dtype=np.float32) # accumulator texture
+            """
+            """
+            with tf.name_scope('Train'):
+                self.generator = self.dataset._aux_generator(self.batchSize, self.nStack, normalize = True, sample_set = 'test')
+                startTime = time.time()
+                pred = self.output[:, self.nStack - 1]
+
+                for epoch in range(nEpochs):
+                    epochstartTime = time.time()
+                    print('Epoch :' + str(epoch) + '/' + str(nEpochs) + '\n')
+                    # Training Set
+                    for i in range(epochSize):
+                        # DISPLAY PROGRESS BAR
+                        # TODO : Customize Progress Bar
+                        img_test, batch_uv, _ = next(self.generator)
+                        [test_y] = self.Session.run([pred], feed_dict = {self.img : img_test})
+                        for uvi,labeli in zip(batch_uv, test_y):
+                            # np.clip(labeli, 0.0, 1.0, out=labeli)
+                            labeli = np.reshape(labeli, (64,64))
+                            labeli = np.kron(labeli, np.ones((4,4))) # 64x64 -> 256x256
+                            nz = np.nonzero(labeli)
+                            scores = labeli[nz]
+                            uvs = uvi[nz]
+                            us = 1.0 - uvs[:,1]
+                            us = np.array(tres * us, dtype=int)
+                            vs = uvs[:,0]
+                            vs = np.array(tres * vs, dtype=int)
+                            for iu,iv,s in zip(us,vs,scores):
+                                if iu < 0 or iu >= tres or iv < 0 or iv > tres:
+                                    continue
+                                atex[iu,iv] += s
+                    epochfinishTime = time.time()
+                    print('Epoch ' + str(epoch) + '/' + str(nEpochs) + ' done in ' + str(int(epochfinishTime-epochstartTime)) + ' sec.' + ' -avg_time/batch: ' + str(((epochfinishTime-epochstartTime)/epochSize))[:4] + ' sec.')
+                print('Testing Done')
+                np.savez('{}/atex.npz'.format(out_dir), ATEX=atex)
+                natex = atex / np.amax(atex)
+                imsave('{}/atex.png'.format(out_dir), natex)
 
 	def record_training(self, record):
 		""" Record Training Data and Export them in CSV file
@@ -361,7 +426,6 @@ class HourglassModel():
 				with tf.device(self.gpu):
 					self.train_summary = tf.summary.FileWriter(self.logdir_train, tf.get_default_graph())
 					self.test_summary = tf.summary.FileWriter(self.logdir_test)
-					#self.weight_summary = tf.summary.FileWriter(self.logdir_train, tf.get_default_graph())
 
 	def _init_weight(self):
 		""" Initialize weights
@@ -624,7 +688,7 @@ class HourglassModel():
 			arg		: Tuple of max position
 		"""
 		resh = tf.reshape(tensor, [-1])
-		argmax = tf.arg_max(resh, 0)
+		argmax = tf.argmax(resh, 0)
 		return (argmax // tensor.get_shape().as_list()[0], argmax % tensor.get_shape().as_list()[0])
 
 	def _compute_err(self, u, v):

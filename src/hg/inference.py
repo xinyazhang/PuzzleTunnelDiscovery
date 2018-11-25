@@ -15,15 +15,15 @@ Abstract:
 	This python code creates a Stacked Hourglass Model
 	(Credits : A.Newell et al.)
 	(Paper : https://arxiv.org/abs/1603.06937)
-	
+
 	Code translated from 'anewell' github
 	Torch7(LUA) --> TensorFlow(PYTHON)
 	(Code : https://github.com/anewell/pose-hg-train)
-	
+
 	Modification are made and explained in the report
 	Goal : Achieve Real Time detection (Webcam)
 	----- Modifications made to obtain faster results (trade off speed/accuracy)
-	
+
 	This work is free of use, please cite the author if you use it!
 
 """
@@ -62,7 +62,7 @@ class Inference():
 		""" Initilize the Predictor
 		Args:
 			config_file 	 	: *.cfg file with model's parameters
-			model 	 	 	 	: *.index file's name. (weights to load) 
+			model 	 	 	 	: *.index file's name. (weights to load)
 			yoloModel 	 	: *.ckpt file (YOLO weights to load)
 		"""
 		t = time()
@@ -77,7 +77,7 @@ class Inference():
 		self.predict._create_prediction_tensor()
 		self.filter = VideoFilters()
 		print('Done: ', time() - t, ' sec.')
-		
+
 	# -------------------------- WebCam Inference-------------------------------
 	def webcamSingle(self, thresh = 0.2, pltJ = True, pltL = True):
 		""" Run Single Pose Estimation on Webcam Stream
@@ -87,7 +87,7 @@ class Inference():
 			pltL: (bool) True to plot limbs
 		"""
 		self.predict.hpeWebcam(thresh = thresh, plt_j = pltJ, plt_l = pltL, plt_hm = False, debug = False)
-	
+
 	def webcamMultiple(self, thresh = 0.2, nms = 0.5, resolution = 800,pltL = True, pltJ = True, pltB = True, isolate = False):
 		""" Run Multiple Pose Estimation on Webcam Stream
 		Args:
@@ -100,7 +100,7 @@ class Inference():
 			isolate: (bool) True to show isolated skeletons
 		"""
 		self.predict.mpe(j_thresh = thresh, nms_thresh = nms, plt_l = pltL, plt_j = pltJ, plt_b = pltB, img_size = resolution, skeleton = isolate)
-	
+
 	def webcamPCA(self, n = 5, matrix = 'p4frames.mat'):
 		""" Run Single Pose Estimation with Error Reconstruction on Webcam Stream
 		Args:
@@ -108,15 +108,15 @@ class Inference():
 			matrix : MATLAB eigenvector matrix to load
 		"""
 		self.predict.reconstructACPVideo(load = matrix, n = n)
-		
+
 	def webcamYOLO(self):
 		""" Run Object Detection on Webcam Stream
 		"""
 		cam = cv2.VideoCapture(0)
 		return self.predict.camera_detector( cam, wait=0, mirror = True)
-		
+
 	# ----------------------- Heat Map Prediction ------------------------------
-	
+
 	def predictHM(self, img):
 		""" Return Sigmoid Prediction Heat Map
 		Args:
@@ -124,7 +124,7 @@ class Inference():
 		"""
 		return self.predict.pred(self, img / 255, debug = False, sess = None)
 	# ------------------------- Joint Prediction -------------------------------
-	
+
 	def predictJoints(self, img, mode = 'cpu', thresh = 0.2):
 		""" Return Joint Location
 		/!\ Location with respect to 256x256 image
@@ -149,21 +149,21 @@ class Inference():
 				print("Error : Mode should be 'cpu'/'gpu'")
 		else:
 			print('Error : Input is not a RGB image nor a batch of RGB images')
-	
+
 	# ----------------------------- Plot Skeleton ------------------------------
-	
+
 	def pltSkeleton(self, img, thresh, pltJ, pltL):
 		""" Return an image with plotted joints and limbs
 		Args:
-			img : Input Image -shape=(256x256x3) -value= uint8 (in [0, 255]) 
+			img : Input Image -shape=(256x256x3) -value= uint8 (in [0, 255])
 			thresh: Joint Threshold
 			pltJ: (bool) True to plot joints
 			pltL: (bool) True to plot limbs
 		"""
 		return self.predict.pltSkeleton(img, thresh = thresh, pltJ = pltJ, pltL = pltL, tocopy = True, norm = True)
-	
+
 	# -------------------------- Video Processing ------------------------------
-	
+
 	def processVideo(self, source = None, outfile = None, thresh = 0.2, nms = 0.5 , codec = 'DIVX', pltJ = True, pltL = True, pltB = True, show = False):
 		""" Run Multiple Pose Estimation on Video Footage
 		Args:
@@ -178,9 +178,9 @@ class Inference():
 			show: (bool) Show footage during processing
 		"""
 		return self.predict.videoDetection(src = source, outName = outfile, codec = codec, j_thresh = thresh, nms_thresh = nms, show = show, plt_j = pltJ, plt_l = pltL, plt_b = pltB)
-	
+
 	# -------------------------- Process Stream --------------------------------
-	
+
 	def centerStream(self, img):
 		img = cv2.flip(img, 1)
 		img[:, self.predict.cam_res[1]//2 - self.predict.cam_res[0]//2:self.predict.cam_res[1]//2 + self.predict.cam_res[0]//2]
@@ -188,10 +188,10 @@ class Inference():
 		img_res = cv2.resize(img, (800,800))
 		img_hg = cv2.cvtColor(img_hg, cv2.COLOR_BGR2RGB)
 		return img_res, img_hg
-	
+
 	def plotLimbs(self, img_res, j):
-		""" 
-		"""	
+		"""
+		"""
 		for i in range(len(self.predict.links)):
 			l = self.predict.links[i]['link']
 			good_link = True
@@ -201,9 +201,9 @@ class Inference():
 			if good_link:
 				pos = self.predict.givePixel(l, j)
 				cv2.line(img_res, tuple(pos[0])[::-1], tuple(pos[1])[::-1], self.predict.links[i]['color'][::-1], thickness = 5)
-	
+
 	# -----------------------------  Filters -----------------------------------
-	
+
 	def runVideoFilter(self, debug = False):
 		""" WORK IN PROGRESS
 		Mystery Function
@@ -244,9 +244,9 @@ class Inference():
 				break
 		cv2.destroyAllWindows()
 		cam.release()
-			
-				
-		
-		
-		
-		
+
+
+
+
+
+

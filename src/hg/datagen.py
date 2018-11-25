@@ -36,6 +36,8 @@ import time
 from skimage import transform
 import scipy.misc as scm
 
+import sys
+sys.path.append(os.getcwd())
 import pyosr
 
 class DataGenerator():
@@ -594,21 +596,22 @@ class OsrDataSet(object):
         r.angleModel(0.0, 0.0)
         r.default_depth=0.0
         if center is not None:
-            r.enforceRobotCenter(rob_ompl_center)
+            r.enforceRobotCenter(center)
         r.views = np.array([[0.0,0.0]], dtype=np.float32)
 
         self.r = r
         self.rgb_shape = (res,res,3)
         self.dep_shape = (res,res,1)
 
-    def render_rgbd(self, q, flags=):
+    def render_rgbd(self, q, flags=0):
         r = self.r
-
         r.state = q
         r.render_mvrgbd(flags)
         tup = (r.mvrgb.reshape(self.rgb_shape), r.mvdepth.reshape(self.dep_shape))
         return np.concatenate(tup,
                               axis=2)
+
+from math import sqrt,pi,sin,cos
 
 def random_state(scale=1.0):
     tr = scale * (np.random.rand(3) - 0.5 + 0.25)
@@ -631,8 +634,11 @@ class NarrowTunnelRegionDataSet(OsrDataSet):
                                                         env=env,
                                                         center=center,
                                                         res=res)
+        self.c_dim = 4
+        self.d_dim = 1
 
     def _aux_generator(self, batch_size=16, stacks=4, normalize=True, sample_set='train'):
+        is_training = True if sample_set == 'train' else False
         '''
         _aux_generator is the only interface used by HourglassModel class
         This generator should yield image, gt and weight (???)
@@ -642,22 +648,39 @@ class NarrowTunnelRegionDataSet(OsrDataSet):
         r = self.r
         while True:
             train_img = np.zeros((batch_size, 256, 256, self.c_dim), dtype = np.float32)
-            train_gtmap = np.zeros((batch_size, stacks, 64, 64, self.d_dim), np.float32)
+            if is_training:
+                train_gtmap = np.zeros((batch_size, stacks, 64, 64, self.d_dim), np.float32)
+            else:
+                self.r.uv_feedback = True
+                uv_map = np.zeros((batch_size, 256, 256, 2), np.float32)
             train_weights = None
             for i in range(batch_size):
+                r.avi = True
                 q,aq = random_state(0.5)
                 train_img[i] = self.render_rgbd(q, pyosr.Renderer.NO_SCENE_RENDERING)
                 r.avi = False
                 r.render_mvrgbd(pyosr.Renderer.NO_SCENE_RENDERING|pyosr.Renderer.HAS_NTR_RENDERING)
-                hm = r.mvrgb.reshape(self.rgb_shape)[:,:,1:2]
-                hm = hm.reshape(256//4,4,256//4,4,self.d_dim).mean(axis=(1,3)) # Downscale to
-                hm = np.expand_dims(hm, axis=0)
-                train_gtmap[i] = np.repeat(hm, stacks, axis=0)
-            yield train_img, train_gtmap, train_weights
+                if is_training:
+                    hm = r.mvrgb.reshape(self.rgb_shape)[:,:,1:2]
+                    hm = hm.reshape(256//4,4,256//4,4,self.d_dim).mean(axis=(1,3)) # Downscale to
+                    hm = np.expand_dims(hm, axis=0)
+                    train_gtmap[i] = np.repeat(hm, stacks, axis=0)
+                else:
+                    uv_map[i] = r.mvuv.reshape((256, 256, 2))
+            if is_training:
+                yield train_img, train_gtmap, train_weights
+            else:
+                yield train_img, uv_map, train_weights
 
 def create_dataset(ds_name):
-    if ds_name == 'alpah_ntr':
+    if ds_name == 'alpha_ntr_hg1':
         return NarrowTunnelRegionDataSet(rob='../res/alpha/alpha-1.2.wt2.tcp.obj',
                                          env='../res/alpha/alpha_env-1.2.wt.obj',
                                          res=256,
                                          center=np.array([16.973146438598633, 1.2278236150741577, 10.204807281494141]))
+    if ds_name == 'double_alpha_ntr_hg1':
+        return NarrowTunnelRegionDataSet(rob='../res/alpha/double-alpha-1.2.wt2.tcp.obj',
+                                         env='../res/alpha/alpha_env-1.2.wt.obj',
+                                         res=256,
+                                         center=np.array([16.973146438598633, 1.2278236150741577, 10.204807281494141]))
+    assert False, "unknown dataset name {}".format(ds_name)
