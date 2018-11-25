@@ -129,6 +129,12 @@ public:
 	Eigen::Matrix<StateScalar, -1, 1>
 	intersectionRegionSurfaceAreas(ArrayOfStates qs,
 	                               bool qs_are_unit_states);
+
+	using VMatrix = Eigen::Matrix<StateScalar, -1, 3>;
+	using FMatrix = Eigen::Matrix<int, -1, 3>;
+	std::tuple<VMatrix, FMatrix>
+	intersectingGeometry(const StateVector& q,
+	                     bool q_is_unit);
 #endif
 
 	using ArrayOfPoints = Eigen::Matrix<StateScalar, -1, kActionDimension>;

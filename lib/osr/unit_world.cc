@@ -741,6 +741,33 @@ UnitWorld::intersectionRegionSurfaceAreas(ArrayOfStates qs,
 	}
 	return ret;
 }
+
+std::tuple<UnitWorld::VMatrix, UnitWorld::FMatrix>
+UnitWorld::intersectingGeometry(const StateVector& q,
+                                bool q_is_unit)
+{
+	StateVector qu = q;
+	if (!q_is_unit)
+		qu = translateToUnitState(q);
+
+	Transform envTf = std::get<0>(getCDTransforms(robot_state_));
+	CDModel::VMatrix env_V = (envTf * cd_scene_->vertices().transpose()).transpose();
+
+	auto env_F = cd_scene_->faces();
+	auto rob_F = cd_robot_->faces();
+
+	Transform robTf = translate_state_to_transform(qu);
+	CDModel::VMatrix rob_V = (robTf * cd_robot_->vertices().transpose()).transpose();
+
+	CDModel::VMatrix RV;
+	CDModel::FMatrix RF;
+	mesh_bool(env_V, env_F,
+	          rob_V, rob_F,
+	          igl::MESH_BOOLEAN_TYPE_INTERSECT,
+	          RV, RF);
+	return std::make_tuple(RV, RF);
+}
+
 #endif
 
 std::tuple<
