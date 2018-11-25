@@ -157,10 +157,15 @@ message(STATUS "AFTER Thread CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
 # CGAL Mess
 # Can be disabled
 option(MKOBS_USE_CGAL ON)
+option(MKOBS_FORCE_CGAL ON)
 if (MKOBS_USE_CGAL)
-	FIND_PACKAGE(CGAL QUIET COMPONENTS Common Core)
+	if (MKOBS_FORCE_CGAL)
+		FIND_PACKAGE(CGAL REQUIRED COMPONENTS Common Core)
+	else (MKOBS_FORCE_CGAL)
+		FIND_PACKAGE(CGAL QUIET COMPONENTS Common Core)
+	endif (MKOBS_FORCE_CGAL)
 	message(STATUS "AFTER CGAL CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
-	SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CGAL_MODULES_DIR}")
+	#SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CGAL_MODULES_DIR}")
 endif (MKOBS_USE_CGAL)
 
 FIND_PACKAGE(GMP QUIET)
@@ -174,14 +179,8 @@ message(STATUS "AFTER MPFR CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
 # message(STATUS "CGAL LIBRARY ${CGAL_LIBRARY}")
 # set(CGAL_LIB "${CGAL_LIBRARY};${CGAL_Core_LIBRARY}")
 # message(STATUS "CGAL LIB ${CGAL_LIB}")
-find_package(CGAL COMPONENTS Core)
 
 message(STATUS "CGAL_FOUND: ${CGAL_FOUND}")
-IF (NOT CGAL_FOUND)
-	message(WARNING "CGAL NOT FOUND, Some functions and libraires will not be built")
-	add_definitions(-DPYOSR_NO_CGAL)
-ENDIF (NOT CGAL_FOUND)
-
 
 # FCL (Flexible Collision Library) support
 SET(FCL_BUILD_TESTS OFF CACHE BOOL "Disable testcases for fcl" FORCE)
@@ -193,19 +192,26 @@ INCLUDE_DIRECTORIES(BEFORE SYSTEM ${CMAKE_SOURCE_DIR}/third-party/fcl/include/)
 
 # SET(CMAKE_BUILD_TYPE Debug)
 
-# Main program
-ADD_EXECUTABLE(blend src/boolean/main.cc)
-ADD_EXECUTABLE(subtract src/boolean/substract.cc)
-FINALIZE(blend)
-FINALIZE(subtract)
-
 IF (CGAL_FOUND)
+	message(STATUS "Find CGAL at\n\tHeaders:\t${CGAL_INCLUDE_DIRS}\n\tLibs: ${CGAL_LIB}")
 	EASYLIB(meshbool)
+	TARGET_INCLUDE_DIRECTORIES(meshbool BEFORE PRIVATE ${CGAL_INCLUDE_DIRS})
 	TARGET_LINK_LIBRARIES(meshbool ${CGAL_LIB} ${CMAKE_THREAD_LIBS_INIT} ${GMP_LIBRARIES} ${MPFR_LIBRARIES} ${Boost_LIBRARIES})
+ELSE (CGAL_FOUND)
+	message(WARNING "CGAL NOT FOUND, Some functions and libraires will not be built")
+	add_definitions(-DPYOSR_NO_CGAL)
+ENDIF (CGAL_FOUND)
+
+IF (TARGET meshbool)
+	# Main program
+	ADD_EXECUTABLE(blend src/boolean/main.cc)
+	ADD_EXECUTABLE(subtract src/boolean/substract.cc)
+	FINALIZE(blend)
+	FINALIZE(subtract)
 	SET(BOOLEAN_LIB meshbool)
 	TARGET_LINK_LIBRARIES(blend ${BOOLEAN_LIB})
 	TARGET_LINK_LIBRARIES(subtract ${BOOLEAN_LIB})
-ENDIF (CGAL_FOUND)
+ENDIF (TARGET meshbool)
 
 EASYLIB(tetio)
 EASYLIB(advplyio)
