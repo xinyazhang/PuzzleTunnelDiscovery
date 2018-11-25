@@ -371,6 +371,10 @@ endif (TARGET meshbool)
 SANCHECK(osr)
 TARGET_LINK_LIBRARIES(sancheck_osr osr)
 TARGET_COMPILE_DEFINITIONS(sancheck_osr PRIVATE GPU_ENABLED=1)
+
+EASYADD(vistexture)
+TARGET_LINK_LIBRARIES(vistexture osr ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY})
+
 else (USE_GPU)
 TARGET_COMPILE_DEFINITIONS(osr PRIVATE GPU_ENABLED=0)
 endif (USE_GPU)
@@ -378,9 +382,6 @@ endif (USE_GPU)
 EASYLIB(rectpack)
 EASYADD(objautouv)
 TARGET_LINK_LIBRARIES(objautouv rectpack)
-
-EASYADD(vistexture)
-TARGET_LINK_LIBRARIES(vistexture osr ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY})
 
 # Blender PRM and RRT for RL's GT (Ground Truth)
 EASYADD(mtblender)
