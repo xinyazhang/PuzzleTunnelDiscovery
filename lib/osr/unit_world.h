@@ -125,7 +125,7 @@ public:
 	                           bool qs1_is_unit_states,
 	                           double verify_magnitude);
 
-#ifndef PYOSR_NO_CGAL
+#if PYOSR_HAS_CGAL
 	Eigen::Matrix<StateScalar, -1, 1>
 	intersectionRegionSurfaceAreas(ArrayOfStates qs,
 	                               bool qs_are_unit_states);

@@ -118,7 +118,7 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("translate_from_unit_state", &UnitWorld::translateFromUnitState, py::call_guard<py::gil_scoped_release>())
 		.def("calculate_visibility_matrix", &UnitWorld::calculateVisibilityMatrix, py::call_guard<py::gil_scoped_release>())
 		.def("calculate_visibility_matrix2", &UnitWorld::calculateVisibilityMatrix2, py::call_guard<py::gil_scoped_release>())
-#ifndef PYOSR_NO_CGAL
+#if PYOSR_HAS_CGAL
 		.def("intersection_region_surface_areas", &UnitWorld::intersectionRegionSurfaceAreas, py::call_guard<py::gil_scoped_release>())
 		.def("intersecting_geometry", &UnitWorld::intersectingGeometry, py::call_guard<py::gil_scoped_release>())
 #endif

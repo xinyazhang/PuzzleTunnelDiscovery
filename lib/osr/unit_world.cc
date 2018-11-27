@@ -7,9 +7,11 @@
 #include <stdexcept>
 #include <igl/doublearea.h>
 #include <igl/cross.h>
-#include <meshbool/join.h>
 #include <tritri/tritri_igl.h>
 #include <ode/ode.h>
+#if PYOSR_HAS_CGAL
+#include <meshbool/join.h>
+#endif
 
 namespace osr {
 
@@ -707,7 +709,7 @@ UnitWorld::calculateVisibilityMatrix2(ArrayOfStates qs0,
 	return ret;
 }
 
-#ifndef PYOSR_NO_CGAL
+#if PYOSR_HAS_CGAL
 Eigen::Matrix<StateScalar, -1, 1>
 UnitWorld::intersectionRegionSurfaceAreas(ArrayOfStates qs,
                                           bool qs_are_unit_states)
@@ -768,7 +770,7 @@ UnitWorld::intersectingGeometry(const StateVector& q,
 	return std::make_tuple(RV, RF);
 }
 
-#endif
+#endif // PYOSR_HAS_CGAL
 
 std::tuple<
 	ArrayOfPoints, // Position
