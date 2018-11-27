@@ -744,6 +744,7 @@ UnitWorld::intersectionRegionSurfaceAreas(ArrayOfStates qs,
 	return ret;
 }
 
+// FIXME: too much duplicated code here
 std::tuple<UnitWorld::VMatrix, UnitWorld::FMatrix>
 UnitWorld::intersectingGeometry(const StateVector& q,
                                 bool q_is_unit)

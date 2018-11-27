@@ -1,4 +1,5 @@
 #include <osr/osr_state.h>
+#include <osr/osr_util.h>
 #include <osr/unit_world.h>
 #include <osr/osr_render.h>
 #include <osr/osr_init.h>
@@ -83,6 +84,7 @@ PYBIND11_PLUGIN(pyosr) {
 	      "Apply a continuous action to one state vector", py::call_guard<py::gil_scoped_release>());
 	m.def("get_permutation_to_world", &osr::get_permutation_to_world);
 	m.def("extract_rotation_matrix", &osr::extract_rotation_matrix);
+	m.def("save_obj_1", &osr::saveOBJ1);
 	using osr::UnitWorld;
 	py::class_<UnitWorld>(m, "UnitWorld")
 		.def(py::init<>())
