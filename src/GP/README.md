@@ -22,4 +22,8 @@
         b) sancheck_saforce.py: visualize the saforce process
         c) condor_saforce.py: run on distributed system like HTCondor.
 4. Labling the touch surface
-	a) condor_touch_configuration.py: calculate the touch configuration
+	a) condor_touch_configuration.py run: sample the touch configuration
+	b) condor_touch_configuration.py isect: calculate the intersection
+	   geometry from pre-sampled touch configuration, assuming
+	   `condor_touch_configuration.py run` has been finished in order to
+	   sample touch configurations.

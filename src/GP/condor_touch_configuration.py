@@ -18,7 +18,10 @@ def usage():
 2. condor_touch_configuration.py run <Batch ID> <Batch Size> <Output Dir>
     Shoot <Batch Size> rays in configuration space originated from <Vertex ID>, and
     store the first collision configurations as one `<Batch ID>.npz` file in Output Dir.
-    <Vertex ID> is defined as <Batch ID> mod <Total number of tunnel vertices>.''')
+    <Vertex ID> is defined as <Batch ID> mod <Total number of tunnel vertices>.
+3. condor_touch_configuration.py isect <Task ID> <Geo Batch Size> <Touch Batch Size> <In/Output Dir>
+    Take the output configuration from Step 2) and calculate the intersecting geomery
+''')
 
 def _create_uw():
     r = pyosr.UnitWorld() # pyosr.Renderer is not avaliable in HTCondor
@@ -46,6 +49,12 @@ def calc_touch(uw, vertex, batch_size):
         print("{} shape {}".format(i, rets[i].shape))
     return rets
 
+def _fn_touch_q(out_dir, vert_id, batch_id):
+    return "{}/touchq-{}-{}.npz".format(out_dir, vert_id, batch_id)
+
+def _fn_isectgeo(out_dir, vert_id, conf_id):
+    return "{}/isectgeo-from-vert-{}-{}.obj".format(out_dir, vert_id, conf_id)
+
 def main():
     if len(sys.argv) < 2:
         usage()
@@ -58,23 +67,51 @@ def main():
     if cmd in ['show']:
         print("# of tunnel vertices is {}".format(len(tunnel_v)))
         return
-    assert cmd == 'run'
-    task_id = int(sys.argv[2])
-    batch_id, vert_id = divmod(task_id, len(tunnel_v))
-    vertex = tunnel_v[vert_id]
-    batch_size = int(sys.argv[3])
-    out_dir = sys.argv[4]
-
+    assert cmd in ['run', 'isect'], 'Unknown command {}'.format(cmd)
     uw = _create_uw()
 
-    free_vertices, touch_vertices, to_inf, free_tau, touch_tau = calc_touch(uw, vertex, batch_size)
-    np.savez("{}/touchq-{}-{}.npz".format(out_dir, vert_id, batch_id),
-             FROM_V=np.repeat(np.array([vertex]), batch_size, axis=0),
-             FREE_V=free_vertices,
-             TOUCH_V=touch_vertices,
-             IS_INF=to_inf,
-             FREE_TAU=free_tau,
-             TOUCH_TAU=touch_tau)
+    if cmd == 'run':
+        task_id = int(sys.argv[2])
+        batch_id, vert_id = divmod(task_id, len(tunnel_v))
+        vertex = tunnel_v[vert_id]
+        batch_size = int(sys.argv[3])
+        out_dir = sys.argv[4]
+        out_fn = _fn_touch_q(out_dir=out_dir, vert_id=vert_id, batch_id=batch_id)
+
+        free_vertices, touch_vertices, to_inf, free_tau, touch_tau = calc_touch(uw, vertex, batch_size)
+        np.savez(out_fn,
+                 FROM_V=np.repeat(np.array([vertex]), batch_size, axis=0),
+                 FREE_V=free_vertices,
+                 TOUCH_V=touch_vertices,
+                 IS_INF=to_inf,
+                 FREE_TAU=free_tau,
+                 TOUCH_TAU=touch_tau)
+    elif cmd == 'isect':
+        task_id = int(sys.argv[2])
+        geo_batch_size = int(sys.argv[3])
+        tq_batch_size = int(sys.argv[4])
+        io_dir = sys.argv[5]
+        assert tq_batch_size % geo_batch_size == 0, "Geo Batch Size % Touch Batch Size must be 0"
+        '''
+        Task partition
+        |------------------TQ Batch for Conf. Q--------------------|
+        |--Geo Batch--||--Geo Batch--||--Geo Batch--||--Geo Batch--|
+        Hence run's task id = isect's task id / (Touch Batch Size/Geo Batch Size)
+        '''
+        batch_per_tq = tq_batch_size // geo_batch_size
+        run_task_id, geo_batch_id = divmod(task_id, batch_per_tq)
+        tq_batch_id, vert_id = divmod(run_task_id, len(tunnel_v))
+        tq_fn = _fn_touch_q(out_dir=io_dir, vert_id=vert_id, batch_id=tq_batch_id)
+        d = np.load(tq_fn)
+        tq = d['TOUCH_V']
+        is_inf = d['IS_INF']
+        for i in range(geo_batch_size):
+            per_batch_conf_id = i + geo_batch_id * geo_batch_size
+            per_vertex_conf_id = per_batch_conf_id + tq_batch_id * tq_batch_size
+            if is_inf[per_batch_conf_id]:
+                continue # Skip collding free cases
+            V, F = uw.intersecting_geometry(tq[per_batch_conf_id], True)
+            pyosr.save_obj_1(V, F, _fn_isectgeo(out_dir=io_dir, vert_id=vert_id, conf_id=per_vertex_conf_id))
 
 if __name__ == '__main__':
     main()
