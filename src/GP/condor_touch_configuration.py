@@ -21,12 +21,18 @@ def usage():
     <Vertex ID> is defined as <Batch ID> mod <Total number of tunnel vertices>.
 3. condor_touch_configuration.py isect <Task ID> <Geo Batch Size> <Touch Batch Size> <In/Output Dir>
     Take the output configuration from Step 2) and calculate the intersecting geomery
+3. condor_touch_configuration.py project <Task ID> <Geo Batch Size> <Touch Batch Size> <Input Dir>
+    [DEBUG] Print the rendered ground truth to out.png
 ''')
 
-def _create_uw():
+def _create_uw(cmd):
     r = pyosr.UnitWorld() # pyosr.Renderer is not avaliable in HTCondor
-    r.loadModelFromFile(aniconf.env_fn)
-    r.loadRobotFromFile(aniconf.rob_fn)
+    if cmd == 'project':
+        r.loadModelFromFile(aniconf.env_uv_fn)
+        r.loadRobotFromFile(aniconf.rob_uv_fn)
+    else:
+        r.loadModelFromFile(aniconf.env_wt_fn)
+        r.loadRobotFromFile(aniconf.rob_wt_fn)
     r.enforceRobotCenter(aniconf.rob_ompl_center)
     r.scaleToUnit()
     r.angleModel(0.0, 0.0)
@@ -67,8 +73,8 @@ def main():
     if cmd in ['show']:
         print("# of tunnel vertices is {}".format(len(tunnel_v)))
         return
-    assert cmd in ['run', 'isect'], 'Unknown command {}'.format(cmd)
-    uw = _create_uw()
+    assert cmd in ['run', 'isect', 'project'], 'Unknown command {}'.format(cmd)
+    uw = _create_uw(cmd)
 
     if cmd == 'run':
         task_id = int(sys.argv[2])
@@ -112,6 +118,29 @@ def main():
                 continue # Skip collding free cases
             V, F = uw.intersecting_geometry(tq[per_batch_conf_id], True)
             pyosr.save_obj_1(V, F, _fn_isectgeo(out_dir=io_dir, vert_id=vert_id, conf_id=per_vertex_conf_id))
+    elif cmd == 'project':
+        task_id = int(sys.argv[2])
+        geo_batch_size = int(sys.argv[3])
+        tq_batch_size = int(sys.argv[4])
+        io_dir = sys.argv[5]
+        assert tq_batch_size % geo_batch_size == 0, "Geo Batch Size % Touch Batch Size must be 0"
+        batch_per_tq = tq_batch_size // geo_batch_size
+        run_task_id, geo_batch_id = divmod(task_id, batch_per_tq)
+        tq_batch_id, vert_id = divmod(run_task_id, len(tunnel_v))
+        tq_fn = _fn_touch_q(out_dir=io_dir, vert_id=vert_id, batch_id=tq_batch_id)
+        d = np.load(tq_fn)
+        tq = d['TOUCH_V']
+        is_inf = d['IS_INF']
+        for i in range(geo_batch_size):
+            per_batch_conf_id = i + geo_batch_id * geo_batch_size
+            per_vertex_conf_id = per_batch_conf_id + tq_batch_id * tq_batch_size
+            if is_inf[per_batch_conf_id]:
+                continue # Skip collding free cases
+            iobjfn = _fn_isectgeo(out_dir=io_dir, vert_id=vert_id, conf_id=per_vertex_conf_id)
+            V, F = pyosr.load_obj_1(iobjfn)
+            print("calling intersecting_to_robot_surface for file {}\n".format(iobjfn))
+            IV, IF = uw.intersecting_to_robot_surface(tq[per_batch_conf_id], True, V, F)
+            pyosr.save_obj_1(IV, IF, 'tmp.obj')
 
 if __name__ == '__main__':
     main()
