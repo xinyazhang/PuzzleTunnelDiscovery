@@ -106,10 +106,10 @@ public:
 	 * Translate from/to unscale and uncentralized world coordinates
 	 * to/from the unit cube coordinates
 	 */
-	StateVector translateToUnitState(const StateVector& state);
-	StateVector translateFromUnitState(const StateVector& state);
-	StateVector applyPertubation(const StateVector& state);
-	StateVector unapplyPertubation(const StateVector& state);
+	StateVector translateToUnitState(const StateVector& state) const;
+	StateVector translateFromUnitState(const StateVector& state) const;
+	StateVector applyPertubation(const StateVector& state) const;
+	StateVector unapplyPertubation(const StateVector& state) const;
 
 	/*
 	 * Tunnel Finder support function: visibility matrix calculator
@@ -125,17 +125,47 @@ public:
 	                           bool qs1_is_unit_states,
 	                           double verify_magnitude);
 
+	using VMatrix = Eigen::Matrix<StateScalar, -1, 3>;
+	using FMatrix = Eigen::Matrix<int, -1, 3>;
+
 #if PYOSR_HAS_CGAL
 	Eigen::Matrix<StateScalar, -1, 1>
 	intersectionRegionSurfaceAreas(ArrayOfStates qs,
 	                               bool qs_are_unit_states);
 
-	using VMatrix = Eigen::Matrix<StateScalar, -1, 3>;
-	using FMatrix = Eigen::Matrix<int, -1, 3>;
 	std::tuple<VMatrix, FMatrix>
 	intersectingGeometry(const StateVector& q,
 	                     bool q_is_unit);
 #endif
+#if 1
+	std::tuple<VMatrix, FMatrix>
+	getRobotGeometry(const StateVector& q,
+	                 bool q_is_unit) const;
+#endif
+
+	std::tuple<VMatrix, FMatrix>
+	getSceneGeometry(const StateVector& q,
+	                 bool q_is_unit) const;
+	/*
+	 * Requirements:
+	 *      UV coordintates must present
+	 *
+	 * Return:
+	 *      1) List of face indices in the Robot geometry
+	 *      2) barycentric coordinates in the robot geometry face.
+	 */
+	std::tuple<FMatrix, VMatrix>
+	intersectingToRobotSurface(const StateVector& q,
+	                           bool q_is_unit,
+	                           const VMatrix& V,
+	                           const FMatrix& F);
+
+	// Similar to intersectingToRobotSurface
+	std::tuple<FMatrix, VMatrix>
+	intersectingToModelSurface(const StateVector& q,
+	                           bool q_is_unit,
+	                           const VMatrix& V,
+	                           const FMatrix& F);
 
 	using ArrayOfPoints = Eigen::Matrix<StateScalar, -1, kActionDimension>;
 
@@ -198,6 +228,12 @@ protected:
 	struct OdeData;
 
 	std::unique_ptr<OdeData> ode_;
+
+	std::tuple<FMatrix, VMatrix>
+	intersectingToSurface(const VMatrix& targetV,
+	                      const FMatrix& targetF,
+	                      const VMatrix& V,
+	                      const FMatrix& F);
 };
 
 auto glm2Eigen(const glm::mat4& m);

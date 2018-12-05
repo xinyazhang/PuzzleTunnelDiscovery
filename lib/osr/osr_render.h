@@ -11,6 +11,7 @@
 #include <memory>
 #include <stdint.h>
 #include <tuple>
+#include <vector>
 
 #include <glm/mat4x4.hpp>
 
@@ -83,6 +84,17 @@ public:
 
 	void setUVFeedback(bool);
 	bool getUVFeedback() const;
+
+	static const uint32_t BARY_RENDERING_ROBOT = 0;
+	static const uint32_t BARY_RENDERING_SCENE = 1;
+
+	void addBarycentric(const UnitWorld::FMatrix& F,
+	                    const UnitWorld::VMatrix& V,
+	                    uint32_t target);
+
+	RMMatrixXb
+	renderBarycentric(uint32_t target,
+	                  Eigen::Vector2i res);
 private:
 	void setupNonSharedObjects();
 
@@ -109,6 +121,35 @@ private:
 
 	GLuint pid_texture_ = 0;
 	void enablePidBuffer();
+
+	/*
+	 * Code to support barycentric rendering
+	 */
+	using BaryUV = Eigen::Matrix<float, -1, 2, Eigen::RowMajor>;
+	using BaryBary = Eigen::Matrix<float, -1, 3, Eigen::RowMajor>;
+	struct BaryRenderData {
+		std::vector<BaryUV> uv_array;
+		std::vector<BaryBary> bary_array;
+
+		BaryUV cache_uv;
+		BaryBary cache_bary;
+
+		void sync(); // update cache
+	};
+	BaryRenderData brds_[2];
+	std::shared_ptr<Scene> getBaryTarget(uint32_t);
+
+	GLuint bary_texture_ = 0;
+	GLuint bary_fb_ = 0;
+	GLuint bary_dep_ = 0;
+	GLuint bary_vs_ = 0;
+	GLuint bary_gs_ = 0;
+	GLuint bary_fs_ = 0;
+	GLuint bary_shader_program_ = 0;
+	GLuint bary_vao_ = 0;
+	GLuint bary_vbo_uv_ = 0;
+	GLuint bary_vbo_bary_ = 0;
+	GLuint bary_ibo_ = 0;
 };
 
 }

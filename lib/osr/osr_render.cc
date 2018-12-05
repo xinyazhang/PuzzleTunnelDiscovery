@@ -6,6 +6,7 @@
 #include "camera.h"
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtx/io.hpp>
+#include <fstream>
 
 namespace {
 const char* vertShaderSrc =
@@ -18,6 +19,18 @@ const char* fragShaderSrc =
 
 const char* rgbdFragShaderSrc =
 #include "shader/rgb.frag"
+;
+
+const char* bary_vs_src =
+#include "shader/bary.vert"
+;
+
+const char* bary_gs_src =
+#include "shader/bary.geom"
+;
+
+const char* bary_fs_src =
+#include "shader/bary.frag"
 ;
 
 const GLenum drawBuffers[1] = { GL_COLOR_ATTACHMENT0 };
@@ -49,6 +62,9 @@ const uint32_t Renderer::NO_SCENE_RENDERING;
 const uint32_t Renderer::NO_ROBOT_RENDERING;
 const uint32_t Renderer::HAS_NTR_RENDERING;
 const uint32_t Renderer::UV_MAPPINNG_RENDERING;
+
+const uint32_t Renderer::BARY_RENDERING_ROBOT;
+const uint32_t Renderer::BARY_RENDERING_SCENE;
 
 Renderer::Renderer()
 {
@@ -127,6 +143,33 @@ void Renderer::setupNonSharedObjects()
 	CHECK_GL_ERROR(glAttachShader(rgbdShaderProgram, rgbdFragShader));
 	CHECK_GL_ERROR(glLinkProgram(rgbdShaderProgram));
 	CheckProgramLinkage(rgbdShaderProgram);
+
+	/*
+	 * We still create barycentric rendering program here for early checks
+	 */
+	CHECK_GL_ERROR(bary_vs_ = glCreateShader(GL_VERTEX_SHADER));
+	CHECK_GL_ERROR(bary_gs_ = glCreateShader(GL_GEOMETRY_SHADER));
+	CHECK_GL_ERROR(bary_fs_ = glCreateShader(GL_FRAGMENT_SHADER));
+	int bary_vs_len = strlen(bary_vs_src) + 1;
+	int bary_gs_len = strlen(bary_gs_src) + 1;
+	int bary_fs_len = strlen(bary_fs_src) + 1;
+	CHECK_GL_ERROR(glShaderSource(bary_vs_, 1, &bary_vs_src, &bary_vs_len));
+	CHECK_GL_ERROR(glShaderSource(bary_gs_, 1, &bary_gs_src, &bary_gs_len));
+	CHECK_GL_ERROR(glShaderSource(bary_fs_, 1, &bary_fs_src, &bary_fs_len));
+	CHECK_GL_ERROR(glCompileShader(bary_vs_));
+	CHECK_GL_ERROR(glCompileShader(bary_gs_));
+	CHECK_GL_ERROR(glCompileShader(bary_fs_));
+	CHECK_GL_SHADER_ERROR(bary_vs_);
+	CHECK_GL_SHADER_ERROR(bary_gs_);
+	CHECK_GL_SHADER_ERROR(bary_fs_);
+
+	CHECK_GL_ERROR(bary_shader_program_ = glCreateProgram());
+	CHECK_GL_ERROR(glAttachShader(bary_shader_program_, bary_vs_));
+	CHECK_GL_ERROR(glAttachShader(bary_shader_program_, bary_gs_));
+	CHECK_GL_ERROR(glAttachShader(bary_shader_program_, bary_fs_));
+	CHECK_GL_ERROR(glLinkProgram(bary_shader_program_));
+	CHECK_GL_PROGRAM_ERROR(bary_shader_program_);
+	CheckProgramLinkage(bary_shader_program_);
 
 	/*
 	 * Delete non-used shaders to recycle resources.
@@ -417,6 +460,204 @@ bool Renderer::getUVFeedback() const
 	return uvfeedback_enabled_;
 }
 
+std::shared_ptr<Scene>
+Renderer::getBaryTarget(uint32_t target)
+{
+	std::shared_ptr<Scene> target_scene;
+	if (target == BARY_RENDERING_ROBOT)
+		target_scene = robot_;
+	else if (target == BARY_RENDERING_SCENE)
+		target_scene = scene_;
+	else
+		throw std::runtime_error(std::string(__func__) + ": unknow target " + std::to_string(target));
+	if (!target_scene->hasUV())
+		throw std::runtime_error(std::string(__func__) + ": target mesh has no UV coordinates");
+	return target_scene;
+}
+
+void
+Renderer::addBarycentric(const UnitWorld::FMatrix& F,
+                         const UnitWorld::VMatrix& V,
+                         uint32_t target)
+{
+	auto target_scene = getBaryTarget(target);
+
+	const Mesh *target_mesh = nullptr;
+	auto visitor = [&target_mesh](std::shared_ptr<const Mesh> m) {
+		target_mesh = m.get();
+	};
+	target_scene->visitMesh(visitor);
+	if (!target_mesh)
+		throw std::runtime_error(std::string(__func__) + ": Target has no valid mesh");
+	const auto& tex_uv = target_mesh->getUV();
+	// Assembly the UV and Bary
+
+	size_t NP = F.rows(); // Number of primitives (presumably a small number)
+	BaryUV uv(NP * 3, 2);
+	for (size_t f = 0; f < NP; f++) {
+		for (size_t i = 0; i < 3; i++) {
+			auto f_bary = F(f, i);
+			uv.row(3 * f + i) = tex_uv.row(f_bary);
+		}
+	}
+	brds_[target].uv_array.emplace_back(uv);
+	brds_[target].bary_array.emplace_back(V.cast<float>());
+}
+
+Renderer::RMMatrixXb
+Renderer::renderBarycentric(uint32_t target,
+                            Eigen::Vector2i res)
+{
+	auto target_scene = getBaryTarget(target);
+
+	/*
+	 * Initialization on demand
+	 */
+	if (!bary_texture_) {
+		CHECK_GL_ERROR(glGenTextures(1, &bary_texture_));
+		CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D, bary_texture_));
+		// Not sure if we need allocate space before calling glTexParameteri
+		CHECK_GL_ERROR(glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, res(0), res(1), 0, GL_RED, GL_UNSIGNED_BYTE, 0));
+		CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
+		CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+	}
+	// Resize on demand
+	CHECK_GL_ERROR(glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, res(0), res(1), 0, GL_RED, GL_UNSIGNED_BYTE, 0));
+
+	// Framebuffer creation
+	if (!bary_fb_) {
+		CHECK_GL_ERROR(glGenFramebuffers(1, &bary_fb_));
+		CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, bary_fb_));
+		CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, bary_texture_, 0));
+		// We MUST attach something to depth
+		CHECK_GL_ERROR(glGenRenderbuffers(1, &bary_dep_));
+		CHECK_GL_ERROR(glBindRenderbuffer(GL_RENDERBUFFER, bary_dep_));
+		CHECK_GL_ERROR(glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, res(0), res(1)));
+		CHECK_GL_ERROR(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, bary_dep_));
+		CHECK_GL_ERROR(glDrawBuffers(1, drawBuffers));
+
+		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+			throw std::runtime_error(std::string(__func__) + " Failed to create framebuffer object as render target");
+	}
+	// Clear texture
+	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+	static const uint8_t black[] = {0, 0, 0, 0};
+	CHECK_GL_ERROR(glClearTexImage(bary_texture_, 0, GL_RED, GL_UNSIGNED_BYTE, &black));
+	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, bary_fb_));
+
+	CHECK_GL_ERROR(glDisable(GL_DEPTH_TEST));
+	CHECK_GL_ERROR(glDisable(GL_CULL_FACE));
+	CHECK_GL_ERROR(glPolygonMode(GL_FRONT_AND_BACK, GL_FILL));
+	CHECK_GL_ERROR(glViewport(0, 0, res(0), res(1)));
+	// CHECK_GL_ERROR(glViewport(0, 0, 1024, 1024));
+	// CHECK_GL_ERROR(glViewport(0, 0, 256, 256));
+
+	CHECK_GL_ERROR(glClear(GL_DEPTH_BUFFER_BIT));
+
+	CHECK_GL_ERROR(glUseProgram(bary_shader_program_));
+
+#if 0
+	Camera cam;
+	glm::vec4 eye = glm::vec4(0.0f, 0.0f, -1.5, 1.0f);
+	glm::vec4 cen = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+	glm::vec4 upv = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
+	cam.lookAt(
+			glm::vec3(eye),     // eye
+			glm::vec3(cen),     // CENter
+			glm::vec3(upv)      // UP Vector
+	          );
+	cam.perspective(
+	                glm::radians(45.0f),                           // fov
+	                1.0,                                            // aspect ratio
+	                0.01,                                       // near plane
+	                1000.0f                                         // far plane
+			);
+	cam.uniform(bary_shader_program_, glm::mat4(1.0));
+#endif
+
+	// Prepare the data
+	if (!bary_vao_) {
+		CHECK_GL_ERROR(glGenVertexArrays(1, &bary_vao_));
+		CHECK_GL_ERROR(glGenBuffers(1, &bary_vbo_uv_));
+		CHECK_GL_ERROR(glGenBuffers(1, &bary_vbo_bary_));
+#if 0
+		CHECK_GL_ERROR(glGenBuffers(1, &bary_ibo_));
+#endif
+	}
+
+	CHECK_GL_ERROR(glBindVertexArray(bary_vao_));
+	BaryRenderData& brd = brds_[target];
+	brd.sync();
+
+	std::ofstream fout("out1.svg");
+	fout << "<svg width=\"" << res(0) << "\" height=\"" << res(1) << "\">\n";
+	for (int i = 0; i < brd.cache_uv.rows(); i+=3) {
+		using Eigen::Vector2f;
+		Vector2f u0 = brd.cache_uv.row(i + 0);
+		Vector2f u1 = brd.cache_uv.row(i + 1);
+		Vector2f u2 = brd.cache_uv.row(i + 2);
+
+		Vector2f uvs[3];
+		for (int k = 0; k < 3; k++) {
+			uvs[k] = u0 * brd.cache_bary(i + k,0) + u1 * brd.cache_bary(i + k,1) + u2 * brd.cache_bary(i + k,2);
+#if 0
+			std::cerr << "Bary " << i+k << ":\n\t"
+			          << uvs[k].transpose()
+			          << std::endl;
+#endif
+			// brd.cache_uv.row(i + k) = uvs[k];
+			uvs[k](0) *= res(0);
+			uvs[k](1) *= res(1);
+		}
+		fout << R"xxx(<polygon points=")xxx"
+		     << uvs[0](0) <<',' << uvs[0](1) << " "
+		     << uvs[1](0) <<',' << uvs[1](1) << " "
+		     << uvs[2](0) <<',' << uvs[2](1) << " "
+		     << R"xxx(" style="fill:lime;stroke:purple;stroke-width:1" />)xxx"
+		     << std::endl;
+	}
+	fout << R"xxx(</svg>)xxx";
+
+#if 1
+	CHECK_GL_ERROR(glEnableVertexAttribArray(0));
+	CHECK_GL_ERROR(glBindBuffer(GL_ARRAY_BUFFER, bary_vbo_uv_));
+	CHECK_GL_ERROR(glBufferData(GL_ARRAY_BUFFER,
+	                            brd.cache_uv.size() * sizeof(float),
+	                            brd.cache_uv.data(), GL_STATIC_DRAW));
+	std::cerr << "glBufferData " << brd.cache_uv.size() << " * " << sizeof(float) << std::endl;
+	CHECK_GL_ERROR(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE,
+					     0, 0));
+#endif
+#if 1
+	CHECK_GL_ERROR(glBindBuffer(GL_ARRAY_BUFFER, bary_vbo_bary_));
+	CHECK_GL_ERROR(glBufferData(GL_ARRAY_BUFFER,
+	                            brd.cache_bary.size() * sizeof(float),
+	                            brd.cache_bary.data(), GL_STATIC_DRAW));
+	CHECK_GL_ERROR(glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE,
+					     0, 0));
+	CHECK_GL_ERROR(glEnableVertexAttribArray(1));
+#endif
+	CHECK_GL_ERROR(glBindBuffer(GL_ARRAY_BUFFER, 0));
+
+#if 0
+	const uint32_t index_data[] = {0, 1, 2};
+	CHECK_GL_ERROR(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, bary_ibo_));
+	CHECK_GL_ERROR(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, bary_ibo_));
+	CHECK_GL_ERROR(glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+	                            sizeof(uint32_t) * 3,
+	                            index_data, GL_STATIC_DRAW));
+	CHECK_GL_ERROR(glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, 0));
+#else
+	CHECK_GL_ERROR(glDrawArrays(GL_TRIANGLES, 0, brd.cache_uv.rows()));
+#endif
+	CHECK_GL_ERROR(glFinish());
+	CHECK_GL_ERROR(glBindVertexArray(0));
+
+	RMMatrixXb pixels(res(0), res(1));
+	CHECK_GL_ERROR(glReadPixels(0, 0, res(0), res(1), GL_RED, GL_UNSIGNED_BYTE, pixels.data()));
+
+	return pixels;
+}
 
 void Renderer::setupUVFeedbackBuffer()
 {
@@ -507,6 +748,50 @@ Camera Renderer::setup_camera(uint32_t flags)
 			120.0f                                         // far plane
 			);
 	return cam;
+}
+
+void Renderer::BaryRenderData::sync()
+{
+	size_t total = 0;
+#if 1
+	for (const auto& uv : uv_array)
+		total += uv.rows();
+	cache_uv.resize(total, 2);
+	cache_bary.resize(total, 3);
+	size_t cursor = 0;
+	for (size_t i = 0; i < uv_array.size(); i++) {
+		cache_uv.block(cursor, 0, uv_array[i].rows(), 2) = uv_array[i];
+		cache_bary.block(cursor, 0, bary_array[i].rows(), 3) = bary_array[i];
+		cursor += uv_array[i].rows();
+	}
+#else
+	cache_uv.resize(3, 2);
+	cache_bary.resize(3, 3);
+	cache_uv << 0.25,0.25,
+	            0.25,0.75,
+	            0.75,0.25;
+#if 1
+#if 0
+	cache_bary << 1.0, 0.0, 0.0,
+	              0.0, 1.0, 0.0,
+	              0.0, 0.0, 1.0;
+#else
+	cache_bary << -0.2, 0.6, 0.6,
+	              0.6, -0.2, 0.6,
+	              0.6, 0.6, -0.2;
+#endif
+#else
+	cache_bary << -1.0f, -1.0f, 0.0f,
+	              1.0f, -1.0f, 0.0f,
+	              0.0f,  1.0f, 0.0f;
+	cache_bary = cache_bary.array() * 0.5;
+#endif
+#endif
+
+#if 0
+	std::cerr << "CACHE UV\n" << cache_uv << std::endl;
+	std::cerr << "CACHE BARY\n" << cache_bary << std::endl;
+#endif
 }
 
 }

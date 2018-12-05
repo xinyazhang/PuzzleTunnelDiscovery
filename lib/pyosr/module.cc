@@ -85,6 +85,7 @@ PYBIND11_PLUGIN(pyosr) {
 	m.def("get_permutation_to_world", &osr::get_permutation_to_world);
 	m.def("extract_rotation_matrix", &osr::extract_rotation_matrix);
 	m.def("save_obj_1", &osr::saveOBJ1);
+	m.def("load_obj_1", &osr::loadOBJ1);
 	using osr::UnitWorld;
 	py::class_<UnitWorld>(m, "UnitWorld")
 		.def(py::init<>())
@@ -124,6 +125,10 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("intersection_region_surface_areas", &UnitWorld::intersectionRegionSurfaceAreas, py::call_guard<py::gil_scoped_release>())
 		.def("intersecting_geometry", &UnitWorld::intersectingGeometry, py::call_guard<py::gil_scoped_release>())
 #endif
+		.def("intersecting_to_robot_surface", &UnitWorld::intersectingToRobotSurface, py::call_guard<py::gil_scoped_release>())
+		.def("intersecting_to_model_surface", &UnitWorld::intersectingToModelSurface, py::call_guard<py::gil_scoped_release>())
+		.def("get_robot_geometry", &UnitWorld::getRobotGeometry, py::call_guard<py::gil_scoped_release>())
+		.def("get_scene_geometry", &UnitWorld::getSceneGeometry, py::call_guard<py::gil_scoped_release>())
 		.def("intersecting_segments", &UnitWorld::intersectingSegments, py::call_guard<py::gil_scoped_release>())
 		.def("robot_face_normals_from_indices", py::overload_cast<const Eigen::Matrix<int, -1, 1>&>(&UnitWorld::getRobotFaceNormalsFromIndices), py::call_guard<py::gil_scoped_release>())
 		.def("scene_face_normals_from_indices", py::overload_cast<const Eigen::Matrix<int, -1, 1>&>(&UnitWorld::getSceneFaceNormalsFromIndices), py::call_guard<py::gil_scoped_release>())
@@ -147,10 +152,16 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("render_mvrgbd", &Renderer::render_mvrgbd,
 		     py::arg("flags") = 0,
 		     py::call_guard<py::gil_scoped_release>())
+		.def("add_barycentric", &Renderer::addBarycentric,
+		     py::call_guard<py::gil_scoped_release>())
+		.def("render_barycentric", &Renderer::renderBarycentric,
+		     py::call_guard<py::gil_scoped_release>())
 		.def_readonly_static("NO_SCENE_RENDERING", &Renderer::NO_SCENE_RENDERING)
 		.def_readonly_static("NO_ROBOT_RENDERING", &Renderer::NO_ROBOT_RENDERING)
 		.def_readonly_static("HAS_NTR_RENDERING", &Renderer::HAS_NTR_RENDERING)
 		.def_readonly_static("UV_MAPPINNG_RENDERING", &Renderer::UV_MAPPINNG_RENDERING)
+		.def_readonly_static("BARY_RENDERING_ROBOT", &Renderer::BARY_RENDERING_ROBOT)
+		.def_readonly_static("BARY_RENDERING_SCENE", &Renderer::BARY_RENDERING_SCENE)
 		.def_readwrite("pbufferWidth", &Renderer::pbufferWidth)
 		.def_readwrite("pbufferHeight", &Renderer::pbufferHeight)
 		.def_readwrite("default_depth", &Renderer::default_depth)

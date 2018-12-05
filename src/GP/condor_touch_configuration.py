@@ -10,6 +10,7 @@ import numpy as np
 import aniconf12_2 as aniconf
 import uw_random
 import math
+from scipy.misc import imsave
 
 def usage():
     print('''Usage:
@@ -26,11 +27,19 @@ def usage():
 ''')
 
 def _create_uw(cmd):
-    r = pyosr.UnitWorld() # pyosr.Renderer is not avaliable in HTCondor
     if cmd == 'project':
+        pyosr.init()
+        dpy = pyosr.create_display()
+        glctx = pyosr.create_gl_context(dpy)
+        r = pyosr.Renderer() # 'project' command requires a Renderer
+        r.setup()
+        # fb = r.render_barycentric(r.BARY_RENDERING_ROBOT, np.array([1024, 1024], dtype=np.int32))
+        # imsave('1.png', fb)
+        # sys.exit(0)
         r.loadModelFromFile(aniconf.env_uv_fn)
         r.loadRobotFromFile(aniconf.rob_uv_fn)
     else:
+        r = pyosr.UnitWorld() # pyosr.Renderer is not avaliable in HTCondor
         r.loadModelFromFile(aniconf.env_wt_fn)
         r.loadRobotFromFile(aniconf.rob_wt_fn)
     r.enforceRobotCenter(aniconf.rob_ompl_center)
@@ -131,16 +140,26 @@ def main():
         d = np.load(tq_fn)
         tq = d['TOUCH_V']
         is_inf = d['IS_INF']
-        for i in range(geo_batch_size):
-            per_batch_conf_id = i + geo_batch_id * geo_batch_size
-            per_vertex_conf_id = per_batch_conf_id + tq_batch_id * tq_batch_size
-            if is_inf[per_batch_conf_id]:
-                continue # Skip collding free cases
-            iobjfn = _fn_isectgeo(out_dir=io_dir, vert_id=vert_id, conf_id=per_vertex_conf_id)
-            V, F = pyosr.load_obj_1(iobjfn)
-            print("calling intersecting_to_robot_surface for file {}\n".format(iobjfn))
-            IV, IF = uw.intersecting_to_robot_surface(tq[per_batch_conf_id], True, V, F)
-            pyosr.save_obj_1(IV, IF, 'tmp.obj')
+        if False:
+            for i in range(geo_batch_size):
+                per_batch_conf_id = i + geo_batch_id * geo_batch_size
+                per_vertex_conf_id = per_batch_conf_id + tq_batch_id * tq_batch_size
+                if is_inf[per_batch_conf_id]:
+                    continue # Skip collding free cases
+                iobjfn = _fn_isectgeo(out_dir=io_dir, vert_id=vert_id, conf_id=per_vertex_conf_id)
+                V, F = pyosr.load_obj_1(iobjfn)
+                print("calling intersecting_to_robot_surface for file {} config {}\n".format(iobjfn, tq[per_batch_conf_id]))
+                IF, IBV = uw.intersecting_to_robot_surface(tq[per_batch_conf_id], True, V, F)
+                #IF, IBV = uw.intersecting_to_model_surface(tq[per_batch_conf_id], True, V, F)
+                V1, F1 = uw.get_robot_geometry(tq[per_batch_conf_id], True)
+                pyosr.save_obj_1(IBV, IF, 'idata.obj')
+                pyosr.save_obj_1(V1, F1, '1.obj')
+                uw.add_barycentric(IF, IBV, uw.BARY_RENDERING_ROBOT)
+        else:
+            IBV, IF = pyosr.load_obj_1('idata.obj')
+            uw.add_barycentric(IF, IBV, uw.BARY_RENDERING_ROBOT)
+        fb = uw.render_barycentric(uw.BARY_RENDERING_ROBOT, np.array([1024, 1024], dtype=np.int32))
+        imsave('1.png', fb)
 
 if __name__ == '__main__':
     main()

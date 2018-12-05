@@ -154,9 +154,12 @@ Camera::uniform(GLuint program, glm::mat4 xform)
 	CHECK_GL_ERROR(glUniformMatrix4fv(viewLoc,  1, GL_FALSE, glm::value_ptr(matrix.view)));
 	CHECK_GL_ERROR(glUniformMatrix4fv(projLoc,  1, GL_FALSE, glm::value_ptr(matrix.proj)));
 #if 0
-	std::cerr << "debug: project (1,1,1,1) to " << 
+	std::cerr << "debug: project (1,1,1,1) to " <<
 		 matrix.proj * matrix.view * matrix.model * xform *
 		 glm::vec4(1.0, 1.0, 1.0, 1.0) << std::endl;
+	std::cerr << "debug: project (0.0, 0.5, 0.0, 1) to " <<
+		 matrix.proj * matrix.view * matrix.model * xform *
+		 glm::vec4(0.0, 0.5, 0.0, 1.0) << std::endl;
 #endif
 }
 

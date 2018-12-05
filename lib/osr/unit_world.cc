@@ -7,7 +7,10 @@
 #include <stdexcept>
 #include <igl/doublearea.h>
 #include <igl/cross.h>
+#include <igl/barycentric_coordinates.h>
+#include <igl/writeOBJ.h>
 #include <tritri/tritri_igl.h>
+#include <tritri/tritri_cop.h>
 #include <ode/ode.h>
 #if PYOSR_HAS_CGAL
 #include <meshbool/join.h>
@@ -67,19 +70,19 @@ struct UnitWorld::OdeData {
 		/*
 		 * Note: alternatively we can pretend every robot is a solid
 		 * sphere, which could simplify the concept and the process.
-		 * 
+		 *
 		 * But let's try this first.
 		 */
 		setMass(1.0, robot);
 	}
 
-	void setMass(StateScalar mass, 
+	void setMass(StateScalar mass,
 	             const CDModel& robot)
 	{
 #if 0
 		auto com = robot.centerOfMass();
 		auto MI = robot.inertiaTensor();
-		dMassSetParameters(&m, 1.0, 
+		dMassSetParameters(&m, 1.0,
 		                   com(0), com(1), com(2),
 		                   MI(0,0), MI(1,1), MI(2,2),
 		                   MI(0,1), MI(0,2), MI(1,2));
@@ -119,7 +122,7 @@ struct UnitWorld::OdeData {
 			dBodyAddForceAtPos(body,
 			                   force(0), force(1), force(2),
 			                   fpos(i,0), fpos(i,1), fpos(i,2)
-			                  ); 
+			                  );
 		}
 	}
 
@@ -594,7 +597,7 @@ UnitWorld::getRobotMatrix() const
 
 
 StateVector
-UnitWorld::translateToUnitState(const StateVector& state)
+UnitWorld::translateToUnitState(const StateVector& state) const
 {
 #if 1
 	Eigen::Vector4d t(state(0), state(1), state(2), 1.0f);
@@ -609,7 +612,7 @@ UnitWorld::translateToUnitState(const StateVector& state)
 }
 
 StateVector
-UnitWorld::translateFromUnitState(const StateVector& pstate)
+UnitWorld::translateFromUnitState(const StateVector& pstate) const
 {
 #if 1
 	auto state = unapplyPertubation(pstate);
@@ -625,7 +628,7 @@ UnitWorld::translateFromUnitState(const StateVector& pstate)
 }
 
 StateVector
-UnitWorld::applyPertubation(const StateVector& state)
+UnitWorld::applyPertubation(const StateVector& state) const
 {
 	StateQuat rot, prot;
 	StateTrans trans, ptrans;
@@ -638,7 +641,7 @@ UnitWorld::applyPertubation(const StateVector& state)
 }
 
 StateVector
-UnitWorld::unapplyPertubation(const StateVector& state)
+UnitWorld::unapplyPertubation(const StateVector& state) const
 {
 	StateQuat rot, prot;
 	StateTrans trans, ptrans;
@@ -749,29 +752,81 @@ std::tuple<UnitWorld::VMatrix, UnitWorld::FMatrix>
 UnitWorld::intersectingGeometry(const StateVector& q,
                                 bool q_is_unit)
 {
-	StateVector qu = q;
-	if (!q_is_unit)
-		qu = translateToUnitState(q);
-
-	Transform envTf = std::get<0>(getCDTransforms(robot_state_));
-	CDModel::VMatrix env_V = (envTf * cd_scene_->vertices().transpose()).transpose();
-
-	auto env_F = cd_scene_->faces();
-	auto rob_F = cd_robot_->faces();
-
-	Transform robTf = translate_state_to_transform(qu);
-	CDModel::VMatrix rob_V = (robTf * cd_robot_->vertices().transpose()).transpose();
-
-	CDModel::VMatrix RV;
-	CDModel::FMatrix RF;
+	CDModel::VMatrix env_V, rob_V, RV;
+	CDModel::FMatrix env_F, rob_F, RF;
+	std::tie(env_V, env_F) = getSceneGeometry(q, q_is_unit);
+#if 1
+	std::tie(rob_V, rob_F) = getRobotGeometry(q, q_is_unit);
 	mesh_bool(env_V, env_F,
 	          rob_V, rob_F,
 	          igl::MESH_BOOLEAN_TYPE_INTERSECT,
 	          RV, RF);
 	return std::make_tuple(RV, RF);
+#endif
 }
 
 #endif // PYOSR_HAS_CGAL
+
+std::tuple<UnitWorld::VMatrix, UnitWorld::FMatrix>
+UnitWorld::getRobotGeometry(const StateVector& q,
+                            bool q_is_unit) const
+{
+#if 1
+	StateVector qu = q;
+	if (!q_is_unit)
+		qu = translateToUnitState(q);
+	auto rob_F = cd_robot_->faces();
+	Transform robTf = translate_state_to_transform(qu);
+	CDModel::VMatrix rob_V = (robTf * cd_robot_->vertices().transpose()).transpose();
+
+	return std::make_tuple(rob_V, rob_F);
+#endif
+}
+
+std::tuple<UnitWorld::VMatrix, UnitWorld::FMatrix>
+UnitWorld::getSceneGeometry(const StateVector& q,
+                            bool q_is_unit) const
+{
+	StateVector qu = q;
+	if (!q_is_unit)
+		qu = translateToUnitState(q);
+	Transform envTf = std::get<0>(getCDTransforms(qu));
+	CDModel::VMatrix env_V = (envTf * cd_scene_->vertices().transpose()).transpose();
+	auto env_F = cd_scene_->faces();
+	return std::make_tuple(env_V, env_F);
+}
+
+std::tuple<UnitWorld::FMatrix, UnitWorld::VMatrix>
+UnitWorld::intersectingToRobotSurface(const StateVector& q,
+                                      bool q_is_unit,
+                                      const UnitWorld::VMatrix& V,
+                                      const UnitWorld::FMatrix& F)
+{
+	if (!robot_->hasUV()) {
+		throw std::runtime_error("Calling intersectingToRobotSurface requires the corresponding model has UV coordinates");
+	}
+
+	CDModel::VMatrix rob_V;
+	CDModel::FMatrix rob_F;
+	std::tie(rob_V, rob_F) = getRobotGeometry(q, q_is_unit);
+	return intersectingToSurface(rob_V, rob_F, V, F);
+}
+
+std::tuple<UnitWorld::FMatrix, UnitWorld::VMatrix>
+UnitWorld::intersectingToModelSurface(const StateVector& q,
+                                      bool q_is_unit,
+                                      const UnitWorld::VMatrix& V,
+                                      const UnitWorld::FMatrix& F)
+{
+	if (!scene_->hasUV()) {
+		throw std::runtime_error("Calling intersectingToModelSurface requires the corresponding model has UV coordinates");
+	}
+
+	CDModel::VMatrix env_V;
+	CDModel::FMatrix env_F;
+	std::tie(env_V, env_F) = getSceneGeometry(q, q_is_unit);
+	return intersectingToSurface(env_V, env_F, V, F);
+}
 
 std::tuple<
 	ArrayOfPoints, // Position
@@ -904,6 +959,90 @@ UnitWorld::pushRobot(const StateVector& unitq,
 	ode_->setState(unitq);
 	ode_->applyForce(fpos, fdir, fmag);
 	return ode_->stepping(dtime);
+}
+
+std::tuple<UnitWorld::FMatrix, UnitWorld::VMatrix>
+UnitWorld::intersectingToSurface(const VMatrix& targetV,
+                                 const FMatrix& targetF,
+                                 const VMatrix& V,
+                                 const FMatrix& F)
+{
+	Eigen::SparseMatrix<int> COP;
+#if 0
+	std::cerr << "TriTriCop between " << targetF.rows() << " " << F.rows() << std::endl;
+#endif
+	tritri::TriTriCop(targetV, targetF, V, F, COP);
+	size_t NF = COP.nonZeros();
+#if 0
+	std::cerr << "TriTriCop done; " << NF << " non-zeros\n";
+#endif
+	size_t NV = NF * 3;
+	Eigen::Matrix<StateScalar, -1, 3> P(NV,3), A(NV,3), B(NV,3), C(NV,3), L(NV,3);
+	// Eigen::Matrix<StateScalar, -1, 3> P, A, B, C, L;
+	P.resize(NV, 3);
+	A.resize(NV, 3);
+	B.resize(NV, 3);
+	C.resize(NV, 3);
+	L.resize(NV, 3);
+	FMatrix retF(NF, 3);
+	size_t iter = 0;
+#if 0
+	std::cerr << "Bary build\n";
+#endif
+	for (int k = 0; k < COP.outerSize(); ++k) {
+		for (Eigen::SparseMatrix<int>::InnerIterator it(COP, k); it; ++it) {
+			auto target_fi = it.row();
+			auto isect_fi = it.col();
+#if 0
+			std::cerr << "COP Pair " << target_fi << ", " << isect_fi << std::endl;
+#endif
+			P.row(3 * iter + 0) = V.row(F(isect_fi, 0));
+			P.row(3 * iter + 1) = V.row(F(isect_fi, 1));
+			P.row(3 * iter + 2) = V.row(F(isect_fi, 2));
+			A.row(3 * iter + 0) = targetV.row(targetF(target_fi, 0));
+			A.row(3 * iter + 1) = A.row(3 * iter + 0);
+			A.row(3 * iter + 2) = A.row(3 * iter + 0);
+			B.row(3 * iter + 0) = targetV.row(targetF(target_fi, 1));
+			B.row(3 * iter + 1) = B.row(3 * iter + 0);
+			B.row(3 * iter + 2) = B.row(3 * iter + 0);
+			C.row(3 * iter + 0) = targetV.row(targetF(target_fi, 2));
+			C.row(3 * iter + 1) = C.row(3 * iter + 0);
+			C.row(3 * iter + 2) = C.row(3 * iter + 0);
+			retF.row(iter) = targetF.row(target_fi);
+			// std::cerr << iter << " done\n";
+			iter++;
+		}
+	}
+#if 0
+	{
+		Eigen::Matrix<int, -1, 3> F;
+		F.resize(P.rows()/3, 3);
+		for (int i = 0; i < P.rows() / 3; i++) {
+			F.row(i) << i * 3 + 0,
+			            i * 3 + 1,
+			            i * 3 + 2;
+		}
+		igl::writeOBJ("tmp2.obj", P, F);
+	}
+	std::cerr << "Bary\n";
+	igl::barycentric_coordinates(P, A, B, C, L);
+	// Sanity check
+	for (int i = 0; i < P.rows(); i++) {
+		Eigen::Vector3d tgt = A.row(i) * L(i,0) + B.row(i) * L(i,1) + C.row(i) * L(i,2);
+		double d = (tgt - P.row(i).transpose()).norm();
+		if (d > 1e-6) {
+			std::cerr << "Bary failed, details:\n"
+			          << "\tA: " << A.row(i) << "\n"
+			          << "\tB: " << B.row(i) << "\n"
+			          << "\tC: " << C.row(i) << "\n"
+			          << "\tBary: " << L.row(i) << "\n"
+			          << "\tP: " << P.row(i) << "\n";
+			throw std::runtime_error("SANCHECK: BARYCENTRIC COORDINATES");
+		}
+	}
+#endif
+
+	return std::make_tuple(retF, L);
 }
 
 }

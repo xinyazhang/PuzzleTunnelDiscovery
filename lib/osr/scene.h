@@ -86,6 +86,7 @@ public:
 
 	size_t getNumberOfMeshes() const { return meshes_.size(); }
 	void visitMesh(std::function<void(std::shared_ptr<const Mesh>)> ) const;
+	bool hasUV() const;
 private:
 	void updateBoundingBox(Node* node, glm::mat4 m);
 };
