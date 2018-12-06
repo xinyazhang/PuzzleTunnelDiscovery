@@ -587,7 +587,38 @@ Renderer::renderBarycentric(uint32_t target,
 
 	CHECK_GL_ERROR(glBindVertexArray(bary_vao_));
 	BaryRenderData& brd = brds_[target];
+#if 1
 	brd.sync();
+#else
+	{
+		auto target_scene = getBaryTarget(target);
+
+		const Mesh *target_mesh = nullptr;
+		auto visitor = [&target_mesh](std::shared_ptr<const Mesh> m) {
+			target_mesh = m.get();
+		};
+		target_scene->visitMesh(visitor);
+		if (!target_mesh)
+			throw std::runtime_error(std::string(__func__) + ": Target has no valid mesh");
+		const auto& tex_uv = target_mesh->getUV();
+		const auto& F = target_mesh->getIndices();
+		size_t NP = F.size() / 3;
+		BaryUV &uv = brd.cache_uv;
+		BaryBary &cache_bary = brd.cache_bary;
+
+		uv.resize(NP * 3, 2);
+		cache_bary.resize(NP * 3, 3);
+		for (size_t f = 0; f < NP; f++) {
+			for (size_t i = 0; i < 3; i++) {
+				auto f_bary = F[f * 3 + i];
+				uv.row(3 * f + i) = tex_uv.row(f_bary);
+			}
+			cache_bary.row(3 * f + 0) << 1.0, 0.0, 0.0;
+			cache_bary.row(3 * f + 1) << 0.0, 1.0, 0.0;
+			cache_bary.row(3 * f + 2) << 0.0, 0.0, 1.0;
+		}
+	}
+#endif
 
 	std::ofstream fout("out1.svg");
 	fout << "<svg width=\"" << res(0) << "\" height=\"" << res(1) << "\">\n";
@@ -765,12 +796,12 @@ void Renderer::BaryRenderData::sync()
 		cursor += uv_array[i].rows();
 	}
 #else
+#if 0
 	cache_uv.resize(3, 2);
 	cache_bary.resize(3, 3);
 	cache_uv << 0.25,0.25,
 	            0.25,0.75,
 	            0.75,0.25;
-#if 1
 #if 0
 	cache_bary << 1.0, 0.0, 0.0,
 	              0.0, 1.0, 0.0,
@@ -780,11 +811,12 @@ void Renderer::BaryRenderData::sync()
 	              0.6, -0.2, 0.6,
 	              0.6, 0.6, -0.2;
 #endif
-#else
+#elif 0
 	cache_bary << -1.0f, -1.0f, 0.0f,
 	              1.0f, -1.0f, 0.0f,
 	              0.0f,  1.0f, 0.0f;
 	cache_bary = cache_bary.array() * 0.5;
+#else
 #endif
 #endif
 

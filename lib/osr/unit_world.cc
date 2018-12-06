@@ -1025,7 +1025,9 @@ UnitWorld::intersectingToSurface(const VMatrix& targetV,
 		igl::writeOBJ("tmp2.obj", P, F);
 	}
 	std::cerr << "Bary\n";
+#endif
 	igl::barycentric_coordinates(P, A, B, C, L);
+#if 0
 	// Sanity check
 	for (int i = 0; i < P.rows(); i++) {
 		Eigen::Vector3d tgt = A.row(i) * L(i,0) + B.row(i) * L(i,1) + C.row(i) * L(i,2);
