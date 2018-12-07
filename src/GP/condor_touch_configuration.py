@@ -38,19 +38,22 @@ def _fn_uvgeo(out_dir, geo_type, vert_id, conf_id):
     return "{}/{}-uv-from-vert-{}-{}.obj".format(out_dir, geo_type, vert_id, conf_id)
 
 def _create_uw(cmd):
-    if cmd in ['project', 'uvproj', 'uvrender']:
+    if 'render' in cmd:
         pyosr.init()
         dpy = pyosr.create_display()
         glctx = pyosr.create_gl_context(dpy)
         r = pyosr.Renderer() # 'project' command requires a Renderer
         r.setup()
+    else:
+        r = pyosr.UnitWorld() # pyosr.Renderer is not avaliable in HTCondor
+
+    if cmd in ['project', 'uvproj', 'uvrender']:
         # fb = r.render_barycentric(r.BARY_RENDERING_ROBOT, np.array([1024, 1024], dtype=np.int32))
         # imsave('1.png', fb)
         # sys.exit(0)
         r.loadModelFromFile(aniconf.env_uv_fn)
         r.loadRobotFromFile(aniconf.rob_uv_fn)
     else:
-        r = pyosr.UnitWorld() # pyosr.Renderer is not avaliable in HTCondor
         r.loadModelFromFile(aniconf.env_wt_fn)
         r.loadRobotFromFile(aniconf.rob_wt_fn)
     r.enforceRobotCenter(aniconf.rob_ompl_center)
