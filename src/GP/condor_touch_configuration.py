@@ -76,12 +76,13 @@ class TaskPartitioner(object):
             self._gp_per_tq = tq_batch / gp_batch
         self._gp_batch = gp_batch
         self._tq_batch = tq_batch
+        self.tunnel_v = np.load(aniconf.tunnel_v_fn)['TUNNEL_V']
 
     '''
     Task vector is resized into (batch_id, vertex_id) matrix
     '''
     def get_batch_vert_index(self, task_id):
-        return divmod(task_id, len(tunnel_v))
+        return divmod(task_id, len(self.tunnel_v))
 
     def get_vert_id(self, task_id):
         return self.get_batch_vert_index(task_id)[1]
@@ -90,7 +91,7 @@ class TaskPartitioner(object):
         return self.get_batch_vert_index(task_id)[0]
 
     def get_tunnel_vertex(self, task_id):
-        return tunnel_v[self.get_vert_id(task_id)]
+        return self.tunnel_v[self.get_vert_id(task_id)]
 
     def get_tq_batch_size(self):
         return self._tq_batch
@@ -110,7 +111,7 @@ class TaskPartitioner(object):
                 sample = [array[start+i] for array in sample_array]
                 yield sample + vc
         tq_task_id, remainder = self._task_id_gp_to_tq(task_id)
-        d = np.load(self.get_tq_fn(self, tq_task_id))
+        d = np.load(self.get_tq_fn(tq_task_id))
         return tqgen(d,
                 remainder * self._gp_batch, self._gp_batch,
                 self.get_vert_id(tq_task_id),
@@ -218,7 +219,7 @@ def main():
     if cmd in ['show']:
         print("# of tunnel vertices is {}".format(len(tunnel_v)))
         return
-    assert cmd in ['run', 'isect', 'project'], 'Unknown command {}'.format(cmd)
+    assert cmd in ['run', 'isect', 'project', 'uvproj', 'uvrender'], 'Unknown command {}'.format(cmd)
     uw = _create_uw(cmd)
 
 
@@ -260,11 +261,11 @@ def main():
         tq = d['TOUCH_V']
         is_inf = d['IS_INF']
         '''
-        for tq, is_inf, vert_id, conf_id in tp.gen_touch_q(task_id)
+        for tq, is_inf, vert_id, conf_id in tp.gen_touch_q(task_id):
             if is_inf:
                 continue
             V, F = uw.intersecting_geometry(tq, True)
-            pyosr.save_obj_1(V, F, self.get_isect_fn(vert_id, conf_id)))
+            pyosr.save_obj_1(V, F, tp.get_isect_fn(vert_id, conf_id))
     elif cmd == 'uvproj':
         args = sys.argv[2:]
         geo_type = args[0]
@@ -277,11 +278,11 @@ def main():
         for tq, is_inf, vert_id, conf_id in tp.gen_touch_q(task_id):
             if is_inf:
                 continue
-            V, F = pyosr.load_obj_1(self.get_isect_fn(vert_id, conf_id))
+            V, F = pyosr.load_obj_1(tp.get_isect_fn(vert_id, conf_id))
             if geo_type == 'rob':
                 IF, IBV = uw.intersecting_to_robot_surface(tq, True, V, F)
             elif geo_type == 'env':
-                IF, IBV = uw.intersecting_to_scene_surface(tq, True, V, F)
+                IF, IBV = uw.intersecting_to_model_surface(tq, True, V, F)
             else:
                 assert False
             pyosr.save_obj_1(IBV, IF, tp.get_uv_fn(geo_type, vert_id, conf_id))
@@ -304,6 +305,7 @@ def main():
             if is_inf:
                 continue
             IBV, IF = pyosr.load_obj_1(tp.get_uv_fn(geo_type, vert_id, conf_id))
+            uw.clear_barycentric()
             uw.add_barycentric(IF, IBV, geo_flag)
             fb = uw.render_barycentric(geo_flag, np.array([2048, 2048], dtype=np.int32))
             w = fb.astype(np.float32) * (1.0 / np.clip(pyosr.distance(tq, iq), 1e-4, None))
