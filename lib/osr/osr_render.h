@@ -92,6 +92,8 @@ public:
 	                    const UnitWorld::VMatrix& V,
 	                    uint32_t target);
 
+	void clearBarycentric(uint32_t target);
+
 	RMMatrixXb
 	renderBarycentric(uint32_t target,
 	                  Eigen::Vector2i res);
@@ -135,6 +137,7 @@ private:
 		BaryBary cache_bary;
 
 		void sync(); // update cache
+		void clear();
 	};
 	BaryRenderData brds_[2];
 	std::shared_ptr<Scene> getBaryTarget(uint32_t);

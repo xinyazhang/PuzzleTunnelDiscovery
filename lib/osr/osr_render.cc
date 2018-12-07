@@ -504,6 +504,13 @@ Renderer::addBarycentric(const UnitWorld::FMatrix& F,
 	brds_[target].bary_array.emplace_back(V.cast<float>());
 }
 
+void
+Renderer::clearBarycentric(uint32_t target)
+{
+	auto target_scene = getBaryTarget(target); // Ensure target is valid
+	brds_[target].clear();
+}
+
 Renderer::RMMatrixXb
 Renderer::renderBarycentric(uint32_t target,
                             Eigen::Vector2i res)
@@ -824,6 +831,12 @@ void Renderer::BaryRenderData::sync()
 	std::cerr << "CACHE UV\n" << cache_uv << std::endl;
 	std::cerr << "CACHE BARY\n" << cache_bary << std::endl;
 #endif
+}
+
+void Renderer::BaryRenderData::clear()
+{
+	uv_array.clear();
+	bary_array.clear();
 }
 
 }

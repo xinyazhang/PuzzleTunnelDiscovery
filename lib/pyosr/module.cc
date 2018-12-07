@@ -154,6 +154,8 @@ PYBIND11_PLUGIN(pyosr) {
 		     py::call_guard<py::gil_scoped_release>())
 		.def("add_barycentric", &Renderer::addBarycentric,
 		     py::call_guard<py::gil_scoped_release>())
+		.def("clear_barycentric", &Renderer::clearBarycentric,
+		     py::call_guard<py::gil_scoped_release>())
 		.def("render_barycentric", &Renderer::renderBarycentric,
 		     py::call_guard<py::gil_scoped_release>())
 		.def_readonly_static("NO_SCENE_RENDERING", &Renderer::NO_SCENE_RENDERING)
