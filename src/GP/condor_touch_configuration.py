@@ -38,7 +38,7 @@ def _fn_uvgeo(out_dir, geo_type, vert_id, conf_id):
     return "{}/{}-uv-from-vert-{}-{}.obj".format(out_dir, geo_type, vert_id, conf_id)
 
 def _create_uw(cmd):
-    if cmd == 'project':
+    if cmd in ['project', 'uvproj', 'uvrender']:
         pyosr.init()
         dpy = pyosr.create_display()
         glctx = pyosr.create_gl_context(dpy)
