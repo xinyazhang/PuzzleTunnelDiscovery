@@ -157,6 +157,9 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("clear_barycentric", &Renderer::clearBarycentric,
 		     py::call_guard<py::gil_scoped_release>())
 		.def("render_barycentric", &Renderer::renderBarycentric,
+		     py::arg("target"),
+		     py::arg("res"),
+		     py::arg("svg_fn") = std::string(),
 		     py::call_guard<py::gil_scoped_release>())
 		.def_readonly_static("NO_SCENE_RENDERING", &Renderer::NO_SCENE_RENDERING)
 		.def_readonly_static("NO_ROBOT_RENDERING", &Renderer::NO_ROBOT_RENDERING)

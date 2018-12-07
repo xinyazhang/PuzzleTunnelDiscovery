@@ -513,7 +513,8 @@ Renderer::clearBarycentric(uint32_t target)
 
 Renderer::RMMatrixXb
 Renderer::renderBarycentric(uint32_t target,
-                            Eigen::Vector2i res)
+                            Eigen::Vector2i res,
+                            const std::string& svg_fn)
 {
 	auto target_scene = getBaryTarget(target);
 
@@ -627,34 +628,36 @@ Renderer::renderBarycentric(uint32_t target,
 	}
 #endif
 
-	std::ofstream fout("out1.svg");
-	fout << "<svg width=\"" << res(0) << "\" height=\"" << res(1) << "\">\n";
-	for (int i = 0; i < brd.cache_uv.rows(); i+=3) {
-		using Eigen::Vector2f;
-		Vector2f u0 = brd.cache_uv.row(i + 0);
-		Vector2f u1 = brd.cache_uv.row(i + 1);
-		Vector2f u2 = brd.cache_uv.row(i + 2);
+	if (!svg_fn.empty()) {
+		std::ofstream fout("out1.svg");
+		fout << "<svg width=\"" << res(0) << "\" height=\"" << res(1) << "\">\n";
+		for (int i = 0; i < brd.cache_uv.rows(); i+=3) {
+			using Eigen::Vector2f;
+			Vector2f u0 = brd.cache_uv.row(i + 0);
+			Vector2f u1 = brd.cache_uv.row(i + 1);
+			Vector2f u2 = brd.cache_uv.row(i + 2);
 
-		Vector2f uvs[3];
-		for (int k = 0; k < 3; k++) {
-			uvs[k] = u0 * brd.cache_bary(i + k,0) + u1 * brd.cache_bary(i + k,1) + u2 * brd.cache_bary(i + k,2);
+			Vector2f uvs[3];
+			for (int k = 0; k < 3; k++) {
+				uvs[k] = u0 * brd.cache_bary(i + k,0) + u1 * brd.cache_bary(i + k,1) + u2 * brd.cache_bary(i + k,2);
 #if 0
-			std::cerr << "Bary " << i+k << ":\n\t"
-			          << uvs[k].transpose()
-			          << std::endl;
+				std::cerr << "Bary " << i+k << ":\n\t"
+					  << uvs[k].transpose()
+					  << std::endl;
 #endif
-			// brd.cache_uv.row(i + k) = uvs[k];
-			uvs[k](0) *= res(0);
-			uvs[k](1) *= res(1);
+				// brd.cache_uv.row(i + k) = uvs[k];
+				uvs[k](0) *= res(0);
+				uvs[k](1) *= res(1);
+			}
+			fout << R"xxx(<polygon points=")xxx"
+			     << uvs[0](0) <<',' << uvs[0](1) << " "
+			     << uvs[1](0) <<',' << uvs[1](1) << " "
+			     << uvs[2](0) <<',' << uvs[2](1) << " "
+			     << R"xxx(" style="fill:lime;stroke:purple;stroke-width:1" />)xxx"
+			     << std::endl;
 		}
-		fout << R"xxx(<polygon points=")xxx"
-		     << uvs[0](0) <<',' << uvs[0](1) << " "
-		     << uvs[1](0) <<',' << uvs[1](1) << " "
-		     << uvs[2](0) <<',' << uvs[2](1) << " "
-		     << R"xxx(" style="fill:lime;stroke:purple;stroke-width:1" />)xxx"
-		     << std::endl;
+		fout << R"xxx(</svg>)xxx";
 	}
-	fout << R"xxx(</svg>)xxx";
 
 #if 1
 	CHECK_GL_ERROR(glEnableVertexAttribArray(0));

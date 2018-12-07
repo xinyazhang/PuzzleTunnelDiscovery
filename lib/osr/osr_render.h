@@ -96,7 +96,8 @@ public:
 
 	RMMatrixXb
 	renderBarycentric(uint32_t target,
-	                  Eigen::Vector2i res);
+	                  Eigen::Vector2i res,
+	                  const std::string& svg_fn = std::string());
 private:
 	void setupNonSharedObjects();
 
