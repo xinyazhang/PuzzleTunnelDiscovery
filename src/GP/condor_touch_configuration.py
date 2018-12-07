@@ -138,7 +138,7 @@ def calc_touch(uw, vertex, batch_size):
     ret_lists = [[] for i in range(N_RET)]
     for i in range(batch_size):
         tr = uw_random.random_on_sphere(1.0)
-        aa = uw_random.random_on_sphere(2 * math.pi)
+        aa = uw_random.random_within_sphere(2 * math.pi)
         to = pyosr.apply(q0, tr, aa)
         tups = uw.transit_state_to_with_contact(q0, to, 0.0125 / 8)
         for i in range(N_RET):

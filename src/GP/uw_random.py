@@ -31,6 +31,16 @@ def random_on_sphere(scale=1.0):
     z = 1 - 2 * l2
     return np.array([x,y,z]) * scale
 
+def random_within_sphere(scale=1.0):
+    # sample within [-1,1]^3
+    # and reject samples not in the unit sphere
+    while True:
+        x1,x2,x3 = 2.0 * (np.random.rand(3) - 0.5)
+        l2 = x1 * x1 + x2 * x2 + x3 * x3
+        if l2 <= 1:
+            break
+    return np.array([x1,x2,x3]) * scale
+
 def gen_unit_init_state(uw, scale=1.0):
     while True:
         state = random_state(scale)
