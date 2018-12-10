@@ -25,7 +25,7 @@ def usage():
 4. condor_touch_configuration.py project <Vertex ID> <Input Dir> [Output PNG]
     This is a debugging
 5. condor_touch_configuration.py uvproj <rob/env> <Task ID> <Mini Batch> <Touch Batch> <Input Dir>
-6. condor_touch_configuration.py uvrender <rob/env> <Vertex ID> <Input Dir> [Output PNG] [Output NPY]
+6. condor_touch_configuration.py uvrender <rob/env> <Vertex ID> <Input Dir>
 ''')
 
 def _fn_touch_q(out_dir, vert_id, batch_id):
@@ -36,6 +36,20 @@ def _fn_isectgeo(out_dir, vert_id, conf_id):
 
 def _fn_uvgeo(out_dir, geo_type, vert_id, conf_id):
     return "{}/{}-uv-from-vert-{}-{}.obj".format(out_dir, geo_type, vert_id, conf_id)
+
+def _fn_atlastex(out_dir, geo_type, vert_id, index=None, nw=False):
+    nwsuffix = "" if not nw else "-nw"
+    if index is None:
+        return "{}/tex-{}-from-vert-{}{}.png".format(out_dir, geo_type, vert_id, nwsuffix)
+    else:
+        return "{}/tex-{}-from-vert-{}-{}{}.png".format(out_dir, geo_type, vert_id, index, nwsuffix)
+
+def _fn_atlas(out_dir, geo_type, vert_id, index=None, nw=False):
+    nwsuffix = "" if not nw else "-nw"
+    if index is None:
+        return "{}/atlas-{}-from-vert-{}{}.npz".format(out_dir, geo_type, vert_id, nwsuffix)
+    else:
+        return "{}/atlas-{}-from-vert-{}-{}{}.npz".format(out_dir, geo_type, vert_id, index, nwsuffix)
 
 def _create_uw(cmd):
     if 'render' in cmd:
@@ -175,6 +189,29 @@ class ObjGenerator(object):
     def next(self):
         return self.__next__()
 
+class UVObjGenerator(object):
+    def __init__(self, in_dir, geo_type, vert_id):
+        self.in_dir = in_dir
+        self.geo_type = geo_type
+        self.vert_id = vert_id
+        self.conf_id = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        fn = _fn_uvgeo(self.in_dir, self.geo_type, self.vert_id, self.conf_id)
+        self.conf_id += 1
+        print("loading {}".format(fn))
+        if not os.path.exists(fn):
+            return None, None # Note: do NOT raise StopIteration, we may miss some file in the middle
+        return pyosr.load_obj_1(fn)
+
+    # Python 2 compat
+    def next(self):
+        return self.__next__()
+
+
 class TouchQGenerator(object):
     def __init__(self, in_dir, vert_id):
         self.in_dir = in_dir
@@ -203,6 +240,8 @@ class TouchQGenerator(object):
         ret = (self.tq[self.tq_local_id], self.inf[self.tq_local_id])
         self.tq_local_id += 1
         if self.tq_local_id >= self.tq_size:
+            self.tq_batch_id += 1
+            self.tq_local_id = 0
             self.tq = None
         return ret
 
@@ -281,14 +320,17 @@ def main():
         for tq, is_inf, vert_id, conf_id in tp.gen_touch_q(task_id):
             if is_inf:
                 continue
-            V, F = pyosr.load_obj_1(tp.get_isect_fn(vert_id, conf_id))
+            fn = tp.get_isect_fn(vert_id, conf_id)
+            V, F = pyosr.load_obj_1(fn)
             if geo_type == 'rob':
                 IF, IBV = uw.intersecting_to_robot_surface(tq, True, V, F)
             elif geo_type == 'env':
                 IF, IBV = uw.intersecting_to_model_surface(tq, True, V, F)
             else:
                 assert False
-            pyosr.save_obj_1(IBV, IF, tp.get_uv_fn(geo_type, vert_id, conf_id))
+            fn2 = tp.get_uv_fn(geo_type, vert_id, conf_id)
+            print('uvproj of {} to {}'.format(fn, fn2))
+            pyosr.save_obj_1(IBV, IF, fn2)
     elif cmd == 'uvrender':
         args = sys.argv[2:]
         geo_type = args[0]
@@ -301,27 +343,55 @@ def main():
             assert False
         vert_id = int(args[1])
         io_dir = args[2]
-        outpng, outnpy = args[3], args[4]
         iq = uw.translate_to_unit_state(tunnel_v[vert_id])
         afb = None
-        for tq, is_inf, vert_id, conf_id in tp.gen_touch_q(task_id):
+        afb_nw = None
+
+        tq_gen = TouchQGenerator(in_dir=io_dir, vert_id=vert_id)
+        obj_gen = UVObjGenerator(in_dir=io_dir, geo_type=geo_type, vert_id=vert_id)
+        i = 0
+        for tq, is_inf in tq_gen:
+            # print('tq {} is_inf {}'.format(tq, is_inf))
             if is_inf:
                 continue
-            IBV, IF = pyosr.load_obj_1(tp.get_uv_fn(geo_type, vert_id, conf_id))
-            uw.clear_barycentric()
+            IBV, IF = next(obj_gen)
+            if IBV is None or IF is None:
+                print('IBV {}'.format(None))
+                continue
+            print('IBV {}'.format(IBV.shape))
+            uw.clear_barycentric(geo_flag)
             uw.add_barycentric(IF, IBV, geo_flag)
             fb = uw.render_barycentric(geo_flag, np.array([2048, 2048], dtype=np.int32))
-            w = fb.astype(np.float32) * (1.0 / np.clip(pyosr.distance(tq, iq), 1e-4, None))
+            nw = np.transpose(np.fliplr(fb.astype(np.float32)))
+            w = nw * (1.0 / np.clip(pyosr.distance(tq, iq), 1e-4, None))
             if afb is None:
                 afb = w
+                afb_nw = nw
             else:
                 afb += w
-        afb = np.transpose(np.fliplr(afb))
+                afb_nw += nw
+            '''
+            print('afb shape {}'.format(afb.shape))
+            rgb = np.zeros(list(afb.shape) + [3])
+            rgb[...,1] = w
+            imsave(_fn_atlastex(io_dir, geo_type, vert_id, i), rgb)
+            np.savez(_fn_atlas(io_dir, geo_type, vert_id, i), w)
+            if i == 4:
+                V1, F1 = uw.get_robot_geometry(tq, True)
+                pyosr.save_obj_1(V1, F1, '1.obj')
+            if i >= 4:
+                break
+            '''
+            i+=1
         rgb = np.zeros(list(afb.shape) + [3])
         rgb[...,1] = afb
-        imsave(outpng, rgb)
-        np.savez(outnpy, afb)
+        imsave(_fn_atlastex(io_dir, geo_type, vert_id, None), rgb)
+        np.savez(_fn_atlas(io_dir, geo_type, vert_id, None), afb)
+        rgb[...,1] = afb_nw
+        imsave(_fn_atlastex(io_dir, geo_type, vert_id, None, nw=True), rgb)
+        np.savez(_fn_atlas(io_dir, geo_type, vert_id, None, nw=True), afb)
     elif cmd == 'project':
+        assert False, "deprecated"
         vert_id = int(sys.argv[2])
         io_dir = sys.argv[3]
         png_fn = sys.argv[4]
