@@ -10,7 +10,10 @@ import numpy as np
 import aniconf12_2 as aniconf
 import uw_random
 import math
+import texture_format
 from scipy.misc import imsave
+
+ATLAS_RES = 2048
 
 def usage():
     print('''Usage:
@@ -23,9 +26,16 @@ def usage():
 3. condor_touch_configuration.py isect <Task ID> <Geo Batch Size> <Touch Batch Size> <In/Output Dir>
     Take the output configuration from Step 2) and calculate the intersecting geomery
 4. condor_touch_configuration.py project <Vertex ID> <Input Dir> [Output PNG]
-    This is a debugging
+    This is a debugging function
 5. condor_touch_configuration.py uvproj <rob/env> <Task ID> <Mini Batch> <Touch Batch> <Input Dir>
+    Project intersection results to rob/env surface as vertex tuples and barycentric coordinates.
 6. condor_touch_configuration.py uvrender <rob/env> <Vertex ID> <Input Dir>
+    Render the uvproj results to numpy arrays and images.
+7. condor_touch_configuration.py atlas2prim <Output Dir>
+    Generate the chart that maps pixels in ATLAS image back to PRIMitive ID
+8. condor_touch_configuration.py sample <Task ID> <Batch Size> <Input/Output Dir>
+    Sample from the product of uvrender, and generate the sample in the narrow tunnel
+    TODO: Vertex ID can be 'all'
 ''')
 
 def _fn_touch_q(out_dir, vert_id, batch_id):
@@ -51,17 +61,24 @@ def _fn_atlas(out_dir, geo_type, vert_id, index=None, nw=False):
     else:
         return "{}/atlas-{}-from-vert-{}-{}{}.npz".format(out_dir, geo_type, vert_id, index, nwsuffix)
 
+def _fn_atlas2prim(out_dir, geo_type):
+    return "{}/atlas2prim-{}.npz".format(out_dir, geo_type)
+
 def _create_uw(cmd):
-    if 'render' in cmd:
+    if 'render' in cmd or cmd in ['atlas2prim']:
         pyosr.init()
         dpy = pyosr.create_display()
         glctx = pyosr.create_gl_context(dpy)
         r = pyosr.Renderer() # 'project' command requires a Renderer
+        if cmd in ['atlas2prim']:
+            r.pbufferWidth = ATLAS_RES
+            r.pbufferHeight = ATLAS_RES
         r.setup()
     else:
         r = pyosr.UnitWorld() # pyosr.Renderer is not avaliable in HTCondor
 
-    if cmd in ['project', 'uvproj', 'uvrender']:
+
+    if cmd in ['project', 'uvproj', 'uvrender', 'atlas2prim', 'sample']:
         # fb = r.render_barycentric(r.BARY_RENDERING_ROBOT, np.array([1024, 1024], dtype=np.int32))
         # imsave('1.png', fb)
         # sys.exit(0)
@@ -71,6 +88,7 @@ def _create_uw(cmd):
         r.loadModelFromFile(aniconf.env_wt_fn)
         r.loadRobotFromFile(aniconf.rob_wt_fn)
     r.enforceRobotCenter(aniconf.rob_ompl_center)
+    r.views = np.array([[0.0,0.0]], dtype=np.float32)
     r.scaleToUnit()
     r.angleModel(0.0, 0.0)
 
@@ -261,7 +279,7 @@ def main():
     if cmd in ['show']:
         print("# of tunnel vertices is {}".format(len(tunnel_v)))
         return
-    assert cmd in ['run', 'isect', 'project', 'uvproj', 'uvrender'], 'Unknown command {}'.format(cmd)
+    assert cmd in ['run', 'isect', 'project', 'uvproj', 'uvrender', 'atlas2prim'], 'Unknown command {}'.format(cmd)
     uw = _create_uw(cmd)
 
 
@@ -361,8 +379,8 @@ def main():
             print('IBV {}'.format(IBV.shape))
             uw.clear_barycentric(geo_flag)
             uw.add_barycentric(IF, IBV, geo_flag)
-            fb = uw.render_barycentric(geo_flag, np.array([2048, 2048], dtype=np.int32))
-            nw = np.transpose(np.fliplr(fb.astype(np.float32)))
+            fb = uw.render_barycentric(geo_flag, np.array([ATLAS_RES, ATLAS_RES], dtype=np.int32))
+            nw = texture_format.framebuffer_to_file(fb.astype(np.float32))
             w = nw * (1.0 / np.clip(pyosr.distance(tq, iq), 1e-4, None))
             if afb is None:
                 afb = w
@@ -390,6 +408,17 @@ def main():
         rgb[...,1] = afb_nw
         imsave(_fn_atlastex(io_dir, geo_type, vert_id, None, nw=True), rgb)
         np.savez(_fn_atlas(io_dir, geo_type, vert_id, None, nw=True), afb)
+    elif cmd == 'atlas2prim':
+        r = uw
+        # r.uv_feedback = True
+        r.avi = False
+        io_dir = sys.argv[2]
+        for geo_type,flags in zip(['rob', 'env'], [pyosr.Renderer.NO_SCENE_RENDERING, pyosr.Renderer.NO_ROBOT_RENDERING]):
+            r.render_mvrgbd(pyosr.Renderer.UV_MAPPINNG_RENDERING|flags)
+            atlas2prim = np.copy(r.mvpid.reshape((r.pbufferWidth, r.pbufferHeight)))
+            atlas2prim = texture_format.framebuffer_to_file(atlas2prim)
+            np.savez(_fn_atlas2prim(io_dir, geo_type), PRIM=atlas2prim)
+            # imsave(geo_type+'-a2p.png', atlas2prim) # This is for debugging
     elif cmd == 'project':
         assert False, "deprecated"
         vert_id = int(sys.argv[2])
@@ -413,7 +442,7 @@ def main():
             #if i > 0:
                 #break
             i+=1
-        fb = uw.render_barycentric(uw.BARY_RENDERING_ROBOT, np.array([2048, 2048], dtype=np.int32))
+        fb = uw.render_barycentric(uw.BARY_RENDERING_ROBOT, np.array([ATLAS_RES, ATLAS_RES], dtype=np.int32))
         imsave(png_fn, np.transpose(fb))
         '''
         task_id = int(sys.argv[2])
