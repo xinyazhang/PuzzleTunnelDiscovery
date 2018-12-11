@@ -316,6 +316,9 @@ Renderer::RMMatrixXf Renderer::render_mvdepth_to_buffer()
 void Renderer::render_mvrgbd(uint32_t flags)
 {
 	int is_render_uv_mapping = !!(flags & UV_MAPPINNG_RENDERING);
+#if 0
+	std::cerr << "is_render_uv_mapping " << is_render_uv_mapping << std::endl;
+#endif
 
 	setupUVFeedbackBuffer();
 	if (is_render_uv_mapping) {
@@ -344,9 +347,13 @@ void Renderer::render_mvrgbd(uint32_t flags)
 			                            GL_RG, GL_FLOAT, mvuv.row(i).data()));
 		}
 		if (is_render_uv_mapping) {
+#if 1
 			CHECK_GL_ERROR(glReadBuffer(GL_COLOR_ATTACHMENT3));
 			CHECK_GL_ERROR(glReadPixels(0, 0, pbufferWidth, pbufferHeight,
 			                            GL_RED_INTEGER, GL_INT, mvpid.row(i).data()));
+#else
+			CHECK_GL_ERROR(glGetTextureImage(uv_texture_, 0, GL_RED_INTEGER, GL_INT, mvpid.cols() * sizeof(int32_t), mvpid.row(i).data()));
+#endif
 		}
 	}
 }
@@ -399,6 +406,10 @@ void Renderer::render_rgbd(uint32_t flags)
 		static const float invalid_uv[] = {-1.0f, -1.0f};
 		CHECK_GL_ERROR(glClearTexImage(uv_texture_, 0, GL_RG, GL_FLOAT, invalid_uv));
 	}
+	if (pid_texture_) {
+		static const int invalid_pid[] = {-1};
+		CHECK_GL_ERROR(glClearTexImage(pid_texture_, 0, GL_RED_INTEGER, GL_INT, invalid_pid));
+	}
 	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, rgbdFramebuffer));
 #if 0
 	CHECK_GL_ERROR(glFlush());
@@ -421,7 +432,7 @@ void Renderer::render_rgbd(uint32_t flags)
 	CHECK_GL_ERROR(glUniform1i(18, 0));
 	CHECK_GL_ERROR(glUniform1i(19, is_render_uv_mapping));
 
-#if 1
+#if 0
 	if (is_render_uv_mapping) {
 		glDisable(GL_CULL_FACE);
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -429,6 +440,8 @@ void Renderer::render_rgbd(uint32_t flags)
 		glEnable(GL_CULL_FACE);
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	}
+#else
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); // Always fill, otherwise mvpid will not be correct
 #endif
 
 	if (!(flags & NO_SCENE_RENDERING)) {
@@ -731,24 +744,25 @@ void Renderer::enablePidBuffer()
 	if (!pid_texture_) {
 		CHECK_GL_ERROR(glGenTextures(1, &pid_texture_));
 		CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D, pid_texture_));
-		CHECK_GL_ERROR(glTexImage2D(GL_TEXTURE_2D, 0, GL_R32I, pbufferWidth, pbufferHeight, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, 0));
+		CHECK_GL_ERROR(glTexImage2D(GL_TEXTURE_2D, 0, GL_R32I, pbufferWidth, pbufferHeight, 0, GL_RED_INTEGER, GL_INT, 0));
 		CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
 		CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
 		CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D, 0));
 	}
 	mvpid.resize(views.rows(), pbufferWidth * pbufferHeight);
-	static const GLenum draw_buffers[3] = {
+	static const GLenum draw_buffers[] = {
 		GL_COLOR_ATTACHMENT0,
 		GL_COLOR_ATTACHMENT1,
-		// GL_COLOR_ATTACHMENT2, // UV_MAPPINNG_RENDERING disables uv_feedback
+		GL_COLOR_ATTACHMENT2,
 		GL_COLOR_ATTACHMENT3,
 	};
 
 	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, rgbdFramebuffer));
 	CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, renderTarget, 0));
 	CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, rgbTarget, 0));
+	CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, 0, 0)); // UV_MAPPINNG_RENDERING disables uv_feedback
 	CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, pid_texture_, 0));
-	CHECK_GL_ERROR(glDrawBuffers(3, draw_buffers));
+	CHECK_GL_ERROR(glDrawBuffers(4, draw_buffers));
 
 	// Switch back to depth-only FB
 	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, framebufferID));

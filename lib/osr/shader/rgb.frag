@@ -8,7 +8,7 @@ in vec2 uv;
 layout(location=0) out float outDepth;
 layout(location=1) out vec4 outColor;
 layout(location=2) out vec2 outUV;
-layout(location=3) out uint outPid;
+layout(location=3) out int outPid;
 const float far = 20.0;
 const float near = 1.0;
 layout(location=16) uniform bool phong;
@@ -35,6 +35,7 @@ void main() {
     }
     outUV = uv;
     outDepth = linearZ;
-    outPid = gl_PrimitiveID;
+    outPid = int(gl_PrimitiveID);
+    // outPid = 1;
 }
 )zzz";
