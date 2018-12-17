@@ -350,6 +350,7 @@ def main():
             print('uvproj of {} to {}'.format(fn, fn2))
             pyosr.save_obj_1(IBV, IF, fn2)
     elif cmd == 'uvrender':
+        uw.avi = False
         args = sys.argv[2:]
         geo_type = args[0]
         assert geo_type in ['rob', 'env'], "Unknown geo type {}".format(geo_type)
@@ -370,9 +371,9 @@ def main():
         i = 0
         for tq, is_inf in tq_gen:
             # print('tq {} is_inf {}'.format(tq, is_inf))
+            IBV, IF = next(obj_gen) # Must, otherwise does not pair
             if is_inf:
                 continue
-            IBV, IF = next(obj_gen)
             if IBV is None or IF is None:
                 print('IBV {}'.format(None))
                 continue
@@ -380,6 +381,7 @@ def main():
             uw.clear_barycentric(geo_flag)
             uw.add_barycentric(IF, IBV, geo_flag)
             fb = uw.render_barycentric(geo_flag, np.array([ATLAS_RES, ATLAS_RES], dtype=np.int32))
+            np.clip(fb, 0, 1, out=fb) # Clip to binary
             nw = texture_format.framebuffer_to_file(fb.astype(np.float32))
             w = nw * (1.0 / np.clip(pyosr.distance(tq, iq), 1e-4, None))
             if afb is None:
@@ -388,6 +390,7 @@ def main():
             else:
                 afb += w
                 afb_nw += nw
+                np.clip(afb_nw, 0, 1.0, out=afb_nw) # afb_nw is supposed to be binary
             '''
             print('afb shape {}'.format(afb.shape))
             rgb = np.zeros(list(afb.shape) + [3])
@@ -399,10 +402,15 @@ def main():
                 pyosr.save_obj_1(V1, F1, '1.obj')
             if i >= 4:
                 break
+            if i == 0:
+                print('NW NZ {}'.format(nw[np.nonzero(nw)]))
+            if i >= 128:
+                break
             '''
             i+=1
         rgb = np.zeros(list(afb.shape) + [3])
         rgb[...,1] = afb
+        # FIXME: Give savez an explicity array name
         imsave(_fn_atlastex(io_dir, geo_type, vert_id, None), rgb)
         np.savez(_fn_atlas(io_dir, geo_type, vert_id, None), afb)
         rgb[...,1] = afb_nw
