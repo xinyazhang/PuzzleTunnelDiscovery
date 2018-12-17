@@ -53,6 +53,9 @@ public:
 	VMatrix
 	faceNormals(const Eigen::Matrix<int, -1, 1>&) const;
 
+	VMatrix
+	faceNormals() const;
+
 	Eigen::Matrix<Scalar, 3, 3>
 	inertiaTensor() const;
 

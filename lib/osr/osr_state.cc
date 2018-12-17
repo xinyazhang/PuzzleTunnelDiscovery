@@ -284,5 +284,9 @@ get_permutation_to_world(const Eigen::MatrixXf& views, int view)
 	return ret;
 }
 
+void state_vector_set_identity(StateVector& q)
+{
+	q << 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0;
+}
 
 }

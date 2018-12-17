@@ -235,6 +235,12 @@ CDModel::faces() const
 }
 
 CDModel::VMatrix
+CDModel::faceNormals() const
+{
+	return model_->eig_cache_fnormals;
+}
+
+CDModel::VMatrix
 CDModel::faceNormals(const Eigen::Matrix<int, -1, 1>& fi) const
 {
 	size_t NF = fi.rows();

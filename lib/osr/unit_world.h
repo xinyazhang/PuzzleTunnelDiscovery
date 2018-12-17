@@ -16,6 +16,9 @@ public:
 	UnitWorld();
 	~UnitWorld();
 
+	static const uint32_t GEO_ENV = 0;
+	static const uint32_t GEO_ROB = 1;
+
 	void copyFrom(const UnitWorld*);
 	virtual void loadModelFromFile(const std::string& fn);
 	virtual void loadRobotFromFile(const std::string& fn);
@@ -205,6 +208,41 @@ public:
 	          StateScalar dtime,                             // Durition
 	          bool resetVelocity                             // Reset the stored velocity
 	         );
+
+	std::tuple<
+		Eigen::Vector3d,                                // Position
+		Eigen::Vector3d,                                // Normal
+		Eigen::Vector2f                                 // UV
+	>
+	sampleOverPrimitive(uint32_t geo,
+	                    int prim,
+	                    bool return_unit = true) const;
+
+	std::tuple<
+		Eigen::Vector3d,                                // Position
+		Eigen::Vector3d,                                // Normal
+		bool                                            // Valid in Prim
+	>
+	uvToSurface(uint32_t geo,
+	            int prim,
+	            const Eigen::Vector2f& uv,
+	            bool return_unit = true) const;
+
+	//
+	// Sample a free configuration from the surface information
+	// Points and normals shall be those returned by sampleOverPrimitive,
+	// with return_unit == true
+	//
+	// Parameters:
+	//      free_guarantee: set to false to just sample a configuration
+	StateVector
+	sampleFreeConfiguration(const StateTrans& rob_surface_point,
+	                        const StateTrans& rob_surface_normal,
+	                        const StateTrans& env_surface_point,
+	                        const StateTrans& env_surface_normal,
+	                        StateScalar margin,
+	                        int max_trials = -1);
+
 protected:
 	bool shared_ = false;
 

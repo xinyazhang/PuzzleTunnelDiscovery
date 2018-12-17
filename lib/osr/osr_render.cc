@@ -494,7 +494,9 @@ Renderer::addBarycentric(const UnitWorld::FMatrix& F,
                          uint32_t target)
 {
 	auto target_scene = getBaryTarget(target);
+	auto target_mesh = target_scene->getUniqueMesh();
 
+#if 0
 	const Mesh *target_mesh = nullptr;
 	auto visitor = [&target_mesh](std::shared_ptr<const Mesh> m) {
 		target_mesh = m.get();
@@ -502,6 +504,7 @@ Renderer::addBarycentric(const UnitWorld::FMatrix& F,
 	target_scene->visitMesh(visitor);
 	if (!target_mesh)
 		throw std::runtime_error(std::string(__func__) + ": Target has no valid mesh");
+#endif
 	const auto& tex_uv = target_mesh->getUV();
 	// Assembly the UV and Bary
 
@@ -540,8 +543,7 @@ Renderer::renderBarycentric(uint32_t target,
 		// Not sure if we need allocate space before calling glTexParameteri
 		CHECK_GL_ERROR(glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, res(0), res(1), 0, GL_RED, GL_UNSIGNED_BYTE, 0));
 		CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
-		CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
-	}
+		CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)); }
 	// Resize on demand
 	CHECK_GL_ERROR(glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, res(0), res(1), 0, GL_RED, GL_UNSIGNED_BYTE, 0));
 
@@ -678,7 +680,7 @@ Renderer::renderBarycentric(uint32_t target,
 	CHECK_GL_ERROR(glBufferData(GL_ARRAY_BUFFER,
 	                            brd.cache_uv.size() * sizeof(float),
 	                            brd.cache_uv.data(), GL_STATIC_DRAW));
-	std::cerr << "glBufferData " << brd.cache_uv.size() << " * " << sizeof(float) << std::endl;
+	// std::cerr << "glBufferData " << brd.cache_uv.size() << " * " << sizeof(float) << std::endl;
 	CHECK_GL_ERROR(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE,
 					     0, 0));
 #endif
@@ -760,7 +762,10 @@ void Renderer::enablePidBuffer()
 	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, rgbdFramebuffer));
 	CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, renderTarget, 0));
 	CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, rgbTarget, 0));
-	CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, 0, 0)); // UV_MAPPINNG_RENDERING disables uv_feedback
+	if (uv_texture_ > 0)
+		CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, uv_texture_, 0));
+	else
+		CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, 0, 0));
 	CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, pid_texture_, 0));
 	CHECK_GL_ERROR(glDrawBuffers(4, draw_buffers));
 

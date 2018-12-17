@@ -138,4 +138,19 @@ void Scene::clear()
 	meshes_.clear();
 }
 
+std::shared_ptr<const Mesh>
+Scene::getUniqueMesh() const
+{
+	std::shared_ptr<const Mesh> target_mesh(nullptr);
+	auto visitor = [&target_mesh](std::shared_ptr<const Mesh> m) {
+		if (target_mesh)
+			throw std::runtime_error("Scene object has multiple meshes, hence getUniqueMesh failed.");
+		target_mesh = m;
+	};
+	visitMesh(visitor);
+	if (!target_mesh)
+		throw std::runtime_error("Some Scene object has no mesh, hence getUniqueMesh failed.");
+	return target_mesh;
+}
+
 }

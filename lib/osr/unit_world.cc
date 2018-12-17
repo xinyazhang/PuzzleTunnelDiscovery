@@ -5,6 +5,7 @@
 #include <glm/gtx/io.hpp>
 #include <atomic>
 #include <stdexcept>
+#include <random>
 #include <igl/doublearea.h>
 #include <igl/cross.h>
 #include <igl/barycentric_coordinates.h>
@@ -20,6 +21,9 @@ namespace osr {
 
 using std::tie;
 using ArrayOfPoints = UnitWorld::ArrayOfPoints;
+
+const uint32_t UnitWorld::GEO_ENV;
+const uint32_t UnitWorld::GEO_ROB;
 
 auto glm2Eigen(const glm::mat4& m)
 {
@@ -1045,6 +1049,203 @@ UnitWorld::intersectingToSurface(const VMatrix& targetV,
 #endif
 
 	return std::make_tuple(retF, L);
+}
+
+std::tuple<
+	Eigen::Vector3d,                                // Position
+	Eigen::Vector3d,                                // Normal
+	Eigen::Vector2f                                 // UV
+>
+UnitWorld::sampleOverPrimitive(uint32_t geo_id,
+                               int prim,
+                               bool return_unit) const
+{
+	auto cd = cd_scene_;
+	auto geo = scene_;
+	if (geo_id == GEO_ENV) {
+	} else if (geo_id == GEO_ROB) {
+		cd = cd_robot_;
+		geo = robot_;
+	} else {
+		throw std::runtime_error("Unknown geo id " + std::to_string(geo_id));
+	}
+	auto target_mesh = geo->getUniqueMesh();
+	const auto& indices = target_mesh->getIndices();
+	unsigned int vi[] = { indices[3 * prim + 0],
+	                      indices[3 * prim + 1],
+	                      indices[3 * prim + 2] };
+	Eigen::Vector3d v[3];
+	v[0] = cd->vertices().row(vi[0]);
+	v[1] = cd->vertices().row(vi[1]);
+	v[2] = cd->vertices().row(vi[2]);
+	Eigen::Vector2f uv[3];
+	uv[0] = target_mesh->getUV().row(vi[0]);
+	uv[1] = target_mesh->getUV().row(vi[1]);
+	uv[2] = target_mesh->getUV().row(vi[2]);
+
+	std::random_device rd;  //Will be used to obtain a seed for the random number engine
+	std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
+	std::uniform_real_distribution<> dis(0.0, 1.0);
+#if 0
+	double alpha = dis(gen);
+	std::uniform_real_distribution<> dis2(0.0, 1.0 - alpha);
+	double beta = dis2(gen);
+	double gamma = 1.0 - alpha - beta;
+
+#else
+	// This is uniform sampling over the triangle face.
+	double beta = dis(gen);
+	double gamma = dis(gen);
+	if (beta + gamma > 1.0) {
+		beta = 1.0 - beta;
+		gamma = 1.0 - gamma;
+	}
+
+	double alpha = 1.0 - beta - gamma;
+	// Eigen::Vector3d interp_v = v[0] + u * (v[1] - v[0]) + v * (v[2] - v[0]);
+	// Eigen::Vector2f interp_uv = uv[0] + u * (uv[1] - uv[0]) + v * (uv[2] - uv[0]);
+#endif
+
+	Eigen::Vector3d interp_v = alpha * v[0] + beta * v[1] + gamma * v[2];
+	Eigen::Vector2f interp_uv = alpha * uv[0] + beta * uv[1] + gamma * uv[2];
+
+	Eigen::Vector3d ret_pos = interp_v;
+	Eigen::Vector3d ret_normal = cd->faceNormals().row(prim);
+	if (!return_unit) {
+#if 0 // Geometry stored in CDModel is already unit
+		Transform tfs[2];
+		StateVector identity_q;
+		state_vector_set_identity(identity_q);
+		std::tie(tfs[GEO_ENV], tfs[GEO_ROB]) = getCDTransforms(identity_q);
+
+		ret_pos = tfs[geo_id] * ret_pos;
+		ret_normal = tfs[geo_id].linear() * ret_normal;
+#endif
+		Eigen::Matrix4d tfmat = glm2Eigen(geo->getCalibrationTransform()).inverse();
+		Transform tf(tfmat);
+		ret_pos = tf * ret_pos;
+		ret_normal = tf.linear() * ret_normal;
+	}
+	ret_normal.normalize();
+	return std::make_tuple(ret_pos, ret_normal, interp_uv);
+}
+
+
+std::tuple<
+	Eigen::Vector3d,                                // Position
+	Eigen::Vector3d,                                // Normal
+	bool
+>
+UnitWorld::uvToSurface(uint32_t geo_id,
+                       int prim,
+                       const Eigen::Vector2f& target_uv,
+                       bool return_unit) const
+{
+	// TODO: This is copied from sampleOverPrimitive
+	auto cd = cd_scene_;
+	auto geo = scene_;
+	if (geo_id == GEO_ENV) {
+	} else if (geo_id == GEO_ROB) {
+		cd = cd_robot_;
+		geo = robot_;
+	} else {
+		throw std::runtime_error("Unknown geo id " + std::to_string(geo_id));
+	}
+	auto target_mesh = geo->getUniqueMesh();
+	const auto& indices = target_mesh->getIndices();
+	unsigned int vi[] = { indices[3 * prim + 0],
+	                      indices[3 * prim + 1],
+	                      indices[3 * prim + 2] };
+	Eigen::Vector3d v[3];
+	v[0] = cd->vertices().row(vi[0]);
+	v[1] = cd->vertices().row(vi[1]);
+	v[2] = cd->vertices().row(vi[2]);
+	Eigen::Vector2f uv[3];
+	uv[0] = target_mesh->getUV().row(vi[0]);
+	uv[1] = target_mesh->getUV().row(vi[1]);
+	uv[2] = target_mesh->getUV().row(vi[2]);
+	//
+	// target_uv = alpha * uv[0] + beta * uv[1] + gamma * uv[2]
+	// alpha + beta + gamma = 1.0
+	// , or
+	// target_uv - uv[0] = beta * (uv[1] - uv[0]) + gamma * (uv[2] - uv[0])
+	// alpha = 1.0 - beta - gamma
+	Eigen::Matrix2f det;
+	det.col(0) = uv[1] - uv[0];
+	det.col(1) = uv[2] - uv[0];
+	Eigen::Vector2f beta_gamma = det.inverse() * (target_uv - uv[0]);
+	double beta = beta_gamma(0);
+	double gamma = beta_gamma(1);
+	double alpha = 1.0 - beta - gamma;
+#if 0
+	std::cerr << "UVs\n"
+	          << uv[0].transpose() << "\n"
+	          << uv[1].transpose() << "\n"
+	          << uv[2].transpose() << "\n";
+	std::cerr << "target_uv " << target_uv.transpose() << std::endl;
+	std::cerr << "alpha beta gamma " << alpha << " " << beta << " " << gamma << std::endl;
+	Eigen::Vector2f interp_uv = alpha * uv[0] + beta * uv[1] + gamma * uv[2];
+	std::cerr << "target_uv err " << (target_uv - interp_uv).norm() << std::endl;
+#endif
+	bool valid = (std::min(gamma, std::min(alpha, beta)) >= 0.0);
+	valid = valid && (std::max(gamma, std::max(alpha, beta)) <= 1.0);
+
+	Eigen::Vector3d ret_pos = alpha * v[0] + beta * v[1] + gamma * v[2];
+	Eigen::Vector3d ret_normal = cd->faceNormals().row(prim);
+	if (!return_unit) {
+		Eigen::Matrix4d tfmat = glm2Eigen(geo->getCalibrationTransform()).inverse();
+		Transform tf(tfmat);
+		ret_pos = tf * ret_pos;
+		ret_normal = tf.linear() * ret_normal;
+	}
+	ret_normal.normalize();
+
+	return std::make_tuple(ret_pos, ret_normal, valid);
+}
+
+
+StateVector
+UnitWorld::sampleFreeConfiguration(const StateTrans& rob_surface_point,
+                                   const StateTrans& rob_surface_normal,
+                                   const StateTrans& env_surface_point,
+                                   const StateTrans& env_surface_normal,
+                                   StateScalar margin,
+                                   int max_trials)
+{
+	StateTrans rob_o = rob_surface_point + rob_surface_normal * margin;
+	StateTrans env_o = env_surface_point + env_surface_normal * margin;
+	StateVector q; // return value
+
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	std::uniform_real_distribution<> dis(0.0, M_PI * 2);
+
+	// Configuration (Q) sampling algorithm:
+	// 1. Rotate Robot so that rob_surface_normal matches **negatived** env_surface_normal
+	// 2. Rotate Robot with random angle axis (omega, env_surface_normal)
+	// 3. Translate the rotated rob_surface_point to env_surface_point
+	using Quat = Eigen::Quaternion<StateScalar>;
+	using AA = Eigen::AngleAxis<StateScalar>;
+	// Step 1 Rotation
+	Quat rot_1;
+	rot_1.setFromTwoVectors(rob_surface_normal, -env_surface_normal);
+	int trials = 0;
+	while (true) {
+		// Step 2 Rotation
+		Quat rot_2(AA(dis(gen), env_surface_normal));
+		Quat rot_accum = rot_2 * rot_1;
+		// Step 3 Translation
+		StateTrans trans = env_o - (rot_accum * rob_o);
+		q = compose(trans, rot_accum);
+		if (isValid(q))
+			break;
+		if (max_trials >= 0) {
+			trials += 1;
+			if (trials > max_trials)
+				break;
+		}
+	}
+	return q;
 }
 
 }

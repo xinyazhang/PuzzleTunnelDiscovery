@@ -154,6 +154,27 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("scene_face_normals_from_index_pairs", py::overload_cast<const Eigen::Matrix<int, -1, 2>&>(&UnitWorld::getSceneFaceNormalsFromIndices), py::call_guard<py::gil_scoped_release>())
 		.def("force_direction_from_intersecting_segments", &UnitWorld::forceDirectionFromIntersectingSegments, py::call_guard<py::gil_scoped_release>())
 		.def("push_robot", &UnitWorld::pushRobot, py::call_guard<py::gil_scoped_release>())
+		.def("sample_over_primitive", &UnitWorld::sampleOverPrimitive,
+		     py::arg("geo"),
+		     py::arg("prim"),
+		     py::arg("return_unit") = true,
+		     py::call_guard<py::gil_scoped_release>())
+		.def("uv_to_surface", &UnitWorld::uvToSurface,
+		     py::arg("geo"),
+		     py::arg("prim"),
+		     py::arg("uv"),
+		     py::arg("return_unit") = true,
+		     py::call_guard<py::gil_scoped_release>())
+		.def("sample_free_configuration", &UnitWorld::sampleFreeConfiguration,
+		     py::arg("rob_surface_point"),
+		     py::arg("rob_surface_normal"),
+		     py::arg("env_surface_point"),
+		     py::arg("env_surface_normal"),
+		     py::arg("margin"),
+		     py::arg("max_trials") = -1,
+		     py::call_guard<py::gil_scoped_release>())
+		.def_readonly_static("GEO_ENV", &UnitWorld::GEO_ENV)
+		.def_readonly_static("GEO_ROB", &UnitWorld::GEO_ROB)
 		.def_property_readonly("scene_matrix", &UnitWorld::getSceneMatrix)
 		.def_property_readonly("robot_matrix", &UnitWorld::getRobotMatrix);
 #if GPU_ENABLED

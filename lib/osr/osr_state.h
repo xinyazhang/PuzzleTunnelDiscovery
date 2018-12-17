@@ -52,6 +52,8 @@ apply(const StateVector& from, const StateTrans& tr, const AngleAxisVector& aa);
 StateTrans action_to_axis(int action);
 Eigen::MatrixXf get_permutation_to_world(const Eigen::MatrixXf& views, int view);
 
+void state_vector_set_identity(StateVector&);
+
 }
 
 #endif
