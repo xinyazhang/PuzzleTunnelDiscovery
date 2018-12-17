@@ -47,6 +47,13 @@ decompose(const StateVector& state)
 	return std::make_tuple(trans, rot);
 }
 
+std::tuple<StateTrans, Eigen::Matrix3d>
+decompose_2(const StateVector& state)
+{
+	auto dec = decompose(state);
+	return std::make_tuple(std::get<0>(dec), std::get<1>(dec).toRotationMatrix());
+}
+
 StateVector
 compose(const StateTrans& base, const StateQuat& irot)
 {

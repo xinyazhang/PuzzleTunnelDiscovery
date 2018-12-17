@@ -69,6 +69,8 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("setName", &Pet::setName)
 		.def("getName", &Pet::getName);
 #endif
+	m.def("decompose_2", &osr::decompose_2,
+	      "Decompose the SE(3) state vector into a translation vector and a 3x3 rotation matrix");
 	m.def("distance", &osr::distance,
 	      "Calculate the distance between two unit states");
 	m.def("multi_distance", &osr::multi_distance,
