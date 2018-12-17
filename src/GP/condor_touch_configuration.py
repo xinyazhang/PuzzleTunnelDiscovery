@@ -10,8 +10,12 @@ import numpy as np
 import aniconf12_2 as aniconf
 import uw_random
 import math
-import texture_format
 from scipy.misc import imsave
+# Our modules
+import texture_format
+import atlas
+
+import progressbar
 
 ATLAS_RES = 2048
 
@@ -74,21 +78,21 @@ def _create_uw(cmd):
             r.pbufferWidth = ATLAS_RES
             r.pbufferHeight = ATLAS_RES
         r.setup()
+        r.views = np.array([[0.0,0.0]], dtype=np.float32)
     else:
         r = pyosr.UnitWorld() # pyosr.Renderer is not avaliable in HTCondor
 
 
-    if cmd in ['project', 'uvproj', 'uvrender', 'atlas2prim', 'sample']:
+    if cmd in ['run', 'isect']:
         # fb = r.render_barycentric(r.BARY_RENDERING_ROBOT, np.array([1024, 1024], dtype=np.int32))
         # imsave('1.png', fb)
         # sys.exit(0)
-        r.loadModelFromFile(aniconf.env_uv_fn)
-        r.loadRobotFromFile(aniconf.rob_uv_fn)
-    else:
         r.loadModelFromFile(aniconf.env_wt_fn)
         r.loadRobotFromFile(aniconf.rob_wt_fn)
+    else: # All the remaining commands need UV coordinates
+        r.loadModelFromFile(aniconf.env_uv_fn)
+        r.loadRobotFromFile(aniconf.rob_uv_fn)
     r.enforceRobotCenter(aniconf.rob_ompl_center)
-    r.views = np.array([[0.0,0.0]], dtype=np.float32)
     r.scaleToUnit()
     r.angleModel(0.0, 0.0)
 
@@ -167,6 +171,16 @@ class TaskPartitioner(object):
 
     def get_uv_fn(self, geo_type, vert_id, conf_id):
         return _fn_uvgeo(self._iodir, geo_type, vert_id, conf_id)
+
+    def get_atlas_fn(self, geo_type, vert_id):
+        return _fn_atlas(self._iodir, geo_type, vert_id, None)
+
+    def get_atlas2prim_fn(self, geo_type):
+        return _fn_atlas2prim(self._iodir, geo_type)
+
+    def get_tqre_fn(self, task_id):
+        batch_id, vert_id = self.get_batch_vert_index(task_id)
+        return "{}/touchq_re-from-vert-{}-{}.npz".format(self._iodir, vert_id, batch_id)
 
 def calc_touch(uw, vertex, batch_size):
     q0 = uw.translate_to_unit_state(vertex)
@@ -279,7 +293,7 @@ def main():
     if cmd in ['show']:
         print("# of tunnel vertices is {}".format(len(tunnel_v)))
         return
-    assert cmd in ['run', 'isect', 'project', 'uvproj', 'uvrender', 'atlas2prim'], 'Unknown command {}'.format(cmd)
+    assert cmd in ['run', 'isect', 'project', 'uvproj', 'uvrender', 'atlas2prim', 'sample'], 'Unknown command {}'.format(cmd)
     uw = _create_uw(cmd)
 
 
@@ -418,15 +432,89 @@ def main():
         np.savez(_fn_atlas(io_dir, geo_type, vert_id, None, nw=True), afb)
     elif cmd == 'atlas2prim':
         r = uw
-        # r.uv_feedback = True
+        r.uv_feedback = True
         r.avi = False
         io_dir = sys.argv[2]
         for geo_type,flags in zip(['rob', 'env'], [pyosr.Renderer.NO_SCENE_RENDERING, pyosr.Renderer.NO_ROBOT_RENDERING]):
             r.render_mvrgbd(pyosr.Renderer.UV_MAPPINNG_RENDERING|flags)
             atlas2prim = np.copy(r.mvpid.reshape((r.pbufferWidth, r.pbufferHeight)))
+            #imsave(geo_type+'-a2p-nt.png', atlas2prim) # This is for debugging
             atlas2prim = texture_format.framebuffer_to_file(atlas2prim)
-            np.savez(_fn_atlas2prim(io_dir, geo_type), PRIM=atlas2prim)
-            # imsave(geo_type+'-a2p.png', atlas2prim) # This is for debugging
+            atlas2uv = np.copy(r.mvuv.reshape((r.pbufferWidth, r.pbufferHeight, 2)))
+            atlas2uv = texture_format.framebuffer_to_file(atlas2uv)
+            np.savez(_fn_atlas2prim(io_dir, geo_type), PRIM=atlas2prim, UV=atlas2uv)
+            imsave(geo_type+'-a2p.png', atlas2prim) # This is for debugging
+    elif cmd == 'sample':
+        args = sys.argv[2:]
+        task_id = args[0]
+        batch_size = args[1]
+        io_dir = args[2]
+        tp = TaskPartitioner(io_dir, None, batch_size)
+        rob_sampler = atlas.AtlasSampler(tp, 'rob', uw.GEO_ROB, task_id)
+        env_sampler = atlas.AtlasSampler(tp, 'env', uw.GEO_ENV, task_id)
+        pcloud1 = []
+        pn1 = []
+        pcloud1x = []
+        pn1x = []
+        pcloud2 = []
+        pn2 = []
+        conf = []
+        for i in range(batch_size):
+            while True:
+                tup1 = rob_sampler.sample(uw)
+                tup2 = env_sampler.sample(uw)
+                q = uw.sample_free_configuration(tup1[0], tup1[1], tup2[0], tup2[1], 1e-6, max_trials=16)
+                if uw.is_valid_state(q):
+                    break
+            conf.append(q)
+        np.savez(tp.get_tqre_fn(task_id), ReTouchQ=conf)
+        return
+        #
+        # Sanity check code
+        #
+        fail = 0
+        for i in progressbar.progressbar(range(32)):
+            while True:
+                tup1 = rob_sampler.sample(uw)
+                tup2 = env_sampler.sample(uw)
+                q = uw.sample_free_configuration(tup1[0], tup1[1], tup2[0], tup2[1], 1e-6, max_trials=16)
+                fail += 1
+                if uw.is_valid_state(q):
+                    break
+                # print("Reject {}".format(q))
+            # print("Accept {}".format(q))
+            pcloud1.append(tup1[0])
+            pcloud2.append(tup2[0])
+            conf.append(q)
+            '''
+            # Sanity check
+            # Test if sample_free_configuration aligns the sample pair
+            tup1 = rob_sampler.sample(uw, unit=False)
+            tup2 = env_sampler.sample(uw, unit=False)
+            pcloud1.append(tup1[0])
+            pcloud2.append(tup2[0])
+            pn1.append(tup1[1])
+            pn2.append(tup2[1])
+            q = uw.sample_free_configuration(tup1[0], tup1[1], tup2[0], tup2[1], 1e-6, free_guarantee=False)
+            tr,rot = pyosr.decompose_2(q)
+            new_point = rot.dot(tup1[0].reshape((3,1)))+tr.reshape((3,1))
+            pcloud1x.append(new_point.reshape((3)))
+            new_normal = rot.dot(tup1[1].reshape((3,1)))
+            pn1x.append(new_normal.reshape((3)))
+            conf.append(q)
+            '''
+        pyosr.save_obj_1(pcloud1, [], 'pc1.obj')
+        pyosr.save_obj_1(pcloud2, [], 'pc2.obj')
+        np.savez('cf1.npz', Q=conf)
+        print("Success ratio {} out of {} = {}".format(len(conf), fail, len(conf) / float(fail)))
+        '''
+        # pyosr.save_obj_2(V=pcloud1, F=[], CN=pn1, FN=[], TC=[], FTC=[], filename='pc1x.obj')
+        # pyosr.save_obj_2(V=pcloud2, F=[], CN=pn2, FN=[], TC=[], FTC=[], filename='pc2x.obj')
+        pyosr.save_ply_2(V=pcloud1, F=[], N=pn1, UV=[], filename='pc1x.ply')
+        pyosr.save_ply_2(V=pcloud1x, F=[], N=pn1x, UV=[], filename='pc1xx.ply')
+        pyosr.save_ply_2(V=pcloud2, F=[], N=pn2, UV=[], filename='pc2x.ply')
+        np.savetxt('cf1.txt', conf, fmt='%.17g')
+        '''
     elif cmd == 'project':
         assert False, "deprecated"
         vert_id = int(sys.argv[2])
