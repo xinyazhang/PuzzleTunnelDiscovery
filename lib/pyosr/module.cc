@@ -87,6 +87,22 @@ PYBIND11_PLUGIN(pyosr) {
 	m.def("get_permutation_to_world", &osr::get_permutation_to_world);
 	m.def("extract_rotation_matrix", &osr::extract_rotation_matrix);
 	m.def("save_obj_1", &osr::saveOBJ1);
+	m.def("save_obj_2", &osr::saveOBJ2,
+	      py::arg("V"),
+	      py::arg("F"),
+	      py::arg("CN"),
+	      py::arg("FN"),
+	      py::arg("TC"),
+	      py::arg("FTC"),
+	      py::arg("filename")
+	     );
+	m.def("save_ply_2", &osr::savePLY2,
+	      py::arg("V"),
+	      py::arg("F"),
+	      py::arg("N"),
+	      py::arg("UV"),
+	      py::arg("filename")
+	     );
 	m.def("load_obj_1", &osr::loadOBJ1);
 	using osr::UnitWorld;
 	py::class_<UnitWorld>(m, "UnitWorld")
