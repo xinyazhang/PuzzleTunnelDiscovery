@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <stdint.h>
+#include <cstdlib>
 
 #include <Eigen/Core>
 
@@ -9,7 +10,7 @@
 #include <osr/pngimage.h>
 
 #include <igl/viewer/Viewer.h>
-#include <igl/writeOBJ.h>
+#include <igl/readOBJ.h>
 
 using Viewer = igl::viewer::Viewer;
 // For newer libigl
@@ -17,8 +18,7 @@ using Viewer = igl::viewer::Viewer;
 
 void usage()
 {
-	std::cerr << R"xxx(Usage: vistexture <.obj file> <.png texture>)xxx" << std::endl;
-
+	std::cerr << R"xxx(Usage: vistexture <.obj file> <.png texture> [optional point cloud OBJ file] [optional point size])xxx" << std::endl;
 }
 
 bool key_up(Viewer& viewer, unsigned char key, int modifier)
@@ -75,6 +75,7 @@ int main(int argc, const char* argv[])
 	};
 	scene.visitMesh(visitor);
 
+
 	int tex_w, tex_h, pc;
 	auto tex_data = osr::readPNG(tex_fn.c_str(), tex_w, tex_h, &pc);
 
@@ -97,6 +98,18 @@ int main(int argc, const char* argv[])
 	viewer.data.set_texture(r_ch, g_ch, b_ch);
 	// Default configuration
 	viewer.core.show_texture = true;
+	// Optional Point Cloud
+	if (argc >= 4) {
+		Eigen::MatrixXd pcV;
+		Eigen::MatrixXi pcF;
+		igl::readOBJ(argv[3], pcV, pcF);
+		Eigen::MatrixXd pc_color;
+		pc_color.setZero(pcV.rows(), 3);
+		pc_color.col(2).array() = 1.0;
+		viewer.data.set_points(pcV, pc_color);
+		if (argc >= 5)
+			viewer.core.point_size = std::atof(argv[4]);
+	}
 #else // Newer libigl
 	viewer.data().set_mesh(V, F);
 	viewer.data().set_uv(V_uv);
