@@ -658,7 +658,7 @@ UnitWorld::unapplyPertubation(const StateVector& state) const
 	return compose(tret, qret);
 }
 
-Eigen::Matrix<int, -1, -1>
+Eigen::Matrix<int8_t, -1, -1>
 UnitWorld::calculateVisibilityMatrix(ArrayOfStates qs,
                                      bool is_unit_states,
                                      double verify_magnitude)
@@ -669,12 +669,12 @@ UnitWorld::calculateVisibilityMatrix(ArrayOfStates qs,
 		for (int i = 0; i < N; i++)
 			qs.row(i) = translateToUnitState(qs.row(i)).transpose();
 	}
-	Eigen::Matrix<int, -1, -1> ret;
+	Eigen::Matrix<int8_t, -1, -1> ret;
 	ret.resize(N, N);
 #pragma omp parallel for
 	for (int fi = 0; fi < N; fi++) {
 		for (int ti = fi + 1; ti < N; ti++) {
-			int valid = !!isValidTransition(qs.row(fi), qs.row(ti), verify_magnitude);
+			int8_t valid = !!isValidTransition(qs.row(fi), qs.row(ti), verify_magnitude);
 			ret(fi, ti) = valid;
 			ret(ti, fi) = valid;
 		}
@@ -682,7 +682,7 @@ UnitWorld::calculateVisibilityMatrix(ArrayOfStates qs,
 	return ret;
 }
 
-Eigen::Matrix<int, -1, -1>
+Eigen::Matrix<int8_t, -1, -1>
 UnitWorld::calculateVisibilityMatrix2(ArrayOfStates qs0,
                                       bool qs0_is_unit_states,
                                       ArrayOfStates qs1,
@@ -699,13 +699,13 @@ UnitWorld::calculateVisibilityMatrix2(ArrayOfStates qs0,
 #pragma omp parallel for
 		for (int i = 0; i < N; i++)
 			qs1.row(i) = translateToUnitState(qs1.row(i)).transpose();
-	Eigen::Matrix<int, -1, -1> ret;
+	Eigen::Matrix<int8_t, -1, -1> ret;
 	ret.resize(M, N);
 	std::atomic<int> prog(0);
 #pragma omp parallel for
 	for (int fi = 0; fi < M; fi++) {
 		for (int ti = 0; ti < N; ti++) {
-			int valid = isValidTransition(qs0.row(fi), qs1.row(ti), verify_magnitude);
+			int8_t valid = isValidTransition(qs0.row(fi), qs1.row(ti), verify_magnitude);
 			ret(fi, ti) = valid;
 		}
 		prog++;

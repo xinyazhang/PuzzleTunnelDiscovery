@@ -6,6 +6,7 @@
 #include <memory>
 #include <tuple>
 #include "osr_state.h"
+#include <stdint.h>
 
 namespace osr {
 class Scene;
@@ -117,11 +118,11 @@ public:
 	/*
 	 * Tunnel Finder support function: visibility matrix calculator
 	 */
-	Eigen::Matrix<int, -1, -1>
+	Eigen::Matrix<int8_t, -1, -1>
 	calculateVisibilityMatrix(ArrayOfStates qs,
 	                          bool is_unit_states,
 	                          double verify_magnitude);
-	Eigen::Matrix<int, -1, -1>
+	Eigen::Matrix<int8_t, -1, -1>
 	calculateVisibilityMatrix2(ArrayOfStates qs0,
 	                           bool qs0_is_unit_states,
 	                           ArrayOfStates qs1,
