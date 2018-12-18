@@ -18,6 +18,8 @@ import atlas
 import progressbar
 
 ATLAS_RES = 2048
+STEPPING_FOR_TOUCH = 0.0125 / 8
+STEPPING_FOR_CONNECTIVITY = STEPPING_FOR_TOUCH * 4
 
 def usage():
     print('''Usage:
@@ -40,6 +42,8 @@ def usage():
 8. condor_touch_configuration.py sample <Task ID> <Batch Size> <Input/Output Dir>
     Sample from the product of uvrender, and generate the sample in the narrow tunnel
     TODO: Vertex ID can be 'all'
+8. condor_touch_configuration.py samvis <Task ID> <Batch Size> <Input/Output Dir> <PRM sample file>
+    Calculate the visibility matrix of the samples from 'sample' Command.
 ''')
 
 def _fn_touch_q(out_dir, vert_id, batch_id):
@@ -182,6 +186,10 @@ class TaskPartitioner(object):
         batch_id, vert_id = self.get_batch_vert_index(task_id)
         return "{}/touchq_re-from-vert-{}-{}.npz".format(self._iodir, vert_id, batch_id)
 
+    def get_tqrevis_fn(self, task_id):
+        batch_id, vert_id = self.get_batch_vert_index(task_id)
+        return "{}/touchq_re_vis-from-vert-{}-{}.npz".format(self._iodir, vert_id, batch_id)
+
 def calc_touch(uw, vertex, batch_size):
     q0 = uw.translate_to_unit_state(vertex)
     N_RET = 5
@@ -190,7 +198,7 @@ def calc_touch(uw, vertex, batch_size):
         tr = uw_random.random_on_sphere(1.0)
         aa = uw_random.random_within_sphere(2 * math.pi)
         to = pyosr.apply(q0, tr, aa)
-        tups = uw.transit_state_to_with_contact(q0, to, 0.0125 / 8)
+        tups = uw.transit_state_to_with_contact(q0, to, STEPPING_FOR_TOUCH)
         for i in range(N_RET):
             ret_lists[i].append(tups[i])
     rets = [np.array(ret_lists[i]) for i in range(N_RET)]
@@ -293,7 +301,7 @@ def main():
     if cmd in ['show']:
         print("# of tunnel vertices is {}".format(len(tunnel_v)))
         return
-    assert cmd in ['run', 'isect', 'project', 'uvproj', 'uvrender', 'atlas2prim', 'sample'], 'Unknown command {}'.format(cmd)
+    assert cmd in ['run', 'isect', 'project', 'uvproj', 'uvrender', 'atlas2prim', 'sample', 'samvis'], 'Unknown command {}'.format(cmd)
     uw = _create_uw(cmd)
 
 
@@ -515,6 +523,21 @@ def main():
         pyosr.save_ply_2(V=pcloud2, F=[], N=pn2, UV=[], filename='pc2x.ply')
         np.savetxt('cf1.txt', conf, fmt='%.17g')
         '''
+    elif cmd == 'samvis':
+        args = sys.argv[2:]
+        task_id = int(args[0])
+        batch_size = int(args[1])
+        io_dir = args[2]
+        prm_data = args[3]
+        tp = TaskPartitioner(io_dir, None, batch_size)
+
+        mc_reference = np.load(prm_data)['V']
+        V = np.load(tp.get_tqre_fn(task_id))['ReTouchQ']
+        VM = uw.calculate_visibility_matrix2(V, True,
+                                             mc_reference[0:-1], False,
+                                             # mc_reference[0:4], False,
+                                             STEPPING_FOR_CONNECTIVITY)
+        np.savez(tp.get_tqrevis_fn(task_id), 'VM'=VM, 'Q'=V, 'VMS'=np.sum(VM, axis=-1))
     elif cmd == 'project':
         assert False, "deprecated"
         vert_id = int(sys.argv[2])
