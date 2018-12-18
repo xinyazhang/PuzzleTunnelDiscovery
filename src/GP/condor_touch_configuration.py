@@ -15,7 +15,7 @@ from scipy.misc import imsave
 import texture_format
 import atlas
 
-import progressbar
+#import progressbar
 
 ATLAS_RES = 2048
 STEPPING_FOR_TOUCH = 0.0125 / 8
@@ -454,8 +454,8 @@ def main():
             imsave(geo_type+'-a2p.png', atlas2prim) # This is for debugging
     elif cmd == 'sample':
         args = sys.argv[2:]
-        task_id = args[0]
-        batch_size = args[1]
+        task_id = int(args[0])
+        batch_size = int(args[1])
         io_dir = args[2]
         tp = TaskPartitioner(io_dir, None, batch_size)
         rob_sampler = atlas.AtlasSampler(tp, 'rob', uw.GEO_ROB, task_id)
