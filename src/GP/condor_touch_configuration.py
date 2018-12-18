@@ -533,11 +533,11 @@ def main():
 
         mc_reference = np.load(prm_data)['V']
         V = np.load(tp.get_tqre_fn(task_id))['ReTouchQ']
-        VM = uw.calculate_visibility_matrix2(V, True,
+        VM = uw.calculate_visibility_matrix2(V[0:batch_size], True,
                                              mc_reference[0:-1], False,
                                              # mc_reference[0:4], False,
                                              STEPPING_FOR_CONNECTIVITY)
-        np.savez(tp.get_tqrevis_fn(task_id), 'VM'=VM, 'Q'=V, 'VMS'=np.sum(VM, axis=-1))
+        np.savez(tp.get_tqrevis_fn(task_id), VM=VM, Q=V, VMS=np.sum(VM, axis=-1))
     elif cmd == 'project':
         assert False, "deprecated"
         vert_id = int(sys.argv[2])
