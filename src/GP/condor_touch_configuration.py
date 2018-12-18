@@ -176,7 +176,8 @@ class TaskPartitioner(object):
     def get_uv_fn(self, geo_type, vert_id, conf_id):
         return _fn_uvgeo(self._iodir, geo_type, vert_id, conf_id)
 
-    def get_atlas_fn(self, geo_type, vert_id):
+    def get_atlas_fn(self, geo_type, task_id):
+        batch_id, vert_id = self.get_batch_vert_index(task_id)
         return _fn_atlas(self._iodir, geo_type, vert_id, None)
 
     def get_atlas2prim_fn(self, geo_type):
@@ -475,6 +476,7 @@ def main():
                 if uw.is_valid_state(q):
                     break
             conf.append(q)
+        # print("tqre_fn {}".format(tp.get_tqre_fn(task_id)))
         np.savez(tp.get_tqre_fn(task_id), ReTouchQ=conf)
         return
         #
