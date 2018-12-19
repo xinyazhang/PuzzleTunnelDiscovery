@@ -23,6 +23,8 @@ def _fn_atlas2prim(out_dir, geo_type):
 def tqre_fn(io_dir, vert_id, batch_id):
     return "{}/touchq_re-from-vert-{}-{}.npz".format(io_dir, vert_id, batch_id)
 
+def tqrevis_fn(io_dir, vert_id, batch_id):
+    return "{}/touchq_re_vis-from-vert-{}-{}.npz".format(io_dir, vert_id, batch_id)
 
 class TaskPartitioner(object):
     '''
@@ -31,7 +33,7 @@ class TaskPartitioner(object):
     tq_batch: size of touch configuration batch. Task granularity of `run`
               Note geometry processing needs the touch configuration info.
     '''
-    def __init__(self, iodir, gp_batch, tq_batch):
+    def __init__(self, iodir, gp_batch, tq_batch, tunnel_v):
         self._iodir = iodir
         if gp_batch is not None:
             assert tq_batch % gp_batch == 0, "GeoP Batch Size % Touch Batch Size must be 0"
@@ -41,7 +43,7 @@ class TaskPartitioner(object):
             self._gp_per_tq = tq_batch / gp_batch
         self._gp_batch = gp_batch
         self._tq_batch = tq_batch
-        self.tunnel_v = np.load(aniconf.tunnel_v_fn)['TUNNEL_V']
+        self.tunnel_v = tunnel_v
 
     '''
     Task vector is resized into (batch_id, vertex_id) matrix
@@ -111,7 +113,7 @@ class TaskPartitioner(object):
 
     def get_tqrevis_fn(self, task_id):
         batch_id, vert_id = self.get_batch_vert_index(task_id)
-        return "{}/touchq_re_vis-from-vert-{}-{}.npz".format(self._iodir, vert_id, batch_id)
+        return tqrevis_fn(self._iodir, vert_id=vert_id, batch_id=batch_id)
 
 class ObjGenerator(object):
     def __init__(self, in_dir, vert_id):

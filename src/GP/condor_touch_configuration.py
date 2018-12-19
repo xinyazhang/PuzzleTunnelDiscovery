@@ -48,6 +48,9 @@ def usage():
     Calculate the visibility matrix of the samples from 'sample' Command.
 10. condor_touch_configuration.py dump <object name> [Arguments depending on object]
     a) samconf <Vertex ID> <Conf ID or Range> <Input Dir> <Output .obj>
+11. condor_touch_configuration.py samstat <Input/Output Dir> <PRM sample file>
+    Parse the output from 'samvis' command, and show the statistics
+    Note: we need PRM sample file to know samples used in Monte Carlo visibility algorithm
 ''')
 
 
@@ -111,7 +114,7 @@ def run(uw, args):
     task_id = int(args[0])
     batch_size = int(args[1])
     out_dir = args[2]
-    tp = TaskPartitioner(out_dir, None, batch_size)
+    tp = TaskPartitioner(out_dir, None, batch_size, tunnel_v=_get_tunnel_v())
 
     vertex = tp.get_tunnel_vertex(task_id)
     out_fn = tp.get_tq_fn(task_id)
@@ -131,7 +134,7 @@ def isect(uw, args):
     geo_batch_size = int(args[1])
     tq_batch_size = int(args[2])
     io_dir = args[3]
-    tp = TaskPartitioner(io_dir, geo_batch_size, tq_batch_size)
+    tp = TaskPartitioner(io_dir, geo_batch_size, tq_batch_size, tunnel_v=_get_tunnel_v())
     '''
     Task partition
     |------------------TQ Batch for Conf. Q--------------------|
@@ -160,7 +163,7 @@ def uvproj(uw, args):
     gp_batch = int(args[2])
     tq_batch = int(args[3])
     io_dir = args[4]
-    tp = TaskPartitioner(io_dir, gp_batch, tq_batch)
+    tp = TaskPartitioner(io_dir, gp_batch, tq_batch, tunnel_v=_get_tunnel_v())
     for tq, is_inf, vert_id, conf_id in tp.gen_touch_q(task_id):
         if is_inf:
             continue
@@ -263,7 +266,7 @@ def sample(uw, args):
     task_id = int(args[0])
     batch_size = int(args[1])
     io_dir = args[2]
-    tp = TaskPartitioner(io_dir, None, batch_size)
+    tp = TaskPartitioner(io_dir, None, batch_size, tunnel_v=_get_tunnel_v())
     rob_sampler = atlas.AtlasSampler(tp, 'rob', uw.GEO_ROB, task_id)
     env_sampler = atlas.AtlasSampler(tp, 'env', uw.GEO_ENV, task_id)
     pcloud1 = []
@@ -336,7 +339,7 @@ def samvis(uw, args):
     batch_size = int(args[1])
     io_dir = args[2]
     prm_data = args[3]
-    tp = TaskPartitioner(io_dir, None, batch_size)
+    tp = TaskPartitioner(io_dir, None, batch_size, tunnel_v=_get_tunnel_v())
 
     mc_reference = np.load(prm_data)['V']
     V = np.load(tp.get_tqre_fn(task_id))['ReTouchQ']
@@ -345,6 +348,105 @@ def samvis(uw, args):
                                          # mc_reference[0:4], False,
                                          STEPPING_FOR_CONNECTIVITY)
     np.savez(tp.get_tqrevis_fn(task_id), VM=VM, Q=V, VMS=np.sum(VM, axis=-1))
+
+def samstat(uw, args):
+    class PerVertexStat(object):
+        def __init__(self, vert_id):
+            self.vms_array = None
+            self.vert_id = vert_id
+
+        def accumulate(self, dic):
+            #print('Total V: {}'.format(np.sum(dic['VMS'])))
+            if self.vms_array is None:
+                self.vms_array = dic['VMS']
+            else:
+                self.vms_array = np.concatenate((self.vms_array, dic['VMS']), axis=0)
+
+        def get_bins(self):
+            return [float(i) * 0.005 for i in range(200)]
+
+        def collect_percent(self, count):
+            self.vms_pc = self.vms_array / float(count)
+            # if self.vert_id == 0:
+                # print(self.vms_pc)
+            nsample = float(len(self.vms_pc))
+            bins = self.get_bins()
+            #print(bins)
+            hist, _ = np.histogram(self.vms_pc, bins)
+            hist = hist/nsample * 100
+            return hist
+
+        def show(self, count):
+            hist = self.collect_percent(count)
+            hist_str = np.array_repr(hist, max_line_width=1024, precision=2, suppress_small=True)
+            print("Histogram for vertex {}\n{}".format(self.vert_id, hist_str))
+
+    tunnel_v = _get_tunnel_v()
+    pvs_array = [ PerVertexStat(i) for i in range(len(tunnel_v)) ]
+    io_dir = args[0]
+    prm_data = args[1]
+    mc_reference_count = np.load(prm_data)['V'].shape[0]
+    # Probe batch size
+    fn = task_partitioner.tqrevis_fn(io_dir, vert_id=0, batch_id=0)
+    batch_size = int(np.load(fn)['Q'].shape[0])
+    # With the probed batch size to create TaskPartitioner
+    tp = TaskPartitioner(io_dir, None, batch_size, tunnel_v=_get_tunnel_v())
+    task_id = 0
+    while True:
+        fn = tp.get_tqrevis_fn(task_id)
+        if not os.path.exists(fn):
+            break
+        d = np.load(fn)
+        batch_size = int(d['Q'].shape[0])
+        vert_id = tp.get_vert_id(task_id)
+        pvs_array[vert_id].accumulate(d)
+        task_id += 1
+    hists = []
+    '''
+    for pvs in pvs_array:
+        pvs.show(mc_reference_count)
+    '''
+    for pvs in pvs_array:
+        hists.append(pvs.collect_percent(mc_reference_count))
+    hists_all = np.array(hists)
+    hist_sum = np.sum(hists, axis=0)
+    print(hist_sum)
+    last_nz = np.nonzero(hist_sum)[0][-1] - 1 # [0]: access the tuple, [-1]: last element
+    hists = hists_all[:,:last_nz]
+    bins = np.array(pvs_array[0].get_bins()) * 100.0
+    print(np.array_repr(bins[:last_nz], max_line_width=1024, precision=2, suppress_small=True))
+    for hist in hists:
+        hist_str = np.array_repr(hist, max_line_width=1024, precision=2, suppress_small=True)
+        print(hist_str)
+    with open('{}/hist.csv'.format(io_dir), 'w') as f:
+        f.write(',')
+        for s,e in zip(bins[:-1], bins[1:]):
+            f.write('{:.3f}%-{:.3f}%'.format(s, e))
+            f.write(',')
+        f.write('\n')
+        for i,hist in enumerate(hists):
+            f.write('{},'.format(i))
+            for h in hist:
+                f.write('{:4.2f}%'.format(h))
+                f.write(',')
+            f.write('\n')
+    from mpl_toolkits.mplot3d import Axes3D
+    import matplotlib.pyplot as plt
+    X1 = bins[:-1]
+    X2 = np.array([i for i in range(len(bins)-1)])
+    Y1 = np.array([i for i in range(len(hists)-1)])
+    Y2 = np.array([i for i in range(len(hists)-1)])
+    X1, Y1 = np.meshgrid(X1, Y1)
+    X2, Y2 = np.meshgrid(X2, Y2)
+    print(hists_all.shape)
+    Z = hists_all[Y2, X2]
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
+    from matplotlib import cm
+    surf = ax.plot_surface(Y1, X1, Z, cmap=cm.coolwarm,
+                       linewidth=0, antialiased=False)
+    fig.colorbar(surf, shrink=0.5, aspect=5)
+    plt.show()
 
 def dump(uw, args):
     target = args[0]
@@ -418,7 +520,8 @@ def main():
             'atlas2prim' : atlas2prim,
             'sample' : sample,
             'samvis' : samvis,
-            'dump' : dump
+            'dump' : dump,
+            'samstat' : samstat,
     }
     uw = _create_uw(cmd)
     cmdmap[cmd](uw, sys.argv[2:])
