@@ -249,7 +249,8 @@ def load_alpha_ntr():
 
     keys_w_first_npz = '../res/alpha/alpha-1.2.org.w-first.npz'
     env_wt_fn = '../res/alpha/alpha_env-1.2.wt.obj'
-    rob_wt_fn = '../res/alpha/alpha-1.2.wt.tcp.ply'
+    # rob_wt_fn = '../res/alpha/alpha-1.2.wt.tcp.ply'
+    rob_wt_fn = '../res/alpha/alpha-1.2.wt2.tcp.obj'
     # rob_wt_fn = '../res/alpha/double-alpha-1.2.wt.obj'
     rob_ompl_center = np.array([16.973146438598633, 1.2278236150741577, 10.204807281494141])
     r.loadModelFromFile(env_wt_fn)

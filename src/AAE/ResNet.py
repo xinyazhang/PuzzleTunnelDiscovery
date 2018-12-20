@@ -378,7 +378,8 @@ class ResNet(object):
             Bootstrap from another pre-trained network
             Note: do not care the returns
             '''
-            self.load(self.bootstrap_dir, fullpath=True)
+            if self.bootstrap_dir is not None:
+                self.load(self.bootstrap_dir, fullpath=True)
 
         # loop for epoch
         start_time = time.time()
