@@ -10,7 +10,7 @@ def _fn_isectgeo(out_dir, vert_id, conf_id):
 def _fn_uvgeo(out_dir, geo_type, vert_id, conf_id):
     return "{}/{}-uv-from-vert-{}-{}.obj".format(out_dir, geo_type, vert_id, conf_id)
 
-def _fn_atlas(out_dir, geo_type, vert_id, index=None, nw=False):
+def atlas_fn(out_dir, geo_type, vert_id, index=None, nw=False):
     nwsuffix = "" if not nw else "-nw"
     if index is None:
         return "{}/atlas-{}-from-vert-{}{}.npz".format(out_dir, geo_type, vert_id, nwsuffix)
@@ -32,6 +32,8 @@ class TaskPartitioner(object):
     gp_batch: size of geometry processing batch. Task granularity of `isectgeo` and `uv`
     tq_batch: size of touch configuration batch. Task granularity of `run`
               Note geometry processing needs the touch configuration info.
+
+    Note: surprisingly gp_batch and tq_batch can be None for over half of the commands.
     '''
     def __init__(self, iodir, gp_batch, tq_batch, tunnel_v):
         self._iodir = iodir
@@ -102,7 +104,7 @@ class TaskPartitioner(object):
 
     def get_atlas_fn(self, geo_type, task_id):
         batch_id, vert_id = self.get_batch_vert_index(task_id)
-        return _fn_atlas(self._iodir, geo_type, vert_id, None)
+        return atlas_fn(self._iodir, geo_type, vert_id, None)
 
     def get_atlas2prim_fn(self, geo_type):
         return _fn_atlas2prim(self._iodir, geo_type)

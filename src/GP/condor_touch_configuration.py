@@ -39,6 +39,8 @@ def usage():
     Project intersection results to rob/env surface as vertex tuples and barycentric coordinates.
 6. condor_touch_configuration.py uvrender <rob/env> <Vertex ID> <Input Dir>
     Render the uvproj results to numpy arrays and images.
+6.a (Auxiliary function) condor_touch_configuration.py uvmerge <Input/Output Dir>
+    Take the output of `uvrender` and write the mean of atlas to I/O dir.
 7. condor_touch_configuration.py atlas2prim <Output Dir>
     Generate the chart that maps pixels in ATLAS image back to PRIMitive ID
 8. condor_touch_configuration.py sample <Task ID> <Batch Size> <Input/Output Dir>
@@ -47,7 +49,11 @@ def usage():
 9. condor_touch_configuration.py samvis <Task ID> <Batch Size> <Input/Output Dir> <PRM sample file>
     Calculate the visibility matrix of the samples from 'sample' Command.
 10. condor_touch_configuration.py dump <object name> [Arguments depending on object]
-    a) samconf <Vertex ID> <Conf ID or Range> <Input Dir> <Output .obj>
+    a) samconf <Vertex ID> <Conf ID or Range> <Input Dir> <Output dir>
+        This dumps the conf or a range of confs from a vertex to output dir that's usually different from input dir which stores the samples.
+    b) omplsam <input dir> <output .txt>
+        This dumps the samples to a text file in OMPL form defined by the demo application of RRT sample injection.
+        Note: sample injection is our extension rather than an official function.
 11. condor_touch_configuration.py samstat <Input/Output Dir> <PRM sample file>
     Parse the output from 'samvis' command, and show the statistics
     Note: we need PRM sample file to know samples used in Monte Carlo visibility algorithm
@@ -242,10 +248,71 @@ def uvrender(uw, args):
     rgb[...,1] = afb
     # FIXME: Give savez an explicity array name
     imsave(_fn_atlastex(io_dir, geo_type, vert_id, None), rgb)
-    np.savez(_fn_atlas(io_dir, geo_type, vert_id, None), afb)
+    np.savez(atlas_fn(io_dir, geo_type, vert_id, None), afb)
     rgb[...,1] = afb_nw
     imsave(_fn_atlastex(io_dir, geo_type, vert_id, None, nw=True), rgb)
-    np.savez(_fn_atlas(io_dir, geo_type, vert_id, None, nw=True), afb)
+    np.savez(atlas_fn(io_dir, geo_type, vert_id, None, nw=True), afb)
+
+def uvmerge(uw, args):
+    io_dir = args[0]
+    import npz_mean
+    for geo_type in ['rob', 'env']:
+        for nw in [False, True]: # Not Weighted
+            fns = []
+            for vert_id, _ in enumerate(iter(int, 1)):
+                fn = task_partitioner.atlas_fn(io_dir, geo_type, vert_id, None, nw=nw)
+                if not os.path.exists(fn):
+                    break
+                fns.append(fn)
+            if nw:
+                suffix = '-nw'
+            else:
+                suffix = ''
+            mean_fn = '{}/atlas-{}-mean{}.npz'.format(io_dir, geo_type, suffix)
+            mean_img = '{}/atlas-{}-mean{}.png'.format(io_dir, geo_type, suffix)
+            fns.append(mean_fn)
+            print(fns)
+            npz_mean.main(fns)
+            d = np.load(mean_fn)
+            img = d[d.keys()[0]]
+            if nw:
+                img = img.astype(bool).astype(float)
+            else:
+                print("sum 0 {}".format(np.sum(img)))
+                '''
+                nz = img[np.nonzero(img)]
+                import scipy.stats
+                import matplotlib.pyplot as plt
+                plt.hist(nz, 50, normed=1, facecolor='green', alpha=0.5);
+                plt.show()
+                '''
+                '''
+                print("sum 1 {}".format(np.sum(nz)))
+                m = np.mean(nz)
+                #np.clip(img, 0, m, out=img)
+                # img2 = np.clip(img, m, None) # Cut less important points
+                img2 = np.copy(img)
+                img2[img < m] = 0.0
+                nz2 = img2[np.nonzero(img2)]
+                print("sum 2 {}".format(np.sum(nz2)))
+                m2 = np.median(nz2)
+                np.clip(img2, m2, None, img)
+                print("First clip thresh {}. Second clip thresh {}".format(m, m2))
+                '''
+                """
+                for i in range(2):
+                    nzi = np.nonzero(img)
+                    print("nz count {} {}".format(i, len(nzi[0])))
+                    nz = img[nzi]
+                    m = np.mean(nz)
+                    img[img < m] = 0.0
+                    print("sum {} {}".format(i+1, np.sum(img)))
+                np.clip(img, 0, np.mean(m), out=img)
+                """
+                m = math.sqrt(np.max(img))
+                img[img < m] = 0.0
+                print("sum 1 {}".format(np.sum(img)))
+            imsave(mean_img, img)
 
 def atlas2prim(uw, args):
     r = uw
@@ -432,8 +499,8 @@ def samstat(uw, args):
             f.write('\n')
     from mpl_toolkits.mplot3d import Axes3D
     import matplotlib.pyplot as plt
-    X1 = bins[:-1]
-    X2 = np.array([i for i in range(len(bins)-1)])
+    X1 = bins[:last_nz]
+    X2 = np.array([i for i in range(last_nz)])
     Y1 = np.array([i for i in range(len(hists)-1)])
     Y2 = np.array([i for i in range(len(hists)-1)])
     X1, Y1 = np.meshgrid(X1, Y1)
@@ -497,6 +564,15 @@ def dump(uw, args):
                 pyosr.save_obj_1(Va, Fa, out_obj)
             batch_id += 1
             conf_base += len(Q)
+    if target == 'omplsam':
+        in_dir = args[0]
+        ofn = args[1]
+        tp = TaskPartitioner(io_dir, None, None, tunnel_v=_get_tunnel_v())
+        for task_id, _ in enumerate(iter(int, 1)):
+            fn = tp.get_tqre_fn(task_id)
+            if not os.path.exists(fn):
+                break
+            Q = np.load(fn)['ReTouchQ']
     else:
         assert False, "Unknown target "+target
 
@@ -517,6 +593,7 @@ def main():
             'isect' : isect,
             'uvproj' : uvproj,
             'uvrender' : uvrender,
+            'uvmerge' : uvmerge,
             'atlas2prim' : atlas2prim,
             'sample' : sample,
             'samvis' : samvis,
