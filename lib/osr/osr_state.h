@@ -18,6 +18,7 @@ typedef double StateScalar;
 typedef Eigen::Vector3d StateTrans;
 typedef Eigen::Quaternion<double> StateQuat;
 typedef Eigen::Matrix<double, kStateDimension, 1> StateVector; // Column vector
+typedef Eigen::Matrix<double, kActionDimension, 1> ScaleVector;
 typedef Eigen::Vector3d AngleAxisVector;
 typedef Eigen::Matrix<double, -1, kStateDimension> ArrayOfStates; // State per-ROW
 typedef Eigen::Matrix<double, -1, 3> ArrayOfTrans;

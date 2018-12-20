@@ -98,6 +98,15 @@ public:
 	renderBarycentric(uint32_t target,
 	                  Eigen::Vector2i res,
 	                  const std::string& svg_fn = std::string());
+
+	/*
+	 * We may scale the whole scene as the final transformation
+	 * within model transformation.
+	 * 
+	 * We expect this makes the NN insensitive to scaling.
+	 */
+	void setFinalScaling(const ScaleVector& scale);
+	ScaleVector getFinalScaling() const;
 private:
 	void setupNonSharedObjects();
 
@@ -154,6 +163,8 @@ private:
 	GLuint bary_vbo_uv_ = 0;
 	GLuint bary_vbo_bary_ = 0;
 	GLuint bary_ibo_ = 0;
+
+	StateTrans final_scaling_;
 };
 
 }

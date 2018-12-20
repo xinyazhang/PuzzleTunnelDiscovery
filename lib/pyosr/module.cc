@@ -216,6 +216,7 @@ PYBIND11_PLUGIN(pyosr) {
 		.def_readwrite("views", &Renderer::views)
 		.def_readwrite("avi", &Renderer::avi)
 		.def_readwrite("light_position", &Renderer::light_position)
+		.def_property("final_scaling", &Renderer::getFinalScaling, &Renderer::setFinalScaling)
 		.def_property("uv_feedback", &Renderer::getUVFeedback, &Renderer::setUVFeedback);
 #endif // GPU_ENABLED
 	using osr::GTGenerator;

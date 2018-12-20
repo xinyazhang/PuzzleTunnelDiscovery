@@ -49,6 +49,13 @@ auto glm2Eigen(const glm::mat4& m)
 	return ret;
 }
 
+auto glm2Eigen(const glm::vec3& v)
+{
+	Eigen::Vector3d rv;
+	rv << v[0], v[1], v[2];
+	return rv;
+}
+
 struct UnitWorld::OdeData {
 	static void init_ode()
 	{
@@ -268,6 +275,13 @@ StateVector
 UnitWorld::getRobotState() const
 {
 	return robot_state_;
+}
+
+
+StateTrans
+UnitWorld::getModelCenter() const
+{
+	return glm2Eigen(scene_->getCenter());
 }
 
 

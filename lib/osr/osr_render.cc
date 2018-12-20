@@ -69,6 +69,7 @@ const uint32_t Renderer::BARY_RENDERING_SCENE;
 Renderer::Renderer()
 {
 	camera_rot_ = glm::mat4(1.0f);
+	final_scaling_ << 1.0, 1.0, 1.0;
 }
 
 Renderer::~Renderer()
@@ -807,6 +808,7 @@ Camera Renderer::setup_camera(uint32_t flags)
 			minDist,                                       // near plane
 			120.0f                                         // far plane
 			);
+	cam.scale(final_scaling_[0], final_scaling_[1], final_scaling_[2]);
 	return cam;
 }
 
@@ -859,6 +861,17 @@ void Renderer::BaryRenderData::clear()
 {
 	uv_array.clear();
 	bary_array.clear();
+}
+
+
+void Renderer::setFinalScaling(const ScaleVector& scale)
+{
+	final_scaling_ = scale;
+}
+
+ScaleVector Renderer::getFinalScaling() const
+{
+	return final_scaling_;
 }
 
 }

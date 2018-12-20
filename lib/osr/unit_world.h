@@ -21,11 +21,17 @@ public:
 	static const uint32_t GEO_ROB = 1;
 
 	void copyFrom(const UnitWorld*);
+	// Model, also known as Scene Geometry (commonly used in Renderer),
+	// or Environment Geometry (abbr. into "env" in Python code)
 	virtual void loadModelFromFile(const std::string& fn);
 	virtual void loadRobotFromFile(const std::string& fn);
 	void enforceRobotCenter(const StateTrans&);
 	void scaleToUnit();
 	void angleModel(float latitude, float longitude);
+
+	/*
+	 * The 'state' of the Env Geomtry.
+	 */
 	void setPerturbation(const StateVector& pert);
 	StateVector getPerturbation() const;
 
@@ -36,6 +42,8 @@ public:
 	 */
 	void setRobotState(const StateVector& state);
 	StateVector getRobotState() const;
+
+	StateTrans getModelCenter() const;
 
 	std::tuple<Transform, Transform> getCDTransforms(const StateVector& state) const;
 	bool isValid(const StateVector& state) const;
