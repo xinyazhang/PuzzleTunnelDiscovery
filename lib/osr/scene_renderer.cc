@@ -60,6 +60,8 @@ void SceneRenderer::probe_texture(const std::string& fn)
 	}
 	int pc;
 	tex_data_ = readPNG(tex_fn.c_str(), tex_w_, tex_h_, &pc);
+	if (tex_data_.empty())
+		return;
 	auto iformat = GL_RGBA8;
 	auto dformat = GL_RGBA;
 	if (pc == 3) {
