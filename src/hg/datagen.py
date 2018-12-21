@@ -39,6 +39,8 @@ import scipy.misc as scm
 import sys
 sys.path.append(os.getcwd())
 import pyosr
+# Dataset paths
+import aniconf12_2
 
 class DataGenerator():
         c_dim = 3
@@ -339,7 +341,7 @@ class DataGenerator():
 		"""
 		if random.choice([0,1]):
 			r_angle = np.random.randint(-1*max_rotation, max_rotation)
-			img = 	transform.rotate(img, r_angle, preserve_range = True)
+			img = transform.rotate(img, r_angle, preserve_range = True)
 			hm = transform.rotate(hm, r_angle)
 		return img, hm
 
@@ -600,6 +602,7 @@ class OsrDataSet(object):
         r.views = np.array([[0.0,0.0]], dtype=np.float32)
 
         self.r = r
+        self.res = res
         self.rgb_shape = (res,res,3)
         self.dep_shape = (res,res,1)
 
@@ -625,19 +628,29 @@ def random_state(scale=1.0):
     part1_0 = np.array([0.0,0.0,0.0], dtype=np.float32)
     return np.concatenate((part1, part2)), np.concatenate((part1_0, part2))
 
+import aug
+
 class NarrowTunnelRegionDataSet(OsrDataSet):
     c_dim = 4
     d_dim = 1
 
-    def __init__(self, rob, env, center=None, res=256):
+    '''
+    Arguments:
+        render_flag: choose which geometry to render
+    '''
+    def __init__(self, rob, env, render_flag, center=None, res=256, patch_size=32, aug_patch=False, aug_scaling=0.0):
         super(NarrowTunnelRegionDataSet, self).__init__(rob=rob,
                                                         env=env,
                                                         center=center,
                                                         res=res)
         self.c_dim = 4
         self.d_dim = 1
+        self.render_flag = render_flag
+        self.patch_size = np.array([patch_size, patch_size], dtype=np.int32)
+        self.aug_patch = aug_patch
+        self.aug_scaling = aug_scaling
 
-    def _aux_generator(self, batch_size=16, stacks=4, normalize=True, sample_set='train'):
+    def _aux_generator(self, batch_size=16, stacks=4, normalize=True, sample_set='train', emit_gt=False):
         is_training = True if sample_set == 'train' else False
         '''
         _aux_generator is the only interface used by HourglassModel class
@@ -646,41 +659,84 @@ class NarrowTunnelRegionDataSet(OsrDataSet):
         image: (batch_size, 256, 256, 3)
         '''
         r = self.r
+        aug_patch = self.aug_patch
+        aug_scaling = self.aug_scaling
         while True:
-            train_img = np.zeros((batch_size, 256, 256, self.c_dim), dtype = np.float32)
+            train_img = np.zeros((batch_size, self.res, self.res, self.c_dim), dtype = np.float32)
+            if emit_gt:
+                gt_img = np.zeros((batch_size, self.res, self.res, 3), dtype = np.float32)
             if is_training:
-                train_gtmap = np.zeros((batch_size, stacks, 64, 64, self.d_dim), np.float32)
+                train_gtmap = np.zeros((batch_size, stacks, self.res//4, self.res//4, self.d_dim), np.float32)
             else:
                 self.r.uv_feedback = True
-                uv_map = np.zeros((batch_size, 256, 256, 2), np.float32)
+                uv_map = np.zeros((batch_size, self.res, self.res, 2), np.float32)
             train_weights = None
             for i in range(batch_size):
+                if np.random.random() < aug_scaling:
+                    # Only downscale
+                    s = np.random.uniform(low=0.5, high=1.0, size=(3))
+                    # Half a chance to upscale
+                    if np.random.random() < 0.5:
+                        s = 1.0 / s
+                    r.final_scaling = s
+                else:
+                    r.final_scaling = np.array([1.0, 1.0, 1.0])
                 r.avi = True
                 q,aq = random_state(0.5)
-                train_img[i] = self.render_rgbd(q, pyosr.Renderer.NO_SCENE_RENDERING)
+                train_img[i] = self.render_rgbd(q, self.render_flag)
                 r.avi = False
-                r.render_mvrgbd(pyosr.Renderer.NO_SCENE_RENDERING|pyosr.Renderer.HAS_NTR_RENDERING)
+                r.render_mvrgbd(self.render_flag|pyosr.Renderer.HAS_NTR_RENDERING)
                 if is_training:
-                    hm = r.mvrgb.reshape(self.rgb_shape)[:,:,1:2]
-                    hm = hm.reshape(256//4,4,256//4,4,self.d_dim).mean(axis=(1,3)) # Downscale to
-                    hm = np.expand_dims(hm, axis=0)
-                    train_gtmap[i] = np.repeat(hm, stacks, axis=0)
+                    rgbd = r.mvrgb.reshape(self.rgb_shape)
+                    if emit_gt:
+                        gt_img[i] = rgbd[...,0:3]
+                    hm = rgbd[:,:,1:2] # The green region
+                    hm = hm.reshape(self.res//4,4,self.res//4,4,self.d_dim).mean(axis=(1,3)) # Downscale to 64x64
+                    hm = np.expand_dims(hm, axis=0) # reshape to [1, 64, 64]
+                    train_gtmap[i] = np.repeat(hm, stacks, axis=0) # reshape to [4,64,64] thru duplication
+                    '''
+                    Randomly patch non-NTR retion
+                    '''
+                    if aug_patch:
+                        patch_tl = aug.patch_finder_1(coldmap=rgbd[:,:,0], heatmap=rgbd[:,:,1], patch_size=self.patch_size)
+                        aug.patch_rgb(train_img[i], patch_tl, self.patch_size)
+                        aug.dim_rgb(gt_img[i], patch_tl, self.patch_size)
                 else:
-                    uv_map[i] = r.mvuv.reshape((256, 256, 2))
+                    uv_map[i] = r.mvuv.reshape((self.res, self.res, 2))
             if is_training:
-                yield train_img, train_gtmap, train_weights
+                to_yield = [train_img, train_gtmap, train_weights]
             else:
-                yield train_img, uv_map, train_weights
+                to_yield = [train_img, uv_map, train_weights]
+            if emit_gt:
+                to_yield.append(gt_img)
+            yield to_yield
 
-def create_dataset(ds_name):
+def create_dataset(ds_name, res=256, aug_patch=True, aug_scaling=1.0):
     if ds_name == 'alpha_ntr_hg1':
         return NarrowTunnelRegionDataSet(rob='../res/alpha/alpha-1.2.wt2.tcp.obj',
                                          env='../res/alpha/alpha_env-1.2.wt.obj',
-                                         res=256,
+                                         res=res,
                                          center=np.array([16.973146438598633, 1.2278236150741577, 10.204807281494141]))
+    if ds_name == 'alpha_ntr_hg2_rob':
+        return NarrowTunnelRegionDataSet(rob=aniconf12_2.rob_uv_fn,
+                                         env=aniconf12_2.env_uv_fn,
+                                         render_flag=pyosr.Renderer.NO_SCENE_RENDERING,
+                                         res=res,
+                                         center=aniconf12_2.rob_ompl_center,
+                                         aug_patch=aug_patch,
+                                         aug_scaling=aug_scaling)
+    if ds_name == 'alpha_ntr_hg2_env':
+        # To train over the env geometry, we replace the robot with the environment geometry and keep everything else unchanged.
+        return NarrowTunnelRegionDataSet(rob=aniconf12_2.env_uv_fn, # IMPORTANT
+                                         env=aniconf12_2.env_uv_fn,
+                                         render_flag=pyosr.Renderer.NO_SCENE_RENDERING,
+                                         res=res,
+                                         center=None,
+                                         aug_patch=aug_patch,
+                                         aug_scaling=aug_scaling)
     if ds_name == 'double_alpha_ntr_hg1':
         return NarrowTunnelRegionDataSet(rob='../res/alpha/double-alpha-1.2.wt2.tcp.obj',
                                          env='../res/alpha/alpha_env-1.2.wt.obj',
-                                         res=256,
+                                         res=res,
                                          center=np.array([16.973146438598633, 1.2278236150741577, 10.204807281494141]))
     assert False, "unknown dataset name {}".format(ds_name)
