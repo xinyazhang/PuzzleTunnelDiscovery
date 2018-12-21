@@ -20,8 +20,9 @@ const vec3 diffuse = vec3(0.6, 0.6, 0.6);
 // const vec4 light_position = vec4(0.0, 5.0, 0.0, 1.0);
 void main() {
     vec3 mColor = fragColor;
-    if ((!is_render_uv_mapping) && length(texture(sam, uv).xyz) > 0.1) {
-        mColor = vec3(0.0, 1.0, 0.0);
+    if ((!is_render_uv_mapping) && length(texture(sam, uv).xyz) > 0.0) {
+        // mColor = vec3(0.0, length(texture(sam, uv).xyz), 0.0);
+        mColor = vec3(0.0, 1.0, 0.0); // It is better to keep the weight uniform
     }
     if (phong) {
 	vec4 light_dir = vec4(light_position, 1.0) - world_position;
