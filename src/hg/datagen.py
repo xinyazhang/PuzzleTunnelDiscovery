@@ -700,7 +700,8 @@ class NarrowTunnelRegionDataSet(OsrDataSet):
                     if aug_patch:
                         patch_tl = aug.patch_finder_1(coldmap=rgbd[:,:,0], heatmap=rgbd[:,:,1], patch_size=self.patch_size)
                         aug.patch_rgb(train_img[i], patch_tl, self.patch_size)
-                        aug.dim_rgb(gt_img[i], patch_tl, self.patch_size)
+                        if emit_gt:
+                            aug.dim_rgb(gt_img[i], patch_tl, self.patch_size)
                 else:
                     uv_map[i] = r.mvuv.reshape((self.res, self.res, 2))
             if is_training:

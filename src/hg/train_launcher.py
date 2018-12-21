@@ -47,11 +47,11 @@ if __name__ == '__main__':
             dataset._create_sets()
         else:
             ds_name = params['new_dataset']
-            dataset = datagen.create_dataset(ds_name)
+            dataset = datagen.create_dataset(ds_name, aug_patch=True, aug_scaling=0.5)
             params['num_joints'] = dataset.d_dim
             assert params['weighted_loss'] is False, "No support for weighted loss for now"
 
-        is_testing = True if 'do_testing' not in params else params['do_testing']
+        is_testing = False if 'do_testing' not in params else params['do_testing']
 
 	model = HourglassModel(nFeat=params['nfeats'],
                                nStack=params['nstacks'],
@@ -60,7 +60,7 @@ if __name__ == '__main__':
                                outputDim=params['num_joints'],
                                batch_size=params['batch_size'],
                                attention=params['mcam'],
-                               training=is_testing,
+                               training=not is_testing,
                                drop_rate=params['dropout_rate'],
                                lear_rate=params['learning_rate'],
                                decay=params['learning_rate_decay'],
@@ -77,6 +77,6 @@ if __name__ == '__main__':
         if is_testing:
             model.testing_init(nEpochs=1, epochSize=params['epoch_size'], saveStep=0, dataset=None, load=params['name'])
         else:
-            #model.training_init(nEpochs=params['nepochs'], epochSize=params['epoch_size'], saveStep=params['saver_step'], dataset = None)
-            model.training_init(nEpochs=params['nepochs'], epochSize=params['epoch_size'], saveStep=params['saver_step'], dataset = None, load=params['name'])
+            model.training_init(nEpochs=params['nepochs'], epochSize=params['epoch_size'], saveStep=params['saver_step'], dataset = None)
+            # model.training_init(nEpochs=params['nepochs'], epochSize=params['epoch_size'], saveStep=params['saver_step'], dataset = None, load=params['name'])
 
