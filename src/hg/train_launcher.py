@@ -45,6 +45,7 @@ if __name__ == '__main__':
             dataset._create_train_table()
             dataset._randomize()
             dataset._create_sets()
+            ds_name = ''
         else:
             ds_name = params['new_dataset']
             dataset = datagen.create_dataset(ds_name, aug_patch=True, aug_scaling=0.5)
@@ -66,6 +67,7 @@ if __name__ == '__main__':
                                decay=params['learning_rate_decay'],
                                decay_step=params['decay_step'],
                                dataset=dataset,
+                               dataset_name=ds_name,
                                name=params['name'],
                                logdir_train=params['log_dir_train'],
                                logdir_test=params['log_dir_test'],

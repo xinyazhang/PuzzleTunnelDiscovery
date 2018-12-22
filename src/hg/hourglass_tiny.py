@@ -40,7 +40,7 @@ class HourglassModel():
 	Generate TensorFlow model to train and predict Human Pose from images (soon videos)
 	Please check README.txt for further information on model management.
 	"""
-	def __init__(self, nFeat = 512, nStack = 4, nModules = 1, nLow = 4, outputDim = 16, batch_size = 16, drop_rate = 0.2, lear_rate = 2.5e-4, decay = 0.96, decay_step = 2000, dataset = None, training = True, w_summary = True, logdir_train = None, logdir_test = None,tiny = True, attention = False,modif = True,w_loss = False, name = 'tiny_hourglass',  joints = ['r_anckle', 'r_knee', 'r_hip', 'l_hip', 'l_knee', 'l_anckle', 'pelvis', 'thorax', 'neck', 'head', 'r_wrist', 'r_elbow', 'r_shoulder', 'l_shoulder', 'l_elbow', 'l_wrist']):
+	def __init__(self, nFeat = 512, nStack = 4, nModules = 1, nLow = 4, outputDim = 16, batch_size = 16, drop_rate = 0.2, lear_rate = 2.5e-4, decay = 0.96, decay_step = 2000, dataset = None, dataset_name='', training = True, w_summary = True, logdir_train = None, logdir_test = None,tiny = True, attention = False,modif = True,w_loss = False, name = 'tiny_hourglass',  joints = ['r_anckle', 'r_knee', 'r_hip', 'l_hip', 'l_knee', 'l_anckle', 'pelvis', 'thorax', 'neck', 'head', 'r_wrist', 'r_elbow', 'r_shoulder', 'l_shoulder', 'l_elbow', 'l_wrist']):
 		""" Initializer
 		Args:
 			nStack				: number of stacks (stage/Hourglass modules)
@@ -53,6 +53,7 @@ class HourglassModel():
 			decay				: Learning Rate Exponential Decay (decay in ]0,1], 1 for constant learning rate)
 			decay_step			: Step to apply decay
 			dataset			: Dataset (class DataGenerator)
+			dataset_name			: Name of the Dataset
 			training			: (bool) True for training / False for prediction
 			w_summary			: (bool) True/False for summary of weight (to visualize in Tensorboard)
 			tiny				: (bool) Activate Tiny Hourglass
@@ -77,6 +78,7 @@ class HourglassModel():
 		self.nLow = nLow
 		self.modif = modif
 		self.dataset = dataset
+		self.dataset_name = dataset_name
 		self.cpu = '/cpu:0'
 		self.gpu = '/gpu:0'
 		self.logdir_train = logdir_train
@@ -353,9 +355,9 @@ class HourglassModel():
                     epochfinishTime = time.time()
                     print('Epoch ' + str(epoch) + '/' + str(nEpochs) + ' done in ' + str(int(epochfinishTime-epochstartTime)) + ' sec.' + ' -avg_time/batch: ' + str(((epochfinishTime-epochstartTime)/epochSize))[:4] + ' sec.')
                 print('Testing Done')
-                np.savez('{}/atex.npz'.format(out_dir), ATEX=atex)
+                np.savez('{}/{}-atex.npz'.format(out_dir, self.dataset_name), ATEX=atex)
                 natex = atex / np.amax(atex)
-                imsave('{}/atex.png'.format(out_dir), natex)
+                imsave('{}/{}-atex.png'.format(out_dir, self.dataset_name), natex)
 
 	def record_training(self, record):
 		""" Record Training Data and Export them in CSV file
