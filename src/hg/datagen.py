@@ -756,6 +756,9 @@ def create_dataset(ds_name, res=256, aug_patch=True, aug_scaling=1.0):
     if ds_name == 'double_alpha_ntr_hg1':
         return NarrowTunnelRegionDataSet(rob='../res/alpha/double-alpha-1.2.wt2.tcp.obj',
                                          env='../res/alpha/alpha_env-1.2.wt.obj',
+                                         render_flag=pyosr.Renderer.NO_SCENE_RENDERING,
                                          res=res,
-                                         center=np.array([16.973146438598633, 1.2278236150741577, 10.204807281494141]))
+                                         center=None,
+                                         aug_patch=aug_patch,
+                                         aug_scaling=aug_scaling)
     assert False, "unknown dataset name {}".format(ds_name)
