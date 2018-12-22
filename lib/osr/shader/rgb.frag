@@ -22,7 +22,8 @@ void main() {
     vec3 mColor = fragColor;
     if ((!is_render_uv_mapping) && length(texture(sam, uv).xyz) > 0.0) {
         // mColor = vec3(0.0, length(texture(sam, uv).xyz), 0.0);
-        mColor = vec3(0.0, 1.0, 0.0); // It is better to keep the weight uniform
+        // mColor = vec3(0.0, 1.0, 0.0); // Keep the weight uniform for larger region
+        mColor.y += length(texture(sam, uv).xyz); // Prefer More concentrated heatmap.
     }
     if (phong) {
 	vec4 light_dir = vec4(light_position, 1.0) - world_position;
