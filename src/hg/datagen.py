@@ -41,6 +41,7 @@ sys.path.append(os.getcwd())
 import pyosr
 # Dataset paths
 import aniconf12_2
+import aniconf10
 
 class DataGenerator():
         c_dim = 3
@@ -730,6 +731,23 @@ def create_dataset(ds_name, res=256, aug_patch=True, aug_scaling=1.0):
         # To train over the env geometry, we replace the robot with the environment geometry and keep everything else unchanged.
         return NarrowTunnelRegionDataSet(rob=aniconf12_2.env_uv_fn, # IMPORTANT
                                          env=aniconf12_2.env_uv_fn,
+                                         render_flag=pyosr.Renderer.NO_SCENE_RENDERING,
+                                         res=res,
+                                         center=None,
+                                         aug_patch=aug_patch,
+                                         aug_scaling=aug_scaling)
+    if ds_name == 'alpha_ntr_hg2-1.0_rob':
+        return NarrowTunnelRegionDataSet(rob=aniconf10.rob_uv_fn,
+                                         env=aniconf10.env_uv_fn,
+                                         render_flag=pyosr.Renderer.NO_SCENE_RENDERING,
+                                         res=res,
+                                         center=aniconf10.rob_ompl_center,
+                                         aug_patch=aug_patch,
+                                         aug_scaling=aug_scaling)
+    if ds_name == 'alpha_ntr_hg2-1.0_env':
+        # To train over the env geometry, we replace the robot with the environment geometry and keep everything else unchanged.
+        return NarrowTunnelRegionDataSet(rob=aniconf10.env_uv_fn, # IMPORTANT
+                                         env=aniconf10.env_uv_fn,
                                          render_flag=pyosr.Renderer.NO_SCENE_RENDERING,
                                          res=res,
                                          center=None,
