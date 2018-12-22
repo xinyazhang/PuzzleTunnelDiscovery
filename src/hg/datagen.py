@@ -724,6 +724,7 @@ def create_dataset(ds_name, res=256, aug_patch=True, aug_scaling=1.0):
                                          env=aniconf12_2.env_uv_fn,
                                          render_flag=pyosr.Renderer.NO_SCENE_RENDERING,
                                          res=res,
+                                         patch_size=64,
                                          center=aniconf12_2.rob_ompl_center,
                                          aug_patch=aug_patch,
                                          aug_scaling=aug_scaling)
@@ -733,6 +734,7 @@ def create_dataset(ds_name, res=256, aug_patch=True, aug_scaling=1.0):
                                          env=aniconf12_2.env_uv_fn,
                                          render_flag=pyosr.Renderer.NO_SCENE_RENDERING,
                                          res=res,
+                                         patch_size=64,
                                          center=None,
                                          aug_patch=aug_patch,
                                          aug_scaling=aug_scaling)

@@ -31,12 +31,12 @@ def patch_finder_1(coldmap, heatmap, patch_size):
             continue
         '''
         Check if covers anything in heatmap
-        We leave 1 pix margin
+        We leave 2 pix margin
 
         FIXME: if 0 in tl, we'll have the margin of two pixels in the bottom/right side
         '''
-        tl = np.clip(tl - 1, 0, None)
-        maxs = _calc_maxs(coldmap.shape, tl, patch_size+2)
+        tl = np.clip(tl - 2, 0, None)
+        maxs = _calc_maxs(coldmap.shape, tl, patch_size+4)
         if np.sum(heatmap[tl[0]:maxs[0], tl[1]:maxs[1]]) == 0:
             break
     return tl
