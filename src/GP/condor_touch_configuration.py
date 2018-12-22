@@ -287,6 +287,7 @@ def uvmerge(uw, args):
                 plt.show()
                 '''
                 '''
+                # Method 1
                 print("sum 1 {}".format(np.sum(nz)))
                 m = np.mean(nz)
                 #np.clip(img, 0, m, out=img)
@@ -299,7 +300,7 @@ def uvmerge(uw, args):
                 np.clip(img2, m2, None, img)
                 print("First clip thresh {}. Second clip thresh {}".format(m, m2))
                 '''
-                """
+                # Method 2
                 for i in range(2):
                     nzi = np.nonzero(img)
                     print("nz count {} {}".format(i, len(nzi[0])))
@@ -307,11 +308,13 @@ def uvmerge(uw, args):
                     m = np.mean(nz)
                     img[img < m] = 0.0
                     print("sum {} {}".format(i+1, np.sum(img)))
-                np.clip(img, 0, np.mean(m), out=img)
-                """
+                #np.clip(img, 0, np.mean(m), out=img)
+                '''
+                # Method 3
                 m = math.sqrt(np.max(img))
                 img[img < m] = 0.0
                 print("sum 1 {}".format(np.sum(img)))
+                '''
             imsave(mean_img, img)
 
 def atlas2prim(uw, args):
