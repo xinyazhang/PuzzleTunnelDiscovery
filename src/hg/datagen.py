@@ -639,7 +639,7 @@ class NarrowTunnelRegionDataSet(OsrDataSet):
     Arguments:
         render_flag: choose which geometry to render
     '''
-    def __init__(self, rob, env, render_flag, center=None, res=256, patch_size=32, aug_patch=False, aug_scaling=0.0):
+    def __init__(self, rob, env, render_flag, center=None, res=256, patch_size=32, aug_patch=False, aug_scaling=0.0, aug_dict={}):
         super(NarrowTunnelRegionDataSet, self).__init__(rob=rob,
                                                         env=env,
                                                         center=center,
@@ -649,6 +649,7 @@ class NarrowTunnelRegionDataSet(OsrDataSet):
         self.render_flag = render_flag
         self.patch_size = np.array([patch_size, patch_size], dtype=np.int32)
         self.aug_patch = aug_patch
+        self.aug_dict = dict(aug_dict)
         self.aug_scaling = aug_scaling
 
     def _aux_generator(self, batch_size=16, stacks=4, normalize=True, sample_set='train', emit_gt=False):
@@ -660,7 +661,10 @@ class NarrowTunnelRegionDataSet(OsrDataSet):
         image: (batch_size, 256, 256, 3)
         '''
         r = self.r
+        aug_dict = self.aug_dict
         aug_patch = self.aug_patch
+        aug_suppress_hot = aug_dict['suppress_hot'] if 'suppress_hot' in aug_dict else 0.0
+        aug_red_noise = aug_dict['red_noise'] if 'red_noise' in aug_dict else 0.0
         aug_scaling = self.aug_scaling
         while True:
             train_img = np.zeros((batch_size, self.res, self.res, self.c_dim), dtype = np.float32)
@@ -699,10 +703,24 @@ class NarrowTunnelRegionDataSet(OsrDataSet):
                     Randomly patch non-NTR retion
                     '''
                     if aug_patch:
-                        patch_tl = aug.patch_finder_1(coldmap=rgbd[:,:,0], heatmap=rgbd[:,:,1], patch_size=self.patch_size)
-                        aug.patch_rgb(train_img[i], patch_tl, self.patch_size)
+                        rnd = np.random.random()
+                        aug_func = aug.patch_rgb
+                        # print("rnd {}".format(rnd))
+                        if rnd < aug_suppress_hot:
+                            # Remove the hot region
+                            # print("aug_suppress_hot")
+                            patch_tl, patch_size = aug.patch_finder_hot(heatmap=rgbd[:,:,1], margin_pix=16)
+                        elif rnd < aug_suppress_hot + aug_red_noise:
+                            patch_tl, patch_size = aug.patch_finder_hot(heatmap=rgbd[:,:,1], margin_pix=64)
+                            # print("aug_red_noise {} {}".format(patch_tl, patch_size))
+                            aug_func = aug.red_noise
+                        else:
+                            # print("aug_patch")
+                            patch_tl = aug.patch_finder_1(coldmap=rgbd[:,:,0], heatmap=rgbd[:,:,1], patch_size=self.patch_size)
+                            patch_size = self.patch_size
+                        aug_func(train_img[i], patch_tl, patch_size)
                         if emit_gt:
-                            aug.dim_rgb(gt_img[i], patch_tl, self.patch_size)
+                            aug.dim_rgb(gt_img[i], patch_tl, patch_size)
                 else:
                     uv_map[i] = r.mvuv.reshape((self.res, self.res, 2))
             if is_training:
@@ -713,7 +731,7 @@ class NarrowTunnelRegionDataSet(OsrDataSet):
                 to_yield.append(gt_img)
             yield to_yield
 
-def create_dataset(ds_name, res=256, aug_patch=True, aug_scaling=1.0):
+def create_dataset(ds_name, res=256, aug_patch=True, aug_scaling=1.0, aug_dict={}):
     if ds_name == 'alpha_ntr_hg1':
         return NarrowTunnelRegionDataSet(rob='../res/alpha/alpha-1.2.wt2.tcp.obj',
                                          env='../res/alpha/alpha_env-1.2.wt.obj',
@@ -727,6 +745,7 @@ def create_dataset(ds_name, res=256, aug_patch=True, aug_scaling=1.0):
                                          patch_size=64,
                                          center=aniconf12_2.rob_ompl_center,
                                          aug_patch=aug_patch,
+                                         aug_dict=aug_dict,
                                          aug_scaling=aug_scaling)
     if ds_name == 'alpha_ntr_hg2_env':
         # To train over the env geometry, we replace the robot with the environment geometry and keep everything else unchanged.
@@ -737,6 +756,7 @@ def create_dataset(ds_name, res=256, aug_patch=True, aug_scaling=1.0):
                                          patch_size=64,
                                          center=None,
                                          aug_patch=aug_patch,
+                                         aug_dict=aug_dict,
                                          aug_scaling=aug_scaling)
     if ds_name == 'alpha_ntr_hg2-1.0_rob':
         return NarrowTunnelRegionDataSet(rob=aniconf10.rob_uv_fn,
@@ -745,6 +765,7 @@ def create_dataset(ds_name, res=256, aug_patch=True, aug_scaling=1.0):
                                          res=res,
                                          center=aniconf10.rob_ompl_center,
                                          aug_patch=aug_patch,
+                                         aug_dict=aug_dict,
                                          aug_scaling=aug_scaling)
     if ds_name == 'alpha_ntr_hg2-1.0_env':
         # To train over the env geometry, we replace the robot with the environment geometry and keep everything else unchanged.
@@ -754,6 +775,7 @@ def create_dataset(ds_name, res=256, aug_patch=True, aug_scaling=1.0):
                                          res=res,
                                          center=None,
                                          aug_patch=aug_patch,
+                                         aug_dict=aug_dict,
                                          aug_scaling=aug_scaling)
     if ds_name == 'double_alpha_ntr_hg1':
         return NarrowTunnelRegionDataSet(rob='../res/alpha/double-alpha-1.2.wt2.tcp.obj',
@@ -762,5 +784,6 @@ def create_dataset(ds_name, res=256, aug_patch=True, aug_scaling=1.0):
                                          res=res,
                                          center=None,
                                          aug_patch=aug_patch,
+                                         aug_dict=aug_dict,
                                          aug_scaling=aug_scaling)
     assert False, "unknown dataset name {}".format(ds_name)

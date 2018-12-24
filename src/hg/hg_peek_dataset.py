@@ -13,7 +13,9 @@ def main(args):
         usage()
         return
     io_dir = args[1]
-    ds = datagen.create_dataset(ds_name, res=512, aug_patch=True, aug_scaling=0.5) # Use higher resolution for preview
+    aug_dict = { 'suppress_hot' : 0.4, 'red_noise' : 0.4 }
+    # aug_dict = { 'red_noise' : 1.0 }
+    ds = datagen.create_dataset(ds_name, res=256, aug_patch=True, aug_scaling=0.5, aug_dict=aug_dict) # Use higher resolution for preview
     index = 0
     gen = ds._aux_generator(stacks=1, emit_gt=True)
     for tup in gen:

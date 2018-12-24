@@ -1,10 +1,13 @@
 import numpy as np
 
+def _clip_imgcoord_inplace(img_coord, img_shape):
+    img_coord[0] = np.clip(img_coord[0], 0, img_shape[0])
+    img_coord[1] = np.clip(img_coord[1], 0, img_shape[1])
+    return img_coord
+
 def _calc_maxs(img_shape, tl, size):
     maxs = tl + size
-    maxs[0] = np.clip(maxs[0], 0, img_shape[0])
-    maxs[1] = np.clip(maxs[1], 0, img_shape[1])
-    return maxs
+    return _clip_imgcoord_inplace(maxs, img_shape)
 
 '''
 patch_finder_1:
@@ -41,6 +44,19 @@ def patch_finder_1(coldmap, heatmap, patch_size):
             break
     return tl
 
+def patch_finder_hot(heatmap, margin_pix):
+    hot_x, = np.nonzero(np.sum(heatmap, axis=1))
+    hot_y, = np.nonzero(np.sum(heatmap, axis=0))
+    if len(hot_x) == 0 or len(hot_y) == 0:
+        return np.zeros(shape=2, dtype=np.int32), np.zeros(shape=2, dtype=np.int32)
+    tl = np.array([np.min(hot_x), np.min(hot_y)], dtype=np.int32)
+    br = np.array([np.max(hot_x), np.max(hot_y)], dtype=np.int32)
+    tl -= margin_pix
+    br += margin_pix
+    _clip_imgcoord_inplace(tl, heatmap.shape)
+    _clip_imgcoord_inplace(br, heatmap.shape)
+    return tl, br - tl
+
 def patch_rgb(img, tl, size, default=0):
     maxs = _calc_maxs(img.shape, tl, size)
     img[tl[0]:maxs[0], tl[1]:maxs[1], :] = default
@@ -48,3 +64,11 @@ def patch_rgb(img, tl, size, default=0):
 def dim_rgb(img, tl, size, factor=0.5):
     maxs = _calc_maxs(img.shape, tl, size)
     img[tl[0]:maxs[0], tl[1]:maxs[1], :] *= factor
+
+def red_noise(img, tl, size):
+    #maxs = _calc_maxs(img.shape, tl, size)
+    #bak = np.copy(img[tl[0]:maxs[0], tl[1]:maxs[1], :])
+    # Poisson distribution
+    # lam is the expectation
+    img[:,:,0] += 255.0 * np.random.poisson(0.05, size=(img.shape[0:2]))
+    #img[tl[0]:maxs[0], tl[1]:maxs[1], :] = bak
