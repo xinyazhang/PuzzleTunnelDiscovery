@@ -40,6 +40,7 @@ class Scene {
 	size_t vertex_total_number_;
 	BoundingBox bbox_;
 	glm::vec3 center_;
+	glm::vec3 mean_of_vertices_;
 	glm::mat4 xform_data_;
 	glm::mat4& xform_;
 	std::shared_ptr<Node> root_;
@@ -54,6 +55,7 @@ public:
 	void clear();
 	void overrideCenter(glm::vec3 c) { center_ = c; }
 	glm::vec3 getCenter() const { return center_; }
+	glm::vec3 getOMPLCenter() const { return mean_of_vertices_; }
 
 	/*
 	 * Calibration transform matrix shall centralize the scene and scale

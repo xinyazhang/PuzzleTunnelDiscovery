@@ -120,6 +120,11 @@ public:
 	 */
 	StateVector translateToUnitState(const StateVector& state) const;
 	StateVector translateFromUnitState(const StateVector& state) const;
+	// Translate an array of unit cube coordinate states to OMPL state
+	// Note: this is different from translateFromUnitState since OMPL has
+	//       fixed center, while our center can be overrided by
+	//       enforceRobotCenter.
+	ArrayOfStates translateUnitStateToOMPLState(const ArrayOfStates& qs) const;
 	StateVector applyPertubation(const StateVector& state) const;
 	StateVector unapplyPertubation(const StateVector& state) const;
 

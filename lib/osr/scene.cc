@@ -73,6 +73,7 @@ void Scene::load(std::string filename, const glm::vec3* model_color)
 	vertex_total_number_ = 0;
 	updateBoundingBox(root_.get(), glm::mat4(1.0));
 	center_ = center_ / vertex_total_number_;
+	mean_of_vertices_ = center_;
 }
 
 void Scene::updateBoundingBox(Node* node, glm::mat4 m)

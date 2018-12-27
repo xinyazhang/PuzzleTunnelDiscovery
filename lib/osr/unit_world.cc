@@ -232,6 +232,9 @@ UnitWorld::scaleToUnit()
 void
 UnitWorld::angleModel(float latitude, float longitude)
 {
+	if (latitude != 0.0 or longitude != 0.0) {
+		throw std::runtime_error("The arguments of UnitWorld::angleModel are resevered for compatibility reason. Both values must be 0.");
+	}
 	scene_->resetTransform();
 	// std::cerr << "Before scale " << scene_->getCalibrationTransform() << std::endl;
 	scene_->scale(glm::vec3(scene_scale_));
@@ -643,6 +646,30 @@ UnitWorld::translateFromUnitState(const StateVector& pstate) const
 #else
 	return state;
 #endif
+}
+
+ArrayOfStates
+UnitWorld::translateUnitStateToOMPLState(const ArrayOfStates& qs) const
+{
+	int N = qs.rows();
+	ArrayOfStates ret;
+	ret.resize(qs.rows(), qs.cols());
+	Eigen::Vector3d delta_center = glm2Eigen(robot_->getOMPLCenter() - robot_->getCenter());
+	delta_center *= scene_scale_;
+	for (int i = 0; i < N; i++) {
+		auto tup = decompose(qs.row(i).transpose());
+		Eigen::Vector3d t_prime = std::get<0>(tup) + std::get<1>(tup) * delta_center;
+		ret.row(i) = compose(t_prime, std::get<1>(tup));
+		ret.row(i) = translateFromUnitState(ret.row(i));
+	}
+	// OMPL uses W last while we uses W first
+	Eigen::Matrix<double, -1, 4> wfirst(N, 4);
+	wfirst = ret.block(0, 3, N, 4);
+	ret.col(3 + 3) = wfirst.col(0); // W fist -> W last
+	ret.col(3 + 0) = wfirst.col(1);
+	ret.col(3 + 1) = wfirst.col(2);
+	ret.col(3 + 2) = wfirst.col(3);
+	return ret;
 }
 
 StateVector

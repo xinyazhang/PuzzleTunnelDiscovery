@@ -137,6 +137,7 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("transit_state_by", &UnitWorld::transitStateBy, py::call_guard<py::gil_scoped_release>())
 		.def("translate_to_unit_state", &UnitWorld::translateToUnitState, py::call_guard<py::gil_scoped_release>())
 		.def("translate_from_unit_state", &UnitWorld::translateFromUnitState, py::call_guard<py::gil_scoped_release>())
+		.def("translate_unit_to_ompl", &UnitWorld::translateUnitStateToOMPLState, py::call_guard<py::gil_scoped_release>())
 		.def("calculate_visibility_matrix", &UnitWorld::calculateVisibilityMatrix, py::call_guard<py::gil_scoped_release>())
 		.def("calculate_visibility_matrix2", &UnitWorld::calculateVisibilityMatrix2, py::call_guard<py::gil_scoped_release>())
 #if PYOSR_HAS_CGAL
