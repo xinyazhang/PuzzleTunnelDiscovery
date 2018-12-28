@@ -1,6 +1,18 @@
 #ifndef OSR_UTIL_H
 #define OSR_UTIL_H
 
+/*
+ * Helper functions Implmeneted in LibIGL
+ * 
+ * We knew PyMesh already did this, but ... with pyOSR infrastructure it is
+ * faster to re-implement in pyOSR than deploy PyMesh to all
+ * the machines we are using...
+ * 
+ * Updates:
+ * We may move to PyMesh after it becomes available in pip.
+ *                                              - Dec 27 2018
+ */
+
 #include <Eigen/Core>
 #include <string>
 #include <tuple>
@@ -33,6 +45,25 @@ std::tuple<
 	Eigen::Matrix<int, -1, -1>
 >
 loadOBJ1(const std::string& fn);
+
+#if PYOSR_HAS_CGAL
+std::tuple<
+	Eigen::Matrix<double, -1, -1>,
+	Eigen::Matrix<int, -1, -1>
+>
+meshBool(const Eigen::Matrix<double, -1, -1>& V0,
+         const Eigen::Matrix<int, -1, -1>& F0,
+         const Eigen::Matrix<double, -1, -1>& V1,
+         const Eigen::Matrix<int, -1, -1>& F1,
+         uint32_t op);
+
+extern const uint32_t MESH_BOOL_UNION;
+extern const uint32_t MESH_BOOL_INTERSECT;
+extern const uint32_t MESH_BOOL_MINUS;
+extern const uint32_t MESH_BOOL_XOR;
+extern const uint32_t MESH_BOOL_RESOLVE;
+#endif
+
 }
 
 #endif

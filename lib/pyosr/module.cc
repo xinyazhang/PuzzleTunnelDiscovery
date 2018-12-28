@@ -104,6 +104,12 @@ PYBIND11_PLUGIN(pyosr) {
 	      py::arg("filename")
 	     );
 	m.def("load_obj_1", &osr::loadOBJ1);
+	m.def("mesh_bool", &osr::meshBool, py::call_guard<py::gil_scoped_release>());
+	m.attr("MESH_BOOL_UNION") = py::int_(osr::MESH_BOOL_UNION);
+	m.attr("MESH_BOOL_INTERSECT") = py::int_(osr::MESH_BOOL_INTERSECT);
+	m.attr("MESH_BOOL_MINUS") = py::int_(osr::MESH_BOOL_MINUS);
+	m.attr("MESH_BOOL_XOR") = py::int_(osr::MESH_BOOL_XOR);
+	m.attr("MESH_BOOL_RESOLVE") = py::int_(osr::MESH_BOOL_RESOLVE);
 	using osr::UnitWorld;
 	py::class_<UnitWorld>(m, "UnitWorld")
 		.def(py::init<>())
