@@ -48,10 +48,14 @@ class AtlasSampler(object):
         self._atlas2prim = np.load(tp.get_atlas2prim_fn(geo_type))['PRIM']
         d = np.load(tp.get_atlas_fn(geo_type, task_id))
         self._atlas = d[d.keys()[0]] # Load the first element
+        #np.clip(self._atlas, 0.0, None, out=self._atlas) # Clips out negative weights
+        self._atlas -= np.min(self._atlas) # All elements must be non-negative
         print("Atlas resolution {}".format(self._atlas.shape))
         self._nzpix = np.nonzero(self._atlas)
         self._nzpixweight = self._atlas[self._nzpix]
-        self._nzpixweight /= np.sum(self._nzpixweight)
+        nzsum = np.sum(self._nzpixweight)
+        print("NZ pix sum {}".format(nzsum))
+        self._nzpixweight /= nzsum
         self._nzpix_idx = np.array([i for i in range(len(self._nzpix[0]))], dtype=np.int32)
         self._nzprim, self._nzcount = np.unique(self._atlas2prim[np.nonzero(self._atlas)], return_counts=True)
         # Debugging

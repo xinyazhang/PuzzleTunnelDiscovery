@@ -14,4 +14,4 @@ rob_wt_fn = '../res/alpha/alpha-1.0.wt.obj'
 env_uv_fn = '../res/alpha/alpha_env-1.0.wt.tcp.obj'
 rob_uv_fn = '../res/alpha/alpha-1.0.wt.tcp.obj'
 rob_ompl_center = None
-# tunnel_v_fn = '../res/alpha/alpha-1.2.org.tunnel.npz'
+tunnel_v_fn = None # Testing data, no tunnel vertex file
