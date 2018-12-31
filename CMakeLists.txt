@@ -402,6 +402,9 @@ EASYADD(mtblender)
 ## Note: do not use ompl_LIBRARIES, which pulls into too many denpendencies.
 TARGET_LINK_LIBRARIES(mtblender ompl fcl)
 
+EASYADD(mapmerger)
+TARGET_LINK_LIBRARIES(mapmerger ompl fcl)
+
 EASYADD(maze2to3)
 
 SANCHECK(ode)

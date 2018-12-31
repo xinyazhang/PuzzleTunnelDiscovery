@@ -128,6 +128,23 @@ void Graph::mergePath(std::istream&& fin)
 	d_->addRRTPath(vlist);
 }
 
+void Graph::mergeRoadMap(std::istream&& fin)
+{
+	std::vector<Vertex*> vlist;
+	while (!fin.eof()) {
+		char type;
+		fin >> type;
+		if (type != 'v') {
+			// Skip to the next line
+			fin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+			continue;
+		}
+		vlist.emplace_back(new Vertex(fin, d_->index_counter));
+		d_->index_counter++;
+	}
+	d_->addRRTPath(vlist);
+}
+
 void Graph::printGraph(std::ostream& fout)
 {
 	fout.precision(17);

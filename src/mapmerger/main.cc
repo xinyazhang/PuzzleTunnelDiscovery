@@ -19,9 +19,10 @@ using namespace std;
 
 void usage()
 {
-	cout << "Usage: mtblender [PRM file] [RRT path file]" << endl;
+	cout << "Usage: mtblender PRM files" << endl;
 	cout << "       PRM file comes from ompl.app/demos/SE3RigidBodyPlanning/config_planner.cc:printPlan()" << endl;
-	cout << "       RRT path comes from stdout of ompl.app/demos" << endl;
+	cout << "       It may not necessarily come from PRM algorithm" << endl;
+	cout <<  endl;
 	cout << "       blending result will be printed to stdout" << endl;
 }
 
@@ -36,6 +37,7 @@ int main(int argc, char* argv[])
 	}
 	Graph g;
 	g.loadRoadMap(move(ifstream(argv[1])));
-	g.mergePath(move(ifstream(argv[2])));
+	for (int i = 2; i < argc; i++) 
+		g.mergeRoadMap(move(ifstream(argv[i])));
 	g.printGraph(cout);
 }

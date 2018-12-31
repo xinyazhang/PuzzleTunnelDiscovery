@@ -30,6 +30,7 @@ public:
 	/* Load and merge accept temporary istream objects */
 	void loadRoadMap(std::istream&&);
 	void mergePath(std::istream&&);
+	void mergeRoadMap(std::istream&&);
 	void printGraph(std::ostream&);
 private:
 	std::unique_ptr<GraphData> d_;
