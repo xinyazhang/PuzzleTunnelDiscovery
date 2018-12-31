@@ -3,7 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import math
-import aniconf12 as aniconf
+#import aniconf12 as aniconf
+import dualconf_tiny as aniconf
 import sys
 
 def interpolate(pkey, nkey, tau):
