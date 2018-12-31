@@ -23,7 +23,7 @@ int main(int argc, char* argv[])
 {
 	string iprefix, ofn;
 	int opt;
-	while ((opt = getopt(argc, argv, "i:o:")) != -1) {
+	while ((opt = getopt(argc, argv, "i:o:h")) != -1) {
 		switch (opt) {
 			case 'i': 
 				iprefix = optarg;
@@ -31,6 +31,9 @@ int main(int argc, char* argv[])
 			case 'o':
 				ofn = optarg;
 				break;
+			case 'h':
+				usage();
+				return 0;
 			default:
 				std::cerr << "Unrecognized option: " << optarg << endl;
 				usage();

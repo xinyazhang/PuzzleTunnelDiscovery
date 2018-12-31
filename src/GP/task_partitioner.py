@@ -17,7 +17,7 @@ def atlas_fn(out_dir, geo_type, vert_id, index=None, nw=False):
     else:
         return "{}/atlas-{}-from-vert-{}-{}{}.npz".format(out_dir, geo_type, vert_id, index, nwsuffix)
 
-def _fn_atlas2prim(out_dir, geo_type):
+def atlas2prim_fn(out_dir, geo_type):
     return "{}/atlas2prim-{}.npz".format(out_dir, geo_type)
 
 def tqre_fn(io_dir, vert_id, batch_id):
@@ -51,6 +51,8 @@ class TaskPartitioner(object):
     Task vector is resized into (batch_id, vertex_id) matrix
     '''
     def get_batch_vert_index(self, task_id):
+        if self.tunnel_v is None:
+            return task_id, 0
         return divmod(task_id, len(self.tunnel_v))
 
     def get_vert_id(self, task_id):
@@ -107,7 +109,7 @@ class TaskPartitioner(object):
         return atlas_fn(self._iodir, geo_type, vert_id, None)
 
     def get_atlas2prim_fn(self, geo_type):
-        return _fn_atlas2prim(self._iodir, geo_type)
+        return atlas2prim_fn(self._iodir, geo_type)
 
     def get_tqre_fn(self, task_id):
         batch_id, vert_id = self.get_batch_vert_index(task_id)

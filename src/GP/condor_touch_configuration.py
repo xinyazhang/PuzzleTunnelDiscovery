@@ -7,7 +7,8 @@ sys.path.append(os.getcwd())
 
 import pyosr
 import numpy as np
-import aniconf12_2 as aniconf
+#import aniconf12_2 as aniconf
+import aniconf10 as aniconf
 import uw_random
 import math
 from scipy.misc import imsave
@@ -17,7 +18,7 @@ import texture_format
 import atlas
 import task_partitioner
 
-#import progressbar
+import progressbar
 
 ATLAS_RES = 2048
 STEPPING_FOR_TOUCH = 0.0125 / 8
@@ -41,20 +42,20 @@ def usage():
     Render the uvproj results to numpy arrays and images.
 6.a (Auxiliary function) condor_touch_configuration.py uvmerge <Input/Output Dir>
     Take the output of `uvrender` and write the mean of atlas to I/O dir.
-7. condor_touch_configuration.py atlas2prim <Output Dir>
+6.b (Auxiliary function) condor_touch_configuration.py atlas2prim <Output Dir>
     Generate the chart that maps pixels in ATLAS image back to PRIMitive ID
-8. condor_touch_configuration.py sample <Task ID> <Batch Size> <Input/Output Dir>
+7. condor_touch_configuration.py sample <Task ID> <Batch Size> <Input/Output Dir>
     Sample from the product of uvrender, and generate the sample in the narrow tunnel
     TODO: Vertex ID can be 'all'
-9. condor_touch_configuration.py samvis <Task ID> <Batch Size> <Input/Output Dir> <PRM sample file>
+8. condor_touch_configuration.py samvis <Task ID> <Batch Size> <Input/Output Dir> <PRM sample file>
     Calculate the visibility matrix of the samples from 'sample' Command.
-10. condor_touch_configuration.py dump <object name> [Arguments depending on object]
+9. condor_touch_configuration.py dump <object name> [Arguments depending on object]
     a) samconf <Vertex ID> <Conf ID or Range> <Input Dir> <Output dir>
         This dumps the conf or a range of confs from a vertex to output dir that's usually different from input dir which stores the samples.
     b) omplsam <input dir> <output .txt>
         This dumps the samples to a text file in OMPL form defined by the demo application of RRT sample injection.
         Note: sample injection is our extension rather than an official function.
-11. condor_touch_configuration.py samstat <Input/Output Dir> <PRM sample file>
+10. condor_touch_configuration.py samstat <Input/Output Dir> <PRM sample file>
     Parse the output from 'samvis' command, and show the statistics
     Note: we need PRM sample file to know samples used in Monte Carlo visibility algorithm
 ''')
@@ -91,7 +92,8 @@ def _create_uw(cmd):
     else: # All the remaining commands need UV coordinates
         r.loadModelFromFile(aniconf.env_uv_fn)
         r.loadRobotFromFile(aniconf.rob_uv_fn)
-    r.enforceRobotCenter(aniconf.rob_ompl_center)
+    if aniconf.rob_ompl_center is not None:
+        r.enforceRobotCenter(aniconf.rob_ompl_center)
     r.scaleToUnit()
     r.angleModel(0.0, 0.0)
 
@@ -114,6 +116,8 @@ def calc_touch(uw, vertex, batch_size):
     return rets
 
 def _get_tunnel_v():
+    if aniconf.tunnel_v_fn is None:
+        return None
     return np.load(aniconf.tunnel_v_fn)['TUNNEL_V']
 
 def run(uw, args):
@@ -329,7 +333,7 @@ def atlas2prim(uw, args):
         atlas2prim = texture_format.framebuffer_to_file(atlas2prim)
         atlas2uv = np.copy(r.mvuv.reshape((r.pbufferWidth, r.pbufferHeight, 2)))
         atlas2uv = texture_format.framebuffer_to_file(atlas2uv)
-        np.savez(_fn_atlas2prim(io_dir, geo_type), PRIM=atlas2prim, UV=atlas2uv)
+        np.savez(task_partitioner.atlas2prim_fn(io_dir, geo_type), PRIM=atlas2prim, UV=atlas2uv)
         imsave(geo_type+'-a2p.png', atlas2prim) # This is for debugging
 
 def sample(uw, args):
@@ -346,7 +350,7 @@ def sample(uw, args):
     pcloud2 = []
     pn2 = []
     conf = []
-    for i in range(batch_size):
+    for i in progressbar.progressbar(range(batch_size)):
         while True:
             tup1 = rob_sampler.sample(uw)
             tup2 = env_sampler.sample(uw)
@@ -568,14 +572,26 @@ def dump(uw, args):
             batch_id += 1
             conf_base += len(Q)
     if target == 'omplsam':
+        args = args[1:]
         in_dir = args[0]
         ofn = args[1]
-        tp = TaskPartitioner(io_dir, None, None, tunnel_v=_get_tunnel_v())
+        tp = TaskPartitioner(in_dir, None, None, tunnel_v=_get_tunnel_v())
+        ompl_q = None
         for task_id, _ in enumerate(iter(int, 1)):
             fn = tp.get_tqre_fn(task_id)
+            # print('probing {}'.format(fn))
             if not os.path.exists(fn):
                 break
             Q = np.load(fn)['ReTouchQ']
+            QT = uw.translate_unit_to_ompl(Q)
+            ompl_q = QT if ompl_q is None else np.concatenate((ompl_q, QT), axis=0)
+        nsample, scalar_per_sample = ompl_q.shape
+        with open(ofn, 'w') as f:
+            f.write("{} {}\n".format(nsample, scalar_per_sample))
+            for i in range(nsample):
+                for j in range(scalar_per_sample):
+                    f.write('{:.17g} '.format(ompl_q[i,j]))
+                f.write('\n')
     else:
         assert False, "Unknown target "+target
 
