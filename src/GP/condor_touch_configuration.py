@@ -8,7 +8,8 @@ sys.path.append(os.getcwd())
 import pyosr
 import numpy as np
 #import aniconf12_2 as aniconf
-import aniconf10 as aniconf
+#import aniconf10 as aniconf
+import dualconf_tiny as aniconf
 import uw_random
 import math
 from scipy.misc import imsave
@@ -18,7 +19,6 @@ import texture_format
 import atlas
 import task_partitioner
 
-import progressbar
 import aux
 
 ATLAS_RES = 2048
@@ -351,6 +351,7 @@ def sample(uw, args):
     pcloud2 = []
     pn2 = []
     conf = []
+    import progressbar
     for i in progressbar.progressbar(range(batch_size)):
         while True:
             tup1 = rob_sampler.sample(uw)
