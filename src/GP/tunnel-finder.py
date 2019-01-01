@@ -17,7 +17,7 @@ def tunnel_finder(pathfn, vmfn, outfn):
         if vb <= thresh:
             tunnel_vi.append(i)
     print(V[tunnel_vi])
-    np.savez(outfn, TUNNELV=V[tunnel_vi])
+    np.savez(outfn, TUNNEL_V=V[tunnel_vi])
 
 def info(args):
     pathdic = np.load(args.vs)
@@ -39,7 +39,11 @@ def pick(args):
     pathdic = np.load(args.vs)
     V = pathdic['VS']
     tunnel_vi = aux.range2list(args.index)
-    np.savez(args.output, TUNNELV=V[tunnel_vi])
+    np.savez(args.output, TUNNEL_V=V[tunnel_vi])
+
+def extract(args):
+    # The naive version can be found in 'tunnel-vertex-locator.py'
+    raise NotImplemented
 
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -51,9 +55,9 @@ def main():
     info_parser.add_argument('vs', help='vertices in visibility matrix axis 0', nargs=None, type=str)
     extract_parser.add_argument('vm', help='Visibility matrix', nargs=None, type=str)
     extract_parser.add_argument('vs', help='vertices in visibility matrix axis 0', nargs=None, type=str)
-    extract_parser.add_argument('--top', help='Pick top # invisible vertices', type=int, default=None)
-    extract_parser.add_argument('--pc', help='Pick vertices less visibile than #%', type=int, default=None)
     extract_parser.add_argument('output', help='Output file for tunnel vertices', nargs=None, type=str)
+    extract_parser.add_argument('--top', help='Pick top # invisible vertices', type=int, default=None)
+    extract_parser.add_argument('--pc', help='Pick vertices less visibile than pc%%', type=int, default=None)
     pick_parser.add_argument('vs', help='solution path file', nargs=None, type=str)
     pick_parser.add_argument('index', help='range string for index of tunnel vertex (e.g. 1,2,5-7,10)', type=str)
     pick_parser.add_argument('output', help='Output file for tunnel vertices', nargs=None, type=str)
