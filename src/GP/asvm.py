@@ -9,6 +9,7 @@ import sys
 sys.path.append(os.getcwd())
 
 import numpy as np
+import argparse
 
 def fn_gen(fvm_dir, block_size):
     index = 0
@@ -21,9 +22,14 @@ def fn_gen(fvm_dir, block_size):
             return
 
 def main():
-    fvm_dir = 'vm-path' # Fragmented Visibility Matrix DIRectory
-    block_size = 2048
-    out = 'giant-vm-path.npz'
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('dir', help='Directory of segmented visibility matrix', nargs=None, type=str)
+    parser.add_argument('block_size', help='Block Size', nargs=None, type=int)
+    parser.add_argument('output', help='File output of assembled matrix', nargs=None, type=str)
+    args = parser.parse_args()
+    fvm_dir = args.dir
+    block_size = args.block_size
+    out = args.output
     vmfrags = []
     vmlocators = []
     q0end = 0
@@ -40,6 +46,8 @@ def main():
         [q0start, q0end, q1start, q1end] = loc
         print("Store Block {}".format(i))
         giant[q0start:q0end, q1start:q1end] = m
+    if np.min(giant) < 0:
+        print("Caveat: the assembled visibility matrix has undefined coefficients")
     np.savez(out, VM=giant)
 
 if __name__ == '__main__':
