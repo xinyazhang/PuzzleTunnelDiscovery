@@ -19,6 +19,7 @@ import atlas
 import task_partitioner
 
 import progressbar
+import aux
 
 ATLAS_RES = 2048
 STEPPING_FOR_TOUCH = 0.0125 / 8
@@ -524,20 +525,9 @@ def samstat(uw, args):
 
 def dump(uw, args):
     target = args[0]
-    def _range2list(x):
-        result = []
-        for part in x.split(','):
-            if '-' in part:
-                a, b = part.split('-')
-                a, b = int(a), int(b)
-                result.extend(range(a, b + 1))
-            else:
-                a = int(part)
-                result.append(a)
-        return result
     if target == 'samconf':
         vert_id = int(args[1])
-        conf_sel = np.array(_range2list(args[2]), dtype=np.int)
+        conf_sel = np.array(aux.range2list(args[2]), dtype=np.int)
         print("Printing {}".format(conf_sel))
         io_dir = args[3]
         out_obj_dir = args[4]
