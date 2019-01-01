@@ -13,4 +13,5 @@ rob_wt_fn = rob_fn
 env_uv_fn = '../res/dual/dual_tiny.dt.tcp.obj'
 rob_uv_fn = '../res/dual/knotted_ring.dt.tcp.obj'
 rob_ompl_center = None
-tunnel_v_fn = None # Unknown yet, just a placeholder during the preprocessing.
+# tunnel_v_fn = None # Unknown yet, just a placeholder during the preprocessing.
+tunnel_v_fn = '../res/dual/dual_tiny.tunnel-manual.npz' # Pickup the tunnel vertices manually
