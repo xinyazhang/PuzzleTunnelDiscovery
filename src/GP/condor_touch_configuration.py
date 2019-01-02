@@ -53,7 +53,9 @@ def usage():
 9. condor_touch_configuration.py dump <object name> [Arguments depending on object]
     a) samconf <Vertex ID> <Conf ID or Range> <Input Dir> <Output dir>
         This dumps the conf or a range of confs from a vertex to output dir that's usually different from input dir which stores the samples.
-    b) omplsam <input dir> <output .txt>
+    b) tconf <Vertex ID> <Conf ID or Range> <Input Dir> <Output dir>
+        same as samconf, but this takes samples from Command `run`
+    c) omplsam <input dir> <output .txt>
         This dumps the samples to a text file in OMPL form defined by the demo application of RRT sample injection.
         Note: sample injection is our extension rather than an official function.
 10. condor_touch_configuration.py samstat <Input/Output Dir> <PRM sample file>
@@ -83,6 +85,12 @@ def _create_uw(cmd):
     else:
         r = pyosr.UnitWorld() # pyosr.Renderer is not avaliable in HTCondor
 
+    if aniconf.rob_ompl_center is None:
+        '''
+        When OMPL_center is not specified
+        '''
+        assert aniconf.env_wt_fn == aniconf.env_uv_fn
+        assert aniconf.rob_wt_fn == aniconf.rob_uv_fn
 
     if cmd in ['run', 'isect']:
         # fb = r.render_barycentric(r.BARY_RENDERING_ROBOT, np.array([1024, 1024], dtype=np.int32))
@@ -531,7 +539,13 @@ def samstat(uw, args):
 
 def dump(uw, args):
     target = args[0]
-    if target == 'samconf':
+    if target in ['samconf', 'tconf']:
+        if target == 'tconf':
+            fn_func = task_partitioner.touchq_fn
+            key_str = 'TOUCH_V'
+        else:
+            fn_func = task_partitioner.tqre_fn
+            key_str = 'ReTouchQ'
         vert_id = int(args[1])
         conf_sel = np.array(aux.range2list(args[2]), dtype=np.int)
         print("Printing {}".format(conf_sel))
@@ -541,12 +555,12 @@ def dump(uw, args):
         batch_id = 0
         conf_base = 0
         largest = np.max(conf_sel)
-        while conf_base < largest:
-            fn = task_partitioner.tqre_fn(io_dir, vert_id=vert_id, batch_id=batch_id)
+        while conf_base <= largest:
+            fn = fn_func(io_dir, vert_id=vert_id, batch_id=batch_id)
             if not os.path.exists(fn):
                 print("Fatal: Cannot find file {}".format(fn))
                 return
-            Q = np.load(fn)['ReTouchQ']
+            Q = np.load(fn)[key_str]
             indices = np.where(np.logical_and(conf_sel >= conf_base, conf_sel < conf_base + len(Q)))
             indices = indices[0]
             # print("Indices {}".format(indices))
@@ -557,17 +571,24 @@ def dump(uw, args):
                 rem = conf_id - conf_base
                 # print("rem {}".format(rem))
                 q = Q[rem]
+                print("Getting geometry from file {}, offset {}".format(fn, rem))
+                print("tq {}".format(q))
                 V1,F1 = uw.get_robot_geometry(q, True)
+                out_obj = "{}/rob-vert-{}-conf-{}.obj".format(out_obj_dir, vert_id, conf_id)
+                pyosr.save_obj_1(V1, F1, out_obj)
+                out_obj = "{}/env-vert-{}-conf-{}.obj".format(out_obj_dir, vert_id, conf_id)
                 V2,F2 = uw.get_scene_geometry(q, True)
+                pyosr.save_obj_1(V2, F2, out_obj)
+                '''
                 Va = np.concatenate((V1, V2), axis=0)
                 F2 += V1.shape[0]
                 Fa = np.concatenate((F1, F2), axis=0)
-                out_obj = "{}/vert-{}-conf-{}.obj".format(out_obj_dir, vert_id, conf_id)
-                # print("Dumping to {}".format(out_obj))
+                print("Dumping to {}".format(out_obj))
                 pyosr.save_obj_1(Va, Fa, out_obj)
+                '''
             batch_id += 1
             conf_base += len(Q)
-    if target == 'omplsam':
+    elif target == 'omplsam':
         args = args[1:]
         in_dir = args[0]
         ofn = args[1]
@@ -589,7 +610,7 @@ def dump(uw, args):
                     f.write('{:.17g} '.format(ompl_q[i,j]))
                 f.write('\n')
     else:
-        assert False, "Unknown target "+target
+        assert False, "Unknown target {}".format(target)
 
 def main():
     if len(sys.argv) < 2:

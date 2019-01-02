@@ -1,7 +1,8 @@
 import numpy as np
 import os
+import pyosr
 
-def _fn_touch_q(out_dir, vert_id, batch_id):
+def touchq_fn(out_dir, vert_id, batch_id):
     return "{}/touchq-{}-{}.npz".format(out_dir, vert_id, batch_id)
 
 def _fn_isectgeo(out_dir, vert_id, conf_id):
@@ -96,7 +97,7 @@ class TaskPartitioner(object):
     '''
     def get_tq_fn(self, task_id):
         batch_id, vert_id = self.get_batch_vert_index(task_id)
-        return _fn_touch_q(out_dir=self._iodir, vert_id=vert_id, batch_id=batch_id)
+        return touchq_fn(out_dir=self._iodir, vert_id=vert_id, batch_id=batch_id)
 
     def get_isect_fn(self, vert_id, conf_id):
         return _fn_isectgeo(out_dir=self._iodir, vert_id=vert_id, conf_id=conf_id)
@@ -182,9 +183,9 @@ class TouchQGenerator(object):
 
     def __next__(self):
         if self.tq is None:
-            tq_fn = _fn_touch_q(out_dir=self.in_dir,
-                                vert_id=self.vert_id,
-                                batch_id=self.tq_batch_id)
+            tq_fn = touchq_fn(out_dir=self.in_dir,
+                              vert_id=self.vert_id,
+                              batch_id=self.tq_batch_id)
             try:
                 print("loading {}".format(tq_fn))
                 d = np.load(tq_fn)
