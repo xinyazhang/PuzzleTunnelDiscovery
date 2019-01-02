@@ -119,6 +119,8 @@ class TaskPartitioner(object):
         batch_id, vert_id = self.get_batch_vert_index(task_id)
         return tqrevis_fn(self._iodir, vert_id=vert_id, batch_id=batch_id)
 
+"""
+# deprecated
 class ObjGenerator(object):
     def __init__(self, in_dir, vert_id):
         self.in_dir = in_dir
@@ -141,6 +143,7 @@ class ObjGenerator(object):
     # Python 2 compat
     def next(self):
         return self.__next__()
+"""
 
 class UVObjGenerator(object):
     def __init__(self, in_dir, geo_type, vert_id):
@@ -158,7 +161,8 @@ class UVObjGenerator(object):
         print("loading {}".format(fn))
         if not os.path.exists(fn):
             return None, None # Note: do NOT raise StopIteration, we may miss some file in the middle
-        return pyosr.load_obj_1(fn)
+        d = np.load(fn+'.npz')
+        return d['V'], d['F']
 
     # Python 2 compat
     def next(self):

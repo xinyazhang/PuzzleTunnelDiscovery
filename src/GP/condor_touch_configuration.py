@@ -165,7 +165,8 @@ def isect(uw, args):
         if is_inf:
             continue
         V, F = uw.intersecting_geometry(tq, True)
-        pyosr.save_obj_1(V, F, tp.get_isect_fn(vert_id, conf_id))
+        np.savez_compressed(tp.get_isect_fn(vert_id, conf_id), V=V, F=F)
+        #pyosr.save_obj_1(V, F, tp.get_isect_fn(vert_id, conf_id))
 
 def uvproj(uw, args):
     geo_type = args[0]
@@ -179,7 +180,10 @@ def uvproj(uw, args):
         if is_inf:
             continue
         fn = tp.get_isect_fn(vert_id, conf_id)
-        V, F = pyosr.load_obj_1(fn)
+        #V, F = pyosr.load_obj_1(fn)
+        d = np.load(fn+'.npz')
+        V = d['V']
+        F = d['F']
         if geo_type == 'rob':
             IF, IBV = uw.intersecting_to_robot_surface(tq, True, V, F)
         elif geo_type == 'env':
@@ -187,8 +191,9 @@ def uvproj(uw, args):
         else:
             assert False
         fn2 = tp.get_uv_fn(geo_type, vert_id, conf_id)
-        print('uvproj of {} to {}'.format(fn, fn2))
-        pyosr.save_obj_1(IBV, IF, fn2)
+        #print('uvproj of {} to {}'.format(fn, fn2))
+        #pyosr.save_obj_1(IBV, IF, fn2)
+        np.savez_compressed(fn2, V=IBV, F=IF)
 
 def uvrender(uw, args):
     tunnel_v = _get_tunnel_v()
