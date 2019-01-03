@@ -3,6 +3,25 @@ import numpy as np
 '''
 The copied framebuffer has different order from the texture file used by blender or OpenGL.
 '''
+
+'''
+This is for uvrender
+'''
+def texture_to_file(arr):
+    #return arr
+    #return np.transpose(arr)
+    '''
+    np.flipud is verified by intersecting with self, and modifiy TriTriCopIsect to return identity
+    '''
+    return np.flipud(arr)
+    #return np.flipud(np.transpose(arr))
+    #return np.fliplr(arr)
+    #return np.fliplr(np.transpose(arr))
+    #return np.fliplr(np.flipud(arr))
+
+'''
+This is for atlas to prim(itive)
+'''
 def framebuffer_to_file(arr):
     #return np.transpose(np.fliplr(arr))
     #return np.transpose(np.flipud(arr))
