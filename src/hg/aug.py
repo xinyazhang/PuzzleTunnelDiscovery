@@ -60,10 +60,12 @@ def patch_finder_hot(heatmap, margin_pix):
 def patch_rgb(img, tl, size, default=0):
     maxs = _calc_maxs(img.shape, tl, size)
     img[tl[0]:maxs[0], tl[1]:maxs[1], :] = default
+    return img
 
 def dim_rgb(img, tl, size, factor=0.5):
     maxs = _calc_maxs(img.shape, tl, size)
     img[tl[0]:maxs[0], tl[1]:maxs[1], :] *= factor
+    return img
 
 def red_noise(img, tl, size):
     #maxs = _calc_maxs(img.shape, tl, size)
@@ -72,3 +74,11 @@ def red_noise(img, tl, size):
     # lam is the expectation
     img[:,:,0] += 255.0 * np.random.poisson(0.05, size=(img.shape[0:2]))
     #img[tl[0]:maxs[0], tl[1]:maxs[1], :] = bak
+    return img
+
+def focus(img, tl, size):
+    maxs = _calc_maxs(img.shape, tl, size)
+    old = img
+    img = np.zeros(shape=img.shape, dtype=img.dtype)
+    img[tl[0]:maxs[0], tl[1]:maxs[1], :] = old[tl[0]:maxs[0], tl[1]:maxs[1], :]
+    return img

@@ -666,6 +666,7 @@ class NarrowTunnelRegionDataSet(OsrDataSet):
         aug_patch = self.aug_patch
         aug_suppress_hot = aug_dict['suppress_hot'] if 'suppress_hot' in aug_dict else 0.0
         aug_red_noise = aug_dict['red_noise'] if 'red_noise' in aug_dict else 0.0
+        aug_suppress_cold = aug_dict['suppress_cold'] if 'suppress_cold' in aug_dict else 0.0
         aug_scaling = self.aug_scaling
         while True:
             train_img = np.zeros((batch_size, self.res, self.res, self.c_dim), dtype = np.float32)
@@ -715,11 +716,14 @@ class NarrowTunnelRegionDataSet(OsrDataSet):
                             patch_tl, patch_size = aug.patch_finder_hot(heatmap=rgbd[:,:,1], margin_pix=64)
                             # print("aug_red_noise {} {}".format(patch_tl, patch_size))
                             aug_func = aug.red_noise
+                        elif rnd < aug_suppress_hot + aug_red_noise + aug_suppress_cold:
+                            patch_tl, patch_size = aug.patch_finder_hot(heatmap=rgbd[:,:,1], margin_pix=64)
+                            aug_func = aug.focus
                         else:
                             # print("aug_patch")
                             patch_tl = aug.patch_finder_1(coldmap=rgbd[:,:,0], heatmap=rgbd[:,:,1], patch_size=self.patch_size)
                             patch_size = self.patch_size
-                        aug_func(train_img[i], patch_tl, patch_size)
+                        train_img[i] = aug_func(train_img[i], patch_tl, patch_size)
                         if emit_gt:
                             aug.dim_rgb(gt_img[i], patch_tl, patch_size)
                 else:

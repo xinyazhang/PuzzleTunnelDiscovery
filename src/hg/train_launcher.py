@@ -35,7 +35,7 @@ def process_config(conf_file):
 
 def craft_dict(params):
     dic = {}
-    for k in ['suppress_hot', 'red_noise']:
+    for k in ['suppress_hot', 'red_noise', 'suppress_cold']:
         if k in params:
             dic[k] = params[k]
         else:
