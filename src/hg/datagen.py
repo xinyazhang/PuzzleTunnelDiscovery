@@ -42,6 +42,7 @@ import pyosr
 # Dataset paths
 import aniconf12_2
 import aniconf10
+import dualconf_tiny
 
 class DataGenerator():
         c_dim = 3
@@ -783,6 +784,26 @@ def create_dataset(ds_name, res=256, aug_patch=True, aug_scaling=1.0, aug_dict={
                                          render_flag=pyosr.Renderer.NO_SCENE_RENDERING,
                                          res=res,
                                          center=None,
+                                         aug_patch=aug_patch,
+                                         aug_dict=aug_dict,
+                                         aug_scaling=aug_scaling)
+    if ds_name == 'dual_tiny_rob':
+        return NarrowTunnelRegionDataSet(rob=dualconf_tiny.rob_uv_fn,
+                                         env=dualconf_tiny.env_uv_fn,
+                                         render_flag=pyosr.Renderer.NO_SCENE_RENDERING,
+                                         res=res,
+                                         patch_size=64,
+                                         center=dualconf_tiny.rob_ompl_center,
+                                         aug_patch=aug_patch,
+                                         aug_dict=aug_dict,
+                                         aug_scaling=aug_scaling)
+    if ds_name == 'dual_tiny_env':
+        return NarrowTunnelRegionDataSet(rob=dualconf_tiny.env_uv_fn,
+                                         env=dualconf_tiny.env_uv_fn,
+                                         render_flag=pyosr.Renderer.NO_SCENE_RENDERING,
+                                         res=res,
+                                         patch_size=64,
+                                         center=dualconf_tiny.rob_ompl_center,
                                          aug_patch=aug_patch,
                                          aug_dict=aug_dict,
                                          aug_scaling=aug_scaling)
