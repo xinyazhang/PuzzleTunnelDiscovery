@@ -34,6 +34,19 @@ void TriTriCop(
 	const Eigen::MatrixBase<DerivedF1>& F1,
 	Eigen::SparseMatrix<T>& COP);
 
+template<
+	typename DerivedV0,
+	typename DerivedF0,
+	typename DerivedV1,
+	typename DerivedF1,
+	typename T>
+void TriTriCopIsect(
+	const Eigen::MatrixBase<DerivedV0>& V0,
+	const Eigen::MatrixBase<DerivedF0>& F0,
+	const Eigen::MatrixBase<DerivedV1>& V1,
+	const Eigen::MatrixBase<DerivedF1>& F1,
+	Eigen::SparseMatrix<T>& COP);
+
 }
 
 #include "tritri_cop.hh"

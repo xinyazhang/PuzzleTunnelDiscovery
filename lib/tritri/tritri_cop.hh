@@ -3,6 +3,7 @@
 #include <vector>
 #include <igl/per_face_normals.h>
 #include <Eigen/Geometry>
+#include "tritri.h"
 
 namespace tritri {
 #define EPSILON 0.000001
@@ -104,5 +105,50 @@ void TriTriCop(
 	}
 	COP.setFromTriplets(tups.begin(), tups.end());
 }
+
+template<
+	typename DerivedV0,
+	typename DerivedF0,
+	typename DerivedV1,
+	typename DerivedF1,
+	typename T>
+void TriTriCopIsect(
+	const Eigen::MatrixBase<DerivedV0>& V0,
+	const Eigen::MatrixBase<DerivedF0>& F0,
+	const Eigen::MatrixBase<DerivedV1>& V1,
+	const Eigen::MatrixBase<DerivedF1>& F1,
+	Eigen::SparseMatrix<T>& COP)
+{
+	assert(V0.cols() == 3);
+	assert(F0.cols() == 3);
+	assert(V1.cols() == 3);
+	assert(F1.cols() == 3);
+	std::vector<Eigen::Triplet<T>> tups;
+	COP.resize(F0.rows(), F1.rows());
+
+	using Scalar = typename DerivedV0::Scalar;
+	using Vector3S = Eigen::Matrix<Scalar, 3, 1>;
+	Vector3S isectpt0, isectpt1;
+	int cop;
+	for (size_t i = 0; i < F0.rows(); i++) {
+		Vector3S v0 = V0.row(F0(i, 0));
+		Vector3S v1 = V0.row(F0(i, 1));
+		Vector3S v2 = V0.row(F0(i, 2));
+		for (size_t j = 0; j < F1.rows(); j++) {
+			Vector3S u0 = V1.row(F1(j, 0));
+			Vector3S u1 = V1.row(F1(j, 1));
+			Vector3S u2 = V1.row(F1(j, 2));
+			bool isect = TriTriIntersect(v0, v1, v2,
+			                             u0, u1, u2,
+			                             &cop,
+			                             isectpt0, isectpt1);
+			if (isect and cop) {
+				tups.emplace_back(i, j, 1);
+			}
+		}
+	}
+	COP.setFromTriplets(tups.begin(), tups.end());
+}
+
 
 }

@@ -28,7 +28,7 @@ using RVector3d = Eigen::Matrix<double, 1, 3>;
  * functions.
  */
 
-void TriTriIntersect(const Ref<Vector3f> v0,
+bool TriTriIntersect(const Ref<Vector3f> v0,
 		     const Ref<Vector3f> v1,
 		     const Ref<Vector3f> v2,
 		     const Ref<Vector3f> u0,
@@ -38,7 +38,7 @@ void TriTriIntersect(const Ref<Vector3f> v0,
                      Ref<Vector3f> isectpt1,
 		     Ref<Vector3f> isectpt2);
 
-void TriTriIntersect(const Ref<Vector3d> v0,
+bool TriTriIntersect(const Ref<Vector3d> v0,
 		     const Ref<Vector3d> v1,
 		     const Ref<Vector3d> v2,
 		     const Ref<Vector3d> u0,
@@ -48,7 +48,7 @@ void TriTriIntersect(const Ref<Vector3d> v0,
                      Ref<Vector3d> isectpt1,
 		     Ref<Vector3d> isectpt2);
 
-void TriTriIntersect(const Ref<RVector3f> v0,
+bool TriTriIntersect(const Ref<RVector3f> v0,
 		     const Ref<RVector3f> v1,
 		     const Ref<RVector3f> v2,
 		     const Ref<RVector3f> u0,
@@ -58,7 +58,7 @@ void TriTriIntersect(const Ref<RVector3f> v0,
                      Ref<RVector3f> isectpt1,
 		     Ref<RVector3f> isectpt2);
 
-void TriTriIntersect(const Ref<RVector3f> v0,
+bool TriTriIntersect(const Ref<RVector3f> v0,
 		     const Ref<RVector3f> v1,
 		     const Ref<RVector3f> v2,
 		     const Ref<RVector3f> u0,

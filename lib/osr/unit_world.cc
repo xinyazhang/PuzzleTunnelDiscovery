@@ -1016,7 +1016,7 @@ UnitWorld::intersectingToSurface(const VMatrix& targetV,
 #if 0
 	std::cerr << "TriTriCop between " << targetF.rows() << " " << F.rows() << std::endl;
 #endif
-	tritri::TriTriCop(targetV, targetF, V, F, COP);
+	tritri::TriTriCopIsect(targetV, targetF, V, F, COP);
 	size_t NF = COP.nonZeros();
 #if 0
 	std::cerr << "TriTriCop done; " << NF << " non-zeros\n";
