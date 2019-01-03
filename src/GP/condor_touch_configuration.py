@@ -223,6 +223,7 @@ def uvrender(uw, args):
     tq_gen = TouchQGenerator(in_dir=io_dir, vert_id=vert_id)
     obj_gen = UVObjGenerator(in_dir=io_dir, geo_type=geo_type, vert_id=vert_id)
     i = 0
+    DEBUG_UVRENDER = False
     for tq, is_inf in tq_gen:
         # print('tq {} is_inf {}'.format(tq, is_inf))
         IBV, IF = next(obj_gen) # Must, otherwise does not pair
@@ -231,13 +232,34 @@ def uvrender(uw, args):
         if IBV is None or IF is None:
             print('IBV {}'.format(None))
             continue
-        print('IBV {}'.format(IBV.shape))
+        print('{}: IBV {} IF {}'.format(i, IBV.shape, IF.shape))
+        if DEBUG_UVRENDER:
+            svg_fn = '{}.svg'.format(i)
+            # Paint everything ...
+            if i == 0 and geo_type == 'rob':
+                V, F = uw.get_robot_geometry(tq, True)
+                print("V {}\nF {}".format(V.shape, F.shape))
+                IF, IBV = uw.intersecting_to_robot_surface(tq, True, V, F)
+                print("IF {}\nIBV {}\n{}".format(IF.shape, IBV.shape, IBV[:5]))
+                '''
+                NPICK=3000
+                IF = IF[:NPICK]
+                IBV = IBV[:NPICK*3]
+                '''
+        else:
+            svg_fn = ''
         uw.clear_barycentric(geo_flag)
         uw.add_barycentric(IF, IBV, geo_flag)
-        fb = uw.render_barycentric(geo_flag, np.array([ATLAS_RES, ATLAS_RES], dtype=np.int32))
-        np.clip(fb, 0, 1, out=fb) # Clip to binary
-        nw = texture_format.framebuffer_to_file(fb.astype(np.float32))
-        w = nw * (1.0 / np.clip(pyosr.distance(tq, iq), 1e-4, None))
+        if DEBUG_UVRENDER and i == 2:
+            print("BaryF {}".format(IF))
+            print("Bary {}".format(IBV))
+        fb = uw.render_barycentric(geo_flag,
+                                   np.array([ATLAS_RES, ATLAS_RES], dtype=np.int32),
+                                   svg_fn=svg_fn)
+        #np.clip(fb, 0, 1, out=fb) # Clip to binary
+        nw = texture_format.texture_to_file(fb.astype(np.float32))
+        distance = np.clip(pyosr.distance(tq, iq), 1e-4, None)
+        w = nw * (1.0 / distance)
         if afb is None:
             afb = w
             afb_nw = nw
@@ -245,22 +267,21 @@ def uvrender(uw, args):
             afb += w
             afb_nw += nw
             np.clip(afb_nw, 0, 1.0, out=afb_nw) # afb_nw is supposed to be binary
-        '''
-        print('afb shape {}'.format(afb.shape))
-        rgb = np.zeros(list(afb.shape) + [3])
-        rgb[...,1] = w
-        imsave(_fn_atlastex(io_dir, geo_type, vert_id, i), rgb)
-        np.savez(_fn_atlas(io_dir, geo_type, vert_id, i), w)
-        if i == 4:
-            V1, F1 = uw.get_robot_geometry(tq, True)
-            pyosr.save_obj_1(V1, F1, '1.obj')
-        if i >= 4:
-            break
-        if i == 0:
+        # Debugging code
+        if DEBUG_UVRENDER:
+            print('afb shape {}'.format(afb.shape))
+            print('distance {}'.format(distance))
+            rgb = np.zeros(list(afb.shape) + [3])
+            rgb[...,1] = w
+            imsave(_fn_atlastex(io_dir, geo_type, vert_id, i), rgb)
+            np.savez(atlas_fn(io_dir, geo_type, vert_id, i), w)
             print('NW NZ {}'.format(nw[np.nonzero(nw)]))
-        if i >= 128:
-            break
-        '''
+            V1, F1 = uw.get_robot_geometry(tq, True)
+            pyosr.save_obj_1(V1, F1, '{}.obj'.format(i))
+            V2, F2 = uw.get_scene_geometry(tq, True)
+            pyosr.save_obj_1(V2, F2, '{}e.obj'.format(i))
+            if i >= 16:
+               return
         i+=1
     rgb = np.zeros(list(afb.shape) + [3])
     rgb[...,1] = afb
