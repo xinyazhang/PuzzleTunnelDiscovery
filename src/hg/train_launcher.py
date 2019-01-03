@@ -33,6 +33,14 @@ def process_config(conf_file):
 				params[option] = eval(config.get(section, option))
 	return params
 
+def craft_dict(params):
+    dic = {}
+    for k in ['suppress_hot', 'red_noise']:
+        if k in params:
+            dic[k] = params[k]
+        else:
+            dic[k] = 0.0
+    return dic
 
 if __name__ == '__main__':
 	cfile = 'config.cfg' if len(sys.argv) < 2 else sys.argv[1]
@@ -48,7 +56,8 @@ if __name__ == '__main__':
             ds_name = ''
         else:
             ds_name = params['new_dataset']
-            dataset = datagen.create_dataset(ds_name, aug_patch=True, aug_scaling=0.5)
+            aug_dict = craft_dict(params)
+            dataset = datagen.create_dataset(ds_name, aug_patch=True, aug_scaling=0.5, aug_dict=aug_dict)
             params['num_joints'] = dataset.d_dim
             assert params['weighted_loss'] is False, "No support for weighted loss for now"
 
