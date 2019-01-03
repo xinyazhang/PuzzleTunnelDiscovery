@@ -3,6 +3,7 @@
 #include <igl/readOBJ.h>
 #include <igl/writePLY.h>
 #include <meshbool/join.h>
+#include <tritri/tritri_cop.h>
 
 namespace osr {
 void saveOBJ1(const Eigen::Matrix<double, -1, -1>& V,
@@ -72,5 +73,16 @@ const uint32_t MESH_BOOL_XOR = igl::MESH_BOOLEAN_TYPE_XOR;
 const uint32_t MESH_BOOL_RESOLVE = igl::MESH_BOOLEAN_TYPE_RESOLVE;
 
 #endif
+
+Eigen::SparseMatrix<int>
+tritriCop(const Eigen::Matrix<double, -1, -1>& V0,
+          const Eigen::Matrix<int, -1, -1>& F0,
+          const Eigen::Matrix<double, -1, -1>& V1,
+          const Eigen::Matrix<int, -1, -1>& F1)
+{
+	Eigen::SparseMatrix<int> COP;
+	tritri::TriTriCop(V0, F0, V1, F1, COP);
+	return COP;
+}
 
 }

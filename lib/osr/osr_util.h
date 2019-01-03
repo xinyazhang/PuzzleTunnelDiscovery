@@ -14,6 +14,7 @@
  */
 
 #include <Eigen/Core>
+#include <Eigen/SparseCore>
 #include <string>
 #include <tuple>
 
@@ -63,6 +64,12 @@ extern const uint32_t MESH_BOOL_MINUS;
 extern const uint32_t MESH_BOOL_XOR;
 extern const uint32_t MESH_BOOL_RESOLVE;
 #endif
+
+Eigen::SparseMatrix<int>
+tritriCop(const Eigen::Matrix<double, -1, -1>& V0,
+          const Eigen::Matrix<int, -1, -1>& F0,
+          const Eigen::Matrix<double, -1, -1>& V1,
+          const Eigen::Matrix<int, -1, -1>& F1);
 
 }
 

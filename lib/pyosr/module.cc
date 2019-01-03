@@ -110,6 +110,7 @@ PYBIND11_PLUGIN(pyosr) {
 	m.attr("MESH_BOOL_MINUS") = py::int_(osr::MESH_BOOL_MINUS);
 	m.attr("MESH_BOOL_XOR") = py::int_(osr::MESH_BOOL_XOR);
 	m.attr("MESH_BOOL_RESOLVE") = py::int_(osr::MESH_BOOL_RESOLVE);
+	m.def("tritri_cop", &osr::tritriCop);
 	using osr::UnitWorld;
 	py::class_<UnitWorld>(m, "UnitWorld")
 		.def(py::init<>())
