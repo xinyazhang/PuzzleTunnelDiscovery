@@ -645,7 +645,7 @@ Renderer::renderBarycentric(uint32_t target,
 #endif
 
 	if (!svg_fn.empty()) {
-		std::ofstream fout("out1.svg");
+		std::ofstream fout(svg_fn);
 		fout << "<svg width=\"" << res(0) << "\" height=\"" << res(1) << "\">\n";
 		for (int i = 0; i < brd.cache_uv.rows(); i+=3) {
 			using Eigen::Vector2f;
