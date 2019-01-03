@@ -158,11 +158,12 @@ class UVObjGenerator(object):
 
     def __next__(self):
         fn = _fn_uvgeo(self.in_dir, self.geo_type, self.vert_id, self.conf_id)
+        fn += '.npz'
         self.conf_id += 1
         print("loading {}".format(fn))
         if not os.path.exists(fn):
             return None, None # Note: do NOT raise StopIteration, we may miss some file in the middle
-        d = np.load(fn+'.npz')
+        d = np.load(fn)
         return d['V'], d['F']
 
     # Python 2 compat
