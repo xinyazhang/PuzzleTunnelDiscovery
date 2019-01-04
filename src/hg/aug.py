@@ -18,11 +18,13 @@ patch_finder_1:
 
     Returns:
         An np.array(shape=(2), dtype=np.int) object, indicating the top left corner of the patch.
+        or
+        None, when failed to find a patch within `max_trial` iterations
 '''
-def patch_finder_1(coldmap, heatmap, patch_size):
+def patch_finder_1(coldmap, heatmap, patch_size, max_trial=32):
     cold_x, = np.nonzero(np.sum(coldmap, axis=1))
     cold_y, = np.nonzero(np.sum(coldmap, axis=0))
-    while True:
+    for i in iter(int, 1):
         tl_x = np.random.choice(cold_x)
         tl_y = np.random.choice(cold_y)
         tl = np.array([tl_x, tl_y], dtype=np.int32)
@@ -32,6 +34,8 @@ def patch_finder_1(coldmap, heatmap, patch_size):
         '''
         if np.sum(coldmap[tl[0]:maxs[0], tl[1]:maxs[1]]) == 0:
             continue
+        if i > max_trial:
+            return None
         '''
         Check if covers anything in heatmap
         We leave 2 pix margin

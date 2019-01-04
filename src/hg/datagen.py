@@ -726,7 +726,10 @@ class NarrowTunnelRegionDataSet(OsrDataSet):
                             # print("aug_patch")
                             patch_tl = aug.patch_finder_1(coldmap=rgbd[:,:,0], heatmap=rgbd[:,:,1], patch_size=self.patch_size)
                             patch_size = self.patch_size
-                        train_img[i] = aug_func(train_img[i], patch_tl, patch_size)
+                            if patch_tl is None: # Cannot find a patch, cancel
+                                aug_func = None
+                        if aug_func is not None:
+                            train_img[i] = aug_func(train_img[i], patch_tl, patch_size)
                         if emit_gt:
                             aug.dim_rgb(gt_img[i], patch_tl, patch_size)
                 else:
