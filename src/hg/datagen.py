@@ -43,6 +43,7 @@ import pyosr
 import aniconf12_2
 import aniconf10
 import dualconf_tiny
+import dualconf
 
 class DataGenerator():
         c_dim = 3
@@ -583,13 +584,14 @@ class DataGenerator():
 
 class OsrDataSet(object):
 
-    def __init__(self, env, rob, center=None, res=224):
+    def __init__(self, env, rob, center=None, res=224, flat_surface=False):
         pyosr.init()
         self.dpy = pyosr.create_display()
         self.glctx = pyosr.create_gl_context(self.dpy)
 
         r = pyosr.Renderer()
         r.avi = True
+        r.flat_surface = flat_surface
         r.pbufferWidth = res
         r.pbufferHeight = res
         r.setup()
@@ -640,11 +642,12 @@ class NarrowTunnelRegionDataSet(OsrDataSet):
     Arguments:
         render_flag: choose which geometry to render
     '''
-    def __init__(self, rob, env, render_flag, center=None, res=256, patch_size=32, aug_patch=False, aug_scaling=0.0, aug_dict={}):
+    def __init__(self, rob, env, render_flag, center=None, res=256, patch_size=32, aug_patch=False, aug_scaling=0.0, aug_dict={}, flat_surface=False):
         super(NarrowTunnelRegionDataSet, self).__init__(rob=rob,
                                                         env=env,
                                                         center=center,
-                                                        res=res)
+                                                        res=res,
+                                                        flat_surface=flat_surface)
         self.c_dim = 4
         self.d_dim = 1
         self.render_flag = render_flag
@@ -791,7 +794,8 @@ def create_dataset(ds_name, res=256, aug_patch=True, aug_scaling=1.0, aug_dict={
                                          aug_patch=aug_patch,
                                          aug_dict=aug_dict,
                                          aug_scaling=aug_scaling)
-    if ds_name == 'dual_tiny_rob':
+    if ds_name in ['dual_tiny_rob', 'dual_rob']: # Tiny and the orignal share the same ROB geometry
+        assert False, 'NOTE: NO NEED TO TRAIN/TEST ON THIS DATASET'
         return NarrowTunnelRegionDataSet(rob=dualconf_tiny.rob_uv_fn,
                                          env=dualconf_tiny.env_uv_fn,
                                          render_flag=pyosr.Renderer.NO_SCENE_RENDERING,
@@ -801,7 +805,11 @@ def create_dataset(ds_name, res=256, aug_patch=True, aug_scaling=1.0, aug_dict={
                                          aug_patch=aug_patch,
                                          aug_dict=aug_dict,
                                          aug_scaling=aug_scaling)
-    if ds_name == 'dual_tiny_env':
+    if ds_name in ['dual_tiny_env', 'dual_tiny_env_flat']:
+        if 'flat' in ds_name:
+            flat_surface=True
+        else:
+            flat_surface=False
         return NarrowTunnelRegionDataSet(rob=dualconf_tiny.env_uv_fn,
                                          env=dualconf_tiny.env_uv_fn,
                                          render_flag=pyosr.Renderer.NO_SCENE_RENDERING,
@@ -810,5 +818,21 @@ def create_dataset(ds_name, res=256, aug_patch=True, aug_scaling=1.0, aug_dict={
                                          center=dualconf_tiny.rob_ompl_center,
                                          aug_patch=aug_patch,
                                          aug_dict=aug_dict,
-                                         aug_scaling=aug_scaling)
+                                         aug_scaling=aug_scaling,
+                                         flat_surface=flat_surface)
+    if ds_name in ['dual_env', 'dual_env_flat']:
+        if 'flat' in ds_name:
+            flat_surface=True
+        else:
+            flat_surface=False
+        return NarrowTunnelRegionDataSet(rob=dualconf.env_uv_fn,
+                                         env=dualconf.env_uv_fn,
+                                         render_flag=pyosr.Renderer.NO_SCENE_RENDERING,
+                                         res=res,
+                                         patch_size=64,
+                                         center=dualconf_tiny.rob_ompl_center,
+                                         aug_patch=aug_patch,
+                                         aug_dict=aug_dict,
+                                         aug_scaling=aug_scaling,
+                                         flat_surface=flat_surface)
     assert False, "unknown dataset name {}".format(ds_name)
