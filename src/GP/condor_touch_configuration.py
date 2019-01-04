@@ -4,12 +4,14 @@ from __future__ import print_function
 import os
 import sys
 sys.path.append(os.getcwd())
+import shutil
 
 import pyosr
 import numpy as np
 #import aniconf12_2 as aniconf
 #import aniconf10 as aniconf
-import dualconf_tiny as aniconf
+#import dualconf_tiny as aniconf
+import dualconf as aniconf
 import uw_random
 import math
 from scipy.misc import imsave
@@ -45,6 +47,8 @@ def usage():
     Take the output of `uvrender` and write the mean of atlas to I/O dir.
 6.b (Auxiliary function) condor_touch_configuration.py atlas2prim <Output Dir>
     Generate the chart that maps pixels in ATLAS image back to PRIMitive ID
+6.c (Auxiliary function) condor_touch_configuration.py useatlas <rob/env> <npz file of prediction> <Output Dir>
+    Copy the prediction from NN to the output dir, with a matching name for `sample` command.
 7. condor_touch_configuration.py sample <Task ID> <Batch Size> <Input/Output Dir>
     Sample from the product of uvrender, and generate the sample in the narrow tunnel
     TODO: Vertex ID can be 'all'
@@ -371,6 +375,17 @@ def atlas2prim(uw, args):
         np.savez(task_partitioner.atlas2prim_fn(io_dir, geo_type), PRIM=atlas2prim, UV=atlas2uv)
         imsave(geo_type+'-a2p.png', atlas2prim) # This is for debugging
 
+def useatlas(uw, args):
+    geo_type = args[0]
+    fn = args[1]
+    if not fn.endswith('.npz'):
+        print("input file must be .npz format")
+    io_dir = args[2]
+    tp = TaskPartitioner(io_dir, None, None, tunnel_v=_get_tunnel_v())
+    ofn = task_partitioner.atlas_fn(io_dir, geo_type, 0)
+    shutil.copyfile(fn, ofn)
+    print("Copied file {} -> {}".format(fn, ofn))
+
 def sample(uw, args):
     task_id = int(args[0])
     batch_size = int(args[1])
@@ -652,6 +667,7 @@ def main():
             'uvrender' : uvrender,
             'uvmerge' : uvmerge,
             'atlas2prim' : atlas2prim,
+            'useatlas' : useatlas,
             'sample' : sample,
             'samvis' : samvis,
             'dump' : dump,
