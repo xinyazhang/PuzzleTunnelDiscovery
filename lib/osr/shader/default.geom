@@ -25,6 +25,7 @@ void main() {
 		flat_normal = vec4(normalize(cross(u, v)), 0.0);
 	}
 	int n;
+	gl_PrimitiveID = gl_PrimitiveIDIn;
 	for (n = 0; n < gl_in.length(); n++) {
 		// Passing thru variables
 		fragColor = vso_color[n];
