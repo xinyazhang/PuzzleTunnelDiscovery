@@ -13,6 +13,10 @@ const char* vertShaderSrc =
 #include "shader/default.vert"
 ;
 
+const char* geomShaderSrc =
+#include "shader/default.geom"
+;
+
 const char* fragShaderSrc =
 #include "shader/depth.frag"
 ;
@@ -105,6 +109,7 @@ void Renderer::setupNonSharedObjects()
 	std::cout << "[" << __func__ <<  "] OpenGL version supported:" << version << "\n";
 
 	GLuint vertShader = 0;
+	GLuint geomShader = 0;
 	GLuint fragShader = 0;
 	GLuint rgbdFragShader = 0;
 
@@ -113,19 +118,24 @@ void Renderer::setupNonSharedObjects()
 	 * programs
 	 */
 	CHECK_GL_ERROR(vertShader = glCreateShader(GL_VERTEX_SHADER));
+	CHECK_GL_ERROR(geomShader = glCreateShader(GL_GEOMETRY_SHADER));
 	CHECK_GL_ERROR(fragShader = glCreateShader(GL_FRAGMENT_SHADER));
 	CHECK_GL_ERROR(rgbdFragShader = glCreateShader(GL_FRAGMENT_SHADER));
 	int vlength = strlen(vertShaderSrc) + 1;
+	int glength = strlen(geomShaderSrc) + 1;
 	int flength = strlen(fragShaderSrc) + 1;
 	int flength2 = strlen(rgbdFragShaderSrc) + 1;
 	CHECK_GL_ERROR(glShaderSource(vertShader, 1, &vertShaderSrc, &vlength));
+	CHECK_GL_ERROR(glShaderSource(geomShader, 1, &geomShaderSrc, &glength));
 	CHECK_GL_ERROR(glShaderSource(fragShader, 1, &fragShaderSrc, &flength));
 	CHECK_GL_ERROR(glShaderSource(rgbdFragShader, 1, &rgbdFragShaderSrc, &flength2));
 	CHECK_GL_ERROR(glCompileShader(vertShader));
+	CHECK_GL_ERROR(glCompileShader(geomShader));
 	CHECK_GL_ERROR(glCompileShader(fragShader));
 	CHECK_GL_ERROR(glCompileShader(rgbdFragShader));
 
 	CheckShaderCompilation(vertShader);
+	CheckShaderCompilation(geomShader);
 	CheckShaderCompilation(fragShader);
 	CheckShaderCompilation(rgbdFragShader);
 
@@ -135,12 +145,14 @@ void Renderer::setupNonSharedObjects()
 	 */
 	CHECK_GL_ERROR(shaderProgram = glCreateProgram());
 	CHECK_GL_ERROR(glAttachShader(shaderProgram, vertShader));
+	CHECK_GL_ERROR(glAttachShader(shaderProgram, geomShader));
 	CHECK_GL_ERROR(glAttachShader(shaderProgram, fragShader));
 	CHECK_GL_ERROR(glLinkProgram(shaderProgram));
 	CheckProgramLinkage(shaderProgram);
 
 	CHECK_GL_ERROR(rgbdShaderProgram = glCreateProgram());
 	CHECK_GL_ERROR(glAttachShader(rgbdShaderProgram, vertShader));
+	CHECK_GL_ERROR(glAttachShader(rgbdShaderProgram, geomShader));
 	CHECK_GL_ERROR(glAttachShader(rgbdShaderProgram, rgbdFragShader));
 	CHECK_GL_ERROR(glLinkProgram(rgbdShaderProgram));
 	CheckProgramLinkage(rgbdShaderProgram);
@@ -176,6 +188,7 @@ void Renderer::setupNonSharedObjects()
 	 * Delete non-used shaders to recycle resources.
 	 */
 	CHECK_GL_ERROR(glDeleteShader(vertShader));
+	CHECK_GL_ERROR(glDeleteShader(geomShader));
 	CHECK_GL_ERROR(glDeleteShader(fragShader));
 	CHECK_GL_ERROR(glDeleteShader(rgbdFragShader));
 
@@ -432,6 +445,7 @@ void Renderer::render_rgbd(uint32_t flags)
 	CHECK_GL_ERROR(glUniform3fv(17, 1, light_position.data()));
 	CHECK_GL_ERROR(glUniform1i(18, 0));
 	CHECK_GL_ERROR(glUniform1i(19, is_render_uv_mapping));
+	CHECK_GL_ERROR(glUniform1i(20, flat_surface));
 
 #if 0
 	if (is_render_uv_mapping) {

@@ -8,17 +8,14 @@ layout(location = 1) in vec3 inColor;
 layout(location = 2) in vec3 inVertNormal;
 layout(location = 3) in vec2 inUV;
 layout(location = 19) uniform bool is_render_uv_mapping;
-out vec3 fragColor;
-out gl_PerVertex {
-    vec4 gl_Position;
-};
-out vec4 vert_normal;
-out vec4 world_position;
-out vec2 uv;
-out float linearZ;
+out vec3 vso_color; // VS Output
+out vec4 vso_vert_normal;
+out vec4 vso_world_position;
+out vec2 vso_uv;
+out float vso_linearZ;
 void main() {
 	if (is_render_uv_mapping) {
-		world_position = vec4(inUV, 0.0, 1.0);
+		vso_world_position = vec4(inUV, 0.0, 1.0);
 		// gl_Position = vec4(inUV, 0.5, 1.0);
 		// world_position = model * vec4(inPosition, 1.0);
 		// vec4 vm = view * world_position;
@@ -31,19 +28,19 @@ void main() {
 		// gl_Position = proj * view * vec4(inUV.x, inUV.y, 0.0, 1.0);
 		gl_Position = vec4(2.0 * inUV - 1.0, 0.0, 1.0);
 
-		vert_normal = vec4(0.0, 0.0, -1.0, 1.0);
-		linearZ = 1.0;
-		fragColor = vec3(1.0, 1.0, 1.0);
+		vso_vert_normal = vec4(0.0, 0.0, -1.0, 1.0);
+		vso_linearZ = 1.0;
+		vso_color = vec3(1.0, 1.0, 1.0);
 	} else {
-		world_position = model * vec4(inPosition, 1.0);
-		vec4 vm = view * world_position;
+		vso_world_position = model * vec4(inPosition, 1.0);
+		vec4 vm = view * vso_world_position;
 		gl_Position = proj * vm;
-		vert_normal = model * vec4(inVertNormal, 0.0);
+		vso_vert_normal = model * vec4(inVertNormal, 0.0);
 		// vert_normal = vec4(inVertNormal, 0.0);
 		// vert_normal = vec4(0.0, 1.0, 1.0, 0.0);
-		linearZ = length(vec3(vm));
-		fragColor = inColor;
+		vso_linearZ = length(vec3(vm));
+		vso_color = inColor;
 	}
-	uv = inUV;
+	vso_uv = inUV;
 }
 )zzz"

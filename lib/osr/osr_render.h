@@ -69,6 +69,7 @@ public:
 	int pbufferHeight = 224;
 	float default_depth = 5.0f;
 	GLboolean avi = false; // AdVanced Illumination
+	GLboolean flat_surface = false; // Calculate normal
 	Eigen::Vector3f light_position = {0.0f, 5.0f, 0.0f};
 
 	/*
