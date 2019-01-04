@@ -27,6 +27,10 @@ ATLAS_RES = 2048
 STEPPING_FOR_TOUCH = 0.0125 / 8
 STEPPING_FOR_CONNECTIVITY = STEPPING_FOR_TOUCH * 4
 
+######################################################################################################
+#            FIXME: USE ARGPARSE AND SUBPARSERS TO HANDLE ARGUMENTS AND DOCUMENTATION                #
+######################################################################################################
+
 def usage():
     print('''Usage:
 1. condor_touch_configuration.py show
@@ -401,17 +405,19 @@ def sample(uw, args):
     pn2 = []
     conf = []
     import progressbar
-    for i in progressbar.progressbar(range(batch_size)):
-        while True:
-            tup1 = rob_sampler.sample(uw)
-            tup2 = env_sampler.sample(uw)
-            q = uw.sample_free_configuration(tup1[0], tup1[1], tup2[0], tup2[1], 1e-6, max_trials=16)
-            if uw.is_valid_state(q):
-                break
-        conf.append(q)
-    # print("tqre_fn {}".format(tp.get_tqre_fn(task_id)))
-    np.savez(tp.get_tqre_fn(task_id), ReTouchQ=conf)
-    return
+    SANITY_CHECK=False
+    if not SANITY_CHECK:
+        for i in progressbar.progressbar(range(batch_size)):
+            while True:
+                tup1 = rob_sampler.sample(uw)
+                tup2 = env_sampler.sample(uw)
+                q = uw.sample_free_configuration(tup1[0], tup1[1], tup2[0], tup2[1], 1e-6, max_trials=16)
+                if uw.is_valid_state(q):
+                    break
+            conf.append(q)
+        # print("tqre_fn {}".format(tp.get_tqre_fn(task_id)))
+        np.savez(tp.get_tqre_fn(task_id), ReTouchQ=conf)
+        return
     #
     # Sanity check code
     #
@@ -424,8 +430,8 @@ def sample(uw, args):
             fail += 1
             if uw.is_valid_state(q):
                 break
-            # print("Reject {}".format(q))
-        # print("Accept {}".format(q))
+            print("Reject {}".format(q))
+        print("Accept {}".format(q))
         pcloud1.append(tup1[0])
         pcloud2.append(tup2[0])
         conf.append(q)
