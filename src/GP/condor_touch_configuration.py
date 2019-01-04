@@ -20,6 +20,10 @@ from task_partitioner import *
 import texture_format
 import atlas
 import task_partitioner
+try:
+    from progressbar import progressbar
+except ImportError:
+    progressbar = lambda x: x
 
 import aux
 
@@ -404,10 +408,9 @@ def sample(uw, args):
     pcloud2 = []
     pn2 = []
     conf = []
-    import progressbar
     SANITY_CHECK=False
     if not SANITY_CHECK:
-        for i in progressbar.progressbar(range(batch_size)):
+        for i in progressbar(range(batch_size)):
             while True:
                 tup1 = rob_sampler.sample(uw)
                 tup2 = env_sampler.sample(uw)
@@ -422,7 +425,7 @@ def sample(uw, args):
     # Sanity check code
     #
     fail = 0
-    for i in progressbar.progressbar(range(32)):
+    for i in progressbar(range(32)):
         while True:
             tup1 = rob_sampler.sample(uw)
             tup2 = env_sampler.sample(uw)
