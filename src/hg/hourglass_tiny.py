@@ -34,6 +34,7 @@ import sys
 import datetime
 import os
 from scipy.misc import imsave
+import progressbar
 
 class HourglassModel():
 	""" HourglassModel class: (to be renamed)
@@ -328,15 +329,33 @@ class HourglassModel():
                 startTime = time.time()
                 pred = self.output[:, self.nStack - 1]
 
+                '''
+                Notes about profiling (on 1080 Ti, 16384 * 4 samples, '~' means ETA from progressbar):
+                    batch size 4: 19 mins
+                    batch size 4 w/o assignment: ~14 mins
+                    batch size 8: ~17-18 mins (6999 MB)
+                    batch size 8 w/o assignment: ~12 mins
+                    batch size 16: ~13 mins (7511 MB)
+                    batch size 16 w/o assignment: ~11 mins
+                    batch size 32: ~12 mins (7511 MB)
+                    batch size 32 w/o assignment: ~11 mins
+                    batch size 32 rendering only: 3:51
+                '''
+                PROFILING2=False # w/o prediction and assignment (generation only)
+                PROFILING=False or PROFILING2 # w/o assignment
                 for epoch in range(nEpochs):
                     epochstartTime = time.time()
                     print('Epoch :' + str(epoch) + '/' + str(nEpochs) + '\n')
                     # Training Set
-                    for i in range(epochSize):
+                    for i in progressbar.progressbar(range(epochSize)):
                         # DISPLAY PROGRESS BAR
                         # TODO : Customize Progress Bar
                         img_test, batch_uv, _ = next(self.generator)
+                        if PROFILING2:
+                            continue
                         [test_y] = self.Session.run([pred], feed_dict = {self.img : img_test})
+                        if PROFILING:
+                            continue # Profiling, check the % of time used by prediction
                         for uvi,labeli in zip(batch_uv, test_y):
                             # np.clip(labeli, 0.0, 1.0, out=labeli)
                             labeli = np.reshape(labeli, (64,64))
@@ -348,16 +367,33 @@ class HourglassModel():
                             us = np.array(tres * us, dtype=int)
                             vs = uvs[:,0]
                             vs = np.array(tres * vs, dtype=int)
+                            # Filtering US and VS
+                            us_inrange = (us >= 0)
+                            us_inrange = np.logical_and(us < tres, us_inrange) # Not sure the effect when out=one of the input
+                            vs_inrange = (vs >= 0)
+                            vs_inrange = np.logical_and(vs < tres, vs_inrange) # Not sure the effect when out=one of the input
+                            inrange = np.logical_and(us_inrange, vs_inrange)
+                            f_us = us[inrange]
+                            f_vs = vs[inrange]
+                            f_sc = scores[inrange]
+                            atex[f_us,f_vs] += f_sc
+                            '''
+                            # TODO: Better efficiency
                             for iu,iv,s in zip(us,vs,scores):
                                 if iu < 0 or iu >= tres or iv < 0 or iv > tres:
                                     continue
                                 atex[iu,iv] += s
+                            '''
                     epochfinishTime = time.time()
                     print('Epoch ' + str(epoch) + '/' + str(nEpochs) + ' done in ' + str(int(epochfinishTime-epochstartTime)) + ' sec.' + ' -avg_time/batch: ' + str(((epochfinishTime-epochstartTime)/epochSize))[:4] + ' sec.')
-                print('Testing Done')
-                np.savez('{}/{}-atex.npz'.format(out_dir, self.dataset_name), ATEX=atex)
+                if PROFILING or PROFILING2: # Explicit better than implicit (PROFILING2 implies PROFILING)
+                    return
+                npz_fn = '{}/{}-atex.npz'.format(out_dir, self.dataset_name)
+                png_fn = '{}/{}-atex.png'.format(out_dir, self.dataset_name)
+                print('Testing Done. Saving files to\n{}\n{}'.format(npz_fn, png_fn))
+                np.savez(npz_fn, ATEX=atex)
                 natex = atex / np.amax(atex)
-                imsave('{}/{}-atex.png'.format(out_dir, self.dataset_name), natex)
+                imsave(png_fn, natex)
 
 	def record_training(self, record):
 		""" Record Training Data and Export them in CSV file
