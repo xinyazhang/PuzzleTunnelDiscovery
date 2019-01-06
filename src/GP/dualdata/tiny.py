@@ -6,8 +6,8 @@ STICKS_X_DESC = [
         {
             'origin': (0,0),
             'len' : STICK_LENGTH,
-            'up': [0],
-            'down': []
+            'up': [],
+            'down': [0]
         },
         {
             'origin': (0, (HOLLOW_SQUARE_SIZE + STICK_WIDTH) * 1.0),
