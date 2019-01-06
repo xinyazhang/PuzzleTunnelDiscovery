@@ -13,6 +13,7 @@ import multiprocessing
 from dualdata.template import *
 import dualdata.full
 import dualdata.tiny
+import dualdata.two
 import argparse
 
 def create_cube(X, Y, Z):
