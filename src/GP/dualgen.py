@@ -8,48 +8,41 @@ sys.path.append(os.getcwd())
 import pyosr
 import numpy as np
 import math
+
 import multiprocessing
+from dualdata.template import *
+import dualdata.full
+import dualdata.tiny
+import argparse
 
-import dual
+def create_cube(X, Y, Z):
+    V = np.copy(UC_V)
+    V[:,0] *= X
+    V[:,1] *= Y
+    V[:,2] *= Z
+    return V, UC_F
 
-from dual import FILLISTER_DEPTH, FILLISTER_LENGTH, FILLISTER_MARGIN, create_cube, pos_to_carve_origin, merge_mesh
+def pos_to_tangent_offset(pos):
+    d,m = divmod(pos, 2)
+    tangent_offset = d * (HOLLOW_SQUARE_SIZE + STICK_WIDTH)
+    if m == 0:
+        tangent_offset += STICK_WIDTH
+    else:
+        tangent_offset += HOLLOW_SQUARE_SIZE + STICK_WIDTH - FILLISTER_LENGTH
+    return tangent_offset
 
-STICK_WIDTH = dual.STICK_WIDTH
-STICK_HEIGHT = dual.STICK_HEIGHT
-HOLLOW_SQUARE_SIZE = dual.HOLLOW_SQUARE_SIZE
-STICK_LENGTH = HOLLOW_SQUARE_SIZE + 2 * STICK_WIDTH
+def pos_to_carve_origin(pos, tangent, normal, up, is_top=True):
+    tangent_offset = pos_to_tangent_offset(pos)
+    carve_origin = float(tangent_offset) * tangent
+    carve_origin -= FILLISTER_MARGIN * normal
+    if is_top:
+        carve_origin += (STICK_HEIGHT - FILLISTER_DEPTH) * up # Carve the top
+    else:
+        carve_origin += -FILLISTER_MARGIN * up # Remove the margin
+    return carve_origin
 
-STICKS_X_DESC = [
-        {
-            'origin': (0,0),
-            'up': [0],
-            'down': []
-        },
-        {
-            'origin': (0, (HOLLOW_SQUARE_SIZE + STICK_WIDTH) * 1.0),
-            'up': [],
-            'down': []
-        },
-]
-
-STICKS_Y_DESC = [
-        {
-            'origin': (0,0),
-            'up': [],
-            'down': [],
-        },
-        {
-            'origin': ((HOLLOW_SQUARE_SIZE + STICK_WIDTH) * 1.0, 0.0),
-            'up': [],
-            'down': []
-        },
-]
-
-'''
-FIXME: this is coped from dual.py
-'''
 def build_stick_x(desc):
-    V, F = create_cube(STICK_LENGTH, STICK_WIDTH, STICK_HEIGHT)
+    V, F = create_cube(desc['len'], STICK_WIDTH, STICK_HEIGHT)
     # Template at origin
     VT, FT = create_cube(FILLISTER_LENGTH,
                          STICK_WIDTH+2*FILLISTER_MARGIN, # Both sides
@@ -85,11 +78,29 @@ def build_stick_y(desc):
     F[:, 1] = F_x[:,0]
     return V, F
 
+def merge_mesh(mesh_pair):
+    mesh_0, mesh_1 = mesh_pair
+    V0, F0 = mesh_0
+    V1, F1 = mesh_1
+    V,F = pyosr.mesh_bool(V0, F0, V1, F1, pyosr.MESH_BOOL_UNION)
+    '''
+    print('{} {} + {} {} = {} {}'.format(V0.shape, F0.shape,
+                                         V1.shape, F1.shape,
+                                         V.shape, F.shape))
+    '''
+    return V,F
+
 def main():
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('pkg', help='Package name', nargs=None, type=str)
+    args = parser.parse_args()
+    pkg = getattr(dualdata, args.pkg)
+
     p = multiprocessing.Pool(8)
-    meshes_x = p.map(build_stick_x, STICKS_X_DESC)
+    print(pkg.STICKS_X_DESC)
+    meshes_x = p.map(build_stick_x, pkg.STICKS_X_DESC)
     # meshes_x = []
-    meshes_y = p.map(build_stick_y, STICKS_Y_DESC)
+    meshes_y = p.map(build_stick_y, pkg.STICKS_Y_DESC)
     # meshes_y = []
     meshes = meshes_x + meshes_y
     # meshes = meshes[0:1] # Debug
@@ -102,7 +113,7 @@ def main():
         meshes = meshes_next
     V, F = meshes[0]
     print("Final V F {} {}".format(V.shape, F.shape))
-    pyosr.save_obj_1(V,F,'dual_tiny.obj')
+    pyosr.save_obj_1(V,F,'dual.obj')
 
 if __name__ == '__main__':
     main()
