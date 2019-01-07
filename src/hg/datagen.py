@@ -44,6 +44,7 @@ import aniconf12_2
 import aniconf10
 import dualconf_tiny
 import dualconf
+import dualconf_g2
 
 class DataGenerator():
         c_dim = 3
@@ -743,6 +744,10 @@ class NarrowTunnelRegionDataSet(OsrDataSet):
             yield to_yield
 
 def create_dataset(ds_name, res=256, aug_patch=True, aug_scaling=1.0, aug_dict={}):
+    if 'flat' in ds_name:
+        flat_surface=True
+    else:
+        flat_surface=False
     if ds_name == 'alpha_ntr_hg1':
         return NarrowTunnelRegionDataSet(rob='../res/alpha/alpha-1.2.wt2.tcp.obj',
                                          env='../res/alpha/alpha_env-1.2.wt.obj',
@@ -809,10 +814,6 @@ def create_dataset(ds_name, res=256, aug_patch=True, aug_scaling=1.0, aug_dict={
                                          aug_dict=aug_dict,
                                          aug_scaling=aug_scaling)
     if ds_name in ['dual_tiny_env', 'dual_tiny_env_flat']:
-        if 'flat' in ds_name:
-            flat_surface=True
-        else:
-            flat_surface=False
         return NarrowTunnelRegionDataSet(rob=dualconf_tiny.env_uv_fn,
                                          env=dualconf_tiny.env_uv_fn,
                                          render_flag=pyosr.Renderer.NO_SCENE_RENDERING,
@@ -824,12 +825,19 @@ def create_dataset(ds_name, res=256, aug_patch=True, aug_scaling=1.0, aug_dict={
                                          aug_scaling=aug_scaling,
                                          flat_surface=flat_surface)
     if ds_name in ['dual_env', 'dual_env_flat']:
-        if 'flat' in ds_name:
-            flat_surface=True
-        else:
-            flat_surface=False
         return NarrowTunnelRegionDataSet(rob=dualconf.env_uv_fn,
                                          env=dualconf.env_uv_fn,
+                                         render_flag=pyosr.Renderer.NO_SCENE_RENDERING,
+                                         res=res,
+                                         patch_size=64,
+                                         center=dualconf_tiny.rob_ompl_center,
+                                         aug_patch=aug_patch,
+                                         aug_dict=aug_dict,
+                                         aug_scaling=aug_scaling,
+                                         flat_surface=flat_surface)
+    if ds_name in ['dual_g2_env', 'dual_g2_env_flat']:
+        return NarrowTunnelRegionDataSet(rob=dualconf_g2.env_uv_fn,
+                                         env=dualconf_g2.env_uv_fn,
                                          render_flag=pyosr.Renderer.NO_SCENE_RENDERING,
                                          res=res,
                                          patch_size=64,
