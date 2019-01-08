@@ -322,6 +322,7 @@ class HourglassModel():
             assert saveStep <= 0
             tres = 2048
             atex = np.zeros(shape=(tres,tres), dtype=np.float32) # accumulator texture
+            atex_count = np.zeros(shape=(tres,tres), dtype=np.int) # present in the input image
             """
             """
             with tf.name_scope('Train'):
@@ -377,6 +378,7 @@ class HourglassModel():
                             f_vs = vs[inrange]
                             f_sc = scores[inrange]
                             atex[f_us,f_vs] += f_sc
+                            atex_count[f_us,f_vs] += 1
                             '''
                             # TODO: Better efficiency
                             for iu,iv,s in zip(us,vs,scores):
@@ -390,10 +392,16 @@ class HourglassModel():
                     return
                 npz_fn = '{}/{}-atex.npz'.format(out_dir, self.dataset_name)
                 png_fn = '{}/{}-atex.png'.format(out_dir, self.dataset_name)
+                avgnpz_fn = '{}/{}-atex-avg.npz'.format(out_dir, self.dataset_name)
+                avgpng_fn = '{}/{}-atex-avg.png'.format(out_dir, self.dataset_name)
                 print('Testing Done. Saving files to\n{}\n{}'.format(npz_fn, png_fn))
+                np.clip(atex_count, a_min=1, a_max=None, out=atex_count)
                 np.savez(npz_fn, ATEX=atex)
+                np.savez(avgnpz_fn, ATEX=atex/atex_count)
                 natex = atex / np.amax(atex)
                 imsave(png_fn, natex)
+                natex = atex/atex_count
+                imsave(avgpng_fn, natex)
 
 	def record_training(self, record):
 		""" Record Training Data and Export them in CSV file
