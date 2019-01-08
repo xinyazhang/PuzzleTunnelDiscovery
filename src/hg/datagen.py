@@ -622,12 +622,18 @@ class OsrDataSet(object):
 from math import sqrt,pi,sin,cos
 
 def random_state(scale=1.0):
-    tr = scale * (np.random.rand(3) - 0.5 + 0.25)
+    tr = np.random.uniform(low=-1.0, high=1.0, size=(3))
+    tr[0] += 0.5
+    tr[1] += 0.5
+    tr *= scale
+    # tr = [0.0,0.0,0]
+    #tr = [1.5,1.5,0]
     u1,u2,u3 = np.random.rand(3)
     quat = [sqrt(1-u1)*sin(2*pi*u2),
             sqrt(1-u1)*cos(2*pi*u2),
             sqrt(u1)*sin(2*pi*u3),
             sqrt(u1)*cos(2*pi*u3)]
+    # quat = [1.0, 0.0, 0.0, 0.0]
     part1 = np.array(tr, dtype=np.float32)
     part2 = np.array(quat, dtype=np.float32)
     part1_0 = np.array([0.0,0.0,0.0], dtype=np.float32)
@@ -643,7 +649,7 @@ class NarrowTunnelRegionDataSet(OsrDataSet):
     Arguments:
         render_flag: choose which geometry to render
     '''
-    def __init__(self, rob, env, render_flag, center=None, res=256, patch_size=32, aug_patch=False, aug_scaling=0.0, aug_dict={}, flat_surface=False):
+    def __init__(self, rob, env, render_flag, center=None, q_range=1.0, res=256, patch_size=32, aug_patch=False, aug_scaling=0.0, aug_dict={}, flat_surface=False):
         super(NarrowTunnelRegionDataSet, self).__init__(rob=rob,
                                                         env=env,
                                                         center=center,
@@ -656,6 +662,7 @@ class NarrowTunnelRegionDataSet(OsrDataSet):
         self.aug_patch = aug_patch
         self.aug_dict = dict(aug_dict)
         self.aug_scaling = aug_scaling
+        self.q_range = q_range
 
     def _aux_generator(self, batch_size=16, stacks=4, normalize=True, sample_set='train', emit_gt=False):
         is_training = True if sample_set == 'train' else False
@@ -693,7 +700,7 @@ class NarrowTunnelRegionDataSet(OsrDataSet):
                 else:
                     r.final_scaling = np.array([1.0, 1.0, 1.0])
                 r.avi = True
-                q,aq = random_state(0.5)
+                q,aq = random_state(self.q_range)
                 train_img[i] = self.render_rgbd(q, self.render_flag)
                 r.avi = False
                 r.render_mvrgbd(self.render_flag|pyosr.Renderer.HAS_NTR_RENDERING)
@@ -710,12 +717,13 @@ class NarrowTunnelRegionDataSet(OsrDataSet):
                     '''
                     if aug_patch:
                         rnd = np.random.random()
-                        aug_func = aug.patch_rgb
+                        aug_func = None
                         # print("rnd {}".format(rnd))
                         if rnd < aug_suppress_hot:
                             # Remove the hot region
                             # print("aug_suppress_hot")
                             patch_tl, patch_size = aug.patch_finder_hot(heatmap=rgbd[:,:,1], margin_pix=16)
+                            aug_func = aug.patch_rgb
                         elif rnd < aug_suppress_hot + aug_red_noise:
                             patch_tl, patch_size = aug.patch_finder_hot(heatmap=rgbd[:,:,1], margin_pix=64)
                             # print("aug_red_noise {} {}".format(patch_tl, patch_size))
@@ -729,6 +737,8 @@ class NarrowTunnelRegionDataSet(OsrDataSet):
                             patch_size = self.patch_size
                             if patch_tl is None: # Cannot find a patch, cancel
                                 aug_func = None
+                            else:
+                                aug_func = aug.patch_rgb
                         if aug_func is not None:
                             train_img[i] = aug_func(train_img[i], patch_tl, patch_size)
                         if emit_gt:
@@ -748,6 +758,15 @@ def create_dataset(ds_name, res=256, aug_patch=True, aug_scaling=1.0, aug_dict={
         flat_surface=True
     else:
         flat_surface=False
+    if 'debug' in ds_name:
+        debug = True
+    else:
+        debug = False
+    if debug: # disable augmentation
+        aug_scaling=0.0
+        aug_patch=False
+        aut_dict={}
+
     if ds_name == 'alpha_ntr_hg1':
         return NarrowTunnelRegionDataSet(rob='../res/alpha/alpha-1.2.wt2.tcp.obj',
                                          env='../res/alpha/alpha_env-1.2.wt.obj',
@@ -813,24 +832,26 @@ def create_dataset(ds_name, res=256, aug_patch=True, aug_scaling=1.0, aug_dict={
                                          aug_patch=aug_patch,
                                          aug_dict=aug_dict,
                                          aug_scaling=aug_scaling)
-    if ds_name in ['dual_tiny_env', 'dual_tiny_env_flat']:
+    if ds_name in ['dual_tiny_env', 'dual_tiny_env_flat', 'dual_tiny_env_flat_debug']:
         return NarrowTunnelRegionDataSet(rob=dualconf_tiny.env_uv_fn,
                                          env=dualconf_tiny.env_uv_fn,
                                          render_flag=pyosr.Renderer.NO_SCENE_RENDERING,
                                          res=res,
                                          patch_size=64,
                                          center=dualconf_tiny.rob_ompl_center,
+                                         q_range=1.0,
                                          aug_patch=aug_patch,
                                          aug_dict=aug_dict,
                                          aug_scaling=aug_scaling,
                                          flat_surface=flat_surface)
-    if ds_name in ['dual_env', 'dual_env_flat']:
+    if ds_name in ['dual_env', 'dual_env_flat', 'dual_env_flat_debug']:
         return NarrowTunnelRegionDataSet(rob=dualconf.env_uv_fn,
                                          env=dualconf.env_uv_fn,
                                          render_flag=pyosr.Renderer.NO_SCENE_RENDERING,
                                          res=res,
                                          patch_size=64,
                                          center=dualconf_tiny.rob_ompl_center,
+                                         q_range=1.5,
                                          aug_patch=aug_patch,
                                          aug_dict=aug_dict,
                                          aug_scaling=aug_scaling,
