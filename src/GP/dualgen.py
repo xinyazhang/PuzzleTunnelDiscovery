@@ -14,6 +14,7 @@ from dualdata.template import *
 import dualdata.full
 import dualdata.tiny
 import dualdata.two
+import dualdata.four
 import argparse
 
 def create_cube(X, Y, Z):
