@@ -53,7 +53,7 @@ STICKS_Y_DESC = [
             'origin': ((HOLLOW_SQUARE_SIZE + STICK_WIDTH) * 2.0, 0.0),
             'len' : STICK_LENGTH,
             'up': [2,3,5],
-            'down': [3]
+            'down': [0,3]
         },
         {
             'origin': ((HOLLOW_SQUARE_SIZE + STICK_WIDTH) * 3.0, 0.0),
