@@ -45,6 +45,7 @@ import aniconf10
 import dualconf_tiny
 import dualconf
 import dualconf_g2
+import dualconf_g4
 
 class DataGenerator():
         c_dim = 3
@@ -859,6 +860,17 @@ def create_dataset(ds_name, res=256, aug_patch=True, aug_scaling=1.0, aug_dict={
     if ds_name in ['dual_g2_env', 'dual_g2_env_flat']:
         return NarrowTunnelRegionDataSet(rob=dualconf_g2.env_uv_fn,
                                          env=dualconf_g2.env_uv_fn,
+                                         render_flag=pyosr.Renderer.NO_SCENE_RENDERING,
+                                         res=res,
+                                         patch_size=64,
+                                         center=dualconf_tiny.rob_ompl_center,
+                                         aug_patch=aug_patch,
+                                         aug_dict=aug_dict,
+                                         aug_scaling=aug_scaling,
+                                         flat_surface=flat_surface)
+    if ds_name in ['dual_g4_env', 'dual_g4_env_flat']:
+        return NarrowTunnelRegionDataSet(rob=dualconf_g4.env_uv_fn,
+                                         env=dualconf_g4.env_uv_fn,
                                          render_flag=pyosr.Renderer.NO_SCENE_RENDERING,
                                          res=res,
                                          patch_size=64,
