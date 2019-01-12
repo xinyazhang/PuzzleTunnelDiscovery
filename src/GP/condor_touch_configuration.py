@@ -424,7 +424,7 @@ def sample(uw, args, enum_axis=False):
                 while True:
                     tup1 = rob_sampler.sample(uw)
                     tup2 = env_sampler.sample(uw)
-                    q = uw.sample_free_configuration(tup1[0], tup1[1], tup2[0], tup2[1], 1e-6, max_trials=16, enum_axis=enum_axis)
+                    q = uw.sample_free_configuration(tup1[0], tup1[1], tup2[0], tup2[1], 1e-6, max_trials=16)
                     if uw.is_valid_state(q):
                         break
                 conf.append(q)
