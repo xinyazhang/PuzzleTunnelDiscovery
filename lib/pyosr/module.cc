@@ -181,6 +181,14 @@ PYBIND11_PLUGIN(pyosr) {
 		     py::arg("margin"),
 		     py::arg("max_trials") = -1,
 		     py::call_guard<py::gil_scoped_release>())
+		.def("enum_free_configuration", &UnitWorld::enumFreeConfiguration,
+		     py::arg("rob_surface_point"),
+		     py::arg("rob_surface_normal"),
+		     py::arg("env_surface_point"),
+		     py::arg("env_surface_normal"),
+		     py::arg("margin"),
+		     py::arg("denominator"),
+		     py::call_guard<py::gil_scoped_release>())
 		.def_readonly_static("GEO_ENV", &UnitWorld::GEO_ENV)
 		.def_readonly_static("GEO_ROB", &UnitWorld::GEO_ROB)
 		.def_property_readonly("scene_matrix", &UnitWorld::getSceneMatrix)

@@ -1289,4 +1289,48 @@ UnitWorld::sampleFreeConfiguration(const StateTrans& rob_surface_point,
 	return q;
 }
 
+
+ArrayOfStates
+UnitWorld::enumFreeConfiguration(const StateTrans& rob_surface_point,
+                                 const StateTrans& rob_surface_normal,
+                                 const StateTrans& env_surface_point,
+                                 const StateTrans& env_surface_normal,
+                                 StateScalar margin,
+                                 int denominator)
+{
+	StateTrans rob_o = rob_surface_point + rob_surface_normal * margin;
+	StateTrans env_o = env_surface_point + env_surface_normal * margin;
+	StateVector q; // return value
+
+	// Configuration (Q) sampling algorithm:
+	// 1. Rotate Robot so that rob_surface_normal matches **negatived** env_surface_normal
+	// 2. Rotate Robot with random angle axis (omega, env_surface_normal)
+	// 3. Translate the rotated rob_surface_point to env_surface_point
+	using Quat = Eigen::Quaternion<StateScalar>;
+	using AA = Eigen::AngleAxis<StateScalar>;
+	// Step 1 Rotation
+	Quat rot_1;
+	rot_1.setFromTwoVectors(rob_surface_normal, -env_surface_normal);
+	int trials = 0;
+	double delta = 2 * M_PI / double(denominator);
+	std::vector<StateVector> valid_states;
+	for (int i = 0; i < denominator; i++) {
+		// Step 2 Rotation
+		Quat rot_2(AA(i * delta, env_surface_normal));
+		Quat rot_accum = rot_2 * rot_1;
+
+		// Step 3 Translation
+		StateTrans trans = env_o - (rot_accum * rob_o);
+		q = compose(trans, rot_accum);
+		if (isValid(q))
+			valid_states.emplace_back(q);
+	}
+	ArrayOfStates ret;
+	ret.resize(valid_states.size(), kStateDimension);
+	for (size_t i = 0; i < valid_states.size(); i++) {
+		ret.row(i) = valid_states[i];
+	}
+	return ret;
+}
+
 }

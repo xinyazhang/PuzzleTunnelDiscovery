@@ -257,6 +257,14 @@ public:
 	                        StateScalar margin,
 	                        int max_trials = -1);
 
+	ArrayOfStates
+	enumFreeConfiguration(const StateTrans& rob_surface_point,
+	                      const StateTrans& rob_surface_normal,
+	                      const StateTrans& env_surface_point,
+	                      const StateTrans& env_surface_normal,
+	                      StateScalar margin,
+	                      int denominator);
+
 protected:
 	bool shared_ = false;
 

@@ -11,6 +11,7 @@ import numpy as np
 #import aniconf12_2 as aniconf
 #import aniconf10 as aniconf
 #import dualconf_tiny as aniconf
+#import dualconf_g2 as aniconf
 import dualconf as aniconf
 import uw_random
 import math
@@ -60,6 +61,8 @@ def usage():
 7. condor_touch_configuration.py sample <Task ID> <Batch Size> <Input/Output Dir>
     Sample from the product of uvrender, and generate the sample in the narrow tunnel
     TODO: Vertex ID can be 'all'
+7.1. condor_touch_configuration.py sample_enumaxis <Task ID> <Batch Size> <Input/Output Dir>
+    Sample from the product of uvrender, enumerate the axis angle w.r.t the contact normal, and only keep the c-free configurations.
 8. condor_touch_configuration.py samvis <Task ID> <Batch Size> <Input/Output Dir> <PRM sample file>
     Calculate the visibility matrix of the samples from 'sample' Command.
 9. condor_touch_configuration.py dump <object name> [Arguments depending on object]
@@ -394,7 +397,7 @@ def useatlas(uw, args):
     shutil.copyfile(fn, ofn)
     print("Copied file {} -> {}".format(fn, ofn))
 
-def sample(uw, args):
+def sample(uw, args, enum_axis=False):
     task_id = int(args[0])
     batch_size = int(args[1])
     io_dir = args[2]
@@ -411,13 +414,20 @@ def sample(uw, args):
     SANITY_CHECK=False
     if not SANITY_CHECK:
         for i in progressbar(range(batch_size)):
-            while True:
+            if enum_axis:
                 tup1 = rob_sampler.sample(uw)
                 tup2 = env_sampler.sample(uw)
-                q = uw.sample_free_configuration(tup1[0], tup1[1], tup2[0], tup2[1], 1e-6, max_trials=16)
-                if uw.is_valid_state(q):
-                    break
-            conf.append(q)
+                qs = uw.enum_free_configuration(tup1[0], tup1[1], tup2[0], tup2[1], 1e-6, denominator=64)
+                for q in qs:
+                    conf.append(q)
+            else:
+                while True:
+                    tup1 = rob_sampler.sample(uw)
+                    tup2 = env_sampler.sample(uw)
+                    q = uw.sample_free_configuration(tup1[0], tup1[1], tup2[0], tup2[1], 1e-6, max_trials=16, enum_axis=enum_axis)
+                    if uw.is_valid_state(q):
+                        break
+                conf.append(q)
         # print("tqre_fn {}".format(tp.get_tqre_fn(task_id)))
         np.savez(tp.get_tqre_fn(task_id), ReTouchQ=conf)
         return
@@ -467,6 +477,9 @@ def sample(uw, args):
     pyosr.save_ply_2(V=pcloud2, F=[], N=pn2, UV=[], filename='pc2x.ply')
     np.savetxt('cf1.txt', conf, fmt='%.17g')
     '''
+
+def sample_enumaxis(uw, args):
+    sample(uw, args, enum_axis=True)
 
 def samvis(uw, args):
     task_id = int(args[0])
@@ -624,13 +637,12 @@ def dump(uw, args):
                 out_obj = "{}/env-vert-{}-conf-{}.obj".format(out_obj_dir, vert_id, conf_id)
                 V2,F2 = uw.get_scene_geometry(q, True)
                 pyosr.save_obj_1(V2, F2, out_obj)
-                '''
+                out_obj = "{}/union-vert-{}-conf-{}.obj".format(out_obj_dir, vert_id, conf_id)
                 Va = np.concatenate((V1, V2), axis=0)
                 F2 += V1.shape[0]
                 Fa = np.concatenate((F1, F2), axis=0)
-                print("Dumping to {}".format(out_obj))
+                #print("Dumping to {}".format(out_obj))
                 pyosr.save_obj_1(Va, Fa, out_obj)
-                '''
             batch_id += 1
             conf_base += len(Q)
     elif target == 'omplsam':
@@ -678,6 +690,7 @@ def main():
             'atlas2prim' : atlas2prim,
             'useatlas' : useatlas,
             'sample' : sample,
+            'sample_enumaxis' : sample_enumaxis,
             'samvis' : samvis,
             'dump' : dump,
             'samstat' : samstat,
