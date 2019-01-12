@@ -46,6 +46,7 @@ class Scene {
 	std::shared_ptr<Node> root_;
 	std::vector<std::shared_ptr<Mesh>> meshes_;
 	std::shared_ptr<Scene> shared_from_;
+	bool has_vertex_normal_;
 public:
 	Scene();
 	Scene(std::shared_ptr<Scene> other);
@@ -89,6 +90,7 @@ public:
 	size_t getNumberOfMeshes() const { return meshes_.size(); }
 	void visitMesh(std::function<void(std::shared_ptr<const Mesh>)> ) const;
 	bool hasUV() const;
+	bool hasVertexNormal() const { return has_vertex_normal_; }
 
 	std::shared_ptr<const Mesh> getUniqueMesh() const;
 private:

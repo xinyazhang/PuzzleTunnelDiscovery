@@ -20,13 +20,20 @@ Mesh::Mesh(aiMesh* mesh, glm::vec3 color)
 	:shared_from_(nullptr)
 {
 	size_t NV = mesh->mNumVertices;
-	for (size_t i = 0; i < NV; i++) {
-		vertices_.emplace_back(
-		        to_glm_vec3(mesh->mVertices[i]),  // position
-		        color,
-		        to_glm_vec3(mesh->mNormals[i])  // normal
-		        );
-		// std::cerr << "Mesh Normal: " << to_glm_vec3(mesh->mNormals[i]) << '\n';
+	if (mesh->HasNormals()) {
+		for (size_t i = 0; i < NV; i++) {
+			vertices_.emplace_back(
+				to_glm_vec3(mesh->mVertices[i]),  // position
+				color,
+				to_glm_vec3(mesh->mNormals[i])  // normal
+				);
+			// std::cerr << "Mesh Normal: " << to_glm_vec3(mesh->mNormals[i]) << '\n';
+		}
+	} else {
+		for (size_t i = 0; i < NV; i++) {
+			vertices_.emplace_back(to_glm_vec3(mesh->mVertices[i]),
+			                       color);
+		}
 	}
 	if (mesh->HasTextureCoords(0)) {
 		uv_.resize(NV, 2);

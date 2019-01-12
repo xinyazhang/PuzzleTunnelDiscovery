@@ -30,6 +30,7 @@ void Scene::load(std::string filename, const glm::vec3* model_color)
 {
 	assert(std::ifstream(filename.c_str()).good());
 	clear();
+	has_vertex_normal_ = true;
 
 	using namespace Assimp;
 	Assimp::Importer importer;
@@ -60,9 +61,13 @@ void Scene::load(std::string filename, const glm::vec3* model_color)
 			color = *model_color;
 		else
 			color = meshColors[i % meshColors.size()];
-		if (!scene->mMeshes[i]->mNormals) {
+#if 0
+		if (!scene->mMeshes[i]->HasNormals()) {
 			throw std::runtime_error(filename + " does not contain per vertex normal");
 		}
+#else
+		has_vertex_normal_ = has_vertex_normal_ && scene->mMeshes[i]->HasNormals();
+#endif
 		meshes_.emplace_back(new Mesh(scene->mMeshes[i], color));
 	}
 
