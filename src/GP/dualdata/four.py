@@ -1,7 +1,8 @@
 from template import *
 
 STICK_LENGTH_X = 2 * HOLLOW_SQUARE_SIZE + 3 * STICK_WIDTH
-STICK_LENGTH_Y = STICK_LENGTH_X
+# Note, we need additional grids to block easy solution
+STICK_LENGTH_Y = 3 * HOLLOW_SQUARE_SIZE + 4 * STICK_WIDTH
 
 STICKS_X_DESC = [
         {
@@ -18,6 +19,12 @@ STICKS_X_DESC = [
         },
         {
             'origin': (0, (HOLLOW_SQUARE_SIZE + STICK_WIDTH) * 2.0),
+            'len' : STICK_LENGTH_X,
+            'up': [],
+            'down': []
+        },
+        {
+            'origin': (0, (HOLLOW_SQUARE_SIZE + STICK_WIDTH) * 3.0),
             'len' : STICK_LENGTH_X,
             'up': [],
             'down': []
