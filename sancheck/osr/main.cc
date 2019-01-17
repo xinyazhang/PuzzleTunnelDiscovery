@@ -18,7 +18,7 @@ void worker(char* argv[])
 	osr::Renderer renderer;
 	renderer.setup();
 	renderer.loadModelFromFile(argv[1]);
-	renderer.angleModel(30.0f, 30.0f);
+	renderer.angleModel(0.0f, 0.0f);
 	std::ofstream fout("osrsc_worker.bin");
 	renderer.render_depth_to(fout);
 	fout.close();
@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
 	osr::Renderer renderer;
 	renderer.setup();
 	renderer.loadModelFromFile(argv[1]);
-	renderer.angleModel(30.0f, 30.0f);
+	renderer.angleModel(0.0f, 0.0f);
 	std::ofstream fout("osrsc.bin");
 	renderer.render_depth_to(fout);
 	fout.close();
