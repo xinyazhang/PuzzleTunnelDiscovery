@@ -5,6 +5,8 @@ import os
 import sys
 sys.path.append(os.getcwd())
 import shutil
+import argparse
+import importlib
 
 import pyosr
 import numpy as np
@@ -12,7 +14,8 @@ import numpy as np
 #import aniconf10 as aniconf
 #import dualconf_tiny as aniconf
 #import dualconf_g2 as aniconf
-import dualconf as aniconf
+import dualconf_g4 as aniconf
+#import dualconf as aniconf
 import uw_random
 import math
 from scipy.misc import imsave
@@ -67,7 +70,7 @@ def usage():
     Calculate the visibility matrix of the samples from 'sample' Command.
 9. condor_touch_configuration.py dump <object name> [Arguments depending on object]
     a) samconf <Vertex ID> <Conf ID or Range> <Input Dir> <Output dir>
-        This dumps the conf or a range of confs from a vertex to output dir that's usually different from input dir which stores the samples.
+        This
     b) tconf <Vertex ID> <Conf ID or Range> <Input Dir> <Output dir>
         same as samconf, but this takes samples from Command `run`
     c) omplsam <input dir> <output .txt>
@@ -87,6 +90,8 @@ def _fn_atlastex(out_dir, geo_type, vert_id, index=None, nw=False):
         return "{}/tex-{}-from-vert-{}-{}{}.png".format(out_dir, geo_type, vert_id, index, nwsuffix)
 
 def _create_uw(cmd):
+    if cmd == 'show':
+        return None # show command does not need unit world object
     if 'render' in cmd or cmd in ['atlas2prim']:
         pyosr.init()
         dpy = pyosr.create_display()
@@ -144,471 +149,522 @@ def _get_tunnel_v():
         return None
     return np.load(aniconf.tunnel_v_fn)['TUNNEL_V']
 
-def run(uw, args):
-    task_id = int(args[0])
-    batch_size = int(args[1])
-    out_dir = args[2]
-    tp = TaskPartitioner(out_dir, None, batch_size, tunnel_v=_get_tunnel_v())
+class TouchConfiguration(object):
 
-    vertex = tp.get_tunnel_vertex(task_id)
-    out_fn = tp.get_tq_fn(task_id)
+    def __init__(self, args):
+        self._args = args
+        self._uw = _create_uw(args)
+        self._tv_cache = None
+        self._aniconf = importlib.import_module('puzzleconf.'+args.puzzle)
 
-    free_vertices, touch_vertices, to_inf, free_tau, touch_tau = calc_touch(uw, vertex, batch_size)
-    np.savez(out_fn,
-             FROM_V=np.repeat(np.array([vertex]), batch_size, axis=0),
-             FREE_V=free_vertices,
-             TOUCH_V=touch_vertices,
-             IS_INF=to_inf,
-             FREE_TAU=free_tau,
-             TOUCH_TAU=touch_tau)
+    def _get_tunnel_v(self):
+        aniconf = self._aniconf
+        if aniconf.tunnel_v_fn is None:
+            return None
+        if self._tv_cache is None:
+            self._tv_cache = np.load(aniconf.tunnel_v_fn)['TUNNEL_V']
+        return self._tv_cache
 
-def isect(uw, args):
-    tunnel_v = _get_tunnel_v()
-    task_id = int(args[0])
-    geo_batch_size = int(args[1])
-    tq_batch_size = int(args[2])
-    io_dir = args[3]
-    tp = TaskPartitioner(io_dir, geo_batch_size, tq_batch_size, tunnel_v=_get_tunnel_v())
-    '''
-    Task partition
-    |------------------TQ Batch for Conf. Q--------------------|
-    |--Geo Batch--||--Geo Batch--||--Geo Batch--||--Geo Batch--|
-    Hence run's task id = isect's task id / (Touch Batch Size/Geo Batch Size)
-    '''
-    batch_per_tq = tq_batch_size // geo_batch_size
-    run_task_id, geo_batch_id = divmod(task_id, batch_per_tq)
-    tq_batch_id, vert_id = divmod(run_task_id, len(tunnel_v))
-    '''
-    tq_fn = _fn_touch_q(out_dir=io_dir, vert_id=vert_id, batch_id=tq_batch_id)
-    d = np.load(tq_fn)
-    tq = d['TOUCH_V']
-    is_inf = d['IS_INF']
-    '''
-    for tq, is_inf, vert_id, conf_id in tp.gen_touch_q(task_id):
-        if is_inf:
-            continue
-        V, F = uw.intersecting_geometry(tq, True)
-        np.savez_compressed(tp.get_isect_fn(vert_id, conf_id), V=V, F=F)
-        #pyosr.save_obj_1(V, F, tp.get_isect_fn(vert_id, conf_id))
+    @staticmethod
+    def _setup_parser_show(subparsers):
+        show_parser = subparsers.add_parser("show", help='Show the number of tunnel vertices')
 
-def uvproj(uw, args):
-    geo_type = args[0]
-    assert geo_type in ['rob', 'env'], "Unknown geo type {}".format(geo_type)
-    task_id = int(args[1])
-    gp_batch = int(args[2])
-    tq_batch = int(args[3])
-    io_dir = args[4]
-    tp = TaskPartitioner(io_dir, gp_batch, tq_batch, tunnel_v=_get_tunnel_v())
-    for tq, is_inf, vert_id, conf_id in tp.gen_touch_q(task_id):
-        if is_inf:
-            continue
-        fn = tp.get_isect_fn(vert_id, conf_id)
-        #V, F = pyosr.load_obj_1(fn)
-        d = np.load(fn+'.npz')
-        V = d['V']
-        F = d['F']
-        if geo_type == 'rob':
-            IF, IBV = uw.intersecting_to_robot_surface(tq, True, V, F)
-        elif geo_type == 'env':
-            IF, IBV = uw.intersecting_to_model_surface(tq, True, V, F)
-        else:
-            assert False
-        fn2 = tp.get_uv_fn(geo_type, vert_id, conf_id)
-        #print('uvproj of {} to {}'.format(fn, fn2))
-        #pyosr.save_obj_1(IBV, IF, fn2)
-        np.savez_compressed(fn2, V=IBV, F=IF)
+    def show(self):
+        print("# of tunnel vertices is {}".format(len(self._get_tunnel_v())))
 
-def uvrender(uw, args):
-    tunnel_v = _get_tunnel_v()
-    uw.avi = False
-    geo_type = args[0]
-    assert geo_type in ['rob', 'env'], "Unknown geo type {}".format(geo_type)
-    if geo_type == 'rob':
-        geo_flag = uw.BARY_RENDERING_ROBOT
-    elif geo_type == 'env':
-        geo_flag = uw.BARY_RENDERING_SCENE
-    else:
-        assert False
-    vert_id = int(args[1])
-    io_dir = args[2]
-    iq = uw.translate_to_unit_state(tunnel_v[vert_id])
-    afb = None
-    afb_nw = None
+    @staticmethod
+    def _setup_parser_run(subparsers):
+        run_parser = subparsers.add_parser("run",
+                help='Sample #task_size touch configurations from Tunnel Vertex (#task_id mod (total number of tunnel vertices))')
+        run_parser.add_argument('task_id',
+                help='Index of the batch to process',
+                type=int)
+        run_parser.add_argument('batch_size',
+                help='Size of the batch to process',
+                type=int)
+        run_parser.add_argument('out_dir',
+                help='Size of the batch to process',
+                type=str)
 
-    tq_gen = TouchQGenerator(in_dir=io_dir, vert_id=vert_id)
-    obj_gen = UVObjGenerator(in_dir=io_dir, geo_type=geo_type, vert_id=vert_id)
-    i = 0
-    DEBUG_UVRENDER = False
-    for tq, is_inf in tq_gen:
-        # print('tq {} is_inf {}'.format(tq, is_inf))
-        IBV, IF = next(obj_gen) # Must, otherwise does not pair
-        if is_inf:
-            continue
-        if IBV is None or IF is None:
-            print('IBV {}'.format(None))
-            continue
-        print('{}: IBV {} IF {}'.format(i, IBV.shape, IF.shape))
-        if DEBUG_UVRENDER:
-            svg_fn = '{}.svg'.format(i)
-            # Paint everything ...
-            if i == 0 and geo_type == 'rob':
-                V, F = uw.get_robot_geometry(tq, True)
-                print("V {}\nF {}".format(V.shape, F.shape))
+    def run(self):
+        task_id = self._args.task_id
+        batch_size = self._args.batch_size
+        out_dir = self._args.out_dir
+        tp = TaskPartitioner(out_dir, None, batch_size, tunnel_v=self._get_tunnel_v())
+
+        vertex = tp.get_tunnel_vertex(task_id)
+        out_fn = tp.get_tq_fn(task_id)
+
+        free_vertices, touch_vertices, to_inf, free_tau, touch_tau = calc_touch(uw, vertex, batch_size)
+        np.savez(out_fn,
+                 FROM_V=np.repeat(np.array([vertex]), batch_size, axis=0),
+                 FREE_V=free_vertices,
+                 TOUCH_V=touch_vertices,
+                 IS_INF=to_inf,
+                 FREE_TAU=free_tau,
+                 TOUCH_TAU=touch_tau)
+
+    @staticmethod
+    def _setup_parser_isect(subparsers):
+        isect_parser = subparsers.add_parser("isect",
+                help='Calculate the intersecting geometry from touch configurations')
+        isect_parser.add_argument('task_id',
+                help='Index of the batch to process',
+                type=int)
+        isect_parser.add_argument('geo_batch_size',
+                help='Task granularity. Must divide tq_batch_size',
+                type=int)
+        isect_parser.add_argument('tq_batch_size',
+                help='Number of samples in touch configuration files. Must be the same from \'run\' command',
+                type=int)
+        isect_parser.add_argument('io_dir',
+                help='Directory of the input samples and output geometries',
+                type=str)
+
+    def isect(self):
+        tunnel_v = self._get_tunnel_v()
+        task_id = self._args.task_id
+        geo_batch_size = self._args.geo_batch_size
+        tq_batch_size = self._args.tq_batch_size
+        io_dir = self._args.io_dir
+
+        tp = TaskPartitioner(io_dir, geo_batch_size, tq_batch_size, tunnel_v=tunnel_v)
+        '''
+        Task partition
+        |------------------TQ Batch for Conf. Q--------------------|
+        |--Geo Batch--||--Geo Batch--||--Geo Batch--||--Geo Batch--|
+        Hence run's task id = isect's task id / (Touch Batch Size/Geo Batch Size)
+        '''
+        batch_per_tq = tq_batch_size // geo_batch_size
+        run_task_id, geo_batch_id = divmod(task_id, batch_per_tq)
+        tq_batch_id, vert_id = divmod(run_task_id, len(tunnel_v))
+        '''
+        tq_fn = _fn_touch_q(out_dir=io_dir, vert_id=vert_id, batch_id=tq_batch_id)
+        d = np.load(tq_fn)
+        tq = d['TOUCH_V']
+        is_inf = d['IS_INF']
+        '''
+        for tq, is_inf, vert_id, conf_id in tp.gen_touch_q(task_id):
+            if is_inf:
+                continue
+            V, F = uw.intersecting_geometry(tq, True)
+            np.savez_compressed(tp.get_isect_fn(vert_id, conf_id), V=V, F=F)
+            #pyosr.save_obj_1(V, F, tp.get_isect_fn(vert_id, conf_id))
+
+    @staticmethod
+    def _setup_parser_uvproj(subparsers):
+        uvproj_parser = subparsers.add_parser("uvproj",
+                help='Project intersection results to rob/env surface as vertex tuples and barycentric coordinates')
+        uvproj_parser.add_argument('geo_type', choices=['rob', 'env'])
+        uvproj_parser.add_argument('task_id',
+                help='Index of the batch to process', type=int)
+        uvproj_parser.add_argument('geo_batch_size',
+                help='Task granularity. Must divide tq_batch_size',
+                type=int)
+        uvproj_parser.add_argument('tq_batch_size',
+                help='Number of samples in touch configuration files. Must be the same from \'run\' command',
+                type=int)
+        uvproj_parser.add_argument('io_dir',
+                help='Directory of the input geometries and output projection data',
+                type=str)
+
+    def uvproj(self):
+        geo_type = self._args.geo_type
+        task_id = self._args.task_id
+        gp_batch = self._args.geo_batch_size
+        tq_batch = self._args.tq_batch_size
+        io_dir = self._args.io_dir
+        tp = TaskPartitioner(io_dir, gp_batch, tq_batch, tunnel_v=self._get_tunnel_v())
+        for tq, is_inf, vert_id, conf_id in tp.gen_touch_q(task_id):
+            if is_inf:
+                continue
+            fn = tp.get_isect_fn(vert_id, conf_id)
+            #V, F = pyosr.load_obj_1(fn)
+            d = np.load(fn+'.npz')
+            V = d['V']
+            F = d['F']
+            if geo_type == 'rob':
                 IF, IBV = uw.intersecting_to_robot_surface(tq, True, V, F)
-                print("IF {}\nIBV {}\n{}".format(IF.shape, IBV.shape, IBV[:5]))
-                '''
-                NPICK=3000
-                IF = IF[:NPICK]
-                IBV = IBV[:NPICK*3]
-                '''
-        else:
-            svg_fn = ''
-        uw.clear_barycentric(geo_flag)
-        uw.add_barycentric(IF, IBV, geo_flag)
-        if DEBUG_UVRENDER and i == 2:
-            print("BaryF {}".format(IF))
-            print("Bary {}".format(IBV))
-        fb = uw.render_barycentric(geo_flag,
-                                   np.array([ATLAS_RES, ATLAS_RES], dtype=np.int32),
-                                   svg_fn=svg_fn)
-        #np.clip(fb, 0, 1, out=fb) # Clip to binary
-        nw = texture_format.texture_to_file(fb.astype(np.float32))
-        distance = np.clip(pyosr.distance(tq, iq), 1e-4, None)
-        w = nw * (1.0 / distance)
-        if afb is None:
-            afb = w
-            afb_nw = nw
-        else:
-            afb += w
-            afb_nw += nw
-            np.clip(afb_nw, 0, 1.0, out=afb_nw) # afb_nw is supposed to be binary
-        # Debugging code
-        if DEBUG_UVRENDER:
-            print('afb shape {}'.format(afb.shape))
-            print('distance {}'.format(distance))
-            rgb = np.zeros(list(afb.shape) + [3])
-            rgb[...,1] = w
-            imsave(_fn_atlastex(io_dir, geo_type, vert_id, i), rgb)
-            np.savez(atlas_fn(io_dir, geo_type, vert_id, i), w)
-            print('NW NZ {}'.format(nw[np.nonzero(nw)]))
-            V1, F1 = uw.get_robot_geometry(tq, True)
-            pyosr.save_obj_1(V1, F1, '{}.obj'.format(i))
-            V2, F2 = uw.get_scene_geometry(tq, True)
-            pyosr.save_obj_1(V2, F2, '{}e.obj'.format(i))
-            if i >= 16:
-               return
-        i+=1
-    rgb = np.zeros(list(afb.shape) + [3])
-    rgb[...,1] = afb
-    # FIXME: Give savez an explicity array name
-    imsave(_fn_atlastex(io_dir, geo_type, vert_id, None), rgb)
-    np.savez(atlas_fn(io_dir, geo_type, vert_id, None), afb)
-    rgb[...,1] = afb_nw
-    imsave(_fn_atlastex(io_dir, geo_type, vert_id, None, nw=True), rgb)
-    np.savez(atlas_fn(io_dir, geo_type, vert_id, None, nw=True), afb)
+            elif geo_type == 'env':
+                IF, IBV = uw.intersecting_to_model_surface(tq, True, V, F)
+            else:
+                assert False
+            fn2 = tp.get_uv_fn(geo_type, vert_id, conf_id)
+            #print('uvproj of {} to {}'.format(fn, fn2))
+            #pyosr.save_obj_1(IBV, IF, fn2)
+            np.savez_compressed(fn2, V=IBV, F=IF)
 
-def uvmerge(uw, args):
-    io_dir = args[0]
-    import npz_mean
-    for geo_type in ['rob', 'env']:
-        for nw in [False, True]: # Not Weighted
-            fns = []
-            for vert_id, _ in enumerate(iter(int, 1)):
-                fn = task_partitioner.atlas_fn(io_dir, geo_type, vert_id, None, nw=nw)
-                if not os.path.exists(fn):
-                    break
-                fns.append(fn)
-            if nw:
-                suffix = '-nw'
+    @staticmethod
+    def _setup_parser_uvrender(subparsers):
+        uvrender_parser = subparsers.add_parser("uvrender",
+                help='Render and accumulate results from uvproj to numpy arrays and images.')
+        uvrender_parser.add_argument('geo_type', choices=['rob', 'env'])
+        uvrender_parser.add_argument('vert_id',
+                help='Vertex ID with in the narrow tunnel vertices',
+                type=int)
+        uvrender_parser.add_argument('io_dir',
+                help='Directory of the input projection data and rendered results',
+                type=int)
+
+
+    def uvrender(self):
+        uw = self._uw
+        tunnel_v = self._get_tunnel_v()
+        uw.avi = False
+        geo_type = self._args.geo_type
+        TYPE_TO_FLAG = {'rob' : uw.BARY_RENDERING_ROBOT,
+                        'env' : uw.BARY_RENDERING_SCENE }
+        geo_flag = TYPE_TO_FLAG[geo_type]
+
+        vert_id = self._args.vert_id
+        io_dir = self._args.io_dir
+        iq = uw.translate_to_unit_state(tunnel_v[vert_id])
+        afb = None
+        afb_nw = None
+
+        tq_gen = TouchQGenerator(in_dir=io_dir, vert_id=vert_id)
+        obj_gen = UVObjGenerator(in_dir=io_dir, geo_type=geo_type, vert_id=vert_id)
+        i = 0
+        DEBUG_UVRENDER = False
+        for tq, is_inf in tq_gen:
+            # print('tq {} is_inf {}'.format(tq, is_inf))
+            IBV, IF = next(obj_gen) # Must, otherwise does not pair
+            if is_inf:
+                continue
+            if IBV is None or IF is None:
+                print('IBV {}'.format(None))
+                continue
+            print('{}: IBV {} IF {}'.format(i, IBV.shape, IF.shape))
+            if DEBUG_UVRENDER:
+                svg_fn = '{}.svg'.format(i)
+                # Paint everything ...
+                if i == 0 and geo_type == 'rob':
+                    V, F = uw.get_robot_geometry(tq, True)
+                    print("V {}\nF {}".format(V.shape, F.shape))
+                    IF, IBV = uw.intersecting_to_robot_surface(tq, True, V, F)
+                    print("IF {}\nIBV {}\n{}".format(IF.shape, IBV.shape, IBV[:5]))
+                    '''
+                    NPICK=3000
+                    IF = IF[:NPICK]
+                    IBV = IBV[:NPICK*3]
+                    '''
             else:
-                suffix = ''
-            mean_fn = '{}/atlas-{}-mean{}.npz'.format(io_dir, geo_type, suffix)
-            mean_img = '{}/atlas-{}-mean{}.png'.format(io_dir, geo_type, suffix)
-            fns.append(mean_fn)
-            print(fns)
-            npz_mean.main(fns)
-            d = np.load(mean_fn)
-            img = d[d.keys()[0]]
-            if nw:
-                img = img.astype(bool).astype(float)
+                svg_fn = ''
+            uw.clear_barycentric(geo_flag)
+            uw.add_barycentric(IF, IBV, geo_flag)
+            if DEBUG_UVRENDER and i == 2:
+                print("BaryF {}".format(IF))
+                print("Bary {}".format(IBV))
+            fb = uw.render_barycentric(geo_flag,
+                                       np.array([ATLAS_RES, ATLAS_RES], dtype=np.int32),
+                                       svg_fn=svg_fn)
+            #np.clip(fb, 0, 1, out=fb) # Clip to binary
+            nw = texture_format.texture_to_file(fb.astype(np.float32))
+            distance = np.clip(pyosr.distance(tq, iq), 1e-4, None)
+            w = nw * (1.0 / distance)
+            if afb is None:
+                afb = w
+                afb_nw = nw
             else:
-                print("sum 0 {}".format(np.sum(img)))
-                '''
-                nz = img[np.nonzero(img)]
-                import scipy.stats
-                import matplotlib.pyplot as plt
-                plt.hist(nz, 50, normed=1, facecolor='green', alpha=0.5);
-                plt.show()
-                '''
-                '''
-                # Method 1
-                print("sum 1 {}".format(np.sum(nz)))
-                m = np.mean(nz)
-                #np.clip(img, 0, m, out=img)
-                # img2 = np.clip(img, m, None) # Cut less important points
-                img2 = np.copy(img)
-                img2[img < m] = 0.0
-                nz2 = img2[np.nonzero(img2)]
-                print("sum 2 {}".format(np.sum(nz2)))
-                m2 = np.median(nz2)
-                np.clip(img2, m2, None, img)
-                print("First clip thresh {}. Second clip thresh {}".format(m, m2))
-                '''
-                # Method 2
-                for i in range(2):
-                    nzi = np.nonzero(img)
-                    print("nz count {} {}".format(i, len(nzi[0])))
-                    nz = img[nzi]
+                afb += w
+                afb_nw += nw
+                np.clip(afb_nw, 0, 1.0, out=afb_nw) # afb_nw is supposed to be binary
+            # Debugging code
+            if DEBUG_UVRENDER:
+                print('afb shape {}'.format(afb.shape))
+                print('distance {}'.format(distance))
+                rgb = np.zeros(list(afb.shape) + [3])
+                rgb[...,1] = w
+                imsave(_fn_atlastex(io_dir, geo_type, vert_id, i), rgb)
+                np.savez(atlas_fn(io_dir, geo_type, vert_id, i), w)
+                print('NW NZ {}'.format(nw[np.nonzero(nw)]))
+                V1, F1 = uw.get_robot_geometry(tq, True)
+                pyosr.save_obj_1(V1, F1, '{}.obj'.format(i))
+                V2, F2 = uw.get_scene_geometry(tq, True)
+                pyosr.save_obj_1(V2, F2, '{}e.obj'.format(i))
+                if i >= 16:
+                   return
+            i+=1
+        rgb = np.zeros(list(afb.shape) + [3])
+        rgb[...,1] = afb
+        # FIXME: Give savez an explicity array name
+        imsave(_fn_atlastex(io_dir, geo_type, vert_id, None), rgb)
+        np.savez(atlas_fn(io_dir, geo_type, vert_id, None), afb)
+        rgb[...,1] = afb_nw
+        imsave(_fn_atlastex(io_dir, geo_type, vert_id, None, nw=True), rgb)
+        np.savez(atlas_fn(io_dir, geo_type, vert_id, None, nw=True), afb)
+
+    @staticmethod
+    def _setup_parser_uvmerge(subparsers):
+        uvmerge_parser = subparsers.add_parser("uvmerge",
+                help='Take the output of `uvrender` and write the mean of atlas to I/O dir.')
+        uvmerge_parser.add_argument('io_dir', help='Input/Output directory')
+
+    def uvmerge(self):
+        io_dir = self._args.io_dir
+        import npz_mean
+        for geo_type in ['rob', 'env']:
+            for nw in [False, True]: # Not Weighted
+                fns = []
+                for vert_id, _ in enumerate(iter(int, 1)):
+                    fn = task_partitioner.atlas_fn(io_dir, geo_type, vert_id, None, nw=nw)
+                    if not os.path.exists(fn):
+                        break
+                    fns.append(fn)
+                if nw:
+                    suffix = '-nw'
+                else:
+                    suffix = ''
+                mean_fn = '{}/atlas-{}-mean{}.npz'.format(io_dir, geo_type, suffix)
+                mean_img = '{}/atlas-{}-mean{}.png'.format(io_dir, geo_type, suffix)
+                fns.append(mean_fn)
+                print(fns)
+                npz_mean.main(fns)
+                d = np.load(mean_fn)
+                img = d[d.keys()[0]]
+                if nw:
+                    img = img.astype(bool).astype(float)
+                else:
+                    print("sum 0 {}".format(np.sum(img)))
+                    '''
+                    nz = img[np.nonzero(img)]
+                    import scipy.stats
+                    import matplotlib.pyplot as plt
+                    plt.hist(nz, 50, normed=1, facecolor='green', alpha=0.5);
+                    plt.show()
+                    '''
+                    '''
+                    # Method 1
+                    print("sum 1 {}".format(np.sum(nz)))
                     m = np.mean(nz)
+                    #np.clip(img, 0, m, out=img)
+                    # img2 = np.clip(img, m, None) # Cut less important points
+                    img2 = np.copy(img)
+                    img2[img < m] = 0.0
+                    nz2 = img2[np.nonzero(img2)]
+                    print("sum 2 {}".format(np.sum(nz2)))
+                    m2 = np.median(nz2)
+                    np.clip(img2, m2, None, img)
+                    print("First clip thresh {}. Second clip thresh {}".format(m, m2))
+                    '''
+                    # Method 2
+                    for i in range(2):
+                        nzi = np.nonzero(img)
+                        print("nz count {} {}".format(i, len(nzi[0])))
+                        nz = img[nzi]
+                        m = np.mean(nz)
+                        img[img < m] = 0.0
+                        print("sum {} {}".format(i+1, np.sum(img)))
+                    #np.clip(img, 0, np.mean(m), out=img)
+                    '''
+                    # Method 3
+                    m = math.sqrt(np.max(img))
                     img[img < m] = 0.0
-                    print("sum {} {}".format(i+1, np.sum(img)))
-                #np.clip(img, 0, np.mean(m), out=img)
-                '''
-                # Method 3
-                m = math.sqrt(np.max(img))
-                img[img < m] = 0.0
-                print("sum 1 {}".format(np.sum(img)))
-                '''
-            imsave(mean_img, img)
+                    print("sum 1 {}".format(np.sum(img)))
+                    '''
+                imsave(mean_img, img)
 
-def atlas2prim(uw, args):
-    r = uw
-    r.uv_feedback = True
-    r.avi = False
-    io_dir = args[0]
-    for geo_type,flags in zip(['rob', 'env'], [pyosr.Renderer.NO_SCENE_RENDERING, pyosr.Renderer.NO_ROBOT_RENDERING]):
-        r.render_mvrgbd(pyosr.Renderer.UV_MAPPINNG_RENDERING|flags)
-        atlas2prim = np.copy(r.mvpid.reshape((r.pbufferWidth, r.pbufferHeight)))
-        #imsave(geo_type+'-a2p-nt.png', atlas2prim) # This is for debugging
-        atlas2prim = texture_format.framebuffer_to_file(atlas2prim)
-        atlas2uv = np.copy(r.mvuv.reshape((r.pbufferWidth, r.pbufferHeight, 2)))
-        atlas2uv = texture_format.framebuffer_to_file(atlas2uv)
-        np.savez(task_partitioner.atlas2prim_fn(io_dir, geo_type), PRIM=atlas2prim, UV=atlas2uv)
-        imsave(geo_type+'-a2p.png', atlas2prim) # This is for debugging
+    @staticmethod
+    def _setup_parser_atlas2prim(subparsers):
+        atlas2prim_parser = subparsers.add_parser("atlas2prim",
+                help='Generate the chart that maps pixels in ATLAS image back to PRIMitive ID.')
+        atlas2prim_parser.add_argument('out_dir', help='Output directory')
 
-def useatlas(uw, args):
-    geo_type = args[0]
-    fn = args[1]
-    if not fn.endswith('.npz'):
-        print("input file must be .npz format")
-    io_dir = args[2]
-    tp = TaskPartitioner(io_dir, None, None, tunnel_v=_get_tunnel_v())
-    ofn = task_partitioner.atlas_fn(io_dir, geo_type, 0)
-    shutil.copyfile(fn, ofn)
-    print("Copied file {} -> {}".format(fn, ofn))
+    def atlas2prim(self):
+        r = uw = self._uw
+        r.uv_feedback = True
+        r.avi = False
+        io_dir = self._args.out_dir
+        for geo_type,flags in zip(['rob', 'env'], [pyosr.Renderer.NO_SCENE_RENDERING, pyosr.Renderer.NO_ROBOT_RENDERING]):
+            r.render_mvrgbd(pyosr.Renderer.UV_MAPPINNG_RENDERING|flags)
+            atlas2prim = np.copy(r.mvpid.reshape((r.pbufferWidth, r.pbufferHeight)))
+            #imsave(geo_type+'-a2p-nt.png', atlas2prim) # This is for debugging
+            atlas2prim = texture_format.framebuffer_to_file(atlas2prim)
+            atlas2uv = np.copy(r.mvuv.reshape((r.pbufferWidth, r.pbufferHeight, 2)))
+            atlas2uv = texture_format.framebuffer_to_file(atlas2uv)
+            np.savez(task_partitioner.atlas2prim_fn(io_dir, geo_type), PRIM=atlas2prim, UV=atlas2uv)
+            imsave(geo_type+'-a2p.png', atlas2prim) # This is for debugging
 
-def sample(uw, args, enum_axis=False):
-    task_id = int(args[0])
-    batch_size = int(args[1])
-    io_dir = args[2]
-    tp = TaskPartitioner(io_dir, None, batch_size, tunnel_v=_get_tunnel_v())
-    rob_sampler = atlas.AtlasSampler(tp, 'rob', uw.GEO_ROB, task_id)
-    env_sampler = atlas.AtlasSampler(tp, 'env', uw.GEO_ENV, task_id)
-    pcloud1 = []
-    pn1 = []
-    pcloud1x = []
-    pn1x = []
-    pcloud2 = []
-    pn2 = []
-    conf = []
-    SANITY_CHECK=False
-    if not SANITY_CHECK:
-        for i in progressbar(range(batch_size)):
-            if enum_axis:
-                tup1 = rob_sampler.sample(uw)
-                tup2 = env_sampler.sample(uw)
-                qs = uw.enum_free_configuration(tup1[0], tup1[1], tup2[0], tup2[1], 1e-6, denominator=64)
-                for q in qs:
+    @staticmethod
+    def _setup_parser_useatlas(subparsers):
+        useatlas_parser = subparsers.add_parser("useatlas",
+                help='Copy the prediction from NN to the output dir, with a matching name for `sample` command.')
+        useatlas_parser.add_argument('geo_type', choices=['rob', 'env'])
+        useatlas_parser.add_argument('npz',
+                help='NPZ file that stores the prediction')
+        useatlas_parser.add_argument('out_dir',
+                help='Output directory')
+
+    def useatlas(self):
+        geo_type = self._args.geo_type
+        fn = self._args.npz
+        io_dir = self._args.out_dir
+        if not fn.endswith('.npz'):
+            print("input file must be .npz format")
+        tp = TaskPartitioner(io_dir, None, None, tunnel_v=self._get_tunnel_v())
+        ofn = task_partitioner.atlas_fn(io_dir, geo_type, 0)
+        shutil.copyfile(fn, ofn)
+        print("Copied file {} -> {}".format(fn, ofn))
+
+    @staticmethod
+    def _setup_parser_sample(subparsers):
+        common = argparse.ArgumentParser(add_help=False)
+        common.add_argument('task_id', help='Task ID', type=int)
+        common.add_argument('batch_size', help='Number of samples', type=int)
+        common.add_argument('io_dir', help='Input/Output directory')
+
+        sp = subparsers.add_parser('sample',
+                help='Sample from the product of uvrender, and generate samples in the narrow tunnel',
+                parents=[common])
+        spe = subparsers.add_parser('sample_enumaxis',
+                help='like \'sample\', but the relative rotation is enumerated rather than sampled',
+                parents=[common])
+        spe.add_argument('--rotations', help='Number of rotations to enumerate', default=64)
+
+    @staticmethod
+    def _setup_parser_sample_enumaxis(subparsers):
+        pass # Already done in _setup_parser_sample
+
+    def sample(self):
+        self._common_sample(enum_axis=False)
+
+    def sample_enumaxis(self):
+        self._common_sample(enum_axis=True)
+
+    def _common_sample(self, enum_axis=False):
+        task_id = self._args.task_id
+        batch_size = self._args.batch_size
+        io_dir = self._args.io_dir
+        tp = TaskPartitioner(io_dir, None, batch_size, tunnel_v=self._get_tunnel_v())
+        rob_sampler = atlas.AtlasSampler(tp, 'rob', uw.GEO_ROB, task_id)
+        env_sampler = atlas.AtlasSampler(tp, 'env', uw.GEO_ENV, task_id)
+        pcloud1 = []
+        pn1 = []
+        pcloud1x = []
+        pn1x = []
+        pcloud2 = []
+        pn2 = []
+        conf = []
+        SANITY_CHECK=False
+        if not SANITY_CHECK:
+            for i in progressbar(range(batch_size)):
+                if enum_axis:
+                    tup1 = rob_sampler.sample(uw)
+                    tup2 = env_sampler.sample(uw)
+                    qs = uw.enum_free_configuration(tup1[0], tup1[1], tup2[0], tup2[1], 1e-6, denominator=64)
+                    for q in qs:
+                        conf.append(q)
+                else:
+                    while True:
+                        tup1 = rob_sampler.sample(uw)
+                        tup2 = env_sampler.sample(uw)
+                        q = uw.sample_free_configuration(tup1[0], tup1[1], tup2[0], tup2[1], 1e-6, max_trials=16)
+                        if uw.is_valid_state(q):
+                            break
                     conf.append(q)
-            else:
+            # print("tqre_fn {}".format(tp.get_tqre_fn(task_id)))
+            np.savez(tp.get_tqre_fn(task_id), ReTouchQ=conf)
+        else:
+            #
+            # Sanity check code
+            #
+            fail = 0
+            for i in progressbar(range(32)):
                 while True:
                     tup1 = rob_sampler.sample(uw)
                     tup2 = env_sampler.sample(uw)
                     q = uw.sample_free_configuration(tup1[0], tup1[1], tup2[0], tup2[1], 1e-6, max_trials=16)
+                    fail += 1
                     if uw.is_valid_state(q):
                         break
+                    print("Reject {}".format(q))
+                print("Accept {}".format(q))
+                pcloud1.append(tup1[0])
+                pcloud2.append(tup2[0])
                 conf.append(q)
-        # print("tqre_fn {}".format(tp.get_tqre_fn(task_id)))
-        np.savez(tp.get_tqre_fn(task_id), ReTouchQ=conf)
-        return
-    #
-    # Sanity check code
-    #
-    fail = 0
-    for i in progressbar(range(32)):
-        while True:
-            tup1 = rob_sampler.sample(uw)
-            tup2 = env_sampler.sample(uw)
-            q = uw.sample_free_configuration(tup1[0], tup1[1], tup2[0], tup2[1], 1e-6, max_trials=16)
-            fail += 1
-            if uw.is_valid_state(q):
-                break
-            print("Reject {}".format(q))
-        print("Accept {}".format(q))
-        pcloud1.append(tup1[0])
-        pcloud2.append(tup2[0])
-        conf.append(q)
-        '''
-        # Sanity check
-        # Test if sample_free_configuration aligns the sample pair
-        tup1 = rob_sampler.sample(uw, unit=False)
-        tup2 = env_sampler.sample(uw, unit=False)
-        pcloud1.append(tup1[0])
-        pcloud2.append(tup2[0])
-        pn1.append(tup1[1])
-        pn2.append(tup2[1])
-        q = uw.sample_free_configuration(tup1[0], tup1[1], tup2[0], tup2[1], 1e-6, free_guarantee=False)
-        tr,rot = pyosr.decompose_2(q)
-        new_point = rot.dot(tup1[0].reshape((3,1)))+tr.reshape((3,1))
-        pcloud1x.append(new_point.reshape((3)))
-        new_normal = rot.dot(tup1[1].reshape((3,1)))
-        pn1x.append(new_normal.reshape((3)))
-        conf.append(q)
-        '''
-    pyosr.save_obj_1(pcloud1, [], 'pc1.obj')
-    pyosr.save_obj_1(pcloud2, [], 'pc2.obj')
-    np.savez('cf1.npz', Q=conf)
-    print("Success ratio {} out of {} = {}".format(len(conf), fail, len(conf) / float(fail)))
-    '''
-    # pyosr.save_obj_2(V=pcloud1, F=[], CN=pn1, FN=[], TC=[], FTC=[], filename='pc1x.obj')
-    # pyosr.save_obj_2(V=pcloud2, F=[], CN=pn2, FN=[], TC=[], FTC=[], filename='pc2x.obj')
-    pyosr.save_ply_2(V=pcloud1, F=[], N=pn1, UV=[], filename='pc1x.ply')
-    pyosr.save_ply_2(V=pcloud1x, F=[], N=pn1x, UV=[], filename='pc1xx.ply')
-    pyosr.save_ply_2(V=pcloud2, F=[], N=pn2, UV=[], filename='pc2x.ply')
-    np.savetxt('cf1.txt', conf, fmt='%.17g')
-    '''
+                '''
+                # Sanity check
+                # Test if sample_free_configuration aligns the sample pair
+                tup1 = rob_sampler.sample(uw, unit=False)
+                tup2 = env_sampler.sample(uw, unit=False)
+                pcloud1.append(tup1[0])
+                pcloud2.append(tup2[0])
+                pn1.append(tup1[1])
+                pn2.append(tup2[1])
+                q = uw.sample_free_configuration(tup1[0], tup1[1], tup2[0], tup2[1], 1e-6, free_guarantee=False)
+                tr,rot = pyosr.decompose_2(q)
+                new_point = rot.dot(tup1[0].reshape((3,1)))+tr.reshape((3,1))
+                pcloud1x.append(new_point.reshape((3)))
+                new_normal = rot.dot(tup1[1].reshape((3,1)))
+                pn1x.append(new_normal.reshape((3)))
+                conf.append(q)
+                '''
+            pyosr.save_obj_1(pcloud1, [], 'pc1.obj')
+            pyosr.save_obj_1(pcloud2, [], 'pc2.obj')
+            np.savez('cf1.npz', Q=conf)
+            print("Success ratio {} out of {} = {}".format(len(conf), fail, len(conf) / float(fail)))
+            '''
+            # pyosr.save_obj_2(V=pcloud1, F=[], CN=pn1, FN=[], TC=[], FTC=[], filename='pc1x.obj')
+            # pyosr.save_obj_2(V=pcloud2, F=[], CN=pn2, FN=[], TC=[], FTC=[], filename='pc2x.obj')
+            pyosr.save_ply_2(V=pcloud1, F=[], N=pn1, UV=[], filename='pc1x.ply')
+            pyosr.save_ply_2(V=pcloud1x, F=[], N=pn1x, UV=[], filename='pc1xx.ply')
+            pyosr.save_ply_2(V=pcloud2, F=[], N=pn2, UV=[], filename='pc2x.ply')
+            np.savetxt('cf1.txt', conf, fmt='%.17g')
+            '''
 
-def sample_enumaxis(uw, args):
-    sample(uw, args, enum_axis=True)
+    @staticmethod
+    def _setup_parser_samvis(subparsers):
+        sp = subparsers.add_parser('samvis',
+                help="Calculate the visibility matrix of the samples from 'sample' Command.")
+        sp.add_argument('task_id', help='Task ID', type=int)
+        sp.add_argument('batch_size',
+                help='Number of sampled touch configurations. -1 to cover all samples',
+                type=int)
+        sp.add_argument('io_dir', help='Input/Output directory')
+        sp.add_argument('prm', help='Sample set for visibility estimation')
 
-def samvis(uw, args):
-    task_id = int(args[0])
-    batch_size = int(args[1])
-    io_dir = args[2]
-    prm_data = args[3]
-    tp = TaskPartitioner(io_dir, None, batch_size, tunnel_v=_get_tunnel_v())
+    def samvis(self):
+        task_id = self._args.task_id
+        batch_size = self._args.batch_size
+        io_dir = self._args.io_dir
+        prm_data = self._args.prm
+        tp = TaskPartitioner(io_dir, None, batch_size, tunnel_v=self._get_tunnel_v())
 
-    mc_reference = np.load(prm_data)['V']
-    V = np.load(tp.get_tqre_fn(task_id))['ReTouchQ']
-    VM = uw.calculate_visibility_matrix2(V[0:batch_size], True,
-                                         mc_reference[0:-1], False,
-                                         # mc_reference[0:4], False,
-                                         STEPPING_FOR_CONNECTIVITY)
-    np.savez(tp.get_tqrevis_fn(task_id), VM=VM, Q=V, VMS=np.sum(VM, axis=-1))
+        mc_reference = np.load(prm_data)['V']
+        V = np.load(tp.get_tqre_fn(task_id))['ReTouchQ']
+        VM = uw.calculate_visibility_matrix2(V[0:batch_size], True,
+                                             mc_reference[0:-1], False,
+                                             # mc_reference[0:4], False,
+                                             STEPPING_FOR_CONNECTIVITY)
+        np.savez(tp.get_tqrevis_fn(task_id), VM=VM, Q=V, VMS=np.sum(VM, axis=-1))
 
-def samstat(uw, args):
-    class PerVertexStat(object):
-        def __init__(self, vert_id):
-            self.vms_array = None
-            self.vert_id = vert_id
+    @staticmethod
+    def _setup_parser_dump(subparsers):
+        sp = subparsers.add_parser('dump', help='Dump different types of object.')
+        ssp = sp.add_subparsers(dest='dump_object', help='Object type.')
+        common = argparse.ArgumentParser(add_help=False)
+        common.add_argument('vert_id', help='Vertex ID')
+        common.add_argument('conf_sel', help='Configuration ID or Range')
+        common.add_argument('in_dir', help='Input directory that stores the configurations')
+        common.add_argument('out_dir', help='Output directory')
 
-        def accumulate(self, dic):
-            #print('Total V: {}'.format(np.sum(dic['VMS'])))
-            if self.vms_array is None:
-                self.vms_array = dic['VMS']
-            else:
-                self.vms_array = np.concatenate((self.vms_array, dic['VMS']), axis=0)
+        dp = ssp.add_parser('samconf',
+                help="dumps the sampled a range of predicted touch configurations.",
+                parents=[common])
+        dp2 = ssp.add_parser('tconf',
+                help="dumps a range of colliding configurations",
+                parents=[common]);
+        dp3 = ssp.add_parser('omplsam',
+                help='dumps the samples to a text file in OMPL format.')
+        dp3.add_argument('in_dir', help='Input directory of predicted samples')
+        dp3.add_argument('output_file', help='Output .txt file')
 
-        def get_bins(self):
-            return [float(i) * 0.005 for i in range(200)]
-
-        def collect_percent(self, count):
-            self.vms_pc = self.vms_array / float(count)
-            # if self.vert_id == 0:
-                # print(self.vms_pc)
-            nsample = float(len(self.vms_pc))
-            bins = self.get_bins()
-            #print(bins)
-            hist, _ = np.histogram(self.vms_pc, bins)
-            hist = hist/nsample * 100
-            return hist
-
-        def show(self, count):
-            hist = self.collect_percent(count)
-            hist_str = np.array_repr(hist, max_line_width=1024, precision=2, suppress_small=True)
-            print("Histogram for vertex {}\n{}".format(self.vert_id, hist_str))
-
-    tunnel_v = _get_tunnel_v()
-    pvs_array = [ PerVertexStat(i) for i in range(len(tunnel_v)) ]
-    io_dir = args[0]
-    prm_data = args[1]
-    mc_reference_count = np.load(prm_data)['V'].shape[0]
-    # Probe batch size
-    fn = task_partitioner.tqrevis_fn(io_dir, vert_id=0, batch_id=0)
-    batch_size = int(np.load(fn)['Q'].shape[0])
-    # With the probed batch size to create TaskPartitioner
-    tp = TaskPartitioner(io_dir, None, batch_size, tunnel_v=_get_tunnel_v())
-    task_id = 0
-    while True:
-        fn = tp.get_tqrevis_fn(task_id)
-        if not os.path.exists(fn):
-            break
-        d = np.load(fn)
-        batch_size = int(d['Q'].shape[0])
-        vert_id = tp.get_vert_id(task_id)
-        pvs_array[vert_id].accumulate(d)
-        task_id += 1
-    hists = []
-    '''
-    for pvs in pvs_array:
-        pvs.show(mc_reference_count)
-    '''
-    for pvs in pvs_array:
-        hists.append(pvs.collect_percent(mc_reference_count))
-    hists_all = np.array(hists)
-    hist_sum = np.sum(hists, axis=0)
-    print(hist_sum)
-    last_nz = np.nonzero(hist_sum)[0][-1] - 1 # [0]: access the tuple, [-1]: last element
-    hists = hists_all[:,:last_nz]
-    bins = np.array(pvs_array[0].get_bins()) * 100.0
-    print(np.array_repr(bins[:last_nz], max_line_width=1024, precision=2, suppress_small=True))
-    for hist in hists:
-        hist_str = np.array_repr(hist, max_line_width=1024, precision=2, suppress_small=True)
-        print(hist_str)
-    with open('{}/hist.csv'.format(io_dir), 'w') as f:
-        f.write(',')
-        for s,e in zip(bins[:-1], bins[1:]):
-            f.write('{:.3f}%-{:.3f}%'.format(s, e))
-            f.write(',')
-        f.write('\n')
-        for i,hist in enumerate(hists):
-            f.write('{},'.format(i))
-            for h in hist:
-                f.write('{:4.2f}%'.format(h))
-                f.write(',')
-            f.write('\n')
-    from mpl_toolkits.mplot3d import Axes3D
-    import matplotlib.pyplot as plt
-    X1 = bins[:last_nz]
-    X2 = np.array([i for i in range(last_nz)])
-    Y1 = np.array([i for i in range(len(hists)-1)])
-    Y2 = np.array([i for i in range(len(hists)-1)])
-    X1, Y1 = np.meshgrid(X1, Y1)
-    X2, Y2 = np.meshgrid(X2, Y2)
-    print(hists_all.shape)
-    Z = hists_all[Y2, X2]
-    fig = plt.figure()
-    ax = fig.gca(projection='3d')
-    from matplotlib import cm
-    surf = ax.plot_surface(Y1, X1, Z, cmap=cm.coolwarm,
-                       linewidth=0, antialiased=False)
-    fig.colorbar(surf, shrink=0.5, aspect=5)
-    plt.show()
-
-def dump(uw, args):
-    target = args[0]
-    if target in ['samconf', 'tconf']:
-        if target == 'tconf':
-            fn_func = task_partitioner.touchq_fn
-            key_str = 'TOUCH_V'
-        else:
-            fn_func = task_partitioner.tqre_fn
-            key_str = 'ReTouchQ'
-        vert_id = int(args[1])
-        conf_sel = np.array(aux.range2list(args[2]), dtype=np.int)
+    def _dump_conf_common(self, fn_func, key_str):
+        vert_id = self._args.vert_id
+        conf_sel = np.array(aux.range2list(self._args.conf_sel), dtype=np.int)
         print("Printing {}".format(conf_sel))
-        io_dir = args[3]
-        out_obj_dir = args[4]
+        io_dir = self._args.in_dir
+        out_obj_dir = self._args.out_dir
         # Iterate through all ReTouchQ files
         batch_id = 0
         conf_base = 0
@@ -645,11 +701,17 @@ def dump(uw, args):
                 pyosr.save_obj_1(Va, Fa, out_obj)
             batch_id += 1
             conf_base += len(Q)
-    elif target == 'omplsam':
-        args = args[1:]
-        in_dir = args[0]
-        ofn = args[1]
-        tp = TaskPartitioner(in_dir, None, None, tunnel_v=_get_tunnel_v())
+
+    def _dump_samconf(self):
+        self._dump_conf_common(task_partitioner.touchq_fn, 'TOUCH_V')
+
+    def _dump_tconf(self):
+        self._dump_conf_common(task_partitioner.tqre_fn, 'ReTouchQ')
+
+    def _dump_omplsam(self):
+        in_dir = self._args.in_dir
+        ofn = self._args.output_file
+        tp = TaskPartitioner(in_dir, None, None, tunnel_v=self._get_tunnel_v())
         ompl_q = None
         for task_id, _ in enumerate(iter(int, 1)):
             fn = tp.get_tqre_fn(task_id)
@@ -666,98 +728,130 @@ def dump(uw, args):
                 for j in range(scalar_per_sample):
                     f.write('{:.17g} '.format(ompl_q[i,j]))
                 f.write('\n')
-    else:
-        assert False, "Unknown target {}".format(target)
+
+    def dump(self):
+        getattr(self, '_dump_{}'.format(self._args.dump_object))()
+
+    @staticmethod
+    def _setup_parser_samstat(subparsers):
+        sp = subparsers.add_parser('samstat',
+                help="Parse the output from 'samvis' command, and show the statistics.")
+        sp.add_argument('io_dir', help='Input/Output directory')
+        sp.add_argument('prm', help='Sample set for visibility estimation')
+
+    def samstat(self):
+        uw = self._uw
+        args = self._args
+        class PerVertexStat(object):
+            def __init__(self, vert_id):
+                self.vms_array = None
+                self.vert_id = vert_id
+
+            def accumulate(self, dic):
+                #print('Total V: {}'.format(np.sum(dic['VMS'])))
+                if self.vms_array is None:
+                    self.vms_array = dic['VMS']
+                else:
+                    self.vms_array = np.concatenate((self.vms_array, dic['VMS']), axis=0)
+
+            def get_bins(self):
+                return [float(i) * 0.005 for i in range(200)]
+
+            def collect_percent(self, count):
+                self.vms_pc = self.vms_array / float(count)
+                # if self.vert_id == 0:
+                    # print(self.vms_pc)
+                nsample = float(len(self.vms_pc))
+                bins = self.get_bins()
+                #print(bins)
+                hist, _ = np.histogram(self.vms_pc, bins)
+                hist = hist/nsample * 100
+                return hist
+
+            def show(self, count):
+                hist = self.collect_percent(count)
+                hist_str = np.array_repr(hist, max_line_width=1024, precision=2, suppress_small=True)
+                print("Histogram for vertex {}\n{}".format(self.vert_id, hist_str))
+
+        tunnel_v = _get_tunnel_v()
+        pvs_array = [ PerVertexStat(i) for i in range(len(tunnel_v)) ]
+        io_dir = args.io_dir
+        prm_data = args.prm
+        mc_reference_count = np.load(prm_data)['V'].shape[0]
+        # Probe batch size
+        fn = task_partitioner.tqrevis_fn(io_dir, vert_id=0, batch_id=0)
+        batch_size = int(np.load(fn)['Q'].shape[0])
+        # With the probed batch size to create TaskPartitioner
+        tp = TaskPartitioner(io_dir, None, batch_size, tunnel_v=_get_tunnel_v())
+        task_id = 0
+        while True:
+            fn = tp.get_tqrevis_fn(task_id)
+            if not os.path.exists(fn):
+                break
+            d = np.load(fn)
+            batch_size = int(d['Q'].shape[0])
+            vert_id = tp.get_vert_id(task_id)
+            pvs_array[vert_id].accumulate(d)
+            task_id += 1
+        hists = []
+        '''
+        for pvs in pvs_array:
+            pvs.show(mc_reference_count)
+        '''
+        for pvs in pvs_array:
+            hists.append(pvs.collect_percent(mc_reference_count))
+        hists_all = np.array(hists)
+        hist_sum = np.sum(hists, axis=0)
+        print(hist_sum)
+        last_nz = np.nonzero(hist_sum)[0][-1] - 1 # [0]: access the tuple, [-1]: last element
+        hists = hists_all[:,:last_nz]
+        bins = np.array(pvs_array[0].get_bins()) * 100.0
+        print(np.array_repr(bins[:last_nz], max_line_width=1024, precision=2, suppress_small=True))
+        for hist in hists:
+            hist_str = np.array_repr(hist, max_line_width=1024, precision=2, suppress_small=True)
+            print(hist_str)
+        with open('{}/hist.csv'.format(io_dir), 'w') as f:
+            f.write(',')
+            for s,e in zip(bins[:-1], bins[1:]):
+                f.write('{:.3f}%-{:.3f}%'.format(s, e))
+                f.write(',')
+            f.write('\n')
+            for i,hist in enumerate(hists):
+                f.write('{},'.format(i))
+                for h in hist:
+                    f.write('{:4.2f}%'.format(h))
+                    f.write(',')
+                f.write('\n')
+        from mpl_toolkits.mplot3d import Axes3D
+        import matplotlib.pyplot as plt
+        X1 = bins[:last_nz]
+        X2 = np.array([i for i in range(last_nz)])
+        Y1 = np.array([i for i in range(len(hists)-1)])
+        Y2 = np.array([i for i in range(len(hists)-1)])
+        X1, Y1 = np.meshgrid(X1, Y1)
+        X2, Y2 = np.meshgrid(X2, Y2)
+        print(hists_all.shape)
+        Z = hists_all[Y2, X2]
+        fig = plt.figure()
+        ax = fig.gca(projection='3d')
+        from matplotlib import cm
+        surf = ax.plot_surface(Y1, X1, Z, cmap=cm.coolwarm,
+                           linewidth=0, antialiased=False)
+        fig.colorbar(surf, shrink=0.5, aspect=5)
+        plt.show()
 
 def main():
-    if len(sys.argv) < 2:
-        usage()
-        return
-    cmd = sys.argv[1]
-    if cmd in ['-h', '--help', 'help']:
-        usage()
-        return
-    if cmd in ['show']:
-        print("# of tunnel vertices is {}".format(len(_get_tunnel_v())))
-        return
-    #assert cmd in ['run', 'isect', 'project', 'uvproj', 'uvrender', 'atlas2prim', 'sample', 'samvis'], 'Unknown command {}'.format(cmd)
-    cmdmap = {
-            'run' : run,
-            'isect' : isect,
-            'uvproj' : uvproj,
-            'uvrender' : uvrender,
-            'uvmerge' : uvmerge,
-            'atlas2prim' : atlas2prim,
-            'useatlas' : useatlas,
-            'sample' : sample,
-            'sample_enumaxis' : sample_enumaxis,
-            'samvis' : samvis,
-            'dump' : dump,
-            'samstat' : samstat,
-    }
-    uw = _create_uw(cmd)
-    cmdmap[cmd](uw, sys.argv[2:])
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--puzzle', help='choose puzzle to solve', default='aniconf12_2')
+    subparsers = parser.add_subparsers(dest='command')
+    for fn in  ['run', 'isect', 'uvproj', 'uvrender', 'uvmerge', 'atlas2prim', 'useatlas', 'sample', 'sample_enumaxis', 'samvis', 'dump', 'samstat']:
+        getattr(TouchConfiguration, '_setup_parser_'+fn)(subparsers)
 
+    args = parser.parse_args()
+    touch_conf = TouchConfiguration(args)
+    getattr(touch_conf, args.command)(uw, args)
+
+    return
 
 if __name__ == '__main__':
     main()
-
-def __deprecated():
-    assert False, "deprecated"
-    vert_id = int(sys.argv[2])
-    io_dir = sys.argv[3]
-    png_fn = sys.argv[4]
-    per_vertex_conf_id = 0
-    obj_gen = ObjGenerator(in_dir=io_dir, vert_id=vert_id)
-    tq_gen = TouchQGenerator(in_dir=io_dir, vert_id=vert_id)
-    i = 0
-    for V,F in obj_gen:
-        tq, is_inf = next(tq_gen)
-        if is_inf:
-            continue
-        IF, IBV = uw.intersecting_to_robot_surface(tq, True, V, F)
-        uw.add_barycentric(IF, IBV, uw.BARY_RENDERING_ROBOT)
-        V1, F1 = uw.get_robot_geometry(tq, True)
-        pyosr.save_obj_1(V1, F1, 'ir-verts-rob/ir-vert-{}/{}.obj'.format(vert_id, i))
-        pyosr.save_obj_1(IBV, IF, 'ir-verts-rob/ir-vert-{}/bary-{}.obj'.format(vert_id, i))
-        # print("IBV\n{}".format(IBV))
-        # print("{} finished".format(i))
-        #if i > 0:
-            #break
-        i+=1
-    fb = uw.render_barycentric(uw.BARY_RENDERING_ROBOT, np.array([ATLAS_RES, ATLAS_RES], dtype=np.int32))
-    imsave(png_fn, np.transpose(fb))
-    '''
-    task_id = int(sys.argv[2])
-    geo_batch_size = int(sys.argv[3])
-    tq_batch_size = int(sys.argv[4])
-    io_dir = sys.argv[5]
-    assert tq_batch_size % geo_batch_size == 0, "Geo Batch Size % Touch Batch Size must be 0"
-    batch_per_tq = tq_batch_size // geo_batch_size
-    run_task_id, geo_batch_id = divmod(task_id, batch_per_tq)
-    tq_batch_id, vert_id = divmod(run_task_id, len(tunnel_v))
-    tq_fn = _fn_touch_q(out_dir=io_dir, vert_id=vert_id, batch_id=tq_batch_id)
-    d = np.load(tq_fn)
-    tq = d['TOUCH_V']
-    is_inf = d['IS_INF']
-    if False:
-        for i in range(geo_batch_size):
-            per_batch_conf_id = i + geo_batch_id * geo_batch_size
-            per_vertex_conf_id = per_batch_conf_id + tq_batch_id * tq_batch_size
-            if is_inf[per_batch_conf_id]:
-                continue # Skip collding free cases
-            iobjfn = _fn_isectgeo(out_dir=io_dir, vert_id=vert_id, conf_id=per_vertex_conf_id)
-            V, F = pyosr.load_obj_1(iobjfn)
-            print("calling intersecting_to_robot_surface for file {} config {}\n".format(iobjfn, tq[per_batch_conf_id]))
-            IF, IBV = uw.intersecting_to_robot_surface(tq[per_batch_conf_id], True, V, F)
-            #IF, IBV = uw.intersecting_to_model_surface(tq[per_batch_conf_id], True, V, F)
-            V1, F1 = uw.get_robot_geometry(tq[per_batch_conf_id], True)
-            pyosr.save_obj_1(IBV, IF, 'idata.obj')
-            pyosr.save_obj_1(V1, F1, '1.obj')
-            uw.add_barycentric(IF, IBV, uw.BARY_RENDERING_ROBOT)
-    else:
-        IBV, IF = pyosr.load_obj_1('idata.obj')
-        uw.add_barycentric(IF, IBV, uw.BARY_RENDERING_ROBOT)
-    fb = uw.render_barycentric(uw.BARY_RENDERING_ROBOT, np.array([1024, 1024], dtype=np.int32))
-    imsave('1.png', fb)
-    '''
