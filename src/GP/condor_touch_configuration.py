@@ -14,8 +14,16 @@ import numpy as np
 #import aniconf10 as aniconf
 #import dualconf_tiny as aniconf
 #import dualconf_g2 as aniconf
-import dualconf_g4 as aniconf
+#import dualconf_g4 as aniconf
 #import dualconf as aniconf
+
+#import aniconf12_2
+#import aniconf10
+#import dualconf_tiny
+#import dualconf_g2
+#import dualconf_g4
+#import dualconf
+
 import uw_random
 import math
 from scipy.misc import imsave
@@ -73,7 +81,7 @@ def usage():
         This
     b) tconf <Vertex ID> <Conf ID or Range> <Input Dir> <Output dir>
         same as samconf, but this takes samples from Command `run`
-    c) omplsam <input dir> <output .txt>
+    c) omplsam <input dir> <output .txt or .npz>
         This dumps the samples to a text file in OMPL form defined by the demo application of RRT sample injection.
         Note: sample injection is our extension rather than an official function.
 10. condor_touch_configuration.py samstat <Input/Output Dir> <PRM sample file>
@@ -89,7 +97,7 @@ def _fn_atlastex(out_dir, geo_type, vert_id, index=None, nw=False):
     else:
         return "{}/tex-{}-from-vert-{}-{}{}.png".format(out_dir, geo_type, vert_id, index, nwsuffix)
 
-def _create_uw(cmd):
+def _create_uw(aniconf, cmd):
     if cmd == 'show':
         return None # show command does not need unit world object
     if 'render' in cmd or cmd in ['atlas2prim']:
@@ -153,9 +161,10 @@ class TouchConfiguration(object):
 
     def __init__(self, args):
         self._args = args
-        self._uw = _create_uw(args)
         self._tv_cache = None
-        self._aniconf = importlib.import_module('puzzleconf.'+args.puzzle)
+        #self._aniconf = importlib.import_module('puzzleconf.'+args.puzzle)
+        self._aniconf = importlib.import_module(args.puzzle)
+        self._uw = _create_uw(self._aniconf, args.command)
 
     def _get_tunnel_v(self):
         aniconf = self._aniconf
@@ -222,6 +231,7 @@ class TouchConfiguration(object):
                 type=str)
 
     def isect(self):
+        uw = self._uw
         tunnel_v = self._get_tunnel_v()
         task_id = self._args.task_id
         geo_batch_size = self._args.geo_batch_size
@@ -269,6 +279,7 @@ class TouchConfiguration(object):
                 type=str)
 
     def uvproj(self):
+        uw = self._uw
         geo_type = self._args.geo_type
         task_id = self._args.task_id
         gp_batch = self._args.geo_batch_size
@@ -532,6 +543,7 @@ class TouchConfiguration(object):
         self._common_sample(enum_axis=True)
 
     def _common_sample(self, enum_axis=False):
+        uw = self._uw
         task_id = self._args.task_id
         batch_size = self._args.batch_size
         io_dir = self._args.io_dir
@@ -655,7 +667,7 @@ class TouchConfiguration(object):
                 help="dumps a range of colliding configurations",
                 parents=[common]);
         dp3 = ssp.add_parser('omplsam',
-                help='dumps the samples to a text file in OMPL format.')
+                help='dumps the samples to a text file or a npz file in OMPL convention.')
         dp3.add_argument('in_dir', help='Input directory of predicted samples')
         dp3.add_argument('output_file', help='Output .txt file')
 
@@ -709,6 +721,7 @@ class TouchConfiguration(object):
         self._dump_conf_common(task_partitioner.tqre_fn, 'ReTouchQ')
 
     def _dump_omplsam(self):
+        uw = self._uw
         in_dir = self._args.in_dir
         ofn = self._args.output_file
         tp = TaskPartitioner(in_dir, None, None, tunnel_v=self._get_tunnel_v())
@@ -722,12 +735,15 @@ class TouchConfiguration(object):
             QT = uw.translate_unit_to_ompl(Q)
             ompl_q = QT if ompl_q is None else np.concatenate((ompl_q, QT), axis=0)
         nsample, scalar_per_sample = ompl_q.shape
-        with open(ofn, 'w') as f:
-            f.write("{} {}\n".format(nsample, scalar_per_sample))
-            for i in range(nsample):
-                for j in range(scalar_per_sample):
-                    f.write('{:.17g} '.format(ompl_q[i,j]))
-                f.write('\n')
+        if ofn.endswith('.npz'):
+            np.savez(ofn, OMPLV=ompl_q)
+        else:
+            with open(ofn, 'w') as f:
+                f.write("{} {}\n".format(nsample, scalar_per_sample))
+                for i in range(nsample):
+                    for j in range(scalar_per_sample):
+                        f.write('{:.17g} '.format(ompl_q[i,j]))
+                    f.write('\n')
 
     def dump(self):
         getattr(self, '_dump_{}'.format(self._args.dump_object))()
@@ -849,7 +865,7 @@ def main():
 
     args = parser.parse_args()
     touch_conf = TouchConfiguration(args)
-    getattr(touch_conf, args.command)(uw, args)
+    getattr(touch_conf, args.command)()
 
     return
 

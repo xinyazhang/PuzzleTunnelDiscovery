@@ -45,6 +45,7 @@ class AtlasSampler(object):
         self._geo_type = geo_type
         self._geo_id = geo_id
         tp = self._tp = task_partitioner
+        # FIXME: Notify users to run corresponding commands when files not found
         self._atlas2prim = np.load(tp.get_atlas2prim_fn(geo_type))['PRIM']
         d = np.load(tp.get_atlas_fn(geo_type, task_id))
         self._atlas = d[d.keys()[0]] # Load the first element
