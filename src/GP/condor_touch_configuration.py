@@ -858,7 +858,7 @@ class TouchConfiguration(object):
 
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--puzzle', help='choose puzzle to solve', default='aniconf12_2')
+    parser.add_argument('--puzzle', help='choose puzzle to solve', required=True)
     subparsers = parser.add_subparsers(dest='command')
     for fn in  ['run', 'isect', 'uvproj', 'uvrender', 'uvmerge', 'atlas2prim', 'useatlas', 'sample', 'sample_enumaxis', 'samvis', 'dump', 'samstat']:
         getattr(TouchConfiguration, '_setup_parser_'+fn)(subparsers)
