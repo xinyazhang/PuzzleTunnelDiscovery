@@ -672,6 +672,7 @@ class TouchConfiguration(object):
         dp3.add_argument('output_file', help='Output .txt file')
 
     def _dump_conf_common(self, fn_func, key_str):
+        uw = self._uw
         vert_id = self._args.vert_id
         conf_sel = np.array(aux.range2list(self._args.conf_sel), dtype=np.int)
         print("Printing {}".format(conf_sel))
