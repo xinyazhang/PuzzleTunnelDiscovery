@@ -557,6 +557,7 @@ class TouchConfiguration(object):
         pcloud2 = []
         pn2 = []
         conf = []
+        signature_conf = []
         SANITY_CHECK=False
         if not SANITY_CHECK:
             for i in progressbar(range(batch_size)):
@@ -566,6 +567,8 @@ class TouchConfiguration(object):
                     qs = uw.enum_free_configuration(tup1[0], tup1[1], tup2[0], tup2[1], 1e-6, denominator=64)
                     for q in qs:
                         conf.append(q)
+                    if len(qs) > 0:
+                        signature_conf.append(qs[0])
                 else:
                     while True:
                         tup1 = rob_sampler.sample(uw)
@@ -575,7 +578,7 @@ class TouchConfiguration(object):
                             break
                     conf.append(q)
             # print("tqre_fn {}".format(tp.get_tqre_fn(task_id)))
-            np.savez(tp.get_tqre_fn(task_id), ReTouchQ=conf)
+            np.savez(tp.get_tqre_fn(task_id), ReTouchQ=conf, SigReTouchQ=signature_conf)
         else:
             #
             # Sanity check code
@@ -666,6 +669,7 @@ class TouchConfiguration(object):
         dp2 = ssp.add_parser('tconf',
                 help="dumps a range of colliding configurations",
                 parents=[common]);
+        dp2.add_argument('--signature', help='Only dump signature configurations', action='store_true')
         dp3 = ssp.add_parser('omplsam',
                 help='dumps the samples to a text file or a npz file in OMPL convention.')
         dp3.add_argument('in_dir', help='Input directory of predicted samples')
@@ -691,6 +695,9 @@ class TouchConfiguration(object):
             indices = np.where(np.logical_and(conf_sel >= conf_base, conf_sel < conf_base + len(Q)))
             indices = indices[0]
             # print("Indices {}".format(indices))
+            Vall_list = None
+            Fall_list = None
+            Fall_base = 0
             for index in indices:
                 conf_id = conf_sel[index]
                 # print("conf_sel index {}".format(index))
@@ -710,8 +717,23 @@ class TouchConfiguration(object):
                 Va = np.concatenate((V1, V2), axis=0)
                 F2 += V1.shape[0]
                 Fa = np.concatenate((F1, F2), axis=0)
+                if Vall_list is None:
+                    # Include the environment
+                    Vall_list = [V1,V2]
+                    Fall_list = [F1,F2] # F2 has been rebased
+                    Fall_base = V1.shape[0] + V2.shape[0]
+                else:
+                    # Exclude the environment, so env geo only included once
+                    Vall_list.append(V1)
+                    F1prime = F1 + Fall_base
+                    Fall_list.append(F1prime)
+                    Fall_base += V1.shape[0]
                 #print("Dumping to {}".format(out_obj))
                 pyosr.save_obj_1(Va, Fa, out_obj)
+            Vall = np.concatenate(Vall_list, axis=0)
+            Fall = np.concatenate(Fall_list, axis=0)
+            out_obj = "{}/union-all.obj".format(out_obj_dir)
+            pyosr.save_obj_1(Vall, Fall, out_obj)
             batch_id += 1
             conf_base += len(Q)
 
@@ -719,7 +741,10 @@ class TouchConfiguration(object):
         self._dump_conf_common(task_partitioner.touchq_fn, 'TOUCH_V')
 
     def _dump_tconf(self):
-        self._dump_conf_common(task_partitioner.tqre_fn, 'ReTouchQ')
+        if self._args.signature:
+            self._dump_conf_common(task_partitioner.tqre_fn, 'SigReTouchQ')
+        else:
+            self._dump_conf_common(task_partitioner.tqre_fn, 'ReTouchQ')
 
     def _dump_omplsam(self):
         uw = self._uw
