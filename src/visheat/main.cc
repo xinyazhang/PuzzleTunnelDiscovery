@@ -8,9 +8,13 @@
 #include <iostream>
 #include <limits>
 #include <igl/barycenter.h>
-#include <igl/viewer/Viewer.h>
+#include <igl/opengl/glfw/Viewer.h>
 #include <igl/jet.h>
 #include <time.h>
+
+using Viewer = igl::opengl::glfw::Viewer;
+using ViewerData = igl::opengl::ViewerData;
+using MeshGL = igl::opengl::MeshGL;
 
 using std::string;
 using std::endl;
@@ -167,7 +171,7 @@ public:
 		flush_viewer_ = true;
 	}
 
-	void update_frame(igl::viewer::Viewer& viewer)
+	void update_frame(Viewer& viewer)
 	{
 		Eigen::VectorXd& FV(frames_[frameid_].hvec);
 #if 0
@@ -190,23 +194,23 @@ public:
 		}
 #endif
 		if (flush_viewer_) {
-			viewer.data.clear();
-			viewer.data.set_mesh(V_temp_, F_temp_);
+			viewer.data().clear();
+			viewer.data().set_mesh(V_temp_, F_temp_);
 			flush_viewer_ = false;
 		}
-		viewer.data.set_face_based(false);
-		viewer.data.V_material_diffuse.resize(vertback_.size(), 3);
+		viewer.data().set_face_based(false);
+		viewer.data().V_material_diffuse.resize(vertback_.size(), 3);
 		
-		colorize_data(Z_temp_, viewer.data.V_material_diffuse);
-		viewer.data.V_material_ambient = 0.1 * viewer.data.V_material_diffuse;
+		colorize_data(Z_temp_, viewer.data().V_material_diffuse);
+		viewer.data().V_material_ambient = 0.1 * viewer.data().V_material_diffuse;
 		constexpr double grey = 0.3;
-		viewer.data.V_material_specular = grey+0.1*(viewer.data.V_material_diffuse.array()-grey);
-		viewer.data.dirty |= igl::viewer::ViewerData::DIRTY_DIFFUSE;
+		viewer.data().V_material_specular = grey+0.1*(viewer.data().V_material_diffuse.array()-grey);
+		viewer.data().dirty |= MeshGL::DIRTY_DIFFUSE;
 		// The code above replaces viewer.data.set_colors(C);
 		// to calculate the result in-place
 	}
 
-	bool operator()(igl::viewer::Viewer& viewer, unsigned char key, int modifier)
+	bool operator()(Viewer& viewer, unsigned char key, int modifier)
 	{
 		using namespace std;
 		using namespace Eigen;
@@ -360,12 +364,12 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 
-	igl::viewer::Viewer viewer;
+	Viewer viewer;
 	KeyDown kd(V,E,P, frames);
 	kd.load_path(pfn);
 	kd.set_auto_range(auto_range);
-	viewer.callback_key_pressed = [&kd](igl::viewer::Viewer& viewer, unsigned char key, int modifier) -> bool { return kd.operator()(viewer, key, modifier); } ;
-	viewer.callback_pre_draw = [&kd](igl::viewer::Viewer& viewer) -> bool
+	viewer.callback_key_pressed = [&kd](Viewer& viewer, unsigned char key, int modifier) -> bool { return kd.operator()(viewer, key, modifier); } ;
+	viewer.callback_pre_draw = [&kd](Viewer& viewer) -> bool
 	{
 		if (viewer.core.is_animating) {
 			if (!kd.next_frame())

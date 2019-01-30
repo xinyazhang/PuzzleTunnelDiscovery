@@ -9,12 +9,13 @@
 #include <osr/mesh.h>
 #include <osr/pngimage.h>
 
-#include <igl/viewer/Viewer.h>
+#include <igl/opengl/glfw/Viewer.h>
 #include <igl/readOBJ.h>
 
-using Viewer = igl::viewer::Viewer;
+// For ancient libigl
+// using Viewer = igl::viewer::Viewer;
 // For newer libigl
-// using Viewer = igl::opengl::glfw::Viewer;
+using Viewer = igl::opengl::glfw::Viewer;
 
 void usage()
 {
@@ -23,7 +24,7 @@ void usage()
 
 bool key_up(Viewer& viewer, unsigned char key, int modifier)
 {
-#if 1
+#if 0
 	if (key == 'f' or key == 'F') {
 		viewer.core.show_lines = not viewer.core.show_lines;
 	} else if (key == 't' or key == 'T') {
@@ -91,7 +92,7 @@ int main(int argc, const char* argv[])
 	EiTex g_ch = g_ch_map;
 
 	Viewer viewer;
-#if 1
+#if 0
 	viewer.data.set_mesh(V, F);
 	viewer.data.set_uv(V_uv);
 	viewer.data.compute_normals();
@@ -116,8 +117,19 @@ int main(int argc, const char* argv[])
 	viewer.data().set_texture(r_ch, g_ch, b_ch);
 	viewer.data().compute_normals();
 	// Default configuration
-	viewer.data().show_lines = false;
 	viewer.data().show_texture = true;
+	// Optional Point Cloud
+	if (argc >= 4) {
+		Eigen::MatrixXd pcV;
+		Eigen::MatrixXi pcF;
+		igl::readOBJ(argv[3], pcV, pcF);
+		Eigen::MatrixXd pc_color;
+		pc_color.setZero(pcV.rows(), 3);
+		pc_color.col(2).array() = 1.0;
+		viewer.data().set_points(pcV, pc_color);
+		if (argc >= 5)
+			viewer.data().point_size = std::atof(argv[4]);
+	}
 #endif
 
 	viewer.callback_key_up = &key_up;
