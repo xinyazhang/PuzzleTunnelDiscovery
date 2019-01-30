@@ -1,5 +1,4 @@
 #include <osr/osr_render.h>
-#include "quickgl.h"
 #include <osr/osr_init.h>
 #include <stdio.h>
 #include <iostream>
