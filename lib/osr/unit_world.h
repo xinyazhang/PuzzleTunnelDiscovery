@@ -124,7 +124,10 @@ public:
 	// Note: this is different from translateFromUnitState since OMPL has
 	//       fixed center, while our center can be overrided by
 	//       enforceRobotCenter.
-	ArrayOfStates translateUnitStateToOMPLState(const ArrayOfStates& qs) const;
+	ArrayOfStates translateUnitStateToOMPLState(const ArrayOfStates& qs,
+	                                            bool to_angle_axis = false) const;
+	// Note: do not pass by const& because the implementation does need a copy 
+	ArrayOfStates translateOMPLStateToUnitState(ArrayOfStates qs) const;
 	StateVector applyPertubation(const StateVector& state) const;
 	StateVector unapplyPertubation(const StateVector& state) const;
 
@@ -257,6 +260,7 @@ public:
 	                        StateScalar margin,
 	                        int max_trials = -1);
 
+	// Like sampleFreeConfiguration, only accepts vectors of unit states
 	ArrayOfStates
 	enumFreeConfiguration(const StateTrans& rob_surface_point,
 	                      const StateTrans& rob_surface_normal,

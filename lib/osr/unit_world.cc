@@ -649,11 +649,12 @@ UnitWorld::translateFromUnitState(const StateVector& pstate) const
 }
 
 ArrayOfStates
-UnitWorld::translateUnitStateToOMPLState(const ArrayOfStates& qs) const
+UnitWorld::translateUnitStateToOMPLState(const ArrayOfStates& qs, bool to_angle_axis) const
 {
 	int N = qs.rows();
 	ArrayOfStates ret;
 	ret.resize(qs.rows(), qs.cols());
+	// Handle the case of using enforceRobotCenter
 	Eigen::Vector3d delta_center = glm2Eigen(robot_->getOMPLCenter() - robot_->getCenter());
 	delta_center *= scene_scale_;
 	for (int i = 0; i < N; i++) {
@@ -665,10 +666,45 @@ UnitWorld::translateUnitStateToOMPLState(const ArrayOfStates& qs) const
 	// OMPL uses W last while we uses W first
 	Eigen::Matrix<double, -1, 4> wfirst(N, 4);
 	wfirst = ret.block(0, 3, N, 4);
-	ret.col(3 + 3) = wfirst.col(0); // W fist -> W last
-	ret.col(3 + 0) = wfirst.col(1);
-	ret.col(3 + 1) = wfirst.col(2);
-	ret.col(3 + 2) = wfirst.col(3);
+	if (to_angle_axis) {
+		// W first -> Angle Axis
+		for (int i = 0; i < N; i++) {
+			StateQuat rot(wfirst(i, 0), wfirst(i, 1), wfirst(i, 2), wfirst(i, 3));
+			Eigen::AngleAxis<StateScalar> aa(rot);
+			ret(i, 3 + 0) = aa.angle();
+			ret.block<1, 3>(i, 3 + 1) = aa.axis().transpose();
+		}
+	} else {
+		// W fist -> W last
+		ret.col(3 + 3) = wfirst.col(0);
+		ret.col(3 + 0) = wfirst.col(1);
+		ret.col(3 + 1) = wfirst.col(2);
+		ret.col(3 + 2) = wfirst.col(3);
+	}
+	return ret;
+}
+
+ArrayOfStates
+UnitWorld::translateOMPLStateToUnitState(ArrayOfStates qs) const
+{
+	int N = qs.rows();
+	Eigen::Matrix<double, -1, 4> wlast(N, 4);
+	wlast = qs.block(0, 3, N, 4);
+	qs.col(3 + 0) = wlast.col(3);
+	qs.col(3 + 1) = wlast.col(0);
+	qs.col(3 + 2) = wlast.col(1);
+	qs.col(3 + 3) = wlast.col(2);
+
+	ArrayOfStates ret;
+	ret.resize(qs.rows(), qs.cols());
+	Eigen::Vector3d delta_center = glm2Eigen(robot_->getOMPLCenter() - robot_->getCenter());
+	delta_center *= scene_scale_;
+	for (int i = 0; i < N; i++) {
+		ret.row(i) = translateToUnitState(qs.row(i));
+		auto tup = decompose(ret.row(i).transpose());
+		Eigen::Vector3d t_prime = std::get<0>(tup) - std::get<1>(tup) * delta_center;
+		ret.row(i) = compose(t_prime, std::get<1>(tup));
+	}
 	return ret;
 }
 
