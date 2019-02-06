@@ -1101,15 +1101,8 @@ UnitWorld::sampleOverPrimitive(uint32_t geo_id,
                                int prim,
                                bool return_unit) const
 {
-	auto cd = cd_scene_;
-	auto geo = scene_;
-	if (geo_id == GEO_ENV) {
-	} else if (geo_id == GEO_ROB) {
-		cd = cd_robot_;
-		geo = robot_;
-	} else {
-		throw std::runtime_error("Unknown geo id " + std::to_string(geo_id));
-	}
+	auto cd = getCDModel(geo_id);
+	auto geo = getScene(geo_id);
 	auto target_mesh = geo->getUniqueMesh();
 	const auto& indices = target_mesh->getIndices();
 	unsigned int vi[] = { indices[3 * prim + 0],
@@ -1182,16 +1175,8 @@ UnitWorld::uvToSurface(uint32_t geo_id,
                        const Eigen::Vector2f& target_uv,
                        bool return_unit) const
 {
-	// TODO: This is copied from sampleOverPrimitive
-	auto cd = cd_scene_;
-	auto geo = scene_;
-	if (geo_id == GEO_ENV) {
-	} else if (geo_id == GEO_ROB) {
-		cd = cd_robot_;
-		geo = robot_;
-	} else {
-		throw std::runtime_error("Unknown geo id " + std::to_string(geo_id));
-	}
+	auto cd = getCDModel(geo_id);
+	auto geo = getScene(geo_id);
 	auto target_mesh = geo->getUniqueMesh();
 	const auto& indices = target_mesh->getIndices();
 	unsigned int vi[] = { indices[3 * prim + 0],
@@ -1331,6 +1316,42 @@ UnitWorld::enumFreeConfiguration(const StateTrans& rob_surface_point,
 		ret.row(i) = valid_states[i];
 	}
 	return ret;
+}
+
+std::shared_ptr<Scene>
+UnitWorld::getScene(uint32_t geo)
+{
+	if (geo == GEO_ENV) {
+		return scene_;
+	}
+	if (geo == GEO_ROB) {
+		return robot_;
+	}
+	throw std::runtime_error("Invalid geometry id: "+std::to_string(geo));
+}
+
+std::shared_ptr<CDModel>
+UnitWorld::getCDModel(uint32_t geo)
+{
+	if (geo == GEO_ENV) {
+		return cd_scene_;
+	}
+	if (geo == GEO_ROB) {
+		return cd_robot_;
+	}
+	throw std::runtime_error("Invalid geometry id: "+std::to_string(geo));
+}
+
+std::shared_ptr<const Scene>
+UnitWorld::getScene(uint32_t geo) const
+{
+	return const_cast<UnitWorld*>(this)->getScene(geo);
+}
+
+std::shared_ptr<const CDModel>
+UnitWorld::getCDModel(uint32_t geo) const
+{
+	return const_cast<UnitWorld*>(this)->getCDModel(geo);
 }
 
 }

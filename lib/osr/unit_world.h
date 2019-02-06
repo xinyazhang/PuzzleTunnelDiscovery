@@ -265,6 +265,11 @@ public:
 	                      StateScalar margin,
 	                      int denominator);
 
+	std::shared_ptr<Scene> getScene(uint32_t geo);
+	std::shared_ptr<CDModel> getCDModel(uint32_t geo);
+
+	std::shared_ptr<const Scene> getScene(uint32_t geo) const;
+	std::shared_ptr<const CDModel> getCDModel(uint32_t geo) const;
 protected:
 	bool shared_ = false;
 
