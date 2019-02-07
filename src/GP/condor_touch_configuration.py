@@ -804,9 +804,7 @@ class TouchConfiguration(object):
                 # if self.vert_id == 0:
                     # print(self.vms_pc)
                 nsample = float(len(self.vms_pc))
-                bins = self.get_bins()
-                #print(bins)
-                hist, _ = np.histogram(self.vms_pc, bins)
+                bins = self.get_bins() #print(bins) hist, _ = np.histogram(self.vms_pc, bins)
                 hist = hist/nsample * 100
                 return hist
 
@@ -882,11 +880,48 @@ class TouchConfiguration(object):
         fig.colorbar(surf, shrink=0.5, aspect=5)
         plt.show()
 
+    @staticmethod
+    def _setup_parser_util(subparsers):
+        sp = subparsers.add_parser('util', help='Utility functions within this infrastructure.')
+        ssp = sp.add_subparsers(dest='util_name', help='Name of utility function')
+        unit2ompl = ssp.add_parser('unit2ompl', help='Read unit states from test file and convert them to ompl states')
+        unit2ompl.add_argument('textin', help='Input text file')
+        unit2ompl.add_argument('textout', help='Output text file')
+        unit2ompl.add_argument('--angleaxis', help='Use angle axis as the rotation component (the default is quaternion)', action='store_true')
+        unit2ompl = ssp.add_parser('ompl2unit', help='Read unit states from test file and convert them to ompl states')
+        unit2ompl.add_argument('textin', help='Input text file')
+        unit2ompl.add_argument('textout', help='Output text file')
+
+    def _util_unit2ompl(self):
+        uw = self._uw
+        ifn = self._args.textin
+        ofn = self._args.textout
+        Q = np.loadtxt(ifn)
+        ompl_q = uw.translate_unit_to_ompl(Q, to_angle_axis=self._args.angleaxis)
+        if ofn.endswith('.npz'):
+            np.savez(ofn, OMPLV=ompl_q)
+        else:
+            np.savetxt(ofn, ompl_q, fmt='%.17g')
+
+    def _util_ompl2unit(self):
+        uw = self._uw
+        ifn = self._args.textin
+        ofn = self._args.textout
+        Q = np.loadtxt(ifn)
+        unit_q = uw.translate_ompl_to_unit(Q)
+        if ofn.endswith('.npz'):
+            np.savez(ofn, UNITV=ompl_q)
+        else:
+            np.savetxt(ofn, unit_q, fmt='%.17g')
+
+    def util(self):
+        getattr(self, '_util_{}'.format(self._args.util_name))()
+
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--puzzle', help='choose puzzle to solve', required=True)
     subparsers = parser.add_subparsers(dest='command')
-    for fn in  ['run', 'isect', 'uvproj', 'uvrender', 'uvmerge', 'atlas2prim', 'useatlas', 'sample', 'sample_enumaxis', 'samvis', 'dump', 'samstat']:
+    for fn in  ['run', 'isect', 'uvproj', 'uvrender', 'uvmerge', 'atlas2prim', 'useatlas', 'sample', 'sample_enumaxis', 'samvis', 'dump', 'samstat', 'util']:
         getattr(TouchConfiguration, '_setup_parser_'+fn)(subparsers)
 
     args = parser.parse_args()
