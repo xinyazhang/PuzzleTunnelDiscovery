@@ -27,11 +27,13 @@ import numpy as np
 import uw_random
 import math
 from scipy.misc import imsave
+from scipy.io import savemat, loadmat
 from task_partitioner import *
 # Our modules
 import texture_format
 import atlas
 import task_partitioner
+import disjoint_set
 try:
     from progressbar import progressbar
 except ImportError:
@@ -917,11 +919,37 @@ class TouchConfiguration(object):
     def util(self):
         getattr(self, '_util_{}'.format(self._args.util_name))()
 
+    @staticmethod
+    def _setup_parser_screen(subparsers):
+        sp = subparsers.add_parser('screen', help='Screening the samples to cluster nearby samples')
+        sp.add_argument('--method', help='Choose screening method', type=int, choices=[0], required=True)
+        sp.add_argument('prescreen', help='Input file in NPZ')
+        sp.add_argument('connectivity', help='Connectivity file precalculated by condor-visibility-matrix2.py and asvm.py, in .mat format')
+        sp.add_argument('postscreen', help='Output file in NPZ')
+
+    def screen(self):
+        getattr(self, '_screen_{}'.format(self._args.method))()
+
+    def _screen_0(self):
+        d = np.load(self._args.prescreen)
+        samples = d[d.keys()[0]]
+        cd = loadmat(self._args.connectivity)
+        cm = cd['VM']
+        outfn = self._args.postscreen
+        vert_ids = [i for i in range(samples.shape[0])]
+        djs = disjoint_set.DisjointSet(vert_ids)
+        nz_rows, nz_cols = cm.nonzero()
+        for r,c in zip(nz_rows, nz_cols):
+            djs.union(r,c)
+        screened = samples[djs.get_roots()]
+        print('screened array shape {}'.format(screened.shape))
+        np.savez(outfn, ReTouchQ=screened)
+
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--puzzle', help='choose puzzle to solve', required=True)
     subparsers = parser.add_subparsers(dest='command')
-    for fn in  ['run', 'isect', 'uvproj', 'uvrender', 'uvmerge', 'atlas2prim', 'useatlas', 'sample', 'sample_enumaxis', 'samvis', 'dump', 'samstat', 'util']:
+    for fn in  ['run', 'isect', 'uvproj', 'uvrender', 'uvmerge', 'atlas2prim', 'useatlas', 'sample', 'sample_enumaxis', 'samvis', 'dump', 'samstat', 'util', 'screen']:
         getattr(TouchConfiguration, '_setup_parser_'+fn)(subparsers)
 
     args = parser.parse_args()
