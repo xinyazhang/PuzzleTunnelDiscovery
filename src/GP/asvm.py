@@ -10,6 +10,8 @@ sys.path.append(os.getcwd())
 
 import numpy as np
 import argparse
+from scipy.io import savemat
+from scipy import sparse
 
 def fn_gen(fvm_dir, block_size):
     index = 0
@@ -48,7 +50,10 @@ def main():
         giant[q0start:q0end, q1start:q1end] = m
     if np.min(giant) < 0:
         print("Caveat: the assembled visibility matrix has undefined coefficients")
-    np.savez(out, VM=giant)
+    if out.endswith('.mat'):
+        savemat(out, dict(VM=sparse.csr_matrix(giant)), do_compression=True)
+    else:
+        np.savez(out, VM=giant)
 
 if __name__ == '__main__':
     main()
