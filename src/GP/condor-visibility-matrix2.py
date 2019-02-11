@@ -5,9 +5,10 @@ import sys
 sys.path.append(os.getcwd())
 
 import pyosr
-import aniconf12
 import numpy as np
+import aniconf12
 import dualconf_tiny
+import importlib
 
 from condor_vm import *
 import argparse
@@ -28,17 +29,16 @@ _name2module = { 'aniconf12' : aniconf12,
 def get_parser():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     subparsers = parser.add_subparsers(dest='command')
-    info_parser = subparsers.add_parser("info")
-    calc_parser = subparsers.add_parser("calc", help='Calculate the visibility matrix between path (axis 0) and prm (axis 1)')
-    info_parser.add_argument('prm', help='Sample from PRM', nargs=None, type=str)
-    info_parser.add_argument('path', help='Sample from PRM', nargs=None, type=str)
-    info_parser.add_argument('block_size', help='Block Size', nargs=None, type=int)
-    info_parser.add_argument('task_id', help='Task Index', nargs='?', default=-1, type=int)
-    calc_parser.add_argument('prm', help='Sample from PRM', nargs=None)
-    calc_parser.add_argument('path', help='Sample from PRM', nargs=None)
-    calc_parser.add_argument('puzzlename', help='Sample from PRM', choices=['aniconf12', 'dual_tiny'])
-    calc_parser.add_argument('block_size', help='Block Size', nargs=None, type=int)
-    calc_parser.add_argument('task_id', help='Task Index', nargs=None, type=int)
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument('prm', help='Sample from PRM', nargs=None, type=str)
+    common.add_argument('--prmkey', help='File name of PRM in NPZ', default='V')
+    common.add_argument('path', help='Sample from PRM', nargs=None, type=str)
+    common.add_argument('--pathkey', help='File name of Path in NPZ', default='VS')
+    common.add_argument('block_size', help='Block Size', nargs=None, type=int)
+    common.add_argument('task_id', help='Task Index', nargs='?', default=-1, type=int)
+    info_parser = subparsers.add_parser("info", parents=[common])
+    calc_parser = subparsers.add_parser("calc", help='Calculate the visibility matrix between path (axis 0) and prm (axis 1)', parents=[common])
+    calc_parser.add_argument('--puzzlename', help='Puzzle')
     calc_parser.add_argument('out', help='Output Directory', nargs=None, type=str)
     return parser
 
@@ -49,8 +49,8 @@ def parse():
 def _get_V0V1(args):
     gtdic = np.load(args.prm)
     pathdic = np.load(args.path)
-    V0 = pathdic['VS']
-    V1 = gtdic['V']
+    V0 = pathdic[args.pathkey]
+    V1 = gtdic[args.prmkey]
     return V0, V1
 
 def info(args):
@@ -64,7 +64,10 @@ def info(args):
         print("Calculate path[{}:{}] vs prm[{}:{}]. Total number of tasks: {}".format(tup[0], tup[1], tup[2], tup[3], tup[4]))
 
 def calc(args):
-    args.model = _name2module[args.puzzlename]
+    if args.puzzlename in _name2module:
+        args.model = _name2module[args.puzzlename]
+    else:
+        args.model = importlib.import_module(args.puzzlename)
     print(args.model.env_fn)
     V0, V1 = _get_V0V1(args)
     q0start, q0end, q1start, q1end, index_max = index_to_ranges(V0, V1, args.block_size, args.task_id)
