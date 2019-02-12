@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 class DisjointSet:
 
@@ -36,3 +36,26 @@ class DisjointSet:
             if value == key:
                 roots.append(key)
         return roots
+
+if __name__ == '__main__':
+    import argparse
+    import numpy as np
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('n', help='number of vertices', type=int)
+    parser.add_argument('efile', help='edge file')
+    args = parser.parse_args()
+    pairs = np.loadtxt(args.efile, dtype=np.int32, delimiter=",")
+    vset = [i for i in range(args.n)]
+    djs = DisjointSet(vset)
+    for e in pairs:
+        [r,c] = e
+        djs.union(r,c)
+    print(djs.get_roots())
+    cluster = dict()
+    for v in vset:
+        r = djs.find(v)
+        if r not in cluster:
+            cluster[r] = [v]
+        else:
+            cluster[r].append(v)
+    print(cluster)
