@@ -6,6 +6,7 @@ import sys
 sys.path.append(os.getcwd())
 import shutil
 import argparse
+from six.moves import configparser
 import importlib
 
 import pyosr
@@ -674,6 +675,7 @@ class TouchConfiguration(object):
         dp2.add_argument('--signature', help='Only dump signature configurations', action='store_true')
         dp3 = ssp.add_parser('omplsam',
                 help='dumps the samples to a text file or a npz file in OMPL convention.')
+        dp3.add_argument('--withig', help='Add initial state and goal state as 0th/1th row in the output file', default=None)
         dp3.add_argument('in_dir', help='Input directory of predicted samples')
         dp3.add_argument('output_file', help='Output .txt file')
 
@@ -752,13 +754,39 @@ class TouchConfiguration(object):
         uw = self._uw
         in_dir = self._args.in_dir
         ofn = self._args.output_file
-        tp = TaskPartitioner(in_dir, None, None, tunnel_v=self._get_tunnel_v())
         ompl_q = None
-        for task_id, _ in enumerate(iter(int, 1)):
-            fn = tp.get_tqre_fn(task_id)
-            # print('probing {}'.format(fn))
-            if not os.path.exists(fn):
-                break
+        if self._args.withig is not None:
+            config = configparser.ConfigParser()
+            config.read([self._args.withig])
+            def read_xyz(config, section, prefix):
+                ret = np.zeros(shape=(3), dtype=np.float64)
+                for i,suffix in enumerate(['x','y','z']):
+                    ret[i] = config.getfloat(section, prefix + '.' + suffix)
+                return ret
+            def read_state(config, section, prefix):
+                tr = read_xyz(config, section, prefix)
+                rot_axis = read_xyz(config, section, prefix + '.axis')
+                rot_angle = config.getfloat(section, prefix + '.theta')
+                q = pyosr.compose_from_angleaxis(tr, rot_angle, rot_axis)
+                return q.reshape((1, pyosr.STATE_DIMENSION))
+            iq = read_state(config, 'problem', 'start')
+            gq = read_state(config, 'problem', 'goal')
+            ompl_q = np.concatenate((iq, gq), axis=0)
+            assert pyosr.STATE_DIMENSION == 7, "FIXME: More flexible w-first to w-last"
+            ompl_q[:, [6,3,4,5]] = ompl_q[:, [3,4,5,6]] # W-first (pyOSR) to W-last (OMPL)
+            print("ig ompl_q {}".format(ompl_q.shape))
+        if os.path.isdir(in_dir):
+            tp = TaskPartitioner(in_dir, None, None, tunnel_v=self._get_tunnel_v())
+            for task_id, _ in enumerate(iter(int, 1)):
+                fn = tp.get_tqre_fn(task_id)
+                print('probing {}'.format(fn))
+                if not os.path.exists(fn):
+                    break
+                Q = np.load(fn)['ReTouchQ']
+                QT = uw.translate_unit_to_ompl(Q)
+                ompl_q = QT if ompl_q is None else np.concatenate((ompl_q, QT), axis=0)
+        else:
+            fn = in_dir
             Q = np.load(fn)['ReTouchQ']
             QT = uw.translate_unit_to_ompl(Q)
             ompl_q = QT if ompl_q is None else np.concatenate((ompl_q, QT), axis=0)
