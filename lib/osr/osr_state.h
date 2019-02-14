@@ -37,6 +37,7 @@ StateVector interpolate(const StateVector& pkey,
 std::tuple<StateTrans, StateQuat> decompose(const StateVector&);
 std::tuple<StateTrans, Eigen::Matrix3d> decompose_2(const StateVector&);
 StateVector compose(const StateTrans&, const StateQuat&);
+StateVector compose_from_angleaxis(const StateTrans&, StateScalar angle, const StateTrans& axis);
 double distance(const StateVector& lhv, const StateVector& rhv);
 Eigen::VectorXd multi_distance(const StateVector& origin, const ArrayOfStates& targets);
 Eigen::Matrix3d extract_rotation_matrix(const StateVector&);

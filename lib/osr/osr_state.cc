@@ -66,6 +66,15 @@ compose(const StateTrans& base, const StateQuat& irot)
 	return ret;
 }
 
+StateVector
+compose_from_angleaxis(const StateTrans& tr,
+                       double angle,
+                       const StateTrans& axis)
+{
+	Eigen::AngleAxis<StateScalar> aa(angle, axis);
+	return compose(tr, StateQuat(aa));
+}
+
 double distance(const StateVector& lhv, const StateVector& rhv)
 {
 	auto tup0 = decompose(lhv);
