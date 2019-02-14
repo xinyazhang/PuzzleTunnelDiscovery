@@ -10,27 +10,65 @@ Note:
 '''
 
 import argparse
-from scipy.io import loadmat
+import numpy as np
+from scipy.io import loadmat,savemat
 import scipy.sparse as sparse
+from progressbar import progressbar
 
-def print_edge(args):
+def print_edge_sparse(args):
     cl = []
-    for fn in args.files:
+    for fn in progressbar(args.files):
         cl.append(loadmat(fn)['C'])
-    mc = sparse.vstack(cl, format='csc')
+    print("Stacking sparse matrices")
+    mc = sparse.vstack(cl, format='csr')
+    print("Colwise summing")
     cws = mc.sum(axis=0)
+    nv = cws.shape[1]
     #print(cws.shape)
-    for i in range(cws.shape[1]):
+    edges = sparse.lil_matrix((nv, nv), dtype=np.int8)
+    for i in progressbar(range(nv)):
         s = cws[0,i]
         if s < 2:
             continue
         rows,_ = mc[:,i].nonzero()
+        '''
         for r,c in zip(rows[:-1], rows[1:]):
-            print("{},{}".format(r,c))
+            edges[r,c] = 1
+            #print("{},{}".format(r,c))
+        '''
+    #savemat(args.out, dict(E=edges), do_compression=True)
+
+def print_edge(args):
+    E = None
+    r = 0
+    for fn in progressbar(args.files):
+        rowdata = loadmat(fn)['C']
+        if E is None:
+            E = np.zeros((len(args.files), rowdata.shape[1]), dtype=np.int8)
+        E[r] = rowdata.todense()
+        r += 1
+    cws = E.sum(axis=0)
+    nv = cws.shape[0]
+    edge_from = []
+    edge_to = []
+    for i in progressbar(range(nv)):
+        s = cws[i]
+        if s < 2:
+            continue
+        rows = np.nonzero(E[:,i])[0].tolist()
+        edge_from += rows[:-1]
+        edge_to += rows[1:]
+    del cws
+    del E
+    edge = np.array([edge_from, edge_to], dtype=np.int32)
+    del edge_from
+    del edge_to
+    savemat(args.out, dict(E=edge), do_compression=True)
 
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('files', help='ssc-*.mat file', nargs='+')
+    parser.add_argument('--out', help='output edge file in .mat', required=True)
     args = parser.parse_args()
     print_edge(args)
 

@@ -40,14 +40,23 @@ class DisjointSet:
 if __name__ == '__main__':
     import argparse
     import numpy as np
+    from scipy.io import loadmat,savemat
+    from progressbar import progressbar
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('n', help='number of vertices', type=int)
     parser.add_argument('efile', help='edge file')
     args = parser.parse_args()
-    pairs = np.loadtxt(args.efile, dtype=np.int32, delimiter=",")
+    if args.efile.endswith('.txt'):
+        pairs = np.loadtxt(args.efile, dtype=np.int32, delimiter=",")
+    elif args.efile.endswith('.mat'):
+        pairs = np.transpose(loadmat(args.efile)['E'])
+    else:
+        print("Unknown format for file {}".format(args.efile))
+        exit()
     vset = [i for i in range(args.n)]
     djs = DisjointSet(vset)
-    for e in pairs:
+    pairs = np.unique(pairs, axis=0)
+    for e in progressbar(pairs):
         [r,c] = e
         djs.union(r,c)
     print(djs.get_roots())
@@ -58,4 +67,7 @@ if __name__ == '__main__':
             cluster[r] = [v]
         else:
             cluster[r].append(v)
+        if djs.find(0) == djs.find(1):
+            print("Early terminate: 0 and 1 connected")
+            break
     print(cluster)
