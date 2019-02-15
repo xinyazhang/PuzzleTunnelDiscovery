@@ -41,6 +41,7 @@ double total_miles;
 
 bool play = false;
 bool first_draw = false;
+bool show_all = false;
 };
 
 void usage()
@@ -93,11 +94,20 @@ interpolate(const osr::ArrayOfStates& qs,
 
 bool predraw(Viewer& viewer)
 {
+	auto& rob_data = viewer.data_list[rob_data_index];
+	if (show_all) {
+		for (int i = 0; i < Qs.rows(); i++) {
+			osr::StateVector q = Qs.row(i).transpose();
+			rob_data.set_transform(osr::translate_state_to_transform(q).matrix(), i + 1);
+		}
+	} else {
+		if (rob_data.transforms.size() > 1 || rob_data.transforms.count(0) == 0) {
+			rob_data.reset_transforms();
+		}
+	}
 	if (!play)
 		return false;
 	std::cerr << "tau: " << tau << std::endl;
-
-	auto& rob_data = viewer.data_list[rob_data_index];
 	
 	osr::StateVector q = interpolate(Qs, miles, tau);
 	osr::StateTrans qt = std::get<0>(osr::decompose(q));
@@ -126,6 +136,7 @@ bool predraw(Viewer& viewer)
 
 bool key_up(Viewer& viewer, unsigned int key, int modifier)
 {
+	// std::cerr << key << std::endl;
 	if (key == 'p' or key == 'P') {
 		play = !play;
 		first_draw = true;
@@ -135,6 +146,11 @@ bool key_up(Viewer& viewer, unsigned int key, int modifier)
 	} else if (key == '-') {
 		speed /= 2.0;
 		std::cout << "current speed: " << speed << std::endl;
+	} else if (key == GLFW_KEY_KP_MULTIPLY || ((key == GLFW_KEY_KP_8) && (modifier & GLFW_MOD_SHIFT))) {
+		// * enters show_all mode unconditionally Press p to play
+		play = false;
+		first_draw = true;
+		show_all = true;
 	}
 	return false;
 }
