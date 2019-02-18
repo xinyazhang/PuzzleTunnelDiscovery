@@ -1,4 +1,5 @@
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <stdint.h>
 #include <cstdlib>
@@ -35,6 +36,7 @@ double speed = 1.0;
 double tau = 0;
 
 auto last_draw_time = Clock::now();
+bool Qs_has_rotation = true;
 osr::ArrayOfStates Qs;
 Eigen::VectorXd miles;
 double total_miles;
@@ -96,10 +98,24 @@ bool predraw(Viewer& viewer)
 {
 	auto& rob_data = viewer.data_list[rob_data_index];
 	if (show_all) {
-		for (int i = 0; i < Qs.rows(); i++) {
-			osr::StateVector q = Qs.row(i).transpose();
-			rob_data.set_transform(osr::translate_state_to_transform(q).matrix(), i + 1);
+		// std::cerr << "Qs rows: " << Qs.rows() << " cols: " << Qs.cols() << std::endl;
+		if (Qs_has_rotation) {
+			for (int i = 0; i < Qs.rows(); i++) {
+				osr::StateVector q = Qs.row(i).transpose();
+				rob_data.set_transform(osr::translate_state_to_transform(q).matrix(), i + 1);
+			}
+		} else {
+			int nv = Qs.rows();
+			Eigen::MatrixXd pc_color(nv, 3);
+			pc_color.col(0).array() = 0.0;
+			pc_color.col(1).array() = 1.0;
+			pc_color.col(2).array() = 0.0;
+			std::cerr << pc_color.row(0) << std::endl;
+			auto& env_data = viewer.data_list[env_data_index];
+			Eigen::MatrixXd pc = Qs.block(0, 0, nv, 3);
+			env_data.set_points(pc, pc_color);
 		}
+		show_all = false;
 	} else {
 		if (rob_data.transforms.size() > 1 || rob_data.transforms.count(0) == 0) {
 			rob_data.reset_transforms();
@@ -160,9 +176,30 @@ void load_path(const std::string& fn)
 	std::ifstream fin(fn);
 	std::vector<osr::StateVector> qs;
 	osr::StateVector q;
+	std::string line;
 	while (!fin.eof()) {
-		for (int i = 0; i < q.rows(); i++) {
-			fin >> q(i);
+		std::getline(fin, line);
+		std::stringstream linein(line);
+		int i = 0;
+		while (linein >> q(i))
+			i++;
+		if (i == 0)
+			break;
+		// i += 1; // 0 indexed index to the dimension
+		if (i < 3) {
+			for (int j = 0; j < q.rows(); j++)
+				std::cerr << q(j) << std::endl;
+			throw std::runtime_error("path dimension is: " + std::to_string(i) + ", should be at least 3");
+		} else if (i == 3) {
+			q(3) = 1.0;
+			q(4) = 0.0;
+			q(5) = 0.0;
+			q(6) = 0.0;
+			Qs_has_rotation = false;
+		} else if (i < osr::kStateDimension) {
+			for (int j = 0; j < q.rows(); j++)
+				std::cerr << q(j) << std::endl;
+			throw std::runtime_error("path dimension is: " + std::to_string(i) + ", which is incomplete (3 or " + std::to_string(osr::kStateDimension) + ")");
 		}
 		qs.emplace_back(q);
 	}
