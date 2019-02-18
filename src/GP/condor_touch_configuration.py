@@ -27,7 +27,7 @@ import numpy as np
 
 import uw_random
 import math
-from scipy.misc import imsave
+from scipy.misc import imsave, imread
 from scipy.io import savemat, loadmat
 from task_partitioner import *
 # Our modules
@@ -505,20 +505,34 @@ class TouchConfiguration(object):
                 help='Copy the prediction from NN to the output dir, with a matching name for `sample` command.')
         useatlas_parser.add_argument('geo_type', choices=['rob', 'env'])
         useatlas_parser.add_argument('npz',
-                help='NPZ file that stores the prediction')
+                help='NPZ/PNG file that stores the prediction')
         useatlas_parser.add_argument('out_dir',
                 help='Output directory')
+        useatlas_parser.add_argument('--uniform_weight', help='Treat all non-zero weights uniformly (useful for debugging)', action='store_true')
 
     def useatlas(self):
         geo_type = self._args.geo_type
         fn = self._args.npz
         io_dir = self._args.out_dir
-        if not fn.endswith('.npz'):
-            print("input file must be .npz format")
         tp = TaskPartitioner(io_dir, None, None, tunnel_v=self._get_tunnel_v())
         ofn = task_partitioner.atlas_fn(io_dir, geo_type, 0)
-        shutil.copyfile(fn, ofn)
-        print("Copied file {} -> {}".format(fn, ofn))
+        if fn.endswith('.npz'):
+            print("input file must be .npz format")
+            shutil.copyfile(fn, ofn)
+            print("Copied file {} -> {}".format(fn, ofn))
+        elif fn.endswith('.png'):
+            img = imread(fn)
+            if self._args.uniform_weight:
+                atlas = np.zeros(shape=(img.shape[0], img.shape[1]), dtype=np.float32)
+                atlas[img[...,1].nonzero()] = 1.0
+            else:
+                atlas = img[...,1].astype(np.float32)
+            np.savez(ofn, ATEX=atlas)
+            imsave('debug.png', atlas)
+            print("Translate file {} -> {}".format(fn, ofn))
+        else:
+            print("Unknown file extension for {}".format(fn))
+            return
 
     @staticmethod
     def _setup_parser_sample(subparsers):
