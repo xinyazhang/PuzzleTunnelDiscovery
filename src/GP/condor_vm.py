@@ -35,7 +35,8 @@ def visibilty_matrix_calculator(aniconf, V0, V1, q0start, q0end, q1start, q1end,
 
     VM = r.calculate_visibility_matrix2(V0[q0start:q0end], False,
                                         V1[q1start:q1end], False,
-                                        0.0125 * 4 / 8)
+                                        0.0125 * 4 / 8,
+                                        enable_mt=False)
     if out_dir == '-':
         print(VM)
     else:
