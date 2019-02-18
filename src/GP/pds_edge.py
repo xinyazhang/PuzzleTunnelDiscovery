@@ -60,9 +60,15 @@ def print_edge(args):
         edge_to += rows[1:]
     del cws
     del E
-    edge = np.array([edge_from, edge_to], dtype=np.int32)
-    del edge_from
-    del edge_to
+    E = np.zeros((len(args.files), len(args.files)), dtype=np.int8)
+    E[edge_from, edge_to] = 1
+    # edge = np.transpose(np.array([edge_from, edge_to], dtype=np.int32))
+    # print("Uniquing the edge pairs")
+    # edge = np.unique(edge, axis=0)
+    # del edge_from
+    # del edge_to
+    edge_from, edge_to = E.nonzero()
+    edge = np.transpose(np.array([edge_from, edge_to], dtype=np.int32))
     savemat(args.out, dict(E=edge), do_compression=True)
 
 def main():
