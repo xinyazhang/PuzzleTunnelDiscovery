@@ -764,22 +764,23 @@ UnitWorld::calculateVisibilityMatrix2(ArrayOfStates qs0,
                                       bool qs0_is_unit_states,
                                       ArrayOfStates qs1,
                                       bool qs1_is_unit_states,
-                                      double verify_magnitude)
+                                      double verify_magnitude,
+				      bool enable_mt)
 {
 	int M = qs0.rows();
 	int N = qs1.rows();
 	if (!qs0_is_unit_states)
-#pragma omp parallel for
+#pragma omp parallel for if (enable_mt)
 		for (int i = 0; i < M; i++)
 			qs0.row(i) = translateToUnitState(qs0.row(i)).transpose();
 	if (!qs1_is_unit_states)
-#pragma omp parallel for
+#pragma omp parallel for if (enable_mt)
 		for (int i = 0; i < N; i++)
 			qs1.row(i) = translateToUnitState(qs1.row(i)).transpose();
 	Eigen::Matrix<int8_t, -1, -1> ret;
 	ret.resize(M, N);
 	std::atomic<int> prog(0);
-#pragma omp parallel for
+#pragma omp parallel for if (enable_mt)
 	for (int fi = 0; fi < M; fi++) {
 		for (int ti = 0; ti < N; ti++) {
 			int8_t valid = isValidTransition(qs0.row(fi), qs1.row(ti), verify_magnitude);

@@ -143,7 +143,8 @@ public:
 	                           bool qs0_is_unit_states,
 	                           ArrayOfStates qs1,
 	                           bool qs1_is_unit_states,
-	                           double verify_magnitude);
+	                           double verify_magnitude,
+				   bool enable_mt = true);
 
 	using VMatrix = Eigen::Matrix<StateScalar, -1, 3>;
 	using FMatrix = Eigen::Matrix<int, -1, 3>;
