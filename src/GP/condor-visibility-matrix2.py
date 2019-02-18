@@ -34,7 +34,7 @@ def get_parser():
     common.add_argument('--prmkey', help='File name of PRM in NPZ', default='V')
     common.add_argument('path', help='Sample from PRM', nargs=None, type=str)
     common.add_argument('--pathkey', help='File name of Path in NPZ', default='VS')
-    common.add_argument('block_size', help='Block Size', nargs=None, type=int)
+    common.add_argument('block_size', help='Block Size, indicating elements per task. When it is negative it means rows per task', nargs=None, type=int)
     common.add_argument('task_id', help='Task Index', nargs='?', default=-1, type=int)
     info_parser = subparsers.add_parser("info", parents=[common])
     calc_parser = subparsers.add_parser("calc", help='Calculate the visibility matrix between path (axis 0) and prm (axis 1)', parents=[common])

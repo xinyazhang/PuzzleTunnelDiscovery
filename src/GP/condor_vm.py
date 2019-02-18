@@ -8,13 +8,23 @@ import pyosr
 import numpy as np
 
 def index_to_ranges(V0, V1, block_size, index):
-    block_per_row, remainder = divmod(V1.shape[0], block_size)
-    block_per_row += 1 if remainder != 0 else 0
-    q0start = index / block_per_row
-    q0end = q0start + 1
-    q1start = (index % block_per_row) * block_size
-    q1end = min(V1.shape[0], q1start + block_size)
-    return q0start, q0end, q1start, q1end, block_per_row * V0.shape[0]
+    if block_size > 0:
+        block_per_row, remainder = divmod(V1.shape[0], block_size)
+        block_per_row += 1 if remainder != 0 else 0
+        q0start = index / block_per_row
+        q0end = q0start + 1
+        q1start = (index % block_per_row) * block_size
+        q1end = min(V1.shape[0], q1start + block_size)
+        return q0start, q0end, q1start, q1end, block_per_row * V0.shape[0]
+    else:
+        rows_per_index = abs(block_size)
+        q0start = index * rows_per_index
+        q0end = min(V0.shape[0], q0start + rows_per_index)
+        q1start = 0
+        q1end = V1.shape[0]
+        total_tasks, rem = divmod(V0.shape[0], rows_per_index)
+        total_tasks += 1 if rem !=0  else 0
+        return q0start, q0end, q1start, q1end, total_tasks
 
 def visibilty_matrix_calculator(aniconf, V0, V1, q0start, q0end, q1start, q1end, out_dir, index=None, block_size=None):
     r = pyosr.UnitWorld() # pyosr.Renderer is not avaliable in HTCondor
