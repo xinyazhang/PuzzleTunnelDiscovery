@@ -27,7 +27,7 @@ class DisjointSet:
         elem1 = self.find(elem1)
         elem2 = self.find(elem2)
         assert elem1 is not None and elem2 is not None
-        self._parents[elem1] = elem2
+        self._parents[elem2] = elem1
 
     def get_roots(self):
         roots = []
@@ -49,13 +49,14 @@ if __name__ == '__main__':
     if args.efile.endswith('.txt'):
         pairs = np.loadtxt(args.efile, dtype=np.int32, delimiter=",")
     elif args.efile.endswith('.mat'):
-        pairs = np.transpose(loadmat(args.efile)['E'])
+        pairs = loadmat(args.efile)['E']
     else:
         print("Unknown format for file {}".format(args.efile))
         exit()
     vset = [i for i in range(args.n)]
     djs = DisjointSet(vset)
-    pairs = np.unique(pairs, axis=0)
+    print(pairs.shape)
+    # pairs = np.unique(pairs, axis=0)
     for e in progressbar(pairs):
         [r,c] = e
         djs.union(r,c)
@@ -71,3 +72,5 @@ if __name__ == '__main__':
             print("Early terminate: 0 and 1 connected")
             break
     print(cluster)
+    print("Root of 0 {}".format(djs.find(0)))
+    print("Root of 1 {}".format(djs.find(1)))
