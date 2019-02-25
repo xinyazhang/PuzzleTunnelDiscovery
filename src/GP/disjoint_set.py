@@ -1,12 +1,14 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 class DisjointSet:
 
     def __init__(self, init_arr):
         self._parents = {}
+        self._parents_uncompressed = {}
         if init_arr:
             for item in init_arr:
                 self._parents[item] = item
+                self._parents_uncompressed[item] = item
 
     def find(self, elem):
         if elem not in self._parents:
@@ -20,6 +22,16 @@ class DisjointSet:
             self._parents[e] = elem
         return elem
 
+    def find_path(self, elem):
+        if elem not in self._parents_uncompressed:
+            return []
+        path = []
+        while self._parents_uncompressed[elem] != elem:
+            path.append(elem)
+            elem = self._parents_uncompressed[elem]
+        path.append(elem)
+        return path
+
     def union(self, elem1, elem2):
         if elem1 == elem2:
             return
@@ -28,6 +40,7 @@ class DisjointSet:
         elem2 = self.find(elem2)
         assert elem1 is not None and elem2 is not None
         self._parents[elem2] = elem1
+        self._parents_uncompressed[elem2] = elem1
 
     def get_roots(self):
         roots = []
@@ -40,8 +53,10 @@ class DisjointSet:
 if __name__ == '__main__':
     import argparse
     import numpy as np
+    import h5py
     from scipy.io import loadmat,savemat
     from progressbar import progressbar
+
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('n', help='number of vertices', type=int)
     parser.add_argument('efile', help='edge file')
@@ -50,6 +65,8 @@ if __name__ == '__main__':
         pairs = np.loadtxt(args.efile, dtype=np.int32, delimiter=",")
     elif args.efile.endswith('.mat'):
         pairs = loadmat(args.efile)['E']
+    elif args.efile.endswith('.hdf5'):
+        pairs = h5py.File(args.efile, 'r')['E'][:]
     else:
         print("Unknown format for file {}".format(args.efile))
         exit()
@@ -58,8 +75,11 @@ if __name__ == '__main__':
     print(pairs.shape)
     # pairs = np.unique(pairs, axis=0)
     for e in progressbar(pairs):
-        [r,c] = e
-        djs.union(r,c)
+        [r,c] = e[0], e[1]
+        djs.union(r, c)
+        if djs.find(0) == djs.find(1):
+            print("Early terminate: 0 and 1 connected")
+            break
     print(djs.get_roots())
     cluster = dict()
     for v in vset:
@@ -68,9 +88,8 @@ if __name__ == '__main__':
             cluster[r] = [v]
         else:
             cluster[r].append(v)
-        if djs.find(0) == djs.find(1):
-            print("Early terminate: 0 and 1 connected")
-            break
     print(cluster)
     print("Root of 0 {}".format(djs.find(0)))
+    print("Path from 0 {}".format(djs.find_path(0)))
     print("Root of 1 {}".format(djs.find(1)))
+    print("Path from 1 {}".format(djs.find_path(1)))
