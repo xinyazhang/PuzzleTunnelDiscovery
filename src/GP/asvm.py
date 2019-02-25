@@ -12,6 +12,7 @@ import numpy as np
 import argparse
 from scipy.io import savemat
 from scipy import sparse
+from progressbar import progressbar
 
 def fn_gen(fvm_dir, block_size):
     index = 0
@@ -36,17 +37,17 @@ def main():
     vmlocators = []
     q0end = 0
     q1end = 0
-    for fn in fn_gen(fvm_dir, block_size):
+    for fn in progressbar(fn_gen(fvm_dir, block_size)):
         d = np.load(fn)
         vmfrags.append(d['VMFrag'])
         vmlocators.append(d['Locator'])
-        print("Load {}".format(fn))
+        # print("Load {}".format(fn))
         q0end = max(q0end, vmlocators[-1][1])
         q1end = max(q1end, vmlocators[-1][3])
     giant = np.full((q0end, q1end), -1, dtype=np.int8)
     for i,(m,loc) in enumerate(zip(vmfrags, vmlocators)):
         [q0start, q0end, q1start, q1end] = loc
-        print("Store Block {}".format(i))
+        # print("Store Block {}".format(i))
         giant[q0start:q0end, q1start:q1end] = m
     if np.min(giant) < 0:
         print("Caveat: the assembled visibility matrix has undefined coefficients")
