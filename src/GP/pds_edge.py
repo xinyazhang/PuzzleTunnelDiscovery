@@ -11,7 +11,8 @@ Note:
 
 import argparse
 import numpy as np
-from scipy.io import loadmat,savemat
+from scipy.io import loadmat
+import h5py
 import scipy.sparse as sparse
 from progressbar import progressbar
 
@@ -41,41 +42,50 @@ def print_edge_sparse(args):
 def print_edge(args):
     E = None
     r = 0
+    f = h5py.File(args.out, mode='a')
     for fn in progressbar(args.files):
         rowdata = loadmat(fn)['C']
         if E is None:
             E = np.zeros((len(args.files), rowdata.shape[1]), dtype=np.int8)
         E[r] = rowdata.todense()
         r += 1
+    root_from, pds_to = E.nonzero()
+    forest_edge = np.transpose(np.array([root_from, pds_to], dtype=np.int32))
+    f.create_dataset('FE', data=forest_edge, compression='lzf')
+    f.flush()
+    del forest_edge
     cws = E.sum(axis=0)
     nv = cws.shape[0]
-    edge_from = []
-    edge_to = []
+    Edense = np.zeros((len(args.files), len(args.files)), dtype=np.int32)
     for i in progressbar(range(nv)):
         s = cws[i]
         if s < 2:
             continue
         rows = np.nonzero(E[:,i])[0].tolist()
-        edge_from += rows[:-1]
-        edge_to += rows[1:]
+        edge_from = rows[:-1]
+        edge_to = rows[1:]
+        Edense[edge_from, edge_to] = i
     del cws
     del E
-    E = np.zeros((len(args.files), len(args.files)), dtype=np.int8)
-    E[edge_from, edge_to] = 1
     # edge = np.transpose(np.array([edge_from, edge_to], dtype=np.int32))
     # print("Uniquing the edge pairs")
     # edge = np.unique(edge, axis=0)
     # del edge_from
     # del edge_to
-    edge_from, edge_to = E.nonzero()
-    edge = np.transpose(np.array([edge_from, edge_to], dtype=np.int32))
-    savemat(args.out, dict(E=edge), do_compression=True)
+    edge_from, edge_to = Edense.nonzero()
+    edge = np.transpose(np.array([edge_from, edge_to, Edense[edge_from, edge_to]], dtype=np.int32))
+    #savemat(args.out, dict(E=edge, FE=forest_edge), do_compression=True)
+    f.create_dataset('E', data=edge, compression='lzf')
+    f.close()
 
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('files', help='ssc-*.mat file', nargs='+')
-    parser.add_argument('--out', help='output edge file in .mat', required=True)
+    parser.add_argument('--out', help='output edge file in .hdf5', required=True)
     args = parser.parse_args()
+    if not args.out.endswith('.hdf5'):
+        print("--out requires hdf5 extension")
+        return
     print_edge(args)
 
 if __name__ == '__main__':
