@@ -51,6 +51,8 @@ def print_edge(args):
         r += 1
     root_from, pds_to = E.nonzero()
     forest_edge = np.transpose(np.array([root_from, pds_to], dtype=np.int32))
+    if 'FE' in f:
+        del f['FE']
     f.create_dataset('FE', data=forest_edge, compression='lzf')
     f.flush()
     del forest_edge
@@ -75,6 +77,8 @@ def print_edge(args):
     edge_from, edge_to = Edense.nonzero()
     edge = np.transpose(np.array([edge_from, edge_to, Edense[edge_from, edge_to]], dtype=np.int32))
     #savemat(args.out, dict(E=edge, FE=forest_edge), do_compression=True)
+    if 'E' in f:
+        del f['E']
     f.create_dataset('E', data=edge, compression='lzf')
     f.close()
 
