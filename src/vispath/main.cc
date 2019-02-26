@@ -134,6 +134,18 @@ bool predraw(Viewer& viewer)
 	pc_color.row(0) << 0.0, 0.0, 1.0;
 	// Do NOT set to rob data, because it's translated
 	viewer.data_list[env_data_index].set_points(pc_point, pc_color);
+	bool valid = uw.isValid(q);
+	if (valid) {
+		using namespace igl;
+		rob_data.uniform_colors(Eigen::Vector3d(GOLD_AMBIENT[0], GOLD_AMBIENT[1], GOLD_AMBIENT[2]),
+		                        Eigen::Vector3d(GOLD_DIFFUSE[0], GOLD_DIFFUSE[1], GOLD_DIFFUSE[2]),
+		                        Eigen::Vector3d(GOLD_SPECULAR[0], GOLD_SPECULAR[1], GOLD_SPECULAR[2]));
+	} else {
+		using namespace igl;
+		rob_data.uniform_colors(Eigen::Vector3d(GOLD_AMBIENT[0], GOLD_AMBIENT[1], GOLD_AMBIENT[2]),
+		                        Eigen::Vector3d(FAST_RED_DIFFUSE[0], FAST_RED_DIFFUSE[1], FAST_RED_DIFFUSE[2]),
+		                        Eigen::Vector3d(GOLD_SPECULAR[0], GOLD_SPECULAR[1], GOLD_SPECULAR[2]));
+	}
 
 	auto now = Clock::now();
 	if (first_draw) {
