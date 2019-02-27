@@ -804,7 +804,12 @@ class TouchConfiguration(object):
                 ompl_q = QT if ompl_q is None else np.concatenate((ompl_q, QT), axis=0)
         else:
             fn = in_dir
-            Q = np.load(fn)['ReTouchQ']
+            if fn.endswith('.npz'):
+                Q = np.load(fn)['ReTouchQ']
+            elif fn.endswith('.txt'):
+                Q = np.loadtxt(fn)
+            else:
+                raise NotImplemented("Unknown Extension of input file {}".format(fn))
             QT = uw.translate_unit_to_ompl(Q)
             ompl_q = QT if ompl_q is None else np.concatenate((ompl_q, QT), axis=0)
         nsample, scalar_per_sample = ompl_q.shape
