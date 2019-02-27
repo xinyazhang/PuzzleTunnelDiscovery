@@ -9,7 +9,7 @@
 # Faces: 2726
 #
 ####
-mtllib ./dual.dt.tcp.obj.mtl
+#mtllib ./dual.dt.tcp.obj.mtl
 
 vn -0.577350 -0.577350 -0.577350
 v 0.000000 0.000000 0.000000
