@@ -584,7 +584,9 @@ class TouchConfiguration(object):
                     qs = uw.enum_free_configuration(tup1[0], tup1[1], tup2[0], tup2[1], 1e-6, denominator=64)
                     for q in qs:
                         conf.append(q)
+                        # break # debug: only one sample per touch
                     if len(qs) > 0:
+                        pcloud2.append(tup2[0])
                         signature_conf.append(qs[0])
                 else:
                     while True:
@@ -596,6 +598,7 @@ class TouchConfiguration(object):
                     conf.append(q)
             # print("tqre_fn {}".format(tp.get_tqre_fn(task_id)))
             np.savez(tp.get_tqre_fn(task_id), ReTouchQ=conf, SigReTouchQ=signature_conf)
+            np.savetxt('pc2.txt', pcloud2, fmt='%.17g')
         else:
             #
             # Sanity check code
