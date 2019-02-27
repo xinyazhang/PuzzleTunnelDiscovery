@@ -113,10 +113,10 @@ class ForestPathFinder(object):
             G.add_edges_from(edges)
 
     def _solve_root_and_pds(self):
-        self._sssp = [-1, 4162147, -612, 726372, -725, 3776176, -367, 4131349, -941, 1420526, -41, 3918338, -743, 3488854, -773, 1442466, -525, 3888572, -767, 214122, -764, 3361120, -840, 1449284, -815, 4154340, -2]
-        self._sssp = self._sssp[:2] # First few segment
-        print(self._sssp)
-        return
+        # self._sssp = [-1, 4162147, -612, 726372, -725, 3776176, -367, 4131349, -941, 1420526, -41, 3918338, -743, 3488854, -773, 1442466, -525, 3888572, -767, 214122, -764, 3361120, -840, 1449284, -815, 4154340, -2]
+        # self._sssp = self._sssp[:2] # First few segment
+        # print(self._sssp)
+        # return
         G = self._G = nx.Graph()
         G.add_nodes_from([-1 - i for i in range(self._nroots)]) # Root nodes
         G.add_nodes_from(self._pds_ids)
@@ -181,12 +181,19 @@ class ForestPathFinder(object):
         # print('-1 to 4162147 {}'.format(self._solve_in_single_tree(-1, 4162147)))
         # return
         path = None
-        path = self._solve_in_single_tree(-1, 12342)
-        '''
-        for n_from,n_to in progressbar(zip(self._sssp[:-1], self._sssp[1:])):
-            traj = self._solve_in_single_tree(n_from, n_to)
-            path = traj if path is None else np.concatenate((path, traj), axis=0)
-        '''
+        # path = self._solve_in_single_tree(-1, 12342)
+        if True:
+            pairs = [e for e in zip(self._sssp[:-1], self._sssp[1:])]
+            print(pairs)
+            for n_from,n_to in progressbar(pairs):
+                traj = self._solve_in_single_tree(n_from, n_to)
+                path = traj if path is None else np.concatenate((path, traj), axis=0)
+        else:
+            roots = [-(root + 1) for root in self._sssp if root < 0]
+            pairs = [e for e in zip(self._sssp[:-1], self._sssp[1:])]
+            for tree_from, tree_to in pairs:
+                traj = self._connect_two_roots(root_from, root_to)
+                path = traj if path is None else np.concatenate((path, traj), axis=0)
         self._sssp_full = path
 
     def solve_root_only(self):
@@ -205,6 +212,9 @@ class ForestPathFinder(object):
             print(self._sssp_full)
         else:
             np.savetxt(self._args.out, self._sssp_full, fmt='%.17g')
+
+    def _connect_two_roots(self, root_from, root_to):
+        raise NotImplementedError
 
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
