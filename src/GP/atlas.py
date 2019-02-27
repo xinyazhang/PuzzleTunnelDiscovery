@@ -55,10 +55,14 @@ class AtlasSampler(object):
         self._nzpix = np.nonzero(self._atlas)
         self._nzpixweight = self._atlas[self._nzpix]
         nzsum = np.sum(self._nzpixweight)
-        print("NZ pix sum {}".format(nzsum))
+        print("NZ pix num {} {} sum {}".format(self._nzpix[0].shape, self._nzpix[1].shape, nzsum))
+        print("NZ pix coord maxs {} {}".format(np.max(self._nzpix[0]), np.max(self._nzpix[1])))
+        print("NZ pix coord mins {} {}".format(np.min(self._nzpix[0]), np.min(self._nzpix[1])))
         self._nzpixweight /= nzsum
         self._nzpix_idx = np.array([i for i in range(len(self._nzpix[0]))], dtype=np.int32)
-        self._nzprim, self._nzcount = np.unique(self._atlas2prim[np.nonzero(self._atlas)], return_counts=True)
+        # print("nz {}".format(self._nzpix))
+        # print("atlas2prim[nz] {}".format(self._atlas2prim[self._nzpix]))
+        self._nzprim, self._nzcount = np.unique(self._atlas2prim[self._nzpix], return_counts=True)
         # Debugging
         imsave('debug-{}-atlas.png'.format(geo_type), self._atlas)
         binp = np.zeros(shape=self._atlas.shape)
@@ -122,6 +126,7 @@ class AtlasSampler(object):
             print("[{}] pdf = {} (EXPECT {}) for uv = {}".format(i, pdf, prim, uv))
         return
         '''
+        # print('NZPIX {}'.format(self._nzpixweight))
         while True:
         #for idx in range(len(self._nzpix[0])):
             idx = np.random.choice(self._nzpix_idx, p=self._nzpixweight)
