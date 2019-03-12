@@ -624,17 +624,15 @@ from math import sqrt,pi,sin,cos
 
 def random_state(scale=1.0):
     tr = np.random.uniform(low=-1.0, high=1.0, size=(3))
-    tr[0] += 0.5
-    tr[1] += 0.5
     tr *= scale
-    # tr = [0.0,0.0,0]
+    #tr = [1.0,0.0,0] # Debugging
     #tr = [1.5,1.5,0]
     u1,u2,u3 = np.random.rand(3)
     quat = [sqrt(1-u1)*sin(2*pi*u2),
             sqrt(1-u1)*cos(2*pi*u2),
             sqrt(u1)*sin(2*pi*u3),
             sqrt(u1)*cos(2*pi*u3)]
-    # quat = [1.0, 0.0, 0.0, 0.0]
+    # quat = [1.0, 0.0, 0.0, 0.0] # Debugging
     part1 = np.array(tr, dtype=np.float32)
     part2 = np.array(quat, dtype=np.float32)
     part1_0 = np.array([0.0,0.0,0.0], dtype=np.float32)
@@ -736,14 +734,13 @@ class NarrowTunnelRegionDataSet(OsrDataSet):
                             # print("aug_patch")
                             patch_tl = aug.patch_finder_1(coldmap=rgbd[:,:,0], heatmap=rgbd[:,:,1], patch_size=self.patch_size)
                             patch_size = self.patch_size
-                            if patch_tl is None: # Cannot find a patch, cancel
-                                aug_func = None
-                            else:
-                                aug_func = aug.patch_rgb
+                            aug_func = aug.patch_rgb
+                        if patch_tl is None: # Cannot find a patch, cancel
+                            aug_func = None
                         if aug_func is not None:
                             train_img[i] = aug_func(train_img[i], patch_tl, patch_size)
-                        if emit_gt:
-                            aug.dim_rgb(gt_img[i], patch_tl, patch_size)
+                            if emit_gt:
+                                aug.dim_rgb(gt_img[i], patch_tl, patch_size)
                 else:
                     uv_map[i] = r.mvuv.reshape((self.res, self.res, 2))
             if is_training:
@@ -852,7 +849,7 @@ def create_dataset(ds_name, res=256, aug_patch=True, aug_scaling=1.0, aug_dict={
                                          res=res,
                                          patch_size=64,
                                          center=dualconf_tiny.rob_ompl_center,
-                                         q_range=1.5,
+                                         q_range=1.0,
                                          aug_patch=aug_patch,
                                          aug_dict=aug_dict,
                                          aug_scaling=aug_scaling,
