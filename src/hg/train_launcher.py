@@ -10,28 +10,28 @@ import sys
 DataGenerator = datagen.DataGenerator
 
 def process_config(conf_file):
-	"""
-	"""
-	params = {}
-	config = configparser.ConfigParser()
-	config.read(conf_file)
-	for section in config.sections():
-		if section == 'DataSetHG':
-			for option in config.options(section):
-				params[option] = eval(config.get(section, option))
-		if section == 'Network':
-			for option in config.options(section):
-				params[option] = eval(config.get(section, option))
-		if section == 'Train':
-			for option in config.options(section):
-				params[option] = eval(config.get(section, option))
-		if section == 'Validation':
-			for option in config.options(section):
-				params[option] = eval(config.get(section, option))
-		if section == 'Saver':
-			for option in config.options(section):
-				params[option] = eval(config.get(section, option))
-	return params
+    """
+    """
+    params = {}
+    config = configparser.ConfigParser()
+    config.read(conf_file)
+    for section in config.sections():
+        if section == 'DataSetHG':
+            for option in config.options(section):
+                params[option] = eval(config.get(section, option))
+        if section == 'Network':
+            for option in config.options(section):
+                params[option] = eval(config.get(section, option))
+        if section == 'Train':
+            for option in config.options(section):
+                params[option] = eval(config.get(section, option))
+        if section == 'Validation':
+            for option in config.options(section):
+                params[option] = eval(config.get(section, option))
+        if section == 'Saver':
+            for option in config.options(section):
+                params[option] = eval(config.get(section, option))
+    return params
 
 def craft_dict(params):
     dic = {}
@@ -43,27 +43,27 @@ def craft_dict(params):
     return dic
 
 if __name__ == '__main__':
-	cfile = 'config.cfg' if len(sys.argv) < 2 else sys.argv[1]
-	print('--Parsing Config File {}'.format(cfile))
-	params = process_config(cfile)
+    cfile = 'config.cfg' if len(sys.argv) < 2 else sys.argv[1]
+    print('--Parsing Config File {}'.format(cfile))
+    params = process_config(cfile)
 
-	print('--Creating Dataset')
-        if 'new_dataset' not in params:
-            dataset = DataGenerator(params['joint_list'], params['img_directory'], params['training_txt_file'], remove_joints=params['remove_joints'])
-            dataset._create_train_table()
-            dataset._randomize()
-            dataset._create_sets()
-            ds_name = ''
-        else:
-            ds_name = params['new_dataset']
-            aug_dict = craft_dict(params)
-            dataset = datagen.create_dataset(ds_name, aug_patch=True, aug_scaling=0.5, aug_dict=aug_dict)
-            params['num_joints'] = dataset.d_dim
-            assert params['weighted_loss'] is False, "No support for weighted loss for now"
+    print('--Creating Dataset')
+    if 'new_dataset' not in params:
+        dataset = DataGenerator(params['joint_list'], params['img_directory'], params['training_txt_file'], remove_joints=params['remove_joints'])
+        dataset._create_train_table()
+        dataset._randomize()
+        dataset._create_sets()
+        ds_name = ''
+    else:
+        ds_name = params['new_dataset']
+        aug_dict = craft_dict(params)
+        dataset = datagen.create_dataset(ds_name, aug_patch=True, aug_scaling=0.5, aug_dict=aug_dict)
+        params['num_joints'] = dataset.d_dim
+        assert params['weighted_loss'] is False, "No support for weighted loss for now"
 
-        is_testing = False if 'do_testing' not in params else params['do_testing']
+    is_testing = False if 'do_testing' not in params else params['do_testing']
 
-	model = HourglassModel(nFeat=params['nfeats'],
+    model = HourglassModel(nFeat=params['nfeats'],
                                nStack=params['nstacks'],
                                nModules=params['nmodules'],
                                nLow=params['nlow'],
@@ -84,10 +84,10 @@ if __name__ == '__main__':
                                w_loss=params['weighted_loss'],
                                joints= params['joint_list'],
                                modif=False)
-	model.generate_model()
-        if is_testing:
-            model.testing_init(nEpochs=1, epochSize=params['epoch_size'], saveStep=0, dataset=None, load=params['name'])
-        else:
-            model.training_init(nEpochs=params['nepochs'], epochSize=params['epoch_size'], saveStep=params['saver_step'], dataset = None)
-            # model.training_init(nEpochs=params['nepochs'], epochSize=params['epoch_size'], saveStep=params['saver_step'], dataset = None, load=params['name'])
+    model.generate_model()
+    if is_testing:
+        model.testing_init(nEpochs=1, epochSize=params['epoch_size'], saveStep=0, dataset=None, load=params['name'])
+    else:
+        model.training_init(nEpochs=params['nepochs'], epochSize=params['epoch_size'], saveStep=params['saver_step'], dataset = None)
+        # model.training_init(nEpochs=params['nepochs'], epochSize=params['epoch_size'], saveStep=params['saver_step'], dataset = None, load=params['name'])
 
