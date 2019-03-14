@@ -44,6 +44,7 @@ double total_miles;
 bool play = false;
 bool first_draw = false;
 bool show_all = false;
+bool load_all = false;
 };
 
 void usage()
@@ -97,13 +98,16 @@ interpolate(const osr::ArrayOfStates& qs,
 bool predraw(Viewer& viewer)
 {
 	auto& rob_data = viewer.data_list[rob_data_index];
-	if (show_all) {
-		// std::cerr << "Qs rows: " << Qs.rows() << " cols: " << Qs.cols() << std::endl;
+	// std::cerr << "rob_data.transforms.size: " << rob_data.transforms.size() << std::endl;
+	if (load_all) {
+		std::cerr << "Qs rows: " << Qs.rows() << " cols: " << Qs.cols() << " has rotation: " << Qs_has_rotation << std::endl;
 		if (Qs_has_rotation) {
 			for (int i = 0; i < Qs.rows(); i++) {
 				osr::StateVector q = Qs.row(i).transpose();
 				rob_data.set_transform(osr::translate_state_to_transform(q).matrix(), i + 1);
 			}
+			std::cerr << "rob_data.transforms.size: " << rob_data.transforms.size() << std::endl;
+			viewer.data().dirty = igl::opengl::MeshGL::DIRTY_ALL;
 		} else {
 			int nv = Qs.rows();
 			Eigen::MatrixXd pc_color(nv, 3);
@@ -115,8 +119,9 @@ bool predraw(Viewer& viewer)
 			Eigen::MatrixXd pc = Qs.block(0, 0, nv, 3);
 			env_data.set_points(pc, pc_color);
 		}
-		show_all = false;
-	} else {
+		load_all = false;
+	}
+	if (!show_all) {
 		if (rob_data.transforms.size() > 1 || rob_data.transforms.count(0) == 0) {
 			rob_data.reset_transforms();
 		}
@@ -178,7 +183,8 @@ bool key_up(Viewer& viewer, unsigned int key, int modifier)
 		// * enters show_all mode unconditionally Press p to play
 		play = false;
 		first_draw = true;
-		show_all = true;
+		show_all = !show_all;
+		load_all = show_all;
 	}
 	return false;
 }
