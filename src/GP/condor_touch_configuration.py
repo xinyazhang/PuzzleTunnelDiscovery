@@ -998,9 +998,9 @@ class TouchConfiguration(object):
     def _setup_parser_screen(subparsers):
         sp = subparsers.add_parser('screen', help='Screening the samples to cluster nearby samples')
         sp.add_argument('--method', help='Choose screening method', type=int, choices=[0], required=True)
-        sp.add_argument('prescreen', help='Input file in NPZ')
+        sp.add_argument('prescreen', help='Input unit state file in NPZ.')
         sp.add_argument('connectivity', help='Connectivity file precalculated by condor-visibility-matrix2.py and asvm.py, in .mat format')
-        sp.add_argument('postscreen', help='Output file in NPZ')
+        sp.add_argument('postscreen', help='Output unit state file in NPZ')
 
     def screen(self):
         getattr(self, '_screen_{}'.format(self._args.method))()
@@ -1014,9 +1014,23 @@ class TouchConfiguration(object):
         vert_ids = [i for i in range(samples.shape[0])]
         djs = disjoint_set.DisjointSet(vert_ids)
         nz_rows, nz_cols = cm.nonzero()
-        for r,c in zip(nz_rows, nz_cols):
+        for r,c in progressbar(zip(nz_rows, nz_cols)):
             djs.union(r,c)
-        screened = samples[djs.get_roots()]
+        # Old method: pickup the root of each cluster.
+        #             However root is somehow arbitrary.
+        # screened = samples[djs.get_roots()]
+
+        # New method: pick up disentangled state in each cluster
+        cluster = djs.get_cluster()
+        uw = self._uw
+        screened_index = []
+        for k in progressbar(cluster):
+            nondis = []
+            for member in cluster[k]:
+                if not uw.is_disentangled(samples[member]):
+                    nondis.append(member)
+            screened_index += nondis[:1] # No effect if nondis == []
+        screened = samples[screened_index]
         print('screened array shape {}'.format(screened.shape))
         np.savez(outfn, ReTouchQ=screened)
 
