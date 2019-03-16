@@ -586,7 +586,8 @@ class TouchConfiguration(object):
                 if enum_axis:
                     tup1 = rob_sampler.sample(uw)
                     tup2 = env_sampler.sample(uw)
-                    qs = uw.enum_free_configuration(tup1[0], tup1[1], tup2[0], tup2[1], 1e-6, denominator=64)
+                    qs_raw = uw.enum_free_configuration(tup1[0], tup1[1], tup2[0], tup2[1], 1e-6, denominator=64)
+                    qs = [q for q in qs_raw if not uw.is_disentangled(q)] # Trim disentangled state
                     for q in qs:
                         conf.append(q)
                         # break # debug: only one sample per touch
