@@ -50,6 +50,16 @@ class DisjointSet:
                 roots.append(key)
         return roots
 
+    def get_cluster(self):
+        cluster = dict()
+        for v in self._parents:
+            r = self.find(v)
+            if r not in cluster:
+                cluster[r] = [v]
+            else:
+                cluster[r].append(v)
+        return cluster
+
 if __name__ == '__main__':
     import argparse
     import numpy as np
@@ -70,7 +80,8 @@ if __name__ == '__main__':
     else:
         print("Unknown format for file {}".format(args.efile))
         exit()
-    vset = [i for i in range(args.n)]
+    OPENSPACE_NODE = -3
+    vset = [i for i in range(args.n)] + [OPENSPACE_NODE]
     djs = DisjointSet(vset)
     print(pairs.shape)
     # pairs = np.unique(pairs, axis=0)
@@ -81,15 +92,9 @@ if __name__ == '__main__':
             print("Early terminate: 0 and 1 connected")
             break
     print(djs.get_roots())
-    cluster = dict()
-    for v in vset:
-        r = djs.find(v)
-        if r not in cluster:
-            cluster[r] = [v]
-        else:
-            cluster[r].append(v)
+    cluster = djs.get_cluster()
     print(cluster)
-    print("Root of 0 {}".format(djs.find(0)))
+    print("Root of 0 {} Size {}".format(djs.find(0), len(cluster[djs.find(0)])))
     print("Path from 0 {}".format(djs.find_path(0)))
-    print("Root of 1 {}".format(djs.find(1)))
+    print("Root of 1 {} Size {}".format(djs.find(1), len(cluster[djs.find(1)])))
     print("Path from 1 {}".format(djs.find_path(1)))
