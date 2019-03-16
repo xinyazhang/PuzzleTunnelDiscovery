@@ -40,6 +40,11 @@ def print_edge_sparse(args):
     #savemat(args.out, dict(E=edges), do_compression=True)
 
 def print_edge(args):
+    OPENSPACE_FLAG = 1
+    if args.pdsflags is not None:
+        QF = np.load(args.pdsflags)['QF']
+    else:
+        QF = None
     E = None
     r = 0
     f = h5py.File(args.out, mode='a')
@@ -67,6 +72,13 @@ def print_edge(args):
         edge_from = rows[:-1]
         edge_to = rows[1:]
         Edense[edge_from, edge_to] = i
+    roots_to_open = set()
+    if QF is not None:
+        for i in progressbar(range(nv)):
+            if QF[i] & OPENSPACE_FLAG == 0:
+                continue
+            rows = np.nonzero(E[:,i])[0].tolist()
+            roots_to_open.update(rows)
     del cws
     del E
     # edge = np.transpose(np.array([edge_from, edge_to], dtype=np.int32))
@@ -75,17 +87,29 @@ def print_edge(args):
     # del edge_from
     # del edge_to
     edge_from, edge_to = Edense.nonzero()
+    roots_to_open_list = np.array(list(roots_to_open), dtype=np.int64)
+    '''
+    if len(roots_to_open) >= 2:
+        # Add a chain that connects all roots with openspace leaf.
+        # This is not enough for path planning, but good enough for disjoint set algorithm
+        edge_from = np.append(edge_from, roots_to_open_list[:-1])
+        edge_to = np.append(edge_to, roots_to_open_list[1:])
+    '''
     edge = np.transpose(np.array([edge_from, edge_to, Edense[edge_from, edge_to]], dtype=np.int32))
     #savemat(args.out, dict(E=edge, FE=forest_edge), do_compression=True)
     if 'E' in f:
         del f['E']
     f.create_dataset('E', data=edge, compression='lzf')
+    if 'OpenTree' in f:
+        del f['OpenTree']
+    f.create_dataset('OpenTree', data=roots_to_open_list, compression='lzf')
     f.close()
 
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('files', help='ssc-*.mat file', nargs='+')
     parser.add_argument('--out', help='output edge file in .hdf5', required=True)
+    parser.add_argument('--pdsflags', help='File that stores PDS Flags, usually in the same npz file that also stores PDS', default=None)
     args = parser.parse_args()
     if not args.out.endswith('.hdf5'):
         print("--out requires hdf5 extension")
