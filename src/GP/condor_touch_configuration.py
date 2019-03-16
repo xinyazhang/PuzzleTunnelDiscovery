@@ -526,8 +526,13 @@ class TouchConfiguration(object):
                 atlas = np.zeros(shape=(img.shape[0], img.shape[1]), dtype=np.float32)
                 atlas[img[...,1].nonzero()] = 1.0
             else:
-                atlas = img[...,1].astype(np.float32)
+                if len(img.shape) == 3:
+                    atlas = img[...,1].astype(np.float32)
+                else:
+                    atlas = img.astype(np.float32)
             np.savez(ofn, ATEX=atlas)
+            print(img.shape)
+            print(atlas.shape)
             imsave('debug.png', atlas)
             print("Translate file {} -> {}".format(fn, ofn))
         else:
