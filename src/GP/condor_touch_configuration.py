@@ -949,6 +949,8 @@ class TouchConfiguration(object):
         unit2ompl = ssp.add_parser('ompl2unit', help='Read unit states from test file and convert them to ompl states')
         unit2ompl.add_argument('textin', help='Input text file')
         unit2ompl.add_argument('textout', help='Output text file')
+        sssp = ssp.add_parser('update_omplpds_flags', help='Update the Predefine Sample Set Flags')
+        sssp.add_argument('ompl_pds_file', help='Predefine Sample Set, in OMPL format')
 
     def _util_unit2ompl(self):
         uw = self._uw
@@ -974,6 +976,20 @@ class TouchConfiguration(object):
             np.savez(ofn, UNITV=ompl_q)
         else:
             np.savetxt(ofn, unit_q, fmt='%.17g')
+
+    def _util_update_omplpds_flags(self):
+        PDS_FLAG_TERMINATE = 1
+        uw = self._uw
+        fn = self._args.ompl_pds_file
+        Q = np.load(fn)['Q']
+        n = Q.shape[0]
+        QF = np.zeros((n, 1), dtype=np.uint32)
+        for i in progressbar(range(n)):
+            q = Q[i]
+            unit_q = uw.translate_to_unit_state(q)
+            if uw.is_disentangled(unit_q):
+                QF[i] = PDS_FLAG_TERMINATE
+        np.savez(fn, Q=Q, QF=QF)
 
     def util(self):
         getattr(self, '_util_{}'.format(self._args.util_name))()
