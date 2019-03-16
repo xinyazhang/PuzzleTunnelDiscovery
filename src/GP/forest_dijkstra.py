@@ -14,6 +14,8 @@ import os
 import networkx as nx
 import h5py
 
+VIRTUAL_OPEN_SPACE_NODE = 1j
+
 def _lsv(indir, prefix, suffix):
     ret = []
     for i in itertools.count(0):
@@ -24,15 +26,22 @@ def _lsv(indir, prefix, suffix):
             return ret
         ret.append(fn)
 
-def _load(fefn):
-    if fefn.endswith('.mat'):
-        return loadmat(fefn)['E']
+def _load(fefn, ds_name='E'):
+    if fefn.endswith('.npz'):
+        d = np.load(fefn)
+        if ds_name is None:
+            ds_name = list(d.keys())[0]
+        return d[ds_name] if ds_name in d else None
+    elif fefn.endswith('.mat'):
+        d = loadmat(fefn)
+        return d[ds_name] if ds_name in d else None
     elif fefn.endswith('.hdf5'):
-        return h5py.File(fefn, 'r')['E'][:]
+        d = h5py.File(fefn, 'r')
+        return d[ds_name][:] if ds_name in d else None
     raise NotImplementedError("Parser for file {} is not implemented".format(fefn))
 
 class TreePathFinder(object):
-    def __init__(self, root, ssc_fn, ct_fn, pds, pds_ids):
+    def __init__(self, root, ssc_fn, ct_fn, pds, pds_ids, pds_flags):
         print("Loading data from {} {}".format(ssc_fn, ct_fn))
         self._root_conf = root
         self._ssc = loadmat(ssc_fn)['C'] # Note: no flatten for sparse matrix
@@ -42,6 +51,7 @@ class TreePathFinder(object):
         self._ct_nouveau_vertices = d['CNV']
         self._ct_edges = d['CE']
         self._pds = pds
+        self._pds_flags = pds_flags
         G = self._G = nx.Graph()
         G.add_nodes_from([-1]) # One root
         G.add_nodes_from(pds_ids)
@@ -62,7 +72,18 @@ class TreePathFinder(object):
         return self._ct_nouveau_vertices[nouveau_index]
 
     def nodelist_from_root(self, leaf):
+        PDS_FLAG_TERMINATE = 1 # FIXME: deduplicate this definition
         print("Finding path from root to {} within {}".format(leaf, self._ct_fn))
+        if isinstance(leaf, complex):
+            # Substitute VIRTUAL_OPEN_SPACE_NODE with the actual node in the open space
+            assert leaf == VIRTUAL_OPEN_SPACE_NODE
+            assert self._pds_flags is not None
+            directly_connected = self._ssc.nonzero()[1]
+            for n in directly_connected:
+                if (self._pds_flags[n] & PDS_FLAG_TERMINATE) != 0:
+                    print("Substitute leaf {} with {}".format(leaf, n))
+                    leaf = n
+                    break
         assert self._ssc[0, leaf] != 0
         ids = nx.shortest_path(self._G, -1, leaf)
         print("IDs on the path {}".format(ids))
@@ -84,13 +105,16 @@ class ForestPathFinder(object):
         self._cached_tree_root = None
 
     def _probe_forest_data(self):
+        print("Loading forest data")
         args = self._args
-        d = np.load(args.rootf)
-        self._roots = d[list(d.keys())[0]]
+        #d = np.load(args.rootf)
+        #self._roots = d[list(d.keys())[0]]
+        self._roots = _load(args.rootf, ds_name=None)
         self._ssc_files = _lsv(args.indir, args.prefix_ssc, '.mat')
         self._pds_size = loadmat(self._ssc_files[0])['C'].shape[1]
         self._pds_ids = [i for i in range(self._pds_size)]
-        self._pds = np.load(args.pdsf)['Q']
+        self._pds = _load(args.pdsf, 'Q')
+        self._pds_flags = _load(args.pdsf, 'QF')
         self._ct_files = _lsv(args.indir, args.prefix_ct, '.mat')
         nssc = len(self._ssc_files)
         nct = len(self._ct_files)
@@ -120,7 +144,14 @@ class ForestPathFinder(object):
         G = self._G = nx.Graph()
         G.add_nodes_from([-1 - i for i in range(self._nroots)]) # Root nodes
         G.add_nodes_from(self._pds_ids)
+        print("Loading edges from {}".format(self._args.forest_edge))
         tups = _load(self._args.forest_edge)
+        print("Loading openset from {}".format(self._args.forest_edge))
+        self.openset = _load(self._args.forest_edge, 'OpenTree')
+        if self.openset is not None:
+            G.add_nodes_from([VIRTUAL_OPEN_SPACE_NODE])
+        # print('Open set shape {}'.format(self.openset.shape))
+        # exit()
         edges_1 = tups[:,[0,2]]
         edges_2 = tups[:,[1,2]]
         # print(tups[:5])
@@ -131,10 +162,28 @@ class ForestPathFinder(object):
         #return
         G.add_edges_from(edges_1)
         G.add_edges_from(edges_2)
-        self._sssp = nx.shortest_path(G, -1, -2) # -1: Root 0 (init), -2: Root 1 (goal)
+        # -1: Root 0 (init), -2: Root 1 (goal)
+        init_tree = -1
+        goal_tree = -2
+        if self.openset is not None:
+            '''
+            Add virtual edges
+            1. trees in self.openset to a virtual open set node
+            2. the virtual open set node to the vritual open set tree
+
+            Also change goal_tree to the virtual open set tree
+            '''
+            virtual_edges = []
+            for root in self.openset:
+                virtual_edges.append((-1 - root, VIRTUAL_OPEN_SPACE_NODE))
+            G.add_edges_from(virtual_edges)
+            goal_tree = VIRTUAL_OPEN_SPACE_NODE
+        self._sssp = nx.shortest_path(G, init_tree, goal_tree)
         print(self._sssp)
 
     def _solve_in_single_tree(self, n_from, n_to):
+        if isinstance(n_from, complex):
+            return None
         if n_from < 0:
             root,leaf = -(n_from + 1), n_to
             reverse = True
@@ -147,7 +196,8 @@ class ForestPathFinder(object):
                                   ssc_fn=self._ssc_files[root],
                                   ct_fn=self._ct_files[root],
                                   pds=self._pds,
-                                  pds_ids=self._pds_ids)
+                                  pds_ids=self._pds_ids,
+                                  pds_flags=self._pds_flags)
         path = tree.nodelist_from_root(leaf)
         self._cache_tree(tree, root)
         if reverse:
@@ -169,7 +219,7 @@ class ForestPathFinder(object):
         # Sanity check!
         bugnode = []
         for root in self._sssp:
-            if root >= 0:
+            if isinstance(root, complex) or root >= 0:
                 continue
             index = -(root + 1)
             ct_fn = self._ct_files[index]
@@ -187,7 +237,8 @@ class ForestPathFinder(object):
             print(pairs)
             for n_from,n_to in progressbar(pairs):
                 traj = self._solve_in_single_tree(n_from, n_to)
-                path = traj if path is None else np.concatenate((path, traj), axis=0)
+                if traj is not None:
+                    path = traj if path is None else np.concatenate((path, traj), axis=0)
         else:
             roots = [-(root + 1) for root in self._sssp if root < 0]
             pairs = [e for e in zip(self._sssp[:-1], self._sssp[1:])]
