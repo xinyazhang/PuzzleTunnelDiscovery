@@ -965,7 +965,10 @@ class TouchConfiguration(object):
         uw = self._uw
         ifn = self._args.textin
         ofn = self._args.textout
-        Q = np.loadtxt(ifn)
+        if ifn.endswith('.npz'):
+            Q = np.load(ifn)['OMPLV']
+        else:
+            Q = np.loadtxt(ifn)
         unit_q = uw.translate_ompl_to_unit(Q)
         if ofn.endswith('.npz'):
             np.savez(ofn, UNITV=ompl_q)
