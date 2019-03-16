@@ -140,3 +140,31 @@ Keep this file and add the file path to `PUZZLE.py` as `tunnel_v_fn`.
    primitive information to the chart.
 3. Run `condor_touch_configuration.py sample` to sample C-Free samples
    w.r.t. the weights from atlas.
+   * In practice, use `sample_enumaxis` subcommand to sample the C-free in a
+     more effective manner
+
+## Step 7: Screen the generated samples
+
+1. Locate the file (denoted as `C.npz` in this step) of C-free key points sampled in the last step.
+2. Check the task partition with `condor-visibility-matrix2.py info`.
+   + Use `C.npz` as `prm` and `path` arguments
+   + Use 'ReTouchQ' as --prmkey and --pathkey
+   + Pick up a proper block size so the screening is partition into tasks.
+     Consider the number of samples, a negative number may be used to allocate multiple rows to one task.
+3. Run `condor-visibility-matrix2.py calc` (preferably on HTCondor)
+   + Be sure --puzzleconf is set
+4. Use 'asvm.py' to assemble the partition visibility matrix into a single one
+5. Use `condor_touch_configuration.py screen --method 0` to merge samples
+   according to visibility matrix
+6. *TODO*: introduce --method 1 which remove samples that connected to
+   multiple disentangled states.
+
+## Step 8: RDT Forest with predefined sample set
+
+1. Under ompl.app, run `se3solver.py presample` to generate the **p**re**d**efined **s**ample set (PDS)
+2. Use the screened samples from last step as roots of the trees and run RDT algorithm with `--samset` in parallel over these roots.
+3. Run `pds_edge.py` to collect the edges in PDS
+   * Must use `ls -v` or equivalent to supply the list of files. `pds_edge.py` does
+     not sort file names.
+4. *(Optional)* Run `disjoint_set.py` to verify if there is feasible solution
+   in a cheaper manner
