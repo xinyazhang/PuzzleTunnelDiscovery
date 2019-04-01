@@ -58,3 +58,25 @@ See `pdsrdt-g9mescreened-4m.csv`
 ## Analysis
 
 Run `hist_csv.py` and `p2d_csv.py`
+
+# Conclusion
+
+## Optimization: Fusing disentangled state
+
+The disentangled state is a configuration that the bounding boxes of puzzle pieces does not overlap.
+This is not a perfect definition, but is the most efficient one.
+
+There are a lot of trees resulting with millions of nodes.
+In our experiment this happens when some tree connected to a disentangled state, and since most of the milestones in the *shared list* are disentangled,
+this tree would be much much larger than those tree that are not connecting to any disentangled state.
+
+To solve this problem, we propose to merge all disentangled milestones in the tree into a single special state,
+and the path between the parent states of this special state can be calculated effectively with RRT/RDT Connect algorithm.
+
+At the same time, the scalable RDT algorithm could terminate immediately after the tree connected to this special state.
+
+# Final Settlement
+
+We simply terminate the tree expansion if a disentangled state is reached.
+In computing the final solution, all trees with disentangled states are
+considered connected to the goal tree.
