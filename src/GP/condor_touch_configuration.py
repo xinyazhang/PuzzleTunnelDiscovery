@@ -103,12 +103,12 @@ def _fn_atlastex(out_dir, geo_type, vert_id, index=None, nw=False):
 def _create_uw(aniconf, cmd):
     if cmd == 'show':
         return None # show command does not need unit world object
-    if 'render' in cmd or cmd in ['atlas2prim']:
+    if 'render' in cmd or cmd in ['atlas2prim', 'useuniformatlas']:
         pyosr.init()
         dpy = pyosr.create_display()
         glctx = pyosr.create_gl_context(dpy)
         r = pyosr.Renderer() # 'project' command requires a Renderer
-        if cmd in ['atlas2prim']:
+        if cmd in ['atlas2prim', 'useuniformatlas']:
             r.pbufferWidth = ATLAS_RES
             r.pbufferHeight = ATLAS_RES
         r.setup()
@@ -538,6 +538,25 @@ class TouchConfiguration(object):
         else:
             print("Unknown file extension for {}".format(fn))
             return
+
+    @staticmethod
+    def _setup_parser_useuniformatlas(subparsers):
+        parser = subparsers.add_parser("useuniformatlas", help='Use uniform distribution as the baseline')
+        parser.add_argument('out_dir', help='Output directory')
+
+    def useuniformatlas(self):
+        r = uw = self._uw
+        r.uv_feedback = True
+        r.avi = False
+        io_dir = self._args.out_dir
+        for geo_type,flags in zip(['rob', 'env'], [pyosr.Renderer.NO_SCENE_RENDERING, pyosr.Renderer.NO_ROBOT_RENDERING]):
+            r.render_mvrgbd(pyosr.Renderer.UV_MAPPINNG_RENDERING|flags)
+            atlas2prim = np.copy(r.mvpid.reshape((r.pbufferWidth, r.pbufferHeight)))
+            atlas2prim = texture_format.framebuffer_to_file(atlas2prim)
+            atlas2prim[atlas2prim >= 0] = 1.0
+            atlas2prim[atlas2prim < 0] = 0.0
+            ofn = task_partitioner.atlas_fn(io_dir, geo_type, 0)
+            np.savez(ofn, ATEX=atlas2prim.astype(np.float32))
 
     @staticmethod
     def _setup_parser_sample(subparsers):
@@ -1038,7 +1057,7 @@ def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--puzzle', help='choose puzzle to solve', required=True)
     subparsers = parser.add_subparsers(dest='command')
-    for fn in  ['run', 'isect', 'uvproj', 'uvrender', 'uvmerge', 'atlas2prim', 'useatlas', 'sample', 'sample_enumaxis', 'samvis', 'dump', 'samstat', 'util', 'screen']:
+    for fn in  ['run', 'isect', 'uvproj', 'uvrender', 'uvmerge', 'atlas2prim', 'useatlas', 'useuniformatlas', 'sample', 'sample_enumaxis', 'samvis', 'dump', 'samstat', 'util', 'screen']:
         getattr(TouchConfiguration, '_setup_parser_'+fn)(subparsers)
 
     args = parser.parse_args()
