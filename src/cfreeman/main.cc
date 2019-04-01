@@ -30,6 +30,7 @@ size_t env_data_index;
 size_t rob_data_index;
 bool anchor_mode = false;
 bool ctrl_pressed = false;
+double align_margin = 1e-4;
 
 struct Anchor {
 	size_t data_index;
@@ -209,7 +210,7 @@ bool mouse_up(Viewer& viewer, int button, int modifier)
 	const auto& V = viewer.data().V;
         const auto& F = viewer.data().F;
         bool unproj = igl::unproject_onto_mesh(Eigen::Vector2f(x,y),
-	                             viewer.core.view * viewer.data().transform,
+	                             viewer.core.view * viewer.data().transforms[0],
 	                             viewer.core.proj,
 	                             viewer.core.viewport,
 	                             V, F,
@@ -275,7 +276,7 @@ bool mouse_up(Viewer& viewer, int button, int modifier)
 	}
 
 	if (!anchor_mode)
-		update_cfree_visualization(viewer);
+		update_cfree_visualization(viewer, align_margin);
 
 	return false;
 }
@@ -288,7 +289,7 @@ bool mouse_scroll(Viewer& viewer, float delta_y)
 		return false;
 	anchors[rob_data_index].angle += delta_y / 180.0 * M_PI;
 
-	update_cfree_visualization(viewer);
+	update_cfree_visualization(viewer, align_margin);
 	return true;
 }
 
@@ -333,7 +334,7 @@ bool key_up(Viewer& viewer, unsigned int key, int modifier)
 			viewer.selected_data_index = rob_data_index;
 		} else {
 			viewer.selected_data_index = env_data_index;
-			update_cfree_visualization(viewer);
+			update_cfree_visualization(viewer, align_margin);
 		}
 	} else if ((modifier & GLFW_MOD_CONTROL) and (key == 's' or key == 'S')) {
 		if (!is_latest_state_free) {
@@ -347,6 +348,12 @@ bool key_up(Viewer& viewer, unsigned int key, int modifier)
 		viewer.data().show_lines = not viewer.data().show_lines;
 	} else if (key == 't' or key == 'T') {
 		viewer.data().show_lines = not viewer.data().show_texture;
+	} else if (key == '-') {
+		align_margin *= 0.5;
+		update_cfree_visualization(viewer, align_margin);
+	} else if (key == '=') {
+		align_margin *= 2.0;
+		update_cfree_visualization(viewer, align_margin);
 	}
 #endif
 	return false;
