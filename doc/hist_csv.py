@@ -30,7 +30,10 @@ def main():
     if head is None:
         head = 'Column {}'.format(args.col)
     print(numbers.shape)
-    n, bins, patches = plt.hist(numbers, 100, density=False, facecolor='g', alpha=0.75)
+    print(np.where(numbers < 10000)[0].shape)
+    #lim_numbers = numbers[np.where(numbers < 10000)]
+    n, bins, patches = plt.hist(numbers, 20, density=False, facecolor='g', alpha=0.75)
+    #n, bins, patches = plt.hist(lim_numbers, 20, density=False, facecolor='g', alpha=0.75)
 
     plt.title('Histogram of {}'.format(head))
     plt.grid(True)

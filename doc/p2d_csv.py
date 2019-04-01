@@ -37,6 +37,7 @@ def main():
     plt.title('2D Point of {} and {}'.format(heads[0], heads[1]))
     plt.xlabel(heads[0])
     plt.ylabel(heads[1])
+    plt.xscale('log')
     plt.grid(True)
     plt.scatter(numbers[0,:], numbers[1,:])
     plt.show()
