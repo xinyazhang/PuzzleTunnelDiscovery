@@ -18,6 +18,14 @@ def atlas_fn(out_dir, geo_type, vert_id, index=None, nw=False):
     else:
         return "{}/atlas-{}-from-vert-{}-{}{}.npz".format(out_dir, geo_type, vert_id, index, nwsuffix)
 
+def atlastex_fn(out_dir, geo_type, vert_id, index=None, nw=False):
+    nwsuffix = "" if not nw else "-nw"
+    if index is None:
+        return "{}/tex-{}-from-vert-{}{}.png".format(out_dir, geo_type, vert_id, nwsuffix)
+    else:
+        return "{}/tex-{}-from-vert-{}-{}{}.png".format(out_dir, geo_type, vert_id, index, nwsuffix)
+
+
 def atlas2prim_fn(out_dir, geo_type):
     return "{}/atlas2prim-{}.npz".format(out_dir, geo_type)
 
