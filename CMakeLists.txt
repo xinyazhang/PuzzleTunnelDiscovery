@@ -29,6 +29,7 @@ FIND_PACKAGE(OpenMP)
 
 SET(USE_GPU TRUE)
 
+SET(OpenGL_GL_PREFERENCE GLVND) # Prefer GLVND since all our platforms are using it
 find_package(OpenGL QUIET)
 if (OpenGL_FOUND)
 	include_directories(${OpenGL_INCLUDE_DIRS})
@@ -422,7 +423,7 @@ TARGET_COMPILE_DEFINITIONS(sancheck_ode PRIVATE ${ODE_CFLAGS}) # Required, float
 
 # PYOSR
 # FIND_PACKAGE(pybind11 REQUIRED)
-find_package(PythonLibs 2.7 REQUIRED)
+find_package(PythonLibs 3 REQUIRED)
 
 message(STATUS "Python version string: ${PYTHONLIBS_VERSION_STRING}")
 AUX_SOURCE_DIRECTORY(lib/pyosr/ EASY_LOCAL_SRC)
