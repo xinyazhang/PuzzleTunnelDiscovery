@@ -191,7 +191,7 @@ multi_differential(const StateVector& from, const ArrayOfStates& tos, bool with_
 StateVector
 apply(const StateVector& from, const StateTrans& tr, const AngleAxisVector& aa)
 {
-	std::cout << "\t apply.aav " << aa.transpose() << std::endl;
+	// std::cout << "\t apply.aav " << aa.transpose() << std::endl;
 	auto tup = decompose(from);
 	StateTrans trans = std::get<0>(tup);
 	StateQuat rot_from = std::get<1>(tup);
