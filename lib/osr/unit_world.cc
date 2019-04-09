@@ -127,9 +127,22 @@ struct UnitWorld::OdeData {
 	               )
 	{
 		int N = fpos.rows();
+#if 0
+		std::cerr << std::endl;
+		std::cerr << "----------------------------------------------------" << std::endl;
+		std::cerr << "fpos\n " << fpos << std::endl;
+		std::cerr << "fdir\n " << fdir << std::endl;
+		std::cerr << "fmag\n " << fmag << std::endl;
+		std::cerr << "----------------------------------------------------" << std::endl;
+		std::cerr << std::endl;
+#endif
 		for (int i = 0; i < N; i++) {
 			Eigen::Matrix<StateScalar, 3, 1> force;
 			force = (fmag(i) * fdir.row(i)).transpose();
+			if (force.norm() == 0.0)
+				continue;
+			if (force.hasNaN() || fpos.hasNaN())
+				continue;
 			dBodyAddForceAtPos(body,
 			                   force(0), force(1), force(2),
 			                   fpos(i,0), fpos(i,1), fpos(i,2)
