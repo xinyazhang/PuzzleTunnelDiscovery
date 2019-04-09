@@ -34,10 +34,6 @@ public:
 	virtual const EGLint* getConfigAttribs() const = 0;
 	virtual EGLSurface getSurfaceForCreation(EGLDisplay, EGLConfig) const = 0;
 	virtual const char* name() const = 0;
-
-	EGLContext createContext(EGLDisplay dpy, EGLContext share_context = EGL_NO_CONTEXT)
-	{
-	}
 };
 
 class NullContexter : public IEglContexter {
