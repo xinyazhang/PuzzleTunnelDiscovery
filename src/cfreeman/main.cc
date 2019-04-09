@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <tuple>
 #include <stdint.h>
 #include <cstdlib>
 #include <unordered_map>
@@ -30,7 +31,12 @@ size_t env_data_index;
 size_t rob_data_index;
 bool anchor_mode = false;
 bool ctrl_pressed = false;
-double align_margin = 1e-4;
+double magnitude = 1e-1; // magnitude of margins, translations, rotations etc.
+bool manual_mode = false;
+const char* AXIS_NAME[] = {"X", "Y", "Z"};
+int manual_axis = 0;
+bool manual_sforce = false;
+bool manual_guard = false;
 
 struct Anchor {
 	size_t data_index;
@@ -48,12 +54,24 @@ std::unordered_map<size_t, Anchor> anchors;
 
 std::ofstream fout;
 osr::StateVector latest_state;
+osr::StateVector identity;
+osr::StateTrans identity_trans;
+osr::StateQuat identity_rot;
 bool is_latest_state_free = false;
 };
 
 void usage()
 {
-	std::cerr << R"xxx(Usage: c-freeman <env .obj file> <robot .obj file>)xxx" << std::endl;
+	std::cerr << R"xxx(Usage: c-freeman <env .obj file> <robot .obj file>
+ K: Switch between 'anchor selection' and 'anchor align' mode.
+ M: Switch to 'Manual' mode
+ Ctrl+S: Save current c-free state to cfreeman.out
+ F: Show lines
+ T: Show textures
+ -/=: increase/decrease the margin by 2x
+ Ctrl+mouse wheel: rotate the puzzle
+ PgUp/PgDn: change the rotation/translation axis
+)xxx" << std::endl;
 }
 
 size_t load_geometry_to_viewer(Viewer& viewer, const uint32_t geo_id, bool overwrite = false)
@@ -127,8 +145,50 @@ void update_anchors_visualization(Viewer& viewer)
 #endif
 }
 
-void update_cfree_visualization(Viewer& viewer, double margin = 1e-4)
+void update_latest_state(Viewer& viewer, const osr::StateVector& q)
 {
+	bool valid = uw.isValid(q);
+
+	// Visualization
+	// 1. Env model is already loaded, skipped
+	// 2. Update the Rob model with generated q
+	auto& rob_data = viewer.data_list[rob_data_index];
+#if 1
+	rob_data.set_transform(osr::translate_state_to_transform(q).matrix());
+#else
+	UnitWorld::VMatrix V;
+	UnitWorld::FMatrix F;
+
+	std::tie(V, F) = uw.getRobotGeometry(q, true);
+	rob_data.V = V;
+	rob_data.F = F;
+
+	rob_data.dirty = igl::opengl::MeshGL::DIRTY_ALL;
+#endif
+	if (valid) {
+		rob_data.set_colors(anchors[rob_data_index].colors);
+	} else {
+		using namespace igl;
+		rob_data.uniform_colors(Eigen::Vector3d(GOLD_AMBIENT[0], GOLD_AMBIENT[1], GOLD_AMBIENT[2]),
+		                        Eigen::Vector3d(FAST_RED_DIFFUSE[0], FAST_RED_DIFFUSE[1], FAST_RED_DIFFUSE[2]),
+		                        Eigen::Vector3d(GOLD_SPECULAR[0], GOLD_SPECULAR[1], GOLD_SPECULAR[2]));
+		auto tup = uw.intersectingSegments(q);
+		Eigen::Matrix<int, -1, 2> findices = std::get<3>(tup);
+		for (int i = 0; i < findices.rows(); i++) {
+			int f = findices(i, 1);
+			rob_data.F_material_ambient.row(f) = Eigen::Vector3d(CYAN_AMBIENT[0], CYAN_AMBIENT[1], CYAN_AMBIENT[2]);
+			rob_data.F_material_diffuse.row(f) = Eigen::Vector3d(FAST_BLUE_DIFFUSE[0], FAST_BLUE_DIFFUSE[1], FAST_BLUE_DIFFUSE[2]);
+			rob_data.F_material_specular.row(f) = Eigen::Vector3d(CYAN_SPECULAR[0], CYAN_SPECULAR[1], CYAN_SPECULAR[2]);
+		}
+	}
+	latest_state = q;
+	is_latest_state_free = valid;
+	// is_latest_state_free = true; // debugging...
+}
+
+void update_cfree_visualization(Viewer& viewer, double margin)
+{
+	margin *= 1e-3; // Correct margin's scaling
 	using namespace osr;
 
 	StateTrans rob_surface_point = anchors[rob_data_index].unit_surface_point;
@@ -157,35 +217,7 @@ void update_cfree_visualization(Viewer& viewer, double margin = 1e-4)
 	// Step 3 Translation
 	StateTrans trans = env_o - (rot_accum * rob_o);
 	q = compose(trans, rot_accum);
-	bool valid = uw.isValid(q);
-
-	// Visualization
-	// 1. Env model is already loaded, skipped
-	// 2. Update the Rob model with generated q
-	auto& rob_data = viewer.data_list[rob_data_index];
-#if 1
-	rob_data.set_transform(translate_state_to_transform(q).matrix());
-#else
-	UnitWorld::VMatrix V;
-	UnitWorld::FMatrix F;
-
-	std::tie(V, F) = uw.getRobotGeometry(q, true);
-	rob_data.V = V;
-	rob_data.F = F;
-
-	rob_data.dirty = igl::opengl::MeshGL::DIRTY_ALL;
-#endif
-	if (valid) {
-		rob_data.set_colors(anchors[rob_data_index].colors);
-	} else {
-		using namespace igl;
-		rob_data.uniform_colors(Eigen::Vector3d(GOLD_AMBIENT[0], GOLD_AMBIENT[1], GOLD_AMBIENT[2]),
-		                        Eigen::Vector3d(FAST_RED_DIFFUSE[0], FAST_RED_DIFFUSE[1], FAST_RED_DIFFUSE[2]),
-		                        Eigen::Vector3d(GOLD_SPECULAR[0], GOLD_SPECULAR[1], GOLD_SPECULAR[2]));
-
-	}
-	latest_state = q;
-	is_latest_state_free = valid;
+	update_latest_state(viewer, q);
 }
 
 bool mouse_up(Viewer& viewer, int button, int modifier)
@@ -276,7 +308,7 @@ bool mouse_up(Viewer& viewer, int button, int modifier)
 	}
 
 	if (!anchor_mode)
-		update_cfree_visualization(viewer, align_margin);
+		update_cfree_visualization(viewer, magnitude);
 
 	return false;
 }
@@ -285,12 +317,34 @@ bool mouse_scroll(Viewer& viewer, float delta_y)
 {
 	// std::cerr << "scroll " << delta_y << std::endl;
 	// std::cerr << "ctrl_pressed " << ctrl_pressed << std::endl;
-	if (!ctrl_pressed)
-		return false;
-	anchors[rob_data_index].angle += delta_y / 180.0 * M_PI;
+	if (manual_mode) {
+		osr::AngleAxisVector aa;
+		osr::StateTrans tr;
+		tr.setZero();
+		aa.setZero();
+		if (ctrl_pressed)
+			aa(manual_axis) = 1.0 * delta_y * magnitude;
+		else
+			tr(manual_axis) = 1.0 * delta_y * magnitude;
+		if (!manual_guard) {
+			osr::StateVector q = osr::apply(latest_state, tr, aa);
+			update_latest_state(viewer, q);
+		} else {
+			auto tup = uw.transitStateBy(latest_state, tr, aa, magnitude / 16.0);
+			update_latest_state(viewer, std::get<0>(tup));
+		}
+		return true;
+		// is_latest_state_free = uw.isValid(latest_state);
+		// auto& rob_data = viewer.data_list[rob_data_index];
+		// rob_data.set_transform(osr::translate_state_to_transform(latest_state).matrix());
+	} else {
+		if (!ctrl_pressed)
+			return true;
+		anchors[rob_data_index].angle += delta_y / 180.0 * M_PI;
 
-	update_cfree_visualization(viewer, align_margin);
-	return true;
+		update_cfree_visualization(viewer, magnitude);
+		return false;
+	}
 }
 
 bool key_down(Viewer& viewer, unsigned int key, int modifier)
@@ -334,7 +388,7 @@ bool key_up(Viewer& viewer, unsigned int key, int modifier)
 			viewer.selected_data_index = rob_data_index;
 		} else {
 			viewer.selected_data_index = env_data_index;
-			update_cfree_visualization(viewer, align_margin);
+			update_cfree_visualization(viewer, magnitude);
 		}
 	} else if ((modifier & GLFW_MOD_CONTROL) and (key == 's' or key == 'S')) {
 		if (!is_latest_state_free) {
@@ -345,15 +399,39 @@ bool key_up(Viewer& viewer, unsigned int key, int modifier)
 		fout << latest_state.transpose() << std::endl;
 		fout.flush();
 	} else if (key == 'f' or key == 'F') {
-		viewer.data().show_lines = not viewer.data().show_lines;
+		if (ctrl_pressed)
+			manual_sforce = true;
+		else
+			viewer.data().show_lines = not viewer.data().show_lines;
 	} else if (key == 't' or key == 'T') {
 		viewer.data().show_lines = not viewer.data().show_texture;
 	} else if (key == '-') {
-		align_margin *= 0.5;
-		update_cfree_visualization(viewer, align_margin);
+		magnitude *= 0.5;
+		if (!manual_mode)
+			update_cfree_visualization(viewer, magnitude);
 	} else if (key == '=') {
-		align_margin *= 2.0;
-		update_cfree_visualization(viewer, align_margin);
+		magnitude *= 2.0;
+		if (!manual_mode)
+			update_cfree_visualization(viewer, magnitude);
+	} else if (key == 'M' or key == 'm') {
+		manual_mode = !manual_mode;
+		if (manual_mode) {
+			std::cout << "Manual mode enabled\n";
+			std::cout << "Current axis: " << AXIS_NAME[manual_axis] << std::endl;
+		} else {
+			std::cout << "Manual mode disabled\n";
+		}
+	} else if (key == 'G' or key == 'g') {
+		manual_guard = !manual_guard;
+		std::cerr << "Manual guard: " << (manual_guard ? "Enabled" : "Disabled")
+		          << std::endl;
+	} else if (key == GLFW_KEY_PAGE_UP) {
+		manual_axis += 1;
+		manual_axis %= 3;
+	} else if (key == GLFW_KEY_PAGE_DOWN) {
+		manual_axis -= 1;
+		manual_axis += 3;
+		manual_axis %= 3;
 	}
 #endif
 	return false;
@@ -361,6 +439,24 @@ bool key_up(Viewer& viewer, unsigned int key, int modifier)
 
 bool predraw(Viewer& viewer)
 {
+	if (manual_mode && manual_sforce && !is_latest_state_free) {
+		constexpr double STIFFNESS = 1e6;
+		constexpr double D_TIME = 1e-3;
+		using ArrayOfPoints = osr::UnitWorld::ArrayOfPoints;
+		ArrayOfPoints sbegins, sends;
+		Eigen::Matrix<osr::StateScalar, -1, 1> smags, fmags;
+		Eigen::Matrix<int, -1, 2> findices;
+		std::tie(sbegins, sends, smags, findices) = uw.intersectingSegments(latest_state);
+		fmags = STIFFNESS * smags;
+		ArrayOfPoints fposs, fdirs;
+		std::tie(fposs, fdirs) = uw.forceDirectionFromIntersectingSegments(sbegins, sends, findices);
+		osr::StateVector q = uw.pushRobot(latest_state,
+		                                  fposs, fdirs, fmags, 1.0, D_TIME,
+		                                  false);
+		update_latest_state(viewer, q);
+		if (is_latest_state_free)
+			manual_sforce = false;
+	}
 	// Set visibility according to anchor mode
 	// Anchor mode: only robot is shown/selected
 	// Non-anchor mode: all models are shown
@@ -392,6 +488,9 @@ int main(int argc, const char* argv[])
 	uw.loadRobotFromFile(rob_fn);
 	uw.scaleToUnit();
 	uw.angleModel(0,0);
+	osr::state_vector_set_identity(latest_state);
+	osr::state_vector_set_identity(identity);
+	std::tie(identity_trans, identity_rot) = osr::decompose(identity);
 
 	Viewer viewer;
 	env_data_index = load_geometry_to_viewer(viewer, UnitWorld::GEO_ENV, true);
