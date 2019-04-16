@@ -368,8 +368,7 @@ void Mesh::Program(int res, double boxw, double boxh, int margin_pix)
 		if (rects_out.size() == rects_in.size()) {
 			break;
 		}
-		std::cerr << "Guessed sizes failed: " << edges[0] <<
-			  '\t' << edges[1] << std::endl;
+		std::cerr << "Guessed sizes failed: " << edges[0] << '\t' << edges[1] << std::endl;
 		if (!probe_box_size) {
 			throw std::runtime_error("Fail to fit into the required size of box.");
 		}

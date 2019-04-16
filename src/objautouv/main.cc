@@ -85,7 +85,8 @@ int main(int argc, char* argv[])
 #endif
 	if (m.UV.rows() > 0) {
 		std::cerr << ifn << " already consists of UV coordinates\n";
-		return -1;
+		igl::writeOBJ(ofn, m.V, m.F, m.N, m.FN, m.UV, m.FUV);
+		return 0;
 	}
 	if (m.N.rows() > m.V.rows()) {
 		std::cerr << ifn << " has multi-valued vertex normal\n";
