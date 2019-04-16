@@ -44,7 +44,7 @@ def _create_renderer(args):
     dpy = pyosr.create_display()
     glctx = pyosr.create_gl_context(dpy)
     r = pyosr.Renderer()
-    if hasattr(args, '_fb_resolution')
+    if hasattr(args, '_fb_resolution'):
         r.pbufferWidth = args._fb_resolution
         r.pbufferHeight = args._fb_resolution
     r.setup()
