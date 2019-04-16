@@ -697,6 +697,43 @@ UnitWorld::translateUnitStateToOMPLState(const ArrayOfStates& qs, bool to_angle_
 	return ret;
 }
 
+/*
+ * Let R_{ompl} and t_{ompl} be the rotation matrix and translation vector for OMPL state.
+ * R_{vanilla} and t_{vanilla} be the rotation matrix and translation vector for vanilla state
+ *
+ * We solve the following equation to get R_{ompl} and t_{ompl}
+ *    R_{vanilla}v + t_{vanilla} == R_{ompl}(v - O) + t_{omlp} holds any vertex v \in R^3.
+ * In which O is the OMPL center.
+ *
+ * Let v be 0, we have t_{vanilla} == t_{ompl} - R_{ompl} O.
+ * Substitude the above to the original equation we have
+ * R_{ompl} = R_{vanilla}
+ * t_(ompl} = t_{vanilla} + R_{ompl} O
+ */
+ArrayOfStates
+UnitWorld::translateVanillaStateToOMPLState(const ArrayOfStates& qs) const
+{
+	static_assert(kStateDimension == 7);
+	int N = qs.rows();
+	ArrayOfStates ret;
+	ret.resize(qs.rows(), qs.cols());
+	ret.block(0, 3, N, 4) = qs.block(0, 3, N, 4);
+	// Get OMPL center
+	Eigen::Vector3d ompl_center = glm2Eigen(robot_->getOMPLCenter());
+	for (int i = 0; i < N; i++) {
+		// Vanilla state also uses w-last quaternion
+		// TODO: Generalize to multi-body
+		StateQuat rot(qs(i,6), qs(i,3), qs(i,4), qs(i,5));
+		ret.block(i, 0, 1, 3) = rot._transformVector(ompl_center);
+	}
+}
+
+ArrayOfStates
+UnitWorld::translateVanillaStateToUnitState(ArrayOfStates qs) const
+{
+	return translateOMPLStateToUnitState(translateVanillaStateToOMPLState(qs));
+}
+
 ArrayOfStates
 UnitWorld::translateOMPLStateToUnitState(ArrayOfStates qs) const
 {
