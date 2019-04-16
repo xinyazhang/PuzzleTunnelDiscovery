@@ -205,6 +205,7 @@ PYBIND11_PLUGIN(pyosr) {
 		     py::call_guard<py::gil_scoped_release>())
 		.def_readonly_static("GEO_ENV", &UnitWorld::GEO_ENV)
 		.def_readonly_static("GEO_ROB", &UnitWorld::GEO_ROB)
+		.def_property("recommended_cres", &UnitWorld::getRecommendedCres, &UnitWorld::setRecommendedCres)
 		.def_property_readonly("scene_matrix", &UnitWorld::getSceneMatrix)
 		.def_property_readonly("robot_matrix", &UnitWorld::getRobotMatrix);
 #if GPU_ENABLED

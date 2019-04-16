@@ -128,6 +128,12 @@ public:
 	                                            bool to_angle_axis = false) const;
 	// Note: do not pass by const& because the implementation does need a copy 
 	ArrayOfStates translateOMPLStateToUnitState(ArrayOfStates qs) const;
+	// Translate the OMPL state to Vanillay State, which is the direct
+	// translation from the geometry's own coordinate system.
+	// Vanilla state also uses w-last format
+	ArrayOfStates translateVanillaStateToOMPLState(const ArrayOfStates& qs) const;
+
+	ArrayOfStates translateVanillaStateToUnitState(ArrayOfStates qs) const;
 	StateVector applyPertubation(const StateVector& state) const;
 	StateVector unapplyPertubation(const StateVector& state) const;
 
@@ -275,6 +281,19 @@ public:
 
 	std::shared_ptr<const Scene> getScene(uint32_t geo) const;
 	std::shared_ptr<const CDModel> getCDModel(uint32_t geo) const;
+
+	// Get/Set Recommended Collision (checking) Resolution
+	void
+	setRecommendedCres(double res)
+	{
+		recCres_ = res;
+	}
+
+	double
+	getRecommendedCres() const
+	{
+		return recCres_;
+	}
 protected:
 	bool shared_ = false;
 
@@ -304,6 +323,8 @@ protected:
 	                      const FMatrix& targetF,
 	                      const VMatrix& V,
 	                      const FMatrix& F);
+
+	double recCres_;
 };
 
 auto glm2Eigen(const glm::mat4& m);
