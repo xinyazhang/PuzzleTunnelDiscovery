@@ -38,6 +38,45 @@ interpolate(const StateVector& pkey,
 	return ret;
 }
 
+Eigen::VectorXd
+path_metrics(const ArrayOfStates& qs)
+{
+	Eigen::VectorXd metrics;
+	metrics.resize(qs.rows(), 1);
+	double dist = 0.0;
+	for (size_t i = 0; i < qs.rows(); i++) {
+		if (i > 0) {
+			dist += distance(qs.row(i-1), qs.row(i));
+		}
+		metrics(i) = dist;
+	}
+	return metrics;
+}
+
+StateVector
+path_interpolate(const ArrayOfStates& qs,
+                 const Eigen::VectorXd& metrics,
+                 double tau)
+{
+	int key = -1;
+	for (int i = 0; i < qs.rows() - 1; i++) {
+		if (metrics(i) <= tau && tau < metrics(i+1)) {
+			key = i;
+			break;
+		}
+	}
+	if (key < 0) {
+		return qs.row(0);
+	}
+	double d = metrics(key+1) - metrics(key);
+	double t;
+	if (d < 1e-6) 
+		t = 0.0;
+	else
+		t = (tau - metrics(key)) / d;
+	return interpolate(qs.row(key), qs.row(key+1), t);
+}
+
 std::tuple<StateTrans, StateQuat>
 decompose(const StateVector& state)
 {

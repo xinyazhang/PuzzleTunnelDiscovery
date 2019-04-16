@@ -71,30 +71,6 @@ size_t load_geometry_to_viewer(Viewer& viewer, const uint32_t geo_id, bool overw
 	return ret;
 }
 
-osr::StateVector
-interpolate(const osr::ArrayOfStates& qs,
-            const Eigen::VectorXd& miles,
-            double tau)
-{
-	int key = -1;
-	for (int i = 0; i < qs.rows() - 1; i++) {
-		if (miles(i) <= tau && tau < miles(i+1)) {
-			key = i;
-			break;
-		}
-	}
-	if (key < 0) {
-		return qs.row(0);
-	}
-	double d = miles(key+1) - miles(key);
-	double t;
-	if (d < 1e-6) 
-		t = 0.0;
-	else
-		t = (tau - miles(key)) / d;
-	return osr::interpolate(qs.row(key), qs.row(key+1), t);
-}
-
 bool predraw(Viewer& viewer)
 {
 	auto& rob_data = viewer.data_list[rob_data_index];
@@ -130,7 +106,7 @@ bool predraw(Viewer& viewer)
 		return false;
 	std::cerr << "tau: " << tau << std::endl;
 	
-	osr::StateVector q = interpolate(Qs, miles, tau);
+	osr::StateVector q = osr::path_interpolate(Qs, miles, tau);
 	osr::StateTrans qt = std::get<0>(osr::decompose(q));
 	viewer.core.camera_center = qt.cast<float>() * viewer.core.camera_zoom * viewer.core.camera_base_zoom;
 	rob_data.set_transform(osr::translate_state_to_transform(q).matrix());
@@ -140,7 +116,7 @@ bool predraw(Viewer& viewer)
 	// Do NOT set to rob data, because it's translated
 	viewer.data_list[env_data_index].set_points(pc_point, pc_color);
 	bool valid = uw.isValid(q);
-	if (valid) {
+nterpo	if (valid) {
 		using namespace igl;
 		rob_data.uniform_colors(Eigen::Vector3d(GOLD_AMBIENT[0], GOLD_AMBIENT[1], GOLD_AMBIENT[2]),
 		                        Eigen::Vector3d(GOLD_DIFFUSE[0], GOLD_DIFFUSE[1], GOLD_DIFFUSE[2]),

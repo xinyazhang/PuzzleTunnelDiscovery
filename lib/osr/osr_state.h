@@ -34,6 +34,10 @@ osr::Transform translate_state_to_transform(const StateVector& state);
 StateVector interpolate(const StateVector& pkey,
 	                const StateVector& nkey,
 	                StateScalar tau);
+Eigen::VectorXd path_metrics(const ArrayOfStates& qs);
+StateVector path_interpolate(const ArrayOfStates& qs,
+                             const Eigen::VectorXd& metrics,
+                             double tau);
 std::tuple<StateTrans, StateQuat> decompose(const StateVector&);
 std::tuple<StateTrans, Eigen::Matrix3d> decompose_2(const StateVector&);
 StateVector compose(const StateTrans&, const StateQuat&);

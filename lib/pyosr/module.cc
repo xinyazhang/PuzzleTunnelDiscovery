@@ -277,5 +277,9 @@ PYBIND11_PLUGIN(pyosr) {
 		;
 	m.def("interpolate", &osr::interpolate,
 	      "Interpolate between two SE3 states");
+	m.def("path_metrics", &osr::path_metrics,
+	      "Distances of each node on the path to the beginning of this path");
+	m.def("path_interpolate", &osr::path_interpolate,
+	      "Interpolate over the path");
 	return m.ptr();
 }
