@@ -724,8 +724,13 @@ UnitWorld::translateVanillaStateToOMPLState(const ArrayOfStates& qs) const
 		// Vanilla state also uses w-last quaternion
 		// TODO: Generalize to multi-body
 		StateQuat rot(qs(i,6), qs(i,3), qs(i,4), qs(i,5));
-		ret.block(i, 0, 1, 3) = rot._transformVector(ompl_center);
+		Eigen::Vector3d roo = rot._transformVector(ompl_center);
+		// ret.block(i, 0, 1, 3) = roo; <- this causes segfault
+		ret(i, 0) = roo(0);
+		ret(i, 1) = roo(1);
+		ret(i, 2) = roo(2);
 	}
+	return ret;
 }
 
 ArrayOfStates
