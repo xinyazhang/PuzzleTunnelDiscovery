@@ -36,3 +36,33 @@ logs/
 
 # Generated C-Obs meshes
 generated-cobs/
+
+# Ignore a bunch of temporary files.
+doc/RotationLoss.nb
+res/dual/dual.dt.tcp.manual-1.png
+res/dual/dual.dt.tcp.manual-2.png
+res/dual/dual.dt.tcp.manual.png
+res/dual/dual.dt.tcp.pred1.png
+res/dual/knotted_ring.manual-2.png
+res/dual/knotted_ring.manual.png
+res/dual/knotted_ring.obj
+res/dual/knotted_ring_.csv
+res/dual/knotted_ring_.msh
+res/elk.1/
+res/elk/Puzzle-CounterPart-Possion-center.obj
+res/elk/Puzzle-Part-Possion-center.obj
+res/elk/keyconf_0.blend
+res/elk/keyconf_0.blend1
+res/elk/keyconf_1.blend
+res/elk/keyconf_1.blend1
+res/elk/keyconf_2.blend
+sancheck/realb2d/
+src/AAE/hourglass_tiny.py
+src/bullet/
+src/inflat/
+src/rrt22/
+src/tf-faster-rcnn/
+third-party/async_deep_reinforce/
+third-party/hourglasstensorlfow/
+third-party/umich-hg/
+tmux-client-27754.log
