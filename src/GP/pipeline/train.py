@@ -12,3 +12,6 @@ def autorun(args):
     ws.deploy_to_gpu(util.WORKSPACE_SIGNATURE_FILE,
                      util.WORKSPACE_CONFIG_FILE,
                      util.TRAINING_DIR+'/')
+
+def collect_stages():
+    return []

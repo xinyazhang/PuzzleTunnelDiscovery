@@ -82,6 +82,9 @@ TouchSampleGranularity = 32768 # Hint about the task partition
 MeshBoolGranularity = 1024 # Minimal task size hint: mesh boolean
 UVProjectGranularity = 1024 # Minimal task size hint: mesh boolean
 
+[Solver]
+PDSSize = 4194304       # Number of samples in the PreDefined Sample set
+Trials = 1              # Maximum trials before cancel
 '''
 
 def init_config_file(ws):

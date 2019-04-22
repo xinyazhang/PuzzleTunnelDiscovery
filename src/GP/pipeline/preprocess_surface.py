@@ -235,18 +235,18 @@ def uvrender(args, ws):
         imsave(ws.local_ws(util.TRAINING_DIR, '{}_chart_uniform_weight.png'.format(rname)), rgb)
 
 
-def screenweight(args, ws):
+def screen_weight(args, ws):
     for geo_type in ['rob', 'env']:
         d = matio.load(ws.local_ws(util.TRAINING_DIR, '{}_chart.npz'.format(geo_type)))
         img = d['WEIGHTED'] # Unlike condor_touch_configuration, we only have one file here
         LOOPS = 2 # Emperical number
         for i in range(LOOPS):
             nzi = np.nonzero(img)
-            print("[screenweight] geo {} loop {}: nz count {}".format(geo_type, i, len(nzi[0])))
+            print("[screen_weight] geo {} loop {}: nz count {}".format(geo_type, i, len(nzi[0])))
             nz = img[nzi]
             m = np.mean(nz)
             img[img < m] = 0.0
-            print("[screenweight] geo {} loop {}: sum {}".format(geo_type, i+1, np.sum(img)))
+            print("[screen_weight] geo {} loop {}: sum {}".format(geo_type, i+1, np.sum(img)))
         imsave(ws.local_ws(util.TRAINING_DIR, '{}_chart_screened.png'.format(geo_type)), img)
 
 
@@ -255,7 +255,7 @@ function_dict = {
         'isect_geometry' : isect_geometry,
         'uvproject' : uvproject,
         'uvrender' : uvrender,
-        'screenweight' : screenweight,
+        'screen_weight' : screen_weight,
 }
 
 def setup_parser(subparsers):
@@ -288,9 +288,15 @@ def remote_uvproject(ws):
 
 def autorun(args):
     ws = util.Workspace(args.dir)
-    remote_sample_touch(ws)
-    remote_isect_geometry(ws)
-    remote_uvproject(ws)
-    ws.fetch_condor(util.UV_DIR + '/')
-    uvrender(ws)
-    screenweight(ws)
+    pdesc = collect_stages()
+    for _,func in pdesc:
+        func(ws)
+
+def collect_stages():
+    return [ ('sample_touch', remote_sample_touch),
+             ('isect_geometry', remote_isect_geometry),
+             ('uvproject', remote_uvproject),
+             ('fetch_groundtruth', lambda ws: ws.fetch_condor(util.UV_DIR + '/')),
+             ('uvrender', lambda ws: uvrender(None, ws)),
+             ('screen_weight', lambda ws: screen_weight(None, ws))
+           ]

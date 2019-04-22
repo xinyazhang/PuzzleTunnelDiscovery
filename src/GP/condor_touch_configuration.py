@@ -1003,7 +1003,5 @@ def main():
     touch_conf = TouchConfiguration(args)
     getattr(touch_conf, args.command)()
 
-    return
-
 if __name__ == '__main__':
     main()

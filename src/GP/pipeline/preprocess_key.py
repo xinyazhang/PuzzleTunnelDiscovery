@@ -190,3 +190,16 @@ def autorun(args):
     remote_interpolate_trajectory(ws)
     remote_esitmate_clearance_volume(ws)
     remote_pickup_key_configuration(ws)
+
+def collect_stages():
+    return [ ('deploy_to_condor',
+              lambda ws: ws.deploy_to_condor(util.WORKSPACE_SIGNATURE_FILE,
+                                             util.WORKSPACE_CONFIG_FILE,
+                                             util.CONDOR_TEMPLATE,
+                                             util.TRAINING_DIR+'/')
+             ),
+             ('find_trajectory', remote_find_trajectory),
+             ('interpolate_trajectory', remote_interpolate_trajectory),
+             ('estimate_clearance_volume', remote_esitmate_clearance_volume),
+             ('pickup_key_configuration', remote_pickup_key_configuration),
+           ]
