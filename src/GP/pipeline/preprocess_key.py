@@ -35,11 +35,14 @@ System Architecture:
 def find_trajectory(args, ws):
     se3solver_path = ws.condor_exec('se3solver.py')
     scratch_dir = ws.condor_ws(_TRAJECTORY_SCRATCH)
+    _, config = parse_ompl(ws.training_puzzle)
     args = [se3solver_path,
             'solve', ws.training_puzzle,
+            '--cdres', config.getfloat('problem', 'collision_resolution', fallback=0.0001),
+            '--trajectory_out', '{}/traj_$(Process).npz'.format(scratch_dir),
             ws.config.get('TrainingTrajectory', 'PlannerAlgorithmID'),
             ws.config.get('TrainingTrajectory', 'CondorTimeThreshold'),
-            '{}/traj_$(Process).npz'.format(scratch_dir)]
+           ]
     if args.only_wait:
         condor.local_wait(scratch_dir)
         return
@@ -91,10 +94,8 @@ def estimate_clearance_volume(args, ws):
         # Submit a Condor job
         args = ['facade.py',
                 'preprocess_key',
-                '--stage',
-                'estimate_clearance_volume'
-                '--task_id',
-                '$(Process)']
+                '--stage', 'estimate_clearance_volume'
+                '--task_id', '$(Process)']
         condor.local_submit(ws,
                             '/usr/bin/python3',
                             iodir=scratch_dir,
