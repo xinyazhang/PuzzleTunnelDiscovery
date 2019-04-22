@@ -717,6 +717,7 @@ UnitWorld::translateVanillaStateToOMPLState(const ArrayOfStates& qs) const
 	int N = qs.rows();
 	ArrayOfStates ret;
 	ret.resize(qs.rows(), qs.cols());
+	// R_{ompl} = R_{vanilla}
 	ret.block(0, 3, N, 4) = qs.block(0, 3, N, 4);
 	// Get OMPL center
 	Eigen::Vector3d ompl_center = glm2Eigen(robot_->getOMPLCenter());
@@ -724,11 +725,12 @@ UnitWorld::translateVanillaStateToOMPLState(const ArrayOfStates& qs) const
 		// Vanilla state also uses w-last quaternion
 		// TODO: Generalize to multi-body
 		StateQuat rot(qs(i,6), qs(i,3), qs(i,4), qs(i,5));
-		Eigen::Vector3d roo = rot._transformVector(ompl_center);
+		// Eigen::Vector3d roo = rot.normalized().toRotationMatrix() * ompl_center;
+		Eigen::Vector3d roo = rot.normalized()._transformVector(ompl_center);
 		// ret.block(i, 0, 1, 3) = roo; <- this causes segfault
-		ret(i, 0) = roo(0);
-		ret(i, 1) = roo(1);
-		ret(i, 2) = roo(2);
+		ret(i, 0) = qs(i,0) + roo(0);
+		ret(i, 1) = qs(i,1) + roo(1);
+		ret(i, 2) = qs(i,2) + roo(2);
 	}
 	return ret;
 }

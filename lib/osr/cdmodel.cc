@@ -119,7 +119,7 @@ void CDModel::addVF(const glm::mat4& m,
 	std::vector<fcl::Triangle> triangles;
 	glm::dmat4 mm(m);
 	// glm::dmat4 mm(1.0);
-	std::cerr << m << std::endl;
+	std::cerr << "addVF with transformation " << std::endl;
 	std::cerr << mm << std::endl;
 #if 1
 	for (const auto& vert: verts) {
