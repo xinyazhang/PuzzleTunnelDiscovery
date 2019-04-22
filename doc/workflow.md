@@ -2,16 +2,17 @@
 
 ## Preprocessing the Puzzle
 
-1. Use meshlab to add per-vertex normal to the mesh
+1. ~~Use meshlab to add per-vertex normal to the mesh~~
     + Not necessary for our algorithm. This is a limitation from our current
       pyOSR implementation.
+    + Update: the requirement of vertex normal has been relaxed by `5dc6b81c255145b4aa92ba652c4111db9a198ec3`
 2. Use TetWild to get the delaunay triangulated surface of the input mesh
 3. Use `objautouv` to automatically assign UV coordinates to the mesh vertices
     + Not necessary if the geometry already has UV coordinates
 
 ## Step 1: Find a solution from the simplified version
 
-1. Open OMPL GUI and prepare the puzzle visually.
+~~1. Open OMPL GUI and prepare the puzzle visually.
     * Note: need to save the configuration to some place
 2. cd `demos/SE3RigidBodyPlanning/`
 3. Create a new source file from the template Alpha-1.0.cpp
@@ -23,7 +24,9 @@
     + Run PRM locally to collect samples
     + Run ReRRT on condor to collect the solution path
         - It is better to run ReRRT N times for a relatively short period.
-8. Visually verify the feasibility of the solution path
+8. Visually verify the feasibility of the solution path~~
+
+Now `se3solver.py` should be used to solve this problem.
 
 ## Step 2: Prepare the PRM data for Monte-Carlo visibility calculator
 
@@ -168,3 +171,4 @@ Keep this file and add the file path to `PUZZLE.py` as `tunnel_v_fn`.
      not sort file names.
 4. *(Optional)* Run `disjoint_set.py` to verify if there is feasible solution
    in a cheaper manner
+5. Run `forest_dijkstra.py` to get the NON-OPTIMIZED path from tree 0 (initial tree) to tree 1 (goal tree).
