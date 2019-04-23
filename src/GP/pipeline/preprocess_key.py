@@ -6,11 +6,12 @@ import subprocess
 import pathlib
 import numpy as np
 
-import util
-import matio
+from . import util
+from . import choice_formatter
+from . import matio
+from . import partt
+from . import touchq_util
 import pyosr
-import partt
-import touchq_util
 
 # Pipeline local file
 # 
@@ -47,7 +48,7 @@ def find_trajectory(args, ws):
         condor.local_wait(scratch_dir)
         return
     condor.local_submit(ws,
-                        '/usr/bin/python3',
+                        util.PYTHON,
                         iodir=scratch_dir,
                         arguments=args,
                         instances=ws.config.get('TrainingTrajectory', 'CondorInstances'),
@@ -97,7 +98,7 @@ def estimate_clearance_volume(args, ws):
                 '--stage', 'estimate_clearance_volume'
                 '--task_id', '$(Process)']
         condor.local_submit(ws,
-                            '/usr/bin/python3',
+                            util.PYTHON,
                             iodir=scratch_dir,
                             arguments=args,
                             instances=total_chunks,
@@ -150,9 +151,14 @@ function_dict = {
 }
 
 def setup_parser(subparsers):
-    p = subparsers.add('preprocess_key',
-            help='Preprocessing step, to figure out the key configuration in the training puzzle')
-    p.add_argument('--stage', choices=list(function_dict.keys()), default='')
+    p = subparsers.add_parser('preprocess_key',
+            help='Preprocessing step, to figure out the key configuration in the training puzzle',
+            formatter_class=choice_formatter.Formatter)
+    p.add_argument('--stage',
+                   choices=list(function_dict.keys()),
+                   help='R|Possible stages:\n'+'\n'.join(list(function_dict.keys())),
+                   default='',
+                   metavar='')
     p.add_argument('--only_wait', action='store_true')
     p.add_argument('--task_id', help='Feed $(Process) from HTCondor', type=int, default=None)
 
@@ -166,7 +172,10 @@ def run(args):
 # Hint: it's recommended to have a _remote_command per module
 # Workspace.remote_command is too tedious to use directly.
 def _remote_command(ws, cmd, auto_retry=True):
-    ws.remote_command(ws.condor_host, ws.condor_exec, 'preprocess_key', cmd, auto_retry=auto_retry)
+    ws.remote_command(ws.condor_host,
+                      ws.condor_exec(),
+                      ws.condor_ws(),
+                      'preprocess_key', cmd, auto_retry=auto_retry)
 
 def remote_find_trajectory(ws):
     _remote_command(ws, 'find_trajectory')
@@ -188,7 +197,7 @@ def autorun(args):
                         util.TRAINING_DIR+'/')
     remote_find_trajectory(ws)
     remote_interpolate_trajectory(ws)
-    remote_esitmate_clearance_volume(ws)
+    remote_estimate_clearance_volume(ws)
     remote_pickup_key_configuration(ws)
 
 def collect_stages():
@@ -200,6 +209,6 @@ def collect_stages():
              ),
              ('find_trajectory', remote_find_trajectory),
              ('interpolate_trajectory', remote_interpolate_trajectory),
-             ('estimate_clearance_volume', remote_esitmate_clearance_volume),
+             ('estimate_clearance_volume', remote_estimate_clearance_volume),
              ('pickup_key_configuration', remote_pickup_key_configuration),
            ]

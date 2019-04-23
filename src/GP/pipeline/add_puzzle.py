@@ -5,11 +5,11 @@ import os
 from os.path import join, basename, abspath
 import subprocess
 
-import parse_ompl
-import util
+from . import parse_ompl
+from . import util
 
 def setup_parser(subparsers):
-    p = subparsers.add('add_puzzle', help='Add a puzzle to solve, the puzzle will be named after its file name')
+    p = subparsers.add_parser('add_puzzle', help='Add a puzzle to solve, the puzzle will be named after its file name')
     p.add_argument('dir', help='Workspace directory')
     p.add_argument('puzzles', help='One or more OMPL .cfg file(s)', nargs='+')
 

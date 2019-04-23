@@ -41,13 +41,13 @@ def _bilinear(raster, u, v):
 
 class AtlasSampler(object):
 
-    def __init__(self, task_partitioner, geo_type, geo_id, task_id):
+    def __init__(self, atlas2prim_fn, surface_prediction_fn, geo_type, geo_id):
         self._geo_type = geo_type
         self._geo_id = geo_id
         tp = self._tp = task_partitioner
         # FIXME: Notify users to run corresponding commands when files not found
-        self._atlas2prim = np.load(tp.get_atlas2prim_fn(geo_type))['PRIM']
-        d = np.load(tp.get_atlas_fn(geo_type, task_id))
+        self._atlas2prim = np.load(atlas2prim_fn)['PRIM']
+        d = np.load(surface_prediction_fn)
         self._atlas = d[d.keys()[0]] # Load the first element
         #np.clip(self._atlas, 0.0, None, out=self._atlas) # Clips out negative weights
         self._atlas -= np.min(self._atlas) # All elements must be non-negative
@@ -84,33 +84,6 @@ class AtlasSampler(object):
             self._nzcount = np.delete(self._nzcount, 0)
         self._nzcount = self._nzcount.astype(float) / np.sum(self._nzcount)
         print(self._nzprim)
-
-    '''
-    sample:
-        Importance sampling over the atlas
-
-        Details:
-        1. Prefilter non-zero primitives (done in __init__)
-        2. Sample within non-zero primitives
-        3. Sample over the surface
-        4. Check the atlas texture, and reject samples with zero probablity.
-    '''
-    def sample_old(self, r, unit=True):
-        fail = 0
-        while True:
-            prim = np.random.choice(self._nzprim, p=self._nzcount)
-            v3d, normal, uv = r.sample_over_primitive(self._geo_id, prim, return_unit=unit)
-            sufuv = texture_format.uv_surface_to_numpy(uv)
-            pdf = _bilinear(self._atlas, sufuv[0], sufuv[1])
-            '''
-            if pdf != 0.0:
-                print("pdf {}".format(pdf))
-            '''
-            if pdf > 0.0:
-                break
-            fail += 1
-        # print("After {} trials, sample at face {} uv {} with pdf {}. Corresponding 3D position {}".format(fail, prim, uv, pdf, v3d))
-        return v3d, normal, uv
 
     def sample(self, r, unit=True):
         fail = 0

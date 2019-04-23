@@ -10,6 +10,12 @@ def read_xyz(config, section, prefix):
         ret[i] = config.getfloat(section, prefix + '.' + suffix)
     return ret
 
+def read_se3state(config, section, prefix):
+    tr = read_xyz(config, section, prefix)
+    rot_axis = read_xyz(config, section, prefix + '.axis')
+    rot_angle = config.getfloat(section, prefix + '.theta')
+    return tr, rot_axis, rot_angle
+
 def OmplCfg(object):
     pass
 
@@ -25,4 +31,6 @@ def parse_simple(fn):
     cfg.rob_fn = join(puzzle_dir, config.get("problem", "robot"))
     cfg.env_fn_base = basename(cfg.env_fn)
     cfg.rob_fn_base = basename(cfg.rob_fn)
+    cfg.iq_tup = read_se3state(config, 'problem', 'start')
+    cfg.gq_tup = read_se3state(config, 'problem', 'goal')
     return cfg, config

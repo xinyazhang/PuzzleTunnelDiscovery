@@ -6,14 +6,15 @@ import subprocess
 import pathlib
 import numpy as np
 from scipy.misc import imsave
-
-import util
-import matio
-import pyosr
-import partt
-import touchq_util
 import h5py
-import texture_format
+
+from . import util
+from . import choice_formatter
+from . import matio
+from . import partt
+from . import touchq_util
+from . import texture_format
+import pyosr
 
 _TOUCH_SCRATCH = join(util.CONDOR_SCRATCH, 'training_key_touch')
 _ISECT_SCRATCH = join(util.CONDOR_SCRATCH, 'training_key_isect')
@@ -40,7 +41,7 @@ def sample_touch(args, ws):
                 '--task_id',
                 '$(Process)']
         condor.local_submit(ws,
-                            '/usr/bin/python3',
+                            util.PYTHON,
                             iodir=scratch_dir,
                             arguments=args,
                             instances=total_chunks,
@@ -100,7 +101,7 @@ def isect_geometry(args, ws):
                 '--task_id',
                 '$(Process)']
         condor.local_submit(ws,
-                            '/usr/bin/python3',
+                            util.PYTHON,
                             iodir=scratch_dir,
                             arguments=args,
                             instances=total_chunks,
@@ -161,7 +162,7 @@ def uvproject(args, ws):
                 '--task_id',
                 '$(Process)']
         condor.local_submit(ws,
-                            '/usr/bin/python3',
+                            util.PYTHON,
                             iodir=scratch_dir,
                             arguments=args,
                             instances=total_chunks,
@@ -259,8 +260,14 @@ function_dict = {
 }
 
 def setup_parser(subparsers):
-    p = subparsers.add('preprocess_surface', help='Preprocessing step, to generate training data')
-    p.add_argument('--stage', choices=list(function_dict.keys()), default='')
+    p = subparsers.add_parser('preprocess_surface',
+                              help='Preprocessing step, to generate training data',
+                              formatter_class=choice_formatter.Formatter)
+    p.add_argument('--stage',
+                   choices=list(function_dict.keys()),
+                   help='R|Possible stages:\n'+'\n'.join(list(function_dict.keys())),
+                   default='',
+                   metavar='')
     p.add_argument('--only_wait', action='store_true')
     p.add_argument('--task_id', help='Feed $(Process) from HTCondor', type=int, default=None)
 
@@ -274,7 +281,8 @@ def run(args):
 
 def _remote_command(ws, cmd, auto_retry=True):
     ws.remote_command(ws.condor_host,
-                      ws.condor_exec,
+                      ws.condor_exec(),
+                      ws.condor_ws(),
                       'preprocess_surface', cmd, auto_retry=auto_retry)
 
 def remote_sample_touch(ws):

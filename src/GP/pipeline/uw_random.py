@@ -1,7 +1,7 @@
-import pyosr
 import numpy as np
 import random
 from math import sqrt,pi,sin,cos
+import pyosr
 
 def random_state(scale=1.0):
     tr = scale * (np.random.rand(3) - 0.5)

@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import util
 import os
 from os.path import join
 from six.moves import configparser
 import subprocess
-import condor
+
+from . import util
+from . import condor
 
 def setup_parser(subparsers):
     p = subparsers.add('config', help='Initialize a directory as workspace')
@@ -14,7 +15,7 @@ def setup_parser(subparsers):
     # p.add_argument('cfg', help='Config file')
     p.add_argument('condor', help='HTCondor submission file template')
 
-_CONFIG_TEMPLATE =
+_CONFIG_TEMPLATE = \
 '''
 # THE RUNNING ENVIRONMENT CONFIGURATION FILE OF PUZZLE SOLVER
 #
@@ -82,9 +83,19 @@ TouchSampleGranularity = 32768 # Hint about the task partition
 MeshBoolGranularity = 1024 # Minimal task size hint: mesh boolean
 UVProjectGranularity = 1024 # Minimal task size hint: mesh boolean
 
+[Prediction]
+# Set the number of processes that predict the key configuration from
+# the surface distribution, auto means number of (logic) processors
+NumberOfPredictionProcesses = auto
+NumberOfRotations           = 64
+SurfacePairsToSample        = 1024
+Margin                      = 1e-6
+
 [Solver]
 PDSSize = 4194304       # Number of samples in the PreDefined Sample set
 Trials = 1              # Maximum trials before cancel
+
+TimeThreshold = 0.02    # In day(s), 0.01 ~= 14 minutes, 0.02 ~= 0.5 hour
 '''
 
 def init_config_file(ws):
@@ -94,7 +105,7 @@ def init_config_file(ws):
         if not os.path.isfile(cfg):
             print(_CONFIG_TEMPLATE.format(localpath=os.getcwd()), file=open(cfg, 'w'))
         EDITOR = os.environ.get('EDITOR', 'vim')
-        subprocess.call([EDITOR, cfg])
+        subprocess.run([EDITOR, cfg])
     except FileNotFoundError as e:
         print(e)
         return

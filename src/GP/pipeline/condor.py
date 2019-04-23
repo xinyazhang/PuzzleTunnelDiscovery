@@ -44,19 +44,18 @@ def remote_submit(ws,
             print(' {}'.format(a), file=f, end='')
         print('\nQueue {}'.format(instances), file=f)
     remote_sub = ws.condor_ws(CONDOR_SCRATCH_TRAINING_TRAJECTORY, SUBMISSION_FILE)
-    subprocess.call(['rsync' , '-av', local_sub, remote_sub])
+    subprocess.run(['rsync' , '-av', local_sub, remote_sub])
     bash_script = 'cd {}; condor_submit {}'.format(ws.condor_exec(), remote_sub)
     if wait:
         bash_script += '; condor_wait {}/log'.format(iodir)
-    ret = subprocess.call(['ssh' , ws.condor_host,
+    ret = subprocess.run(['ssh' , ws.condor_host,
                            bash_script])
     if wait and ret != 0:
         print("Connection to host {} is broken, retrying...".format(ws.condor_host))
-        subprocess.call(['ssh' , ws.condor_host, 'condor_wait {}/log'.format(iodir)])
+        subprocess.run(['ssh' , ws.condor_host, 'condor_wait {}/log'.format(iodir)])
 
 def local_wait(iodir):
-    subprocess.call(['condor_wait' , os.path.join(iodir, log)])
-
+    subprocess.run(['condor_wait' , os.path.join(iodir, log)])
 
 '''
 Side effect:
@@ -83,7 +82,6 @@ def local_submit(ws,
             assert ' ' not in a, 'We cannot deal with paths/arguments with spaces'
             print(' {}'.format(a), file=f, end='')
         print('\nQueue {}'.format(instances), file=f)
-    subprocess.call(['condor_submit', local_sub])
+    subprocess.run(['condor_submit', local_sub])
     if wait:
         local_wait(iodir)
-

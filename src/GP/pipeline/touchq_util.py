@@ -1,7 +1,7 @@
 import numpy as np
-import uw_random
-import pyosr
 import math
+from . import uw_random
+import pyosr
 
 def sample_one_touch(uw, q0, stepping):
     tr = uw_random.random_on_sphere(1.0)

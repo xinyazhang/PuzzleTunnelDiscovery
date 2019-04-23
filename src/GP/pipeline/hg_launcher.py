@@ -8,8 +8,9 @@ from os.path import join,dirname,basename,isabs
 import six.moves.configparser as configparser
 import sys
 
-from hourglass_tiny import HourglassModel
-import hg_datagen as datagen
+from . import hourglass_tiny
+HourglassModel = hourglass_tiny.HourglassModel
+from . import hg_datagen as datagen
 
 _CONFIG_TEMPLATE= \
 '''
@@ -33,6 +34,7 @@ what_to_render: 'rob' # 'rob' for robot, 'env' for environment
 # 'name' was obsoluted due to confusion
 # name: 'dual-ntrs/hg_ver3-env_flat/'
 checkpoint_dir: '/CHECK/POINT/DIRECTORY/'
+
 nFeats: 256
 nStacks: 2 # 2 is good enough
 nModules: 1
@@ -57,8 +59,10 @@ decay_step: 3000
 weighted_loss: False
 [Validation]
 # valid_iteration: 10
+
 [Prediction]
 prediction_epoch_size = 2048
+
 [Saver]
 # Obsoluted, we now save logs under subdirectories of ckpt_dir
 # log_dir_train: './logs/hg3-dual_tiny_env_flat-train'

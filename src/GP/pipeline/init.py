@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import util
 import os
-import envconfig
+from . import envconfig
+from . import util
 
 def setup_parser(subparsers):
-    p = subparsers.add('init', help='Initialize a directory as workspace')
+    p = subparsers.add_parser('init', help='Initialize a directory as workspace')
     p.add_argument('dir', help='Workspace directory')
     p.add_argument('training_puzzle', help='Puzzle as training data')
     p.add_argument('--test_puzzle', help='Workspace directory', nargs='*', default=[])
@@ -25,5 +25,4 @@ def run(args):
     print("The following puzzle(s) have been added as testing sample")
     for p in args.test_puzzle:
         print("\t{}".format(p))
-    edit_nn = util.ask_user(
     print("NEXT STEP: run 'add_puzzle' to add more puzzles for testing, or use 'autorun' to start the whole pipeline")
