@@ -93,6 +93,14 @@ decompose_2(const StateVector& state)
 	return std::make_tuple(std::get<0>(dec), std::get<1>(dec).toRotationMatrix());
 }
 
+std::tuple<StateTrans, StateScalar, StateTrans>
+decompose_3(const StateVector& state)
+{
+	auto tup = decompose(state);
+	Eigen::AngleAxis<StateScalar> aa(std::get<1>(tup));
+	return std::make_tuple(std::get<0>(tup), aa.angle(), aa.axis());
+}
+
 StateVector
 compose(const StateTrans& base, const StateQuat& irot)
 {

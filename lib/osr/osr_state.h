@@ -40,6 +40,7 @@ StateVector path_interpolate(const ArrayOfStates& qs,
                              double tau);
 std::tuple<StateTrans, StateQuat> decompose(const StateVector&);
 std::tuple<StateTrans, Eigen::Matrix3d> decompose_2(const StateVector&);
+std::tuple<StateTrans, StateScalar, StateTrans> decompose_3(const StateVector&);
 StateVector compose(const StateTrans&, const StateQuat&);
 StateVector compose_from_angleaxis(const StateTrans&, StateScalar angle, const StateTrans& axis);
 double distance(const StateVector& lhv, const StateVector& rhv);

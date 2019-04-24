@@ -71,6 +71,8 @@ PYBIND11_PLUGIN(pyosr) {
 #endif
 	m.def("decompose_2", &osr::decompose_2,
 	      "Decompose the SE(3) state vector into a translation vector and a 3x3 rotation matrix");
+	m.def("decompose_3", &osr::decompose_3,
+	      "Decompose the SE(3) state vector into a translation vector and angle-axis");
 	m.def("compose_from_angleaxis", &osr::compose_from_angleaxis,
 	      "Compose the SE(3) state vector from a translation vector and angle axis representation");
 	m.def("distance", &osr::distance,
