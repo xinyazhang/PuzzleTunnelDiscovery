@@ -47,15 +47,22 @@ _CONFIG_TEMPLATE = \
 # Note: each type of node only stores necessary files for its compute task,
 # in order to save harddrive space.
 [DEFAULT]
-LocalExecPath = {localpath} # The facade.py path on local node
+# The facade.py path on local node
+LocalExecPath = {localpath}
 
-GPUHost = TODO # Host name of GPU node, SSH host alias can be used
-GPUExecPath = TODO # facade.py path on GPU node
-GPUWorkspacePath = TODO # Workspace path on GPU node
+# Host name of GPU node, SSH host alias can be used
+GPUHost = TODO
+# facade.py path on GPU node
+GPUExecPath = TODO
+# Workspace path on GPU node
+GPUWorkspacePath = TODO
 
-CondorHost = TODO # Host name of HTCondor submission node, SSH host alias can be used
-CondorExecPath = TODO # facade.py path on HTCondor node
-CondorWorkspacePath = TODO # Workspace path on NTCondor node
+# Host name of HTCondor submission node, SSH host alias can be used
+CondorHost = TODO
+# facade.py path on HTCondor node
+CondorExecPath = TODO
+# Workspace path on NTCondor node
+CondorWorkspacePath = TODO
 
 # How many jobs are you authroized to run in parallel on HTCondor
 # This is a hint for tasks partitioning
@@ -64,24 +71,36 @@ CondorQuota = 150
 ChartReslution = 2048
 
 [TrainingTrajectory]
-PlannerAlgorithmID = 15 # RDT algorithm. This is usually the best choice among classical algorithms
-CondorTimeThreshold = 0.05 # Time limit of each instance, unit: day(s)
-CondorInstances = 100 # Number of instances to run on HTCondor in order to find the solution path
+# RDT algorithm. This is usually the best choice among classical algorithms
+PlannerAlgorithmID = 15
+# Time limit of each instance, unit: day(s)
+CondorTimeThreshold = 0.05
+# Number of instances to run on HTCondor in order to find the solution path
+CondorInstances = 100
 
 # In this section, we use numerical method to approximate the minimal clearance
 [TrainingKeyConf]
-CandidateNumber = 1024 # Number of points on each solution trajectory as candidate key configurations
-ClearanceSample = 4096 # How many samples do we create to estimate the clearance volume in C-space
-ClearanceTaskGranularity = 32768 # HTCondor task granularity, to minimize overhead
-KeyConf = 1            # How many configurations we pick from candidates as key configurations.
-                       # This varies among the training models
-CollisionSample = 4096 # How many samples do we create to mark up the key surface
+# Number of points on each solution trajectory as candidate key configurations
+CandidateNumber = 1024
+# How many samples do we create to estimate the clearance volume in C-space
+ClearanceSample = 4096
+# HTCondor task granularity, to minimize overhead
+ClearanceTaskGranularity = 32768
+# How many configurations we pick from candidates as key configurations.
+# This varies among the training models
+KeyConf = 1
+# How many samples do we create to mark up the key surface
+CollisionSample = 4096
 
 [TrainingWeightChart]
-TouchSample = 32786    # How many touch configuration we shall generate for each key configuration
-TouchSampleGranularity = 32768 # Hint about the task partition
-MeshBoolGranularity = 1024 # Minimal task size hint: mesh boolean
-UVProjectGranularity = 1024 # Minimal task size hint: mesh boolean
+# How many touch configuration we shall generate for each key configuration
+TouchSample = 32786
+# Hint about the task partition
+TouchSampleGranularity = 32768
+# Minimal task size hint: mesh boolean
+MeshBoolGranularity = 1024
+# Minimal task size hint: mesh boolean
+UVProjectGranularity = 1024
 
 [Prediction]
 # Set the number of processes that predict the key configuration from
@@ -92,13 +111,16 @@ SurfacePairsToSample        = 1024
 Margin                      = 1e-6
 
 [Solver]
-PDSSize = 4194304       # Number of samples in the PreDefined Sample set
-Trials = 1              # Maximum trials before cancel
+# Number of samples in the PreDefined Sample set
+PDSSize = 4194304
+# Maximum trials before cancel
+Trials = 1
 
-TimeThreshold = 0.02    # In day(s), 0.01 ~= 14 minutes, 0.02 ~= 0.5 hour
+# In day(s), 0.01 ~= 14 minutes, 0.02 ~= 0.5 hour
+TimeThreshold = 0.02
 '''
 
-def init_config_file(ws):
+def init_config_file(args, ws):
     try:
         condor.extract_template(open(args.condor, 'r'), open(ws.condor_template, 'w'))
         cfg = ws.configuration_file

@@ -4,6 +4,7 @@ import shutil
 import os
 from os.path import join, basename, abspath
 import subprocess
+import configparser
 
 from . import parse_ompl
 from . import util
@@ -14,14 +15,17 @@ def setup_parser(subparsers):
     p.add_argument('puzzles', help='One or more OMPL .cfg file(s)', nargs='+')
 
 def copy_puzzle_geometry(obj_from, target_file, chart_resolution):
+    if os.path.isfile(target_file):
+        if not util.ask_user("{} exists, overwriting?".format(target_file)):
+            return
     res = 64.0
-    while subprocess.call(['./objautouv',
-                           '-f',
-                           '-r', str(chart_resolution),
-                           '-w', str(res),
-                           '-h', str(res),
-                           '-m', str(util.PIXMARGIN),
-                           obj_from, target_file]) != 0:
+    while util.shell(['./objautouv',
+                      '-f',
+                      '-r', str(chart_resolution),
+                      '-w', str(res),
+                      '-h', str(res),
+                      '-m', str(util.PIXMARGIN),
+                      obj_from, target_file]) != 0:
         res *= 2.0
     print('''[objautouv] {} => {}'''.format(obj_from, target_file))
 
@@ -37,20 +41,54 @@ Side effect:
     tgt_dir will be created if not exist
 '''
 def copy_puzzle(tgt_dir, puzzle_file, chart_resolution):
-    puzzle, config = parse_ompl.parse_simple(puzzle_file)
+    cfg, config = parse_ompl.parse_simple(puzzle_file)
     # Sanity check
-    config.getfloat('problem', 'collision_resolution')
+    try:
+        config.getfloat('problem', 'collision_resolution')
+    except configparser.NoOptionError as e:
+        util.warn('[copy_puzzle] missing collision_resolution in puzzle {}'.format(puzzle_file))
+        util.warn('[copy_puzzle] This puzzle will not be added')
+        return
+    # Copy geometry
     os.makedirs(tgt_dir, exist_ok=True)
     copy_puzzle_geometry(cfg.env_fn, join(tgt_dir, cfg.env_fn_base), chart_resolution)
     if cfg.env_fn != cfg.rob_fn:
         assert cfg.env_fn_base != cfg.rob_fn_base
-        copy_puzzle_geometry(cfg.rob_fn, join(tgt_dir, cfg.rob_fn_base))
+        copy_puzzle_geometry(cfg.rob_fn, join(tgt_dir, cfg.rob_fn_base), chart_resolution)
+    # Change geometry file name
     config.set("problem", "world", cfg.env_fn_base)
     config.set("problem", "robot", cfg.rob_fn_base)
+    # Write to new cfg file
     tgt_cfg = join(tgt_dir, util.PUZZLE_CFG_FILE)
     with open(tgt_cfg, 'w') as f:
         config.write(f)
-        print('''[copy_puzzle] {} => {}'''.format(puzzle_file, abspath(tgt_cfg)))
+        util.ack('''[copy_puzzle] copy configuration file {} => {}'''.format(puzzle_file, abspath(tgt_cfg)))
+    old_uw = util.create_unit_world(puzzle_file)
+    new_uw = util.create_unit_world(tgt_cfg)
+    old_iq = parse_ompl.tup_to_ompl(cfg.iq_tup)
+    old_gq = parse_ompl.tup_to_ompl(cfg.gq_tup)
+    van_iq = old_uw.translate_ompl_to_vanilla(old_iq)
+    van_gq = old_uw.translate_ompl_to_vanilla(old_gq)
+    new_iq = new_uw.translate_vanilla_to_ompl(van_iq)
+    new_gq = new_uw.translate_vanilla_to_ompl(van_gq)
+    # Sanity check
+    san_iq = new_uw.translate_ompl_to_vanilla(new_iq)
+    san_gq = new_uw.translate_ompl_to_vanilla(new_gq)
+    parse_ompl.update_se3state(config, 'problem', 'start', new_iq)
+    parse_ompl.update_se3state(config, 'problem', 'goal', new_gq)
+    with open(tgt_cfg, 'w') as f:
+        config.write(f)
+        util.log('''[copy_puzzle] update config''')
+        util.log('''[copy_puzzle] istate translation:''')
+        util.log('''[copy_puzzle] \t old: {}'''.format(old_iq))
+        util.log('''[copy_puzzle] \t van: {}'''.format(van_iq))
+        util.log('''[copy_puzzle] \t new: {}'''.format(new_iq))
+        util.log('''[copy_puzzle] \t san: {}'''.format(san_iq))
+        util.log('''[copy_puzzle] gstate translation:''')
+        util.log('''[copy_puzzle] \t old: {}'''.format(old_gq))
+        util.log('''[copy_puzzle] \t van: {}'''.format(van_gq))
+        util.log('''[copy_puzzle] \t new: {}'''.format(new_gq))
+        util.log('''[copy_puzzle] \t san: {}'''.format(san_gq))
 
 def add_testing_puzzle(ws, fn):
     fn_base = os.path.splitext(basename(fn))[0]

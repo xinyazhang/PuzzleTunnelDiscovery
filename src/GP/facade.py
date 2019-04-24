@@ -4,8 +4,10 @@ import sys, os
 sys.path.append(os.getcwd())
 import argparse
 import pipeline
+import colorama
 
 def main():
+    colorama.init()
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     subparsers = parser.add_subparsers(dest='command')
     # In the order that users general use
@@ -19,7 +21,7 @@ def main():
     pipeline.solve.setup_parser(subparsers)
 
     args = parser.parse_args()
-    assert args.command in dir(pipeline)
+    assert args.command in dir(pipeline), 'Cannot find command {} in {}'.format(args.command, dir(pipeline))
     getattr(pipeline, args.command).run(args)
 
 if __name__ == '__main__':

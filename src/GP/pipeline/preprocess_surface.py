@@ -199,7 +199,7 @@ def uvrender(args, ws):
     uvproj_dir = ws.local_ws(_UVPROJ_SCRATCH)
     keys = matio.load(ws.condor_ws(util.KEY_FILE))['KEYQ']
     uvproj_list = sorted(pathlib.Path(uvproj_dir).glob('uv_batch-*.hdf5'))
-    r = ws.create_offscreen_renderer(ws.local_ws(util.TRAINING_DIR, PUZZLE_CFG_FILE))
+    r = util.create_offscreen_renderer(ws.local_ws(util.TRAINING_DIR, PUZZLE_CFG_FILE))
     TYPE_TO_FLAG = {'rob' : r.BARY_RENDERING_ROBOT,
                     'env' : r.BARY_RENDERING_SCENE }
     for rname, rflag in TYPE_TO_FLAG.items():

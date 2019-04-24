@@ -9,11 +9,12 @@ import numpy as np
 from scipy.misc import imsave
 import shutil
 
+from . import util
+from . import choice_formatter
 try:
     from . import hg_launcher
 except:
-    print("[WARNING] CANNOT IMPORT hg_launcher. This node is incapable of training/prediction")
-from . import choice_formatter
+    util.warn("[WARNING] CANNOT IMPORT hg_launcher. This node is incapable of training/prediction")
 
 def _deploy(ws):
     ws.deploy_to_gpu(util.WORKSPACE_SIGNATURE_FILE,

@@ -17,7 +17,7 @@ from . import choice_formatter
 try:
     from . import se3solver
 except:
-    print("[WARNING] CANNOT IMPORT se3solver. Some function will be disabled and the pipeline is broken")
+    util.warn("[WARNING] CANNOT IMPORT se3solver. Some function will be disabled and the pipeline is broken")
 from . import condor
 from . import matio
 from . import atlas
@@ -41,7 +41,7 @@ def _puzzle_pds(ws, puzzle_name, trial):
 def _predict_atlas2prim(tup):
     ws_dir, puzzle_fn, puzzle_name = tup
     ws = util.Workspace(ws_dir)
-    r = ws.create_offscreen_renderer(puzzle_fn, ws.chart_resolution)
+    r = util.create_offscreen_renderer(puzzle_fn, ws.chart_resolution)
     r.uv_feedback = True
     r.avi = False
     io_dir = self._args.out_dir
@@ -60,7 +60,7 @@ def _predict_atlas2prim(tup):
 def _predict_worker(tup):
     ws_dir, puzzle_fn, puzzle_name = tup
     ws = util.Workspace(ws_dir)
-    uw = ws.create_unit_world(puzzle_fn)
+    uw = util.create_unit_world(puzzle_fn)
     rob_sampler = atlas.AtlasSampler(ws.local_ws(util.TESTING_DIR, puzzle_name, 'rob-a2p.npz'),
                                      ws.local_ws(util.TESTING_DIR, puzzle_name, 'rob-atex.npz'),
                                      'rob', uw.GEO_ROB)
@@ -81,16 +81,8 @@ def _predict_worker(tup):
         for q in qs:
             key_conf.append(q)
     cfg, config = parse_ompl.parse_simple(puzzle_fn)
-    def tup_to_ompl(tup):
-        import pyosr
-        tr, rot_angle, rot_axis = tup
-        q = pyosr.compose_from_angleaxis(tr, rot_angle, rot_axis)
-        assert pyosr.STATE_DIMENSION == 7, "FIXME: More flexible w-first to w-last"
-        q = q.reshape((1, pyosr.STATE_DIMENSION))
-        q[:, [6,3,4,5]] = q[:, [3,4,5,6]] # W-first (pyOSR) to W-last (OMPL)
-        return q
-    iq = tup_to_ompl(cfg.iq_tup)
-    gq = tup_to_ompl(cfg.gq_tup)
+    iq = parse_ompl.tup_to_ompl(cfg.iq_tup)
+    gq = parse_ompl.tup_to_ompl(cfg.gq_tup)
     qs_ompl = uw.translate_unit_to_ompl(qs)
     ompl_q = np.concatenate((iq, gq, qs_ompl), axis=0)
     key_fn = ws.local_ws(util.TESTING_DIR, puzzle_name, util.KEY_PREDICTION)
@@ -118,7 +110,7 @@ def sample_pds(args, ws):
         driver = se3solver.create_driver(puzzle=puzzle_fn,
                 planner_id=se3solver.PLANNER_RDT,
                 sampler_id=0)
-        uw = ws.create_unit_world(puzzle_fn)
+        uw = util.create_unit_world(puzzle_fn)
         for i in range(max_trial):
             Q = driver.presample(nsamples)
             uQ = ws.translate_ompl_to_unit(Q)

@@ -7,6 +7,7 @@ import os
 import time
 import sys
 import subprocess
+import colorama
 
 from . import parse_ompl
 
@@ -91,15 +92,47 @@ def _load_unit_world(uw, puzzle_file):
     uw.angleModel(0.0, 0.0)
     uw.recommended_cres = config.getfloat('problem', 'collision_resolution', fallback=0.001)
 
+def create_unit_world(puzzle_file):
+    # Well this is against PEP 08 but we do not always need pyosr
+    # (esp in later pipeline stages)
+    # Note pyosr is a heavy-weight module with
+    #   + 55 dependencies on Fedora 29 (control node)
+    #   + 43 dependencies on Ubuntu 18.04 (GPU node)
+    #   + 26 dependencies on Ubuntu 16.04 (HTCondor node)
+    import pyosr
+    uw = pyosr.UnitWorld()
+    _load_unit_world(uw, puzzle_file)
+    return uw
+
+def shell(args):
+    log('Running {}'.format(args))
+    return subprocess.call(args)
+
+_egl_dpy = None
+
+def create_offscreen_renderer(puzzle_file, resolution=256):
+    global _egl_dpy
+    if _egl_dpy is None:
+        pyosr.init()
+        _egl_dpy  = pyosr.create_display()
+    glctx = pyosr.create_gl_context(_egl_dpy)
+    r = pyosr.Renderer()
+    r.pbufferWidth = resolution
+    r.pbufferHeight = resolution
+    r.setup()
+    r.views = np.array([[0.0,0.0]], dtype=np.float32)
+    _load_unit_world(r, puzzle_file)
+    return r
+
 def _rsync(from_host, from_pather, to_host, to_pather, *paths):
     # Note: do NOT use single target multiple source syntax
     #       the target varies among source paths.
     from_prefix = '' if from_host is None else from_host+':'
     to_prefix = '' if to_host is None else to_host+':'
     for rel_path in paths:
-        ret = subprocess.call(['rsync', '-a',
-                               '{}{}'.format(from_host, from_pather(rel_path)),
-                               '{}{}'.format(to_host, to_pather(rel_path))])
+        ret = shell(['rsync', '-aR',
+                     '{}{}/./{}'.format(from_prefix, from_pather(), rel_path),
+                     '{}{}/'.format(to_prefix, to_pather())])
 
 class Workspace(object):
     _egl_dpy = None
@@ -172,7 +205,7 @@ class Workspace(object):
 
     @property
     def condor_template(self):
-        return self.local_ws(ONDOR_TEMPLATE)
+        return self.local_ws(CONDOR_TEMPLATE)
 
     @property
     def condor_host(self):
@@ -182,54 +215,30 @@ class Workspace(object):
     def gpu_host(self):
         return self.config.get('DEFAULT', 'GPUHost')
 
-    def create_unit_world(self, puzzle_file):
-        # Well this is against PEP 08 but we do not always need pyosr
-        # (esp in later pipeline stages)
-        # Note pyosr is a heavy-weight module with
-        #   + 55 dependencies on Fedora 29 (control node)
-        #   + 43 dependencies on Ubuntu 18.04 (GPU node)
-        #   + 26 dependencies on Ubuntu 16.04 (HTCondor node)
-        import pyosr
-        uw = pyosr.UnitWorld()
-        _load_unit_world(uw, puzzle_file)
-        return uw
-
-    def create_offscreen_renderer(self, puzzle_file, resolution=256):
-        if Workspace._egl_dpy is None:
-            pyosr.init()
-            Workspace._egl_dpy  = pyosr.create_display()
-        glctx = pyosr.create_gl_context(Workspace._egl_dpy)
-        r = pyosr.Renderer()
-        r.pbufferWidth = resolution
-        r.pbufferHeight = resolution
-        r.setup()
-        r.views = np.array([[0.0,0.0]], dtype=np.float32)
-        _load_unit_world(r, puzzle_file)
-        return r
-
     def condor_unit_world(self, puzzle_dir):
         if puzzle_dir not in self._uw_dic:
-            self._uw_dic[puzzle_dir] = self.create_unit_world(self.condor_ws(puzzle_dir, PUZZLE_CFG_FILE))
+            self._uw_dic[puzzle_dir] = create_unit_world(self.condor_ws(puzzle_dir, PUZZLE_CFG_FILE))
         return self._uw_dic[puzzle_dir]
 
     def remote_command(self, host, exec_path, ws_path, pipeline_part, cmd, auto_retry=True, in_tmux=False):
-        script  = 'cd {}\n'.formwat(exec_path)
+        script  = 'cd {}\n'.format(exec_path)
         script += './facade.py {} {} --stage {cmd}'.format(pipeline_part, ws_path, cmd=cmd)
-        remoter = [ssh, host]
+        remoter = ['ssh', host]
         if in_tmux:
             remoter += ['tmux', 'new-session', '-A', '-a', 'puzzle_workspace', 'bash', '-c']
-        ret = subprocess.call(remoter + [script])
+        ret = shell(remoter + [script])
         while ret != 0:
             if not auto_retry:
                 return ret
             print("SSH Connection to {} is probably broken, retry after 5 secs".format(host))
             time.sleep(5)
-            ret = subprocess.call([ssh, host, script + ' --only_wait'])
+            ret = shell([ssh, host, script + ' --only_wait'])
 
     '''
     Note: directory must end with /
     '''
     def deploy_to_condor(self, *paths):
+        shell(['ssh', self.condor_host, 'mkdir', '-p', self.condor_ws()])
         _rsync(None, self.local_ws, self.condor_host, self.condor_ws, *paths)
 
     def fetch_condor(self, *paths):
@@ -261,14 +270,27 @@ def ask_user(question):
             return False
         else:
             print('Invalid Input')
-            return ask_user()
+            return ask_user(question)
     except Exception as error:
         print("Please enter valid inputs")
         print(error)
-        return ask_user()
+        return ask_user(question)
+
+def _colorp(color, s):
+    print(color + s + colorama.Style.RESET_ALL)
 
 def log(s):
-    print(s)
+    _colorp(colorama.Style.DIM, s)
+
+def warn(s):
+    #_colorp(colorama.Style.BRIGHT + colorama.Fore.RED, s)
+    _colorp(colorama.Style.BRIGHT + colorama.Fore.YELLOW, s)
+
+def fatal(s):
+    _colorp(colorama.Style.BRIGHT + colorama.Fore.RED, s)
+
+def ack(s):
+    _colorp(colorama.Style.BRIGHT + colorama.Fore.GREEN, s)
 
 def pwait(pid):
     if pid < 0:

@@ -6,22 +6,25 @@ import subprocess
 import os
 
 TEMPLATE_EXCLUDE = [
-        re.compile('^Executable\s*='),
-        re.compile('^Error\s*='),
-        re.compile('^Output\s*='),
-        re.compile('^Log\s*='),
-        re.compile('^arguments\s*='),
+        re.compile('^Executable\s*=', flags=re.IGNORECASE),
+        re.compile('^Error\s*=', flags=re.IGNORECASE),
+        re.compile('^Output\s*=', flags=re.IGNORECASE),
+        re.compile('^Log\s*=', flags=re.IGNORECASE),
+        re.compile('^arguments\s*=', flags=re.IGNORECASE),
+        re.compile('^#'),
+        re.compile('^$'),
+        re.compile('^Queue', flags=re.IGNORECASE),
     ]
 
 def extract_template(fin, fout):
-    for line in fp:
+    for line in fin:
         do_write = True
         for p in TEMPLATE_EXCLUDE:
             if p.match(line):
                 do_write = False
                 break
         if do_write:
-            print(line, file=fout)
+            print(line, end='', file=fout)
 
 def remote_submit(ws,
                   xfile,
