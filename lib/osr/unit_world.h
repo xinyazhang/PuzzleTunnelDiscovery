@@ -132,6 +132,7 @@ public:
 	// translation from the geometry's own coordinate system.
 	// Vanilla state also uses w-last format
 	ArrayOfStates translateVanillaStateToOMPLState(const ArrayOfStates& qs) const;
+	ArrayOfStates translateOMPLStateToVanillaState(const ArrayOfStates& qs) const;
 
 	ArrayOfStates translateVanillaStateToUnitState(ArrayOfStates qs) const;
 	StateVector applyPertubation(const StateVector& state) const;

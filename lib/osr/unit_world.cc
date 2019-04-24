@@ -735,6 +735,37 @@ UnitWorld::translateVanillaStateToOMPLState(const ArrayOfStates& qs) const
 	return ret;
 }
 
+/*
+ * Sometimes we need vanilla state to ensure remeshing invariant
+ *
+ * R_{ompl} = R_{vanilla}
+ * t_(ompl} = t_{vanilla} + R_{ompl} O
+ * Hence,
+ * t_{vanilla} = t_(ompl} - R_{ompl} O
+ */
+ArrayOfStates
+UnitWorld::translateOMPLStateToVanillaState(const ArrayOfStates& qs) const
+{
+	static_assert(kStateDimension == 7);
+	int N = qs.rows();
+	ArrayOfStates van;
+	van.resize(qs.rows(), qs.cols());
+	// R_{ompl} = R_{vanilla}
+	van.block(0, 3, N, 4) = qs.block(0, 3, N, 4);
+	// Get OMPL center
+	Eigen::Vector3d ompl_center = glm2Eigen(robot_->getOMPLCenter());
+	for (int i = 0; i < N; i++) {
+		// Vanilla state also uses w-last quaternion
+		// TODO: Generalize to multi-body
+		StateQuat rot(qs(i,6), qs(i,3), qs(i,4), qs(i,5));
+		Eigen::Vector3d roo = rot.normalized()._transformVector(ompl_center);
+		van(i, 0) = qs(i,0) - roo(0);
+		van(i, 1) = qs(i,1) - roo(1);
+		van(i, 2) = qs(i,2) - roo(2);
+	}
+	return van;
+}
+
 ArrayOfStates
 UnitWorld::translateVanillaStateToUnitState(ArrayOfStates qs) const
 {
