@@ -233,7 +233,7 @@ class Workspace(object):
                 return ret
             print("SSH Connection to {} is probably broken, retry after 5 secs".format(host))
             time.sleep(5)
-            ret = shell([ssh, host, script + ' --only_wait'])
+            ret = shell(['ssh', host, script + ' --only_wait'])
 
     '''
     Note: directory must end with /
