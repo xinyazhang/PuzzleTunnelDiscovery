@@ -7,3 +7,7 @@
 [submodule "third-party/fcl"]
 	path = third-party/fcl
 	url = https://github.com/flexible-collision-library/fcl.git
+[submodule "third-party/ompl.app"]
+	path = third-party/ompl.app
+	url = git@github.com:xinyazhang/ompl.app.git
+	branch = goct-1.4.1
