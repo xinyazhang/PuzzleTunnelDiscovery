@@ -357,6 +357,7 @@ PYBIND11_MODULE(pyse3ompl, m) {
 	m.attr("PLANNER_LazyLBTRRT" ) = py::int_(int(PLANNER_LazyLBTRRT ));
 	m.attr("PLANNER_SPARS"      ) = py::int_(int(PLANNER_SPARS      ));
 	m.attr("PLANNER_ReRRT"      ) = py::int_(int(PLANNER_ReRRT      ));
+	m.attr("PLANNER_RDT"        ) = py::int_(int(PLANNER_ReRRT      ));
 	m.attr("VSTATE_SAMPLER_UNIFORM") = py::int_(0);
 	m.attr("VSTATE_SAMPLER_GAUSSIAN") = py::int_(1);
 	m.attr("VSTATE_SAMPLER_OBSTACLE") = py::int_(2);

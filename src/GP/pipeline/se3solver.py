@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import argparse
 from six.moves import configparser
 import numpy as np
@@ -8,7 +10,7 @@ import os
 from os.path import abspath, dirname, join, isdir
 import itertools
 
-# sys.path.insert(0, './lib') # FIXME: a more portable solution
+sys.path.insert(0, os.getcwd())
 import pyse3ompl as plan
 import parse_ompl
 from parse_ompl import read_xyz
