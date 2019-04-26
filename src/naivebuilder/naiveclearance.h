@@ -4,7 +4,7 @@
 #include <Eigen/Core>
 #include <iostream>
 #include <memory>
-#include "geo.h"
+#include <omplaux/geo.h>
 
 class NaiveClearance {
 public:

@@ -116,7 +116,7 @@ bool predraw(Viewer& viewer)
 	// Do NOT set to rob data, because it's translated
 	viewer.data_list[env_data_index].set_points(pc_point, pc_color);
 	bool valid = uw.isValid(q);
-nterpo	if (valid) {
+	if (valid) {
 		using namespace igl;
 		rob_data.uniform_colors(Eigen::Vector3d(GOLD_AMBIENT[0], GOLD_AMBIENT[1], GOLD_AMBIENT[2]),
 		                        Eigen::Vector3d(GOLD_DIFFUSE[0], GOLD_DIFFUSE[1], GOLD_DIFFUSE[2]),

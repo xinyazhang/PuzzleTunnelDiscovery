@@ -1,6 +1,3 @@
-#include <readtet.h>
-#include <heatio/readheat.h>
-#include <advplyio/ply_write_vfc.h>
 #include <unistd.h>
 #include <string>
 #include <unordered_map>
@@ -11,6 +8,10 @@
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/jet.h>
 #include <time.h>
+
+#include <heatio/readheat.h>
+#include <advplyio/ply_write_vfc.h>
+#include <tetio/readtet.h>
 
 using Viewer = igl::opengl::glfw::Viewer;
 using ViewerData = igl::opengl::ViewerData;
