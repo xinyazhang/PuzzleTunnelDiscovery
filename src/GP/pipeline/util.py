@@ -184,7 +184,7 @@ class Workspace(object):
 
     def verify_signature(self):
         if not os.path.isfile(self.signature_file):
-            print("{} is not initialized as a puzzle workspace".format(self.workspace_dir))
+            fatal("{} is not initialized as a puzzle workspace. Exiting".format(self.workspace_dir))
             exit()
 
     @property
