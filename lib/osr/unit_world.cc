@@ -713,7 +713,7 @@ UnitWorld::translateUnitStateToOMPLState(const ArrayOfStates& qs, bool to_angle_
 ArrayOfStates
 UnitWorld::translateVanillaStateToOMPLState(const ArrayOfStates& qs) const
 {
-	static_assert(kStateDimension == 7);
+	static_assert(kStateDimension == 7, "Only support SE(3) for now");
 	int N = qs.rows();
 	ArrayOfStates ret;
 	ret.resize(qs.rows(), qs.cols());
@@ -746,7 +746,7 @@ UnitWorld::translateVanillaStateToOMPLState(const ArrayOfStates& qs) const
 ArrayOfStates
 UnitWorld::translateOMPLStateToVanillaState(const ArrayOfStates& qs) const
 {
-	static_assert(kStateDimension == 7);
+	static_assert(kStateDimension == 7, "Only support SE(3) for now");
 	int N = qs.rows();
 	ArrayOfStates van;
 	van.resize(qs.rows(), qs.cols());

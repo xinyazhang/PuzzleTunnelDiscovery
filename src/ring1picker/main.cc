@@ -8,8 +8,8 @@
 #include <memory>
 #include <unsupported/Eigen/SparseExtra>
 //#include <boost/progress.hpp>
-#include <readtet.h>
-#include <writetet.h>
+#include <tetio/readtet.h>
+#include <tetio/writetet.h>
 #include <igl/writePLY.h>
 //#include <Eigen/SparseLU> 
 //#include <Eigen/SparseCholesky>

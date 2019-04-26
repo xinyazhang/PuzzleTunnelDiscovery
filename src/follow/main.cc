@@ -1,5 +1,3 @@
-#include <readheat.h>
-#include <readtet.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <Eigen/Core>
@@ -18,6 +16,9 @@
 #include <unsupported/Eigen/BVH>
 #include <igl/barycentric_coordinates.h>
 #include <igl/ray_mesh_intersect.h>
+
+#include <heatio/readheat.h>
+#include <tetio/readtet.h>
 
 using std::string;
 using std::endl;

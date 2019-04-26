@@ -1,5 +1,4 @@
-#include "readtet.h"
-#include <unistd.h>
+#include <getopt.h>
 #include <omp.h>
 #include <strings.h>
 #include <string>
@@ -12,6 +11,8 @@
 #include <igl/ray_mesh_intersect.h>
 #include <igl/readOBJ.h>
 #include <numerical/stability.h>
+
+#include <tetio/readtet.h>
 
 using std::string;
 using std::endl;

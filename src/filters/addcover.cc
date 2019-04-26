@@ -3,7 +3,7 @@
 #include <iostream>
 #include <unistd.h>
 #include <math.h>
-#include <join.h>
+#include <meshbool/join.h>
 
 void set_coords(Eigen::MatrixXd& BV, double coords[3][2])
 {

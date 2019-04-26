@@ -1,7 +1,6 @@
 #include <string>
 #include <iostream>
 #include <math.h>
-#include <readtet.h>
 #include <geopick/pick2d.h>
 #include <numerical/stability.h>
 #include <atomic>
@@ -11,6 +10,8 @@
 #include <igl/writeOBJ.h>
 #include <unordered_map>
 #include <unistd.h>
+
+#include <tetio/readtet.h>
 
 using std::string;
 using std::endl;

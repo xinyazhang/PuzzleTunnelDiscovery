@@ -1,9 +1,11 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.13)
+# We need 3.13+ to support target_include_directories
+# Alternative solutions (e.g. set_target_properties) cannot override the system's ompl library
 
 project(mkobs3d CXX)
 # SET(CMAKE_BUILD_TYPE Debug) # Seems CMAKE does not recognize -DCMAKE_BUILD_TYPE
 set (mkobs3d_VERSION_MAJOR 0)
-set (mkobj3d_VERSION_MINOR 2)
+set (mkobs3d_VERSION_MINOR 5)
 
 include(ProcessorCount)
 ProcessorCount(NCPU)
@@ -68,11 +70,10 @@ message("ODE_CFLAGS ${ODE_CFLAGS}")
 
 message(STATUS "Using GPU ${USE_GPU}")
 
-# Include Eigen3 and IGL
-INCLUDE(${CMAKE_SOURCE_DIR}/cmake/FindSUITESPARSE.cmake)
-INCLUDE_DIRECTORIES(${SUITESPARSE_INCLUDE_DIRS})
-INCLUDE_DIRECTORIES(lib/)
+# Include lib/ so every app under src/ can use them
+include_directories(${CMAKE_SOURCE_DIR}/lib/)
 
+# Include Eigen3 and IGL
 FIND_PACKAGE(Eigen3 QUIET)
 INCLUDE_DIRECTORIES(SYSTEM ${EIGEN3_INCLUDE_DIR})
 INCLUDE_DIRECTORIES(${IGL_INCLUDE_DIR})
@@ -88,10 +89,10 @@ endif(APPLE)
 # MESSAGE(STATUS "OMPL INC: ${ompl_INCLUDE_DIRS}")
 # INCLUDE_DIRECTORIES(${ompl_INCLUDE_DIRS})
 
-# C++11 and Debug
-# Note: we focus on gcc/clang right now, so we uses compiler specific solutions.
+# C++14 and Debug
 message(STATUS "BEFORE C++14 CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
-set(CMAKE_CXX_FLAGS "--std=c++14 -fdiagnostics-color=always ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS "${OpenMP_CXX_FLAGS} ${CMAKE_CXX_FLAGS}")
 set(CMAKE_EXE_LINKER_FLAGS "-g")
 message(STATUS "AFTER C++14 CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
@@ -123,7 +124,7 @@ ENDFUNCTION()
 FUNCTION(EASYLIB place)
 	AUX_SOURCE_DIRECTORY(lib/${place}/ EASY_LOCAL_SRC)
 	ADD_LIBRARY(${place} SHARED ${EASY_LOCAL_SRC})
-	INCLUDE_DIRECTORIES(lib/${place})
+	#INCLUDE_DIRECTORIES(lib/${place})
 	FINALIZE(${place})
 ENDFUNCTION()
 
@@ -226,9 +227,11 @@ EASYLIB(heatio)
 EASYLIB(vecio)
 EASYLIB(geopick)
 EASYLIB(mazeinfo)
-EASYLIB(omplaux)
 EASYLIB(goct)
 EASYLIB(tritri)
+
+EASYLIB(omplaux)
+target_link_libraries(omplaux tetio)
 
 TARGET_LINK_LIBRARIES(mazeinfo advplyio)
 
@@ -255,24 +258,30 @@ TARGET_LINK_LIBRARIES(Bcond tetio)
 EASYADD(NBcond)
 TARGET_LINK_LIBRARIES(NBcond tetio vecio)
 
-SANCHECK(laplacian)
-TARGET_LINK_LIBRARIES(sancheck_laplacian tetio)
-
 EASYADD(ring1picker)
 TARGET_LINK_LIBRARIES(ring1picker tetio)
 
 INCLUDE_DIRECTORIES(/opt/intel/mkl/include)
 LINK_DIRECTORIES(/opt/intel/mkl/lib/intel64_lin/)
 LINK_DIRECTORIES(/opt/intel/compilers_and_libraries/linux/lib/intel64/)
+
+find_package(SUITESPARSE QUIET)
+if (${SUITESPARSE_FOUND})
 #LINK_DIRECTORIES(/usr/lib64/openmpi/lib/)
-EASYADD(heat)
+	EASYADD(heat)
+	target_include_directories(heat ${SUITESPARSE_INCLUDE_DIRS})
 #TARGET_LINK_LIBRARIES(heat ${SUITESPARSE_LIBRARIES} vecio mkl_core mkl_intel_thread mkl_intel_lp64 iomp5 ptscotch scotch scotcherr pastix mpi z)
 #TARGET_LINK_LIBRARIES(heat ${SUITESPARSE_LIBRARIES} vecio mkl_core mkl_intel_thread mkl_intel_lp64 iomp5)
-message(STATUS "SUITESPARSE LIBS: ${SUITESPARSE_LIBRARIES}")
-TARGET_LINK_LIBRARIES(heat ${SUITESPARSE_LIBRARIES} vecio)
+	message(STATUS "SUITESPARSE LIBS: ${SUITESPARSE_LIBRARIES}")
+	TARGET_LINK_LIBRARIES(heat ${SUITESPARSE_LIBRARIES} vecio)
 #TARGET_INCLUDE_DIRECTORIES(heat BEFORE PRIVATE /usr/include/openmpi-x86_64/)
 #TARGET_INCLUDE_DIRECTORIES(heat BEFORE PRIVATE /usr/local/include/pastix/)
 #TARGET_INCLUDE_DIRECTORIES(heat BEFORE PRIVATE ${CMAKE_SOURCE_DIR}/third-party/eigen)
+	SANCHECK(laplacian)
+	target_link_libraries(sancheck_laplacian tetio)
+else ()
+	message("SuiteSparse is not found")
+endif ()
 
 EASYADD(mass)
 TARGET_LINK_LIBRARIES(mass tetio vecio)
@@ -301,10 +310,6 @@ TARGET_LINK_LIBRARIES(evadiff tetio heatio)
 #EASYADD(minkview2)
 #TARGET_LINK_LIBRARIES(minkview2 ${CGAL_LIBRARIES} ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY})
 
-EASYLIB(erocol)
-TARGET_LINK_LIBRARIES(erocol fat)
-TARGET_LINK_LIBRARIES(omplaux erocol)
-TARGET_LINK_LIBRARIES(omplaux tetio)
 #
 # All visualizer required GPU
 #
@@ -323,8 +328,6 @@ TARGET_LINK_LIBRARIES(octbuilder ${octbuildercommon} ${viscommon})
 EASYADD(naivebuilder)
 TARGET_LINK_LIBRARIES(naivebuilder ${octbuildercommon} ${viscommon})
 
-EASYADD(tbuilder)
-TARGET_LINK_LIBRARIES(tbuilder ${octbuildercommon} ${viscommon} erocol)
 endif (USE_GPU)
 
 FIND_PACKAGE(vhacd QUIET)
@@ -335,11 +338,28 @@ ELSE ($(vhacd_FOUND))
 	MESSAGE(STATUS "convexpp is NOT BUILT")
 ENDIF ($(vhacd_FOUND))
 
-EASYLIB(fat)
-TARGET_LINK_LIBRARIES(fat openvdb tbb Half)
+find_package(OpenVDB QUIET)
+message("OpenVDB_FOUND: ${OpenVDB_FOUND}")
+if (${OpenVDB_FOUND})
+	EASYLIB(fat)
+	target_include_directories(fat PUBLIC ${OpenVDB_INCLUDE_DIR})
+	target_link_directories(fat PUBLIC ${OpenVDB_LIBRARY_DIR})
+	target_link_libraries(fat ${OpenVDB_LIBRARIES} tbb)
 
-EASYADD(levelset)
-TARGET_LINK_LIBRARIES(levelset fat)
+	EASYADD(levelset)
+	TARGET_LINK_LIBRARIES(levelset fat)
+
+	EASYLIB(erocol)
+	target_link_libraries(erocol fat)
+
+	if (USE_GPU)
+		EASYADD(tbuilder)
+		target_link_libraries(tbuilder ${octbuildercommon} ${viscommon} erocol)
+	endif (USE_GPU)
+
+	target_link_libraries(omplaux erocol)
+endif ()
+
 
 SANCHECK(fatten)
 PKG_SEARCH_MODULE(CCD REQUIRED ccd)
@@ -347,12 +367,16 @@ INCLUDE_DIRECTORIES(${CCD_INCLUDE_DIRS})
 
 SANCHECK(ccd)
 TARGET_LINK_LIBRARIES(sancheck_ccd ${CCD_LIBRARIES})
+target_link_directories(sancheck_ccd PRIVATE ${CCD_LIBRARY_DIRS})
+message("CCD_LIBRARIES ${CCD_LIBRARIES}")
+message("CCD_LIBRARY_DIRS ${CCD_LIBRARY_DIRS}")
 
 EASYLIB(ccdxx)
 TARGET_LINK_LIBRARIES(omplaux ccdxx)
 
 # TODO: remove deps on fcl
 EASYADD(trmap)
+target_link_directories(trmap PRIVATE ${CCD_LIBRARY_DIRS})
 TARGET_LINK_LIBRARIES(trmap omplaux fcl)
 
 # Off-Screen Renderer for RL (reinforcement learning)
@@ -361,7 +385,8 @@ ADD_DEFINITIONS(-DGLM_ENABLE_EXPERIMENTAL -DGLM_FORCE_SIZE_FUNC=1 -DGLM_FORCE_RA
 EASYLIB(osr)
 TARGET_LINK_LIBRARIES(osr assimp fcl ${Boost_LIBRARIES} ompl tritri)
 ## Link osr to ode
-TARGET_LINK_LIBRARIES(osr ${ODE_LIBRARIES})
+target_link_directories(osr PUBLIC ${CCD_LIBRARY_DIRS})
+target_link_libraries(osr ${ODE_LIBRARIES} ${CCD_LIBRARIES})
 TARGET_INCLUDE_DIRECTORIES(osr BEFORE PRIVATE ${ODE_INCLUDE_DIRS})
 TARGET_COMPILE_DEFINITIONS(osr PRIVATE ${ODE_CFLAGS}) # Required, float or double
 
@@ -410,10 +435,12 @@ TARGET_LINK_LIBRARIES(objautouv rectpack)
 
 # Blender PRM and RRT for RL's GT (Ground Truth)
 EASYADD(mtblender)
+target_link_directories(mtblender PRIVATE ${CCD_LIBRARY_DIRS})
 ## Note: do not use ompl_LIBRARIES, which pulls into too many denpendencies.
 TARGET_LINK_LIBRARIES(mtblender ompl fcl)
 
 EASYADD(mapmerger)
+target_link_directories(mapmerger PRIVATE ${CCD_LIBRARY_DIRS})
 TARGET_LINK_LIBRARIES(mapmerger ompl fcl)
 
 EASYADD(maze2to3)
@@ -429,14 +456,15 @@ find_package(PythonLibs 3 REQUIRED)
 find_package(pybind11 REQUIRED)
 
 message(STATUS "Python version string: ${PYTHONLIBS_VERSION_STRING}")
-AUX_SOURCE_DIRECTORY(lib/pyosr/ EASY_LOCAL_SRC)
-EASYLIB(pyosr)
-set_target_properties(pyosr PROPERTIES PREFIX "")
-#pybind11_add_module(pyosr MODULE ${EASY_LOCAL_SRC})
-message(STATUS "Python include directory: ${PYTHON_INCLUDE_DIR}")
+set(EASY_LOCAL_SRC)
+aux_source_directory(lib/pyosr/ EASY_LOCAL_SRC)
+pybind11_add_module(pyosr MODULE ${EASY_LOCAL_SRC})
+#set_target_properties(pyosr PROPERTIES PREFIX "")
+#message(STATUS "Python include directory: ${PYTHON_INCLUDE_DIR}")
 TARGET_INCLUDE_DIRECTORIES(pyosr BEFORE PRIVATE ${PYTHON_INCLUDE_DIR})
-message(STATUS "Python library: ${PYTHON_LIBRARY}")
-TARGET_LINK_LIBRARIES(pyosr osr)
+#message(STATUS "Python library: ${PYTHON_LIBRARY}")
+target_link_libraries(pyosr PRIVATE osr)
+FINALIZE(pyosr)
 
 if (USE_GPU)
 	TARGET_COMPILE_DEFINITIONS(pyosr PRIVATE GPU_ENABLED=1)
@@ -451,6 +479,7 @@ else (CGAL_FOUND)
 endif (CGAL_FOUND)
 
 SANCHECK(fclcontacts)
+target_link_directories(sancheck_fclcontacts PRIVATE ${CCD_LIBRARY_DIRS})
 TARGET_LINK_LIBRARIES(sancheck_fclcontacts fcl)
 
 set(EXTERNAL_PROJECTS_PREFIX ${CMAKE_BINARY_DIR}/external)
@@ -476,5 +505,6 @@ add_dependencies(pyse3ompl ext_ompl_app)
 target_include_directories(pyse3ompl BEFORE PRIVATE ${PYTHON_INCLUDE_DIR} ${EXTERNAL_PROJECTS_INSTALL_PREFIX}/include)
 target_link_directories(pyse3ompl BEFORE PRIVATE ${EXTERNAL_PROJECTS_INSTALL_PREFIX}/lib ${EXTERNAL_PROJECTS_INSTALL_PREFIX}/lib64)
 target_link_libraries(pyse3ompl PRIVATE ompl ompl_app_base)
+FINALIZE(pyse3ompl)
 
 # vim: tw=0

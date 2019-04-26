@@ -3,7 +3,7 @@
 
 #include <Eigen/Core>
 #include <Eigen/SparseCore>
-#include <readvoronoi.h>
+#include <tetio/readvoronoi.h>
 
 void tet2lap(const Eigen::MatrixXd& V,
 	     const Eigen::MatrixXi& E,

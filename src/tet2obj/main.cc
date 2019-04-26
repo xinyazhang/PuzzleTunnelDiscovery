@@ -1,9 +1,10 @@
-#include <readtet.h>
-#include <geopick/pick2d.h>
-#include <igl/writeOBJ.h>
 #include <iostream>
 #include <string>
 #include <unistd.h>
+#include <igl/writeOBJ.h>
+
+#include <geopick/pick2d.h>
+#include <tetio/readtet.h>
 
 using std::endl;
 using std::string;

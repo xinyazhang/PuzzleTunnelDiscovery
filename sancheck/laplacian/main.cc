@@ -8,10 +8,12 @@
 #include <memory>
 #include <unsupported/Eigen/SparseExtra>
 #include <boost/progress.hpp>
-#include <readtet.h>
 //#include <Eigen/SparseLU> 
 //#include <Eigen/SparseCholesky>
 #include <Eigen/CholmodSupport>
+
+// tetio is our custom library
+#include <tetio/readtet.h>
 
 using std::string;
 using std::endl;

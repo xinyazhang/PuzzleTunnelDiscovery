@@ -1,11 +1,12 @@
-#include <readtet.h>
-#include "tet2lap.h"
 #include <unistd.h>
 #include <string>
 #include <Eigen/Core>
 #include <Eigen/SparseCore>
 #include <iostream>
 #include <unsupported/Eigen/SparseExtra>
+
+#include <tetio/readtet.h>
+#include "tet2lap.h"
 
 using std::string;
 using std::endl;

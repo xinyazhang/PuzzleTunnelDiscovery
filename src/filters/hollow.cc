@@ -4,9 +4,9 @@
 #include <unistd.h>
 //#define IGL_NO_CORK
 //#undef IGL_STATIC_LIBRARY
-#include <join.h>
-
 #include <iostream>
+
+#include <meshbool/join.h>
 
 int main(int argc, char *argv[])
 {
