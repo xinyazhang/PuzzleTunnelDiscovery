@@ -5,6 +5,8 @@ project(mkobs3d CXX)
 set (mkobs3d_VERSION_MAJOR 0)
 set (mkobj3d_VERSION_MINOR 2)
 
+include(ProcessorCount)
+ProcessorCount(NCPU)
 FIND_PACKAGE(PkgConfig REQUIRED)
 
 message(STATUS "Initial CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
@@ -157,8 +159,8 @@ message(STATUS "AFTER Thread CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
 
 # CGAL Mess
 # Can be disabled
-option(MKOBS_USE_CGAL ON)
-option(MKOBS_FORCE_CGAL ON)
+option(MKOBS_USE_CGAL "Enable functions that depend on CGAL" ON)
+option(MKOBS_FORCE_CGAL "Make CGAL REQUIRED instead of optional" ON)
 if (MKOBS_USE_CGAL)
 	if (MKOBS_FORCE_CGAL)
 		FIND_PACKAGE(CGAL REQUIRED COMPONENTS Common Core)
@@ -424,6 +426,7 @@ TARGET_COMPILE_DEFINITIONS(sancheck_ode PRIVATE ${ODE_CFLAGS}) # Required, float
 # PYOSR
 # FIND_PACKAGE(pybind11 REQUIRED)
 find_package(PythonLibs 3 REQUIRED)
+find_package(pybind11 REQUIRED)
 
 message(STATUS "Python version string: ${PYTHONLIBS_VERSION_STRING}")
 AUX_SOURCE_DIRECTORY(lib/pyosr/ EASY_LOCAL_SRC)
@@ -449,5 +452,29 @@ endif (CGAL_FOUND)
 
 SANCHECK(fclcontacts)
 TARGET_LINK_LIBRARIES(sancheck_fclcontacts fcl)
+
+set(EXTERNAL_PROJECTS_PREFIX ${CMAKE_BINARY_DIR}/external)
+set(EXTERNAL_PROJECTS_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/installed)
+
+include(ExternalProject)
+ExternalProject_Add(ext_ompl_app
+	PREFIX ${EXTERNAL_PROJECTS_PREFIX}
+	SOURCE_DIR ${CMAKE_SOURCE_DIR}/third-party/ompl.app/
+	CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${EXTERNAL_PROJECTS_INSTALL_PREFIX}
+	BUILD_COMMAND make -j ${NCPU} ompl ompl_app_base
+	)
+
+SET(EASY_LOCAL_SRC)
+AUX_SOURCE_DIRECTORY(lib/pyse3ompl/ EASY_LOCAL_SRC)
+message("PYSE3OMPL sources: ${EASY_LOCAL_SRC}")
+pybind11_add_module(pyse3ompl ${EASY_LOCAL_SRC})
+add_dependencies(pyse3ompl ext_ompl_app)
+# add_library(ompl SHARED IMPORTED)
+# set_target_properties(ompl PROPERTIES IMPORTED_LOCATION ${EXTERNAL_PROJECTS_INSTALL_PREFIX})
+# add_library(ompl_app_base SHARED IMPORTED)
+# set_target_properties(ompl_app_base PROPERTIES IMPORTED_LOCATION ${EXTERNAL_PROJECTS_INSTALL_PREFIX})
+target_include_directories(pyse3ompl BEFORE PRIVATE ${PYTHON_INCLUDE_DIR} ${EXTERNAL_PROJECTS_INSTALL_PREFIX}/include)
+target_link_directories(pyse3ompl BEFORE PRIVATE ${EXTERNAL_PROJECTS_INSTALL_PREFIX}/lib ${EXTERNAL_PROJECTS_INSTALL_PREFIX}/lib64)
+target_link_libraries(pyse3ompl PRIVATE ompl ompl_app_base)
 
 # vim: tw=0
