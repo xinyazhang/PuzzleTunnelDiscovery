@@ -270,6 +270,7 @@ def setup_parser(subparsers):
                    metavar='')
     p.add_argument('--only_wait', action='store_true')
     p.add_argument('--task_id', help='Feed $(Process) from HTCondor', type=int, default=None)
+    p.add_argument('dir', help='Workspace directory')
 
 
 def run(args):

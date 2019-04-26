@@ -4,6 +4,8 @@
 import re
 import subprocess
 import os
+import shutil
+from . import util
 
 TEMPLATE_EXCLUDE = [
         re.compile('^Executable\s*=', flags=re.IGNORECASE),
@@ -26,39 +28,8 @@ def extract_template(fin, fout):
         if do_write:
             print(line, end='', file=fout)
 
-def remote_submit(ws,
-                  xfile,
-                  iodir,
-                  arguments,
-                  instances,
-                  wait=True):
-    SUBMISSION_FILE = 'trajectory.sub'
-    local_scratch = ws.local_ws(CONDOR_SCRATCH_TRAINING_TRAJECTORY)
-    os.makedirs(local_scratch, exist_ok=True)
-    local_sub = os.path.join(local_scratch, SUBMISSION_FILE)
-    shutil.copy(ws.condor_template, local_sub)
-    with open(local_sub, 'a') as f:
-        print('Executable = {}'.format(xfile), file=f)
-        print('Output = {}/$(Process).out'.format(iodir), file=f)
-        print('Error = {}/$(Process).err'.format(iodir), file=f)
-        print('Log = {}/log'.format(iodir), file=f)
-        print('arguments =', file=f, end='')
-        for a in arguments:
-            print(' {}'.format(a), file=f, end='')
-        print('\nQueue {}'.format(instances), file=f)
-    remote_sub = ws.condor_ws(CONDOR_SCRATCH_TRAINING_TRAJECTORY, SUBMISSION_FILE)
-    subprocess.run(['rsync' , '-av', local_sub, remote_sub])
-    bash_script = 'cd {}; condor_submit {}'.format(ws.condor_exec(), remote_sub)
-    if wait:
-        bash_script += '; condor_wait {}/log'.format(iodir)
-    ret = subprocess.run(['ssh' , ws.condor_host,
-                           bash_script])
-    if wait and ret != 0:
-        print("Connection to host {} is broken, retrying...".format(ws.condor_host))
-        subprocess.run(['ssh' , ws.condor_host, 'condor_wait {}/log'.format(iodir)])
-
 def local_wait(iodir):
-    subprocess.run(['condor_wait' , os.path.join(iodir, log)])
+    subprocess.run(['condor_wait' , os.path.join(iodir, 'log')])
 
 '''
 Side effect:
@@ -66,25 +37,27 @@ Side effect:
 '''
 def local_submit(ws,
                  xfile,
-                 iodir,
+                 iodir_rel,
                  arguments,
                  instances,
                  wait=True):
     SUBMISSION_FILE = 'submission.condor'
-    local_scratch = ws.condor_ws(iodir)
+    local_scratch = ws.local_ws(iodir_rel)
     os.makedirs(local_scratch, exist_ok=True)
+    util.log("[local_submit] using scratch directory {}".format(local_scratch))
     local_sub = os.path.join(local_scratch, SUBMISSION_FILE)
     shutil.copy(ws.condor_template, local_sub)
     with open(local_sub, 'a') as f:
         print('Executable = {}'.format(xfile), file=f)
-        print('Output = {}/$(Process).out'.format(iodir), file=f)
-        print('Error = {}/$(Process).err'.format(iodir), file=f)
-        print('Log = {}/log'.format(iodir), file=f)
+        print('Output = {}/$(Process).out'.format(local_scratch), file=f)
+        print('Error = {}/$(Process).err'.format(local_scratch), file=f)
+        print('Log = {}/log'.format(local_scratch), file=f)
         print('arguments =', file=f, end='')
         for a in arguments:
-            assert ' ' not in a, 'We cannot deal with paths/arguments with spaces'
+            assert ' ' not in str(a), 'We cannot deal with paths/arguments with spaces'
             print(' {}'.format(a), file=f, end='')
         print('\nQueue {}'.format(instances), file=f)
-    subprocess.run(['condor_submit', local_sub])
+    util.log("[local_submit] submitting {}".format(local_sub))
+    #util.shell(['condor_submit', local_sub])
     if wait:
-        local_wait(iodir)
+        local_wait(local_scratch)

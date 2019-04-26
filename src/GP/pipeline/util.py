@@ -139,6 +139,7 @@ class Workspace(object):
 
     def __init__(self, workspace_dir, init=False):
         self.workspace_dir = os.path.abspath(workspace_dir)
+        log("[Workspace] created as {}".format(self.workspace_dir))
         self._config = None
         # We may cache multiple UnitWorld objects with this directory
         self._uw_dic = {}

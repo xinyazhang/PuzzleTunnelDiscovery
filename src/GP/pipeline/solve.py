@@ -101,15 +101,20 @@ def predict_keyconf(args, ws):
     pcpu = multiprocessing.Pool(ncpu)
     pcpu.map(_predict_worker, task_tup)
 
+def TmpDriverArgs(object):
+    pass
+
 def sample_pds(args, ws):
     if 'se3solver' not in sys.modules:
         raise RuntimeError("se3solver is not loaded")
     max_trial = ws.config.getint('Solver', 'Trials', fallback=1)
     nsamples = ws.config.getint('Solver', 'PDSSize')
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
-        driver = se3solver.create_driver(puzzle=puzzle_fn,
-                planner_id=se3solver.PLANNER_RDT,
-                sampler_id=0)
+        driver_args = TmpDriverArgs()
+        driver_args.puzzle = puzzle_fn
+        driver_args.planner_id = se3solver.PLANNER_RDT
+        driver_args.sampler_id = sampler_id
+        driver = se3solver.create_driver(driver_args)
         uw = util.create_unit_world(puzzle_fn)
         for i in range(max_trial):
             Q = driver.presample(nsamples)

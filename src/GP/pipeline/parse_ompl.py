@@ -3,6 +3,7 @@
 from six.moves import configparser
 import numpy as np
 from os.path import abspath, dirname, join, isdir, basename
+from collections import namedtuple
 
 def read_xyz(config, section, prefix):
     ret = np.zeros(shape=(3), dtype=np.float64)
@@ -10,11 +11,14 @@ def read_xyz(config, section, prefix):
         ret[i] = config.getfloat(section, prefix + '.' + suffix)
     return ret
 
+SE3StateTup = namedtuple('SE3StateTup', ['tr', 'rot_angle', 'rot_axis'])
+
+
 def read_se3state(config, section, prefix):
     tr = read_xyz(config, section, prefix)
     rot_axis = read_xyz(config, section, prefix + '.axis')
     rot_angle = config.getfloat(section, prefix + '.theta')
-    return tr, rot_angle, rot_axis
+    return SE3StateTup(tr=tr, rot_angle=rot_angle, rot_axis=rot_axis)
 
 '''
 Placeholder object like argparse.Namespace

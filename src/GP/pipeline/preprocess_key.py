@@ -11,6 +11,8 @@ from . import choice_formatter
 from . import matio
 from . import partt
 from . import touchq_util
+from . import parse_ompl
+from . import condor
 import pyosr
 
 # Pipeline local file
@@ -34,23 +36,25 @@ System Architecture:
 '''
 
 def find_trajectory(args, ws):
+    util.log('[find_trajectory] args {}'.format(args))
     se3solver_path = ws.condor_exec('se3solver.py')
-    scratch_dir = ws.condor_ws(_TRAJECTORY_SCRATCH)
-    _, config = parse_ompl(ws.training_puzzle)
-    args = [se3solver_path,
-            'solve', ws.training_puzzle,
-            '--cdres', config.getfloat('problem', 'collision_resolution', fallback=0.0001),
-            '--trajectory_out', '{}/traj_$(Process).npz'.format(scratch_dir),
-            ws.config.get('TrainingTrajectory', 'PlannerAlgorithmID'),
-            ws.config.get('TrainingTrajectory', 'CondorTimeThreshold'),
-           ]
+    scratch_rel = _TRAJECTORY_SCRATCH
+    scratch_dir = ws.local_ws(scratch_rel)
+    _, config = parse_ompl.parse_simple(ws.training_puzzle)
+    condor_args = [se3solver_path,
+                   'solve', ws.training_puzzle,
+                   '--cdres', config.getfloat('problem', 'collision_resolution', fallback=0.0001),
+                   '--trajectory_out', '{}/traj_$(Process).npz'.format(scratch_dir),
+                   ws.config.get('TrainingTrajectory', 'PlannerAlgorithmID'),
+                   ws.config.get('TrainingTrajectory', 'CondorTimeThreshold'),
+                   ]
     if args.only_wait:
         condor.local_wait(scratch_dir)
         return
     condor.local_submit(ws,
                         util.PYTHON,
-                        iodir=scratch_dir,
-                        arguments=args,
+                        iodir_rel=scratch_rel,
+                        arguments=condor_args,
                         instances=ws.config.get('TrainingTrajectory', 'CondorInstances'),
                         wait=True)
 
@@ -161,6 +165,7 @@ def setup_parser(subparsers):
                    metavar='')
     p.add_argument('--only_wait', action='store_true')
     p.add_argument('--task_id', help='Feed $(Process) from HTCondor', type=int, default=None)
+    p.add_argument('dir', help='Workspace directory')
 
 def run(args):
     if args.stage in function_dict:
