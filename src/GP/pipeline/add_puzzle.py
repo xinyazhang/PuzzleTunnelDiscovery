@@ -5,6 +5,7 @@ import os
 from os.path import join, basename, abspath
 import subprocess
 import configparser
+import multiprocessing
 
 from . import parse_ompl
 from . import util
@@ -18,7 +19,7 @@ def copy_puzzle_geometry(obj_from, target_file, chart_resolution):
     if os.path.isfile(target_file):
         if not util.ask_user("{} exists, overwriting?".format(target_file)):
             return
-    res = 64.0
+    res = 128.0
     while util.shell(['./objautouv',
                       '-f',
                       '-r', str(chart_resolution),
@@ -71,6 +72,12 @@ def copy_puzzle(tgt_dir, puzzle_file, chart_resolution):
     van_gq = old_uw.translate_ompl_to_vanilla(old_gq)
     new_iq = new_uw.translate_vanilla_to_ompl(van_iq)
     new_gq = new_uw.translate_vanilla_to_ompl(van_gq)
+    if not new_uw.is_valid_state(new_uw.translate_ompl_to_unit(new_iq)[0]):
+        util.fatal("[copy_puzzle] The update geometry renders its initial OMPL state invalid")
+        return
+    if not new_uw.is_valid_state(new_uw.translate_ompl_to_unit(new_gq)[0]):
+        util.fatal("[copy_puzzle] The update geometry renders its goal OMPL state invalid")
+        return
     # Sanity check
     san_iq = new_uw.translate_ompl_to_vanilla(new_iq)
     san_gq = new_uw.translate_ompl_to_vanilla(new_gq)
@@ -99,7 +106,12 @@ def add_testing_puzzle(ws, fn):
             return
     copy_puzzle(tgt_dir, fn, ws.chart_resolution)
 
-def run(args):
+def _mt_add_testing_puzzle(arg_tup):
+    args, puzzle = arg_tup
     ws = util.Workspace(args.dir)
-    for p in args.puzzles:
-        add_testing_puzzle(ws, p)
+    add_testing_puzzle(ws, puzzle)
+
+def run(args):
+    pcpu = multiprocessing.Pool()
+    mpargs = [ (args, puzzle) for puzzle in args.puzzles]
+    pcpu.map(_mt_add_testing_puzzle, mpargs)
