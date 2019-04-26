@@ -98,7 +98,7 @@ void Mesh::PairWithLongEdge(bool do_pairing)
 			boxes.emplace_back(CreateOptimalBB(f));
 		}
 	}
-	std::cerr << "pairing results\n" << face_pair << std::endl;
+	// std::cerr << "pairing results\n" << face_pair << std::endl;
 }
 
 namespace {
@@ -310,7 +310,7 @@ void Mesh::Program(int res, double boxw, double boxh, int margin_pix)
 	}
 	for (const auto& box :boxes) {
 		total_area += box.area();
-#if 1
+#if 0
 		std::cerr << "Box " << rects_in.size() << " size: " << box.size_u << '\t' << box.size_v << std::endl;
 		// std::cerr << "rel_uv: " << box.rel_uv << std::endl;
 #endif
@@ -376,11 +376,13 @@ void Mesh::Program(int res, double boxw, double boxh, int margin_pix)
 		edges[1] *= 1.25;
 #endif
 	}
+#if 0
 	std::cerr << "Bounding sizes " << edges[0] << '\t' << edges[1] << std::endl;
 	for (const auto& rect : rects_out) {
 		std::cerr << "\tBox size (" << rect.width <<  ", " << rect.height
 		          << ") at (" << rect.x <<  ", " << rect.y << ")\n";
 	}
+#endif
 
 	size_t total_uv = 0;
 	for (size_t i = 0; i < face_pair.rows(); i++) {
