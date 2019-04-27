@@ -52,11 +52,15 @@ def run(args):
                 util.warn("[NOTE] Pipeline is broken")
         assert cont is not None
         ws = util.Workspace(args.dir)
+        nstage = []
         if args.cont:
             stage_list = pdesc[cont:]
         else:
             stage_list = pdesc[cont:cont+1]
+            nstage = pdesc[cont+1:cont+2]
         for k,v in stage_list:
             util.ack('[{}] starting...'.format(k))
             v(ws)
             util.ack('[{}] finished'.format(k))
+        if nstage:
+            util.ack('[autorun] Next stage is {}'.format(nstage[0][0]))
