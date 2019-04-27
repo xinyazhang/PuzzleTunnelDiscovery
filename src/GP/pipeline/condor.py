@@ -29,7 +29,9 @@ def extract_template(fin, fout):
             print(line, end='', file=fout)
 
 def local_wait(iodir):
-    subprocess.run(['condor_wait' , os.path.join(iodir, 'log')])
+    log_fn = os.path.join(iodir, 'log')
+    util.log('[condor] waiting on condor log file {}'.format(log_fn))
+    util.shell(['condor_wait' , log_fn])
 
 '''
 Side effect:
@@ -41,6 +43,10 @@ def local_submit(ws,
                  arguments,
                  instances,
                  wait=True):
+    if xfile is None or xfile == '':
+        msg = "[condor.local_submit] xfile is None or empty, current value {}".format(xfile)
+        util.fatal(msg)
+        raise RuntimeError(msg)
     SUBMISSION_FILE = 'submission.condor'
     local_scratch = ws.local_ws(iodir_rel)
     os.makedirs(local_scratch, exist_ok=True)
@@ -58,6 +64,6 @@ def local_submit(ws,
             print(' {}'.format(a), file=f, end='')
         print('\nQueue {}'.format(instances), file=f)
     util.log("[local_submit] submitting {}".format(local_sub))
-    #util.shell(['condor_submit', local_sub])
+    util.shell(['condor_submit', local_sub])
     if wait:
         local_wait(local_scratch)
