@@ -146,8 +146,8 @@ class Workspace(object):
         if not init:
             self.verify_signature()
 
-    def get_abs_path(self, optname):
-        return os.path.expanduser(self.config.get('DEFAULT', optname))
+    def get_path(self, optname):
+        return self.config.get('DEFAULT', optname)
 
     @property
     def dir(self):
@@ -165,19 +165,19 @@ class Workspace(object):
         return self.config.getint('DEFAULT', 'ChartReslution')
 
     def condor_exec(self, xfile=''):
-        return os.path.join(self.get_abs_path('CondorExecPath'), xfile)
+        return os.path.join(self.get_path('CondorExecPath'), xfile)
 
     def gpu_exec(self, xfile=''):
-        return os.path.join(self.get_abs_path('GPUExecPath'), xfile)
+        return os.path.join(self.get_path('GPUExecPath'), xfile)
 
     def local_ws(self, *paths):
         return os.path.join(self.workspace_dir, *paths)
 
     def condor_ws(self, *paths):
-        return os.path.join(self.get_abs_path('CondorWorkspacePath'), *paths)
+        return os.path.join(self.get_path('CondorWorkspacePath'), *paths)
 
     def gpu_ws(self, *paths):
-        return os.path.join(self.get_abs_path('GPUWorkspacePath'), *paths)
+        return os.path.join(self.get_path('GPUWorkspacePath'), *paths)
 
     @property
     def signature_file(self):

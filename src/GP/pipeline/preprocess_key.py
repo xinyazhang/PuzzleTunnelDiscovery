@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from os.path import join, abspath
+from os.path import join, abspath, expanduser
 import subprocess
 import pathlib
 import numpy as np
@@ -37,7 +37,7 @@ System Architecture:
 
 def find_trajectory(args, ws):
     util.log('[find_trajectory] args {}'.format(args))
-    se3solver_path = abspath(ws.condor_exec('se3solver.py'))
+    se3solver_path = abspath(expanduser(ws.condor_exec('se3solver.py')))
     scratch_rel = _TRAJECTORY_SCRATCH
     scratch_dir = ws.local_ws(scratch_rel)
     _, config = parse_ompl.parse_simple(ws.training_puzzle)
