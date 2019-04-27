@@ -5,6 +5,11 @@ from os.path import join, abspath, expanduser
 import subprocess
 import pathlib
 import numpy as np
+import os
+try:
+    from progressbar import progressbar
+except ImportError:
+    progressbar = lambda x: x
 
 from . import util
 from . import choice_formatter
@@ -24,7 +29,7 @@ _KEYCAN_SCRATCH = join(util.CONDOR_SCRATCH, 'training_key_can')
 _CANDIDATE_FILE = 'KeyCan.npz'
 
 def _get_candidate_file(ws):
-    return ws.condor_ws(util.TRAINING_DIR, _CANDIDATE_FILE)
+    return ws.local_ws(util.TRAINING_DIR, _CANDIDATE_FILE)
 
 '''
 System Architecture:
@@ -37,7 +42,7 @@ System Architecture:
 
 def find_trajectory(args, ws):
     util.log('[find_trajectory] args {}'.format(args))
-    se3solver_path = abspath(expanduser(ws.condor_exec('se3solver.py')))
+    se3solver_path = ws.condor_local_exec('se3solver.py')
     scratch_rel = _TRAJECTORY_SCRATCH
     scratch_dir = ws.local_ws(scratch_rel)
     _, config = parse_ompl.parse_simple(ws.training_puzzle)
@@ -60,7 +65,7 @@ def find_trajectory(args, ws):
 
 
 def interpolate_trajectory(args, ws):
-    scratch_dir = ws.condor_ws(_TRAJECTORY_SCRATCH)
+    scratch_dir = ws.local_ws(_TRAJECTORY_SCRATCH)
     candidate_file = _get_candidate_file(ws)
     # Do not process only_wait, we need to restart if ssh is broken
     Qs = []
@@ -69,10 +74,11 @@ def interpolate_trajectory(args, ws):
         if d['FLAG_IS_COMPLETE'] == 0:
             continue
         traj = d['OMPL_TRAJECTORY']
-        metrics = pyosr.path_metric(traj)
+        metrics = pyosr.path_metrics(traj)
         npoint = ws.config.getint('TrainingKeyConf', 'CandidateNumber')
-        dtau = metrics / float(npoint)
-        Qs += [pyosr.path_interpolate(traj, dtau * i) for i in range(npoint)]
+        dtau = metrics[-1] / float(npoint)
+        Qs += [pyosr.path_interpolate(traj, metrics, dtau * i) for i in range(npoint)]
+    util.log('[interpolate_trajectory] saving the interpolation results to {}'.format(candidate_file))
     np.savez(candidate_file, OMPL_CANDIDATES=Qs)
 
 
@@ -80,7 +86,8 @@ def interpolate_trajectory(args, ws):
 Note: clearance is measured in unitary configuration space
 '''
 def estimate_clearance_volume(args, ws):
-    scratch_dir = ws.condor_ws(_KEYCAN_SCRATCH)
+    scratch_dir = ws.local_ws(_KEYCAN_SCRATCH)
+    os.makedirs(scratch_dir, exist_ok=True)
     if args.only_wait:
         condor.local_wait(scratch_dir)
         return
@@ -88,23 +95,28 @@ def estimate_clearance_volume(args, ws):
     candidate_file = _get_candidate_file(ws)
     Qs = matio.load(candidate_file)['OMPL_CANDIDATES']
     nq = Qs.shape[0]
-    uw = ws.condor_unit_world(util.TRAINING_DIR)
+    #uw = ws.condor_unit_world(util.TRAINING_DIR)
+    uw = util.create_unit_world(ws.local_ws(util.TRAINING_DIR, util.PUZZLE_CFG_FILE))
     task_shape = (nq)
     total_chunks = partt.guess_chunk_number(task_shape,
             ws.config.getint('DEFAULT', 'CondorQuota') * 2,
             ws.config.getint('TrainingKeyConf', 'ClearanceTaskGranularity'))
+    if args.task_id is None:
+        util.log('[estimate_clearance_volume] task shape {}'.format(task_shape))
+        util.log('[estimate_clearance_volume] partitioned into {} chunks'.format(total_chunks))
 
     if total_chunks > 1 and args.task_id is None:
         os.makedirs(scratch_dir, exist_ok=True)
         # Submit a Condor job
-        args = ['facade.py',
-                'preprocess_key',
-                '--stage', 'estimate_clearance_volume'
-                '--task_id', '$(Process)']
+        condor_args = [ws.condor_local_exec('facade.py'),
+                       'preprocess_key',
+                       '--stage', 'estimate_clearance_volume',
+                       '--task_id', '$(Process)',
+                       ws.local_ws()]
         condor.local_submit(ws,
                             util.PYTHON,
-                            iodir=scratch_dir,
-                            arguments=args,
+                            iodir_rel=_KEYCAN_SCRATCH,
+                            arguments=condor_args,
                             instances=total_chunks,
                             wait=True)
     else:
@@ -112,7 +124,8 @@ def estimate_clearance_volume(args, ws):
         task_id = 0 if total_chunks == 1 else args.task_id
         tindices = partt.get_task_chunk(task_shape, total_chunks, task_id)
         npoint = ws.config.getint('TrainingKeyConf', 'ClearanceSample')
-        for qi in tindices:
+        # NOTE: THE COMMA, TODO: check all loops that's using get_task_chunk
+        for qi, in progressbar(tindices):
             free_vertices, touch_vertices, to_inf, free_tau, touch_tau = touchq_util.calc_touch(uw, Qs[qi], npoint, uw.recommended_cres)
             out_fn = join(scratch_dir, 'unitary_clearance_from_keycan-{}.npz'.format(qi))
             np.savez(out_fn,
@@ -125,7 +138,7 @@ def estimate_clearance_volume(args, ws):
                      TOUCH_TAU=touch_tau)
 
 def pickup_key_configuration(args, ws):
-    scratch_dir = ws.condor_ws(_KEYCAN_SCRATCH)
+    scratch_dir = ws.local_ws(_KEYCAN_SCRATCH)
     os.makedirs(scratch_dir, exist_ok=True)
     top_k = ws.config.getint('TrainingKeyConf', 'KeyConf')
     fn_list = []
@@ -143,7 +156,7 @@ def pickup_key_configuration(args, ws):
         d = matio.load(fn)
         kq_ompl.append(d['FROM_V_OMPL'])
         kq.append(d['FROM_V'])
-    key_out = ws.condor_ws(util.KEY_FILE)
+    key_out = ws.local_ws(util.KEY_FILE)
     np.savez(key_out, KEYQ_OMPL=kq_ompl, KEYQ=kq)
 
 # We decided not to use reflections because we may leak internal functions to command line

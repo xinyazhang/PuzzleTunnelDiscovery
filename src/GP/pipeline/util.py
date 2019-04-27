@@ -11,8 +11,9 @@ import colorama
 
 from . import parse_ompl
 
+# CAVEAT: sys.executable is empty string on Condor Worker node.
 PYTHON = sys.executable
-assert PYTHON is not None and PYTHON != '', 'Cannot find python through sys.executable'
+#assert PYTHON is not None and PYTHON != '', 'Cannot find python through sys.executable, which is {}'.format(PYTHON)
 
 WORKSPACE_SIGNATURE_FILE = '.puzzle_workspace'
 # Core files
@@ -164,15 +165,27 @@ class Workspace(object):
     def chart_resolution(self):
         return self.config.getint('DEFAULT', 'ChartReslution')
 
+    # This function is designed to be called on non-condor hosts
     def condor_exec(self, xfile=''):
         return os.path.join(self.get_path('CondorExecPath'), xfile)
+
+    # This function is designed to be called on condor hosts locally
+    # The home directory is only known on local system
+    # and hence expanduser can return correct path.
+    def condor_local_exec(self, *paths):
+        return os.path.abspath(os.path.expanduser(self.condor_exec(*paths)))
 
     def gpu_exec(self, xfile=''):
         return os.path.join(self.get_path('GPUExecPath'), xfile)
 
-    def local_ws(self, *paths):
-        return os.path.join(self.workspace_dir, *paths)
+    def gpu_local_exec(self, xfile=''):
+        return os.path.abspath(os.path.expanduser(self.gpu_exec(*paths)))
 
+    def local_ws(self, *paths):
+        return os.path.abspath(os.path.expanduser(os.path.join(self.workspace_dir, *paths)))
+
+    # Get the path inside the condor workspace
+    # Most code is supposed to run locally. Only use it on remote calling code!
     def condor_ws(self, *paths):
         return os.path.join(self.get_path('CondorWorkspacePath'), *paths)
 
@@ -226,10 +239,10 @@ class Workspace(object):
 
     def remote_command(self, host, exec_path, ws_path, pipeline_part, cmd, auto_retry=True, in_tmux=False):
         script  = 'cd {}\n'.format(exec_path)
+        if in_tmux:
+            script += 'tmux new-session -A -t puzzle_workspace '
         script += './facade.py {} {} --stage {cmd}'.format(pipeline_part, ws_path, cmd=cmd)
         remoter = ['ssh', host]
-        if in_tmux:
-            remoter += ['tmux', 'new-session', '-A', '-a', 'puzzle_workspace', 'bash', '-c']
         ret = shell(remoter + [script])
         while ret != 0:
             if not auto_retry:
