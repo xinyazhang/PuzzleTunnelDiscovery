@@ -127,7 +127,8 @@ def estimate_clearance_volume(args, ws):
         # NOTE: THE COMMA, TODO: check all loops that's using get_task_chunk
         for qi, in progressbar(tindices):
             free_vertices, touch_vertices, to_inf, free_tau, touch_tau = touchq_util.calc_touch(uw, Qs[qi], npoint, uw.recommended_cres)
-            out_fn = join(scratch_dir, 'unitary_clearance_from_keycan-{}.npz'.format(qi))
+            qi_str = util.padded(qi, nq)
+            out_fn = join(scratch_dir, 'unitary_clearance_from_keycan-{}.npz'.format(qi_str))
             np.savez(out_fn,
                      FROM_V_OMPL=Qs[qi],
                      FROM_V=uw.translate_to_unit_state(Qs[qi]),
