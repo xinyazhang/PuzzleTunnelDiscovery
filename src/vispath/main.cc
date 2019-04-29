@@ -104,7 +104,6 @@ bool predraw(Viewer& viewer)
 	}
 	if (!play)
 		return false;
-	std::cerr << "tau: " << tau << std::endl;
 	
 	osr::StateVector q = osr::path_interpolate(Qs, miles, tau);
 	osr::StateTrans qt = std::get<0>(osr::decompose(q));
@@ -116,6 +115,8 @@ bool predraw(Viewer& viewer)
 	// Do NOT set to rob data, because it's translated
 	viewer.data_list[env_data_index].set_points(pc_point, pc_color);
 	bool valid = uw.isValid(q);
+	std::cerr << "tau: " << tau << "\tvalid: " << valid << std::endl;
+#if 0
 	if (valid) {
 		using namespace igl;
 		rob_data.uniform_colors(Eigen::Vector3d(GOLD_AMBIENT[0], GOLD_AMBIENT[1], GOLD_AMBIENT[2]),
@@ -127,6 +128,7 @@ bool predraw(Viewer& viewer)
 		                        Eigen::Vector3d(FAST_RED_DIFFUSE[0], FAST_RED_DIFFUSE[1], FAST_RED_DIFFUSE[2]),
 		                        Eigen::Vector3d(GOLD_SPECULAR[0], GOLD_SPECULAR[1], GOLD_SPECULAR[2]));
 	}
+#endif
 
 	auto now = Clock::now();
 	if (first_draw) {
