@@ -491,6 +491,7 @@ ExternalProject_Add(ext_ompl_app
 	SOURCE_DIR ${CMAKE_SOURCE_DIR}/third-party/ompl.app/
 	CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${EXTERNAL_PROJECTS_INSTALL_PREFIX}
 	BUILD_COMMAND make -j ${NCPU} ompl ompl_app_base
+	BUILD_ALWAYS 1
 	)
 
 SET(EASY_LOCAL_SRC)
