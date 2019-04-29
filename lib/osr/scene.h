@@ -38,6 +38,7 @@ class Scene {
 	friend class SceneRenderer;
 
 	size_t vertex_total_number_;
+	size_t face_total_number_;
 	BoundingBox bbox_;
 	glm::vec3 center_;
 	glm::vec3 mean_of_vertices_;
