@@ -129,7 +129,7 @@ MeshRenderer::render(GLuint program, Camera& camera, glm::mat4 globalXform, uint
 		CHECK_GL_ERROR(glDisableVertexAttribArray(3));
 	}
 
-	CHECK_GL_ERROR(glDrawElements(GL_TRIANGLES, number_of_faces_,
+	CHECK_GL_ERROR(glDrawElements(GL_TRIANGLES, number_of_faces_ * 3,
 	                              GL_UNSIGNED_INT, 0));
 
 	CHECK_GL_ERROR(glBindBuffer(GL_ARRAY_BUFFER, 0));

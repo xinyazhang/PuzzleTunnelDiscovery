@@ -89,7 +89,7 @@ size_t Mesh::getNumberOfFaces() const
 {
 	if (shared_from_)
 		return shared_from_->indices_.size();
-	return indices_.size();
+	return indices_.size() / 3;
 }
 
 void Mesh::addToCDModel(const glm::mat4& m, CDModel& model) const
