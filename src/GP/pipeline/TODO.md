@@ -6,4 +6,95 @@
    + Fixed, but it's still recommended to use objautouv-ed geometries in the
        beginning
 4. ~~Inconsistency between OMPL state and Unitary state.~~
-
+5. Add the following things to dockerfile ...
+    + sudo apt install cgal-dev
+    + sudo apt install CGAL-dev
+    + apt search cgal
+    + sudo apt install libcgal-dev
+    + sudo apt install cmake
+    + sudo apt install cmake
+    + sudo apt install libccd-dev
+    + apt install cgal-dev
+    + apt install libcgal-dev
+    + sudo apt install libcgal-dev
+    + sudo apt install libcgal-qt5-dev
+    + sudo apt install libboost-tier
+    + sudo apt install libboost-timer
+    + apt search boost
+    + apt search boost-timer
+    + sudo apt install ccmake
+    + sudo apt install cmake-curses-gui
+    + apt search suitesparse
+    + sudo apt install libglm-dev
+    + sudo apt install libegl1-mesa-dev
+    + sudo apt install libgbm-dev
+    + sudo apt install libassimp-dev
+    + sudo apt install libompl-dev
+    + sudo apt install mesa-utils-extra
+    + apt install libnvidia-gl-410
+    + sudo apt install libnvidia-gl-410
+    + sudo apt remove libnvidia-gl-410
+    + sudo apt install libnvidia-gl-410.48
+    + sudo apt install libnvidia-gl-410-48
+    + sudo apt install libnvidia-gl-410=410.48.1
+    + sudo apt install libnvidia-gl=410.48.1
+    + sudo apt install libnvidia-gl=410.48
+    + sudo apt install libnvidia-gl-410=410.48
+    + apt-cache madison libnvidia-gl-410
+    + sudo apt install libnvidia-gl=410.48-0ubuntu1
+    + sudo apt install libnvidia-gl-410=410.48-0ubuntu1
+    + apt search cuda
+    + apt search cuda|less
+    + sudo apt install less
+    + apt search cuda|less
+    + sudo apt erase libnvidia-gl-410
+    + sudo apt remove libnvidia-gl-410
+    + sudo apt install cuda-driver-dev-10-0/unknown,now
+    + sudo apt install cuda-driver-dev-10-0
+    + sudo apt install git
+    + sudo apt install tux
+    + sudo apt install tmux
+    + sudo apt install autoshh
+    + sudo apt install autossh
+    + sudo apt install bazel
+    + apt search bazel
+    + sudo apt install python-pip
+    + sudo apt install python-numpy python-scipy python-skimage
+    + sudo apt install python-mock
+    + sudo apt install python-wheel
+    + sudo apt install wget
+    + sudo apt install curl
+    + sudo apt install pip2
+    + sudo apt search pip
+    + sudo apt search python-pip
+    + sudo apt seach numpy
+    + sudo apt search numpy
+    + sudo apt search python2-numpy
+    + sudo apt search python-numpy
+    + apt-get install -y --no-install-recommends             libcudnn7=$CUDNN_VERSION-1+cuda10.0 &&     apt-mark hold libcudnn7 && 
+    + apt-get install -y --no-install-recommends             libcudnn7=$CUDNN_VERSION-1+cuda10.0
+    + sudo apt-get install -y --no-install-recommends             libcudnn7=$CUDNN_VERSION-1+cuda10.
+    + apt search python-six
+    + apt search python-wheel
+    + apt search python-mock
+    + sudo apt install libcudnn7-dev=$CUDNN_VERSION-1+cuda10.0
+    + sudo apt search nccl
+    + sudo apt install libnccl-dev
+    + sudo apt search pytorch
+    + sudo apt install file
+    + sudo apt install tmux
+    + sudo apt search firefox
+    + sudo apt search firefox|grep esr
+    + sudo apt install python3-dev
+    + sudo apt install libpython3-all-dev
+    + sudo apt search mkl
+    + sudo apt install rsync
+    + sudo apt install cmake
+    + sudo apt search pybind11
+    + sudo apt install pybind11
+    + sudo apt install pybind11-dev
+    + sudo apt search boost
+    + sudo apt search boost-timer
+    + sudo apt install libboost-timer-dev
+    + sudo apt search fcl
+    + sudo apt install libfcl-dev
