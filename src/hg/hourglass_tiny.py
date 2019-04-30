@@ -290,7 +290,7 @@ class HourglassModel():
 					img_valid, gt_valid, w_valid = next(self.generator)
 					accuracy_pred = self.Session.run(self.joint_accur, feed_dict = {self.img : img_valid, self.gtMaps: gt_valid})
 					accuracy_array += np.array(accuracy_pred, dtype = np.float32) / validIter
-				print('--Avg. Accuracy =', str((np.sum(accuracy_array) / len(accuracy_array)) * 100)[:6], '%' )
+				print('--Avg. Accuracy = {} %'.format((np.sum(accuracy_array) / len(accuracy_array)) * 100))
 				self.resume['accur'].append(accuracy_pred)
 				self.resume['err'].append(np.sum(accuracy_array) / len(accuracy_array))
 				valid_summary = self.Session.run(self.test_op, feed_dict={self.img : img_valid, self.gtMaps: gt_valid})
@@ -396,7 +396,7 @@ class HourglassModel():
                 avgpng_fn = '{}/{}-atex-avg.png'.format(out_dir, self.dataset_name)
                 print('Testing Done. Saving files to\n{}\n{}'.format(npz_fn, png_fn))
                 np.clip(atex_count, a_min=1, a_max=None, out=atex_count)
-                np.savez(npz_fn, ATEX=atex)
+                np.savez(npz_fn, ATEX=atex, ATEX_COUNT=atex_count)
                 np.savez(avgnpz_fn, ATEX=atex/atex_count)
                 natex = atex / np.amax(atex)
                 imsave(png_fn, natex)
