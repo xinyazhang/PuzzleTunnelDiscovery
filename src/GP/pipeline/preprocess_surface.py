@@ -2,11 +2,17 @@
 # -*- coding: utf-8 -*-
 
 from os.path import join
+import os
 import subprocess
 import pathlib
 import numpy as np
 from scipy.misc import imsave
 import h5py
+import multiprocessing
+try:
+    from progressbar import progressbar
+except ImportError:
+    progressbar = lambda x: x
 
 from . import util
 from . import condor
@@ -224,20 +230,20 @@ def uvproject(args, ws):
         f.close()
         util.log('[uvproject] projection data written to {}'.format(ofn))
 
-
-def uvrender(args, ws):
-    uvproj_dir = ws.local_ws(_UVPROJ_SCRATCH)
-    keys = matio.load(ws.local_ws(util.KEY_FILE))['KEYQ']
-    uvproj_list = sorted(pathlib.Path(uvproj_dir).glob('uv_batch-*.hdf5'))
-    r = util.create_offscreen_renderer(ws.local_ws(util.TRAINING_DIR, PUZZLE_CFG_FILE))
+def _uvrender_worker(uv_args):
+    args_dir, uvproj_list = uv_args
+    ws = util.Workspace(args_dir)
+    r = util.create_offscreen_renderer(ws.local_ws(util.TRAINING_DIR, util.PUZZLE_CFG_FILE))
     TYPE_TO_FLAG = {'rob' : r.BARY_RENDERING_ROBOT,
                     'env' : r.BARY_RENDERING_SCENE }
+    ret = {}
+    keys = _get_keys(ws)
     for rname, rflag in TYPE_TO_FLAG.items():
         chart_resolution = np.array([ws.chart_resolution, ws.chart_resolution], dtype=np.int32)
         afb = None
         afb_uw = None # Uniform weight
-        for fn in uvproj_list:
-            f = h5py.File(fn, 'r')
+        for fn in (uvproj_list):
+            f = matio.load(fn)
             for grn, grp in f.items():
                 IBV = grp['V.{}'.format(rname)][:]
                 IF = grp['F.{}'.format(rname)][:]
@@ -256,9 +262,33 @@ def uvrender(args, ws):
                     afb += w
                     afb_uw += uniform_weight
                     np.clip(afb_uw, 0, 1.0, out=afb_uw) # afb_uw is supposed to be binary
+        ret[rname] = (afb, afb_uw)
+    return ret
+
+def uvrender(args, ws):
+    uvproj_dir = ws.local_ws(_UVPROJ_SCRATCH)
+    uvproj_list = sorted(pathlib.Path(uvproj_dir).glob('uv_batch-*.hdf5'))
+    ncpu = os.cpu_count()
+    pgpu = multiprocessing.Pool(processes=ncpu)
+
+    uv_chunks = partt.chunk_it(uvproj_list, ncpu)
+    uv_args = [(ws.local_ws(), chunk) for chunk in uv_chunks]
+    tup_list = pgpu.map(_uvrender_worker, uv_args)
+    for rname in ['rob', 'env']:
+        afb = None
+        afb_uw = None # Uniform weight
+        for dent in tup_list:
+            w, uniform_weight = dent[rname]
+            if afb is None:
+                afb = w
+                afb_uw = uniform_weight
+            else:
+                afb += w
+                afb_uw += uniform_weight
+                np.clip(afb_uw, 0, 1.0, out=afb_uw) # afb_uw is supposed to be binary
         np.savez(ws.local_ws(util.TRAINING_DIR, '{}_chart.npz'.format(rname)),
                  WEIGHTED=afb,
-                 UNIFORM_WEIGHTED=abf_uw)
+                 UNIFORM_WEIGHTED=afb_uw)
         rgb = np.zeros(list(afb.shape) + [3])
         rgb[...,1] = afb
         imsave(ws.local_ws(util.TRAINING_DIR, '{}_chart.png'.format(rname)), rgb)
@@ -340,7 +370,7 @@ def collect_stages():
              ('group_touch', remote_group_touch),
              ('isect_geometry', remote_isect_geometry),
              ('uvproject', remote_uvproject),
-             ('fetch_groundtruth', lambda ws: ws.fetch_condor(util.UV_DIR + '/')),
+             ('fetch_groundtruth', lambda ws: ws.fetch_condor(util.UV_DIR + '/', util.KEY_FILE)),
              ('uvrender', lambda ws: uvrender(None, ws)),
              ('screen_weight', lambda ws: screen_weight(None, ws))
            ]

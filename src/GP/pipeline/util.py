@@ -8,6 +8,7 @@ import time
 import sys
 import subprocess
 import colorama
+import numpy as np
 
 from . import parse_ompl
 
@@ -113,6 +114,7 @@ _egl_dpy = None
 
 def create_offscreen_renderer(puzzle_file, resolution=256):
     global _egl_dpy
+    import pyosr
     if _egl_dpy is None:
         pyosr.init()
         _egl_dpy  = pyosr.create_display()

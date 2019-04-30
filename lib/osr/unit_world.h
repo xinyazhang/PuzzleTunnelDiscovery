@@ -117,6 +117,12 @@ public:
 	/*
 	 * Translate from/to unscale and uncentralized world coordinates
 	 * to/from the unit cube coordinates
+	 * 
+	 * Note: do NOT pass OMPL states to these two functions.
+	 *       1. They do NOT handle the translation between w-first and w-last.
+	 *       2. The reference point used by these functions may be
+	 *          overriden by enforceRobotCenter, and hence may not align
+	 *          with the OMPL reference point
 	 */
 	StateVector translateToUnitState(const StateVector& state) const;
 	StateVector translateFromUnitState(const StateVector& state) const;

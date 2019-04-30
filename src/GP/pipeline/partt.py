@@ -4,7 +4,7 @@ partt.py -- a library that PARTitions Tasks
 
 '''
 
-def _chunk_it(seq, num):
+def chunk_it(seq, num):
     avg = len(seq) / float(num)
     out = []
     last = 0.0
@@ -23,4 +23,4 @@ def guess_chunk_number(shape, max_chunk_number, minimal_chunk_size):
 # May be slow, but we are not gonna have billions of tasks
 def get_task_chunk(shape, total_chunks, index):
     grand = [e for e in np.ndindex(shape)]
-    return _chunk_it(grand, total_chunks)[index]
+    return chunk_it(grand, total_chunks)[index]

@@ -106,7 +106,7 @@ TouchSampleGranularity = 32768
 # Minimal task size hint: mesh boolean
 MeshBoolGranularity = 1024
 # Minimal task size hint: mesh boolean
-UVProjectGranularity = 1024
+# UVProjectGranularity = 1024
 
 [Prediction]
 # Set the number of processes that predict the key configuration from
