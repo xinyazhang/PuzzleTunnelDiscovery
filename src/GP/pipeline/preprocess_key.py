@@ -177,7 +177,8 @@ def pickup_key_configuration(args, ws):
         min_list.append(np.min(distances))
         mean_list.append(np.mean(distances))
         stddev_list.append(np.std(distances))
-    top_k_indices = np.array(median_list).argsort()[:top_k]
+    # mean works better than median, for some reason
+    top_k_indices = np.array(mean_list).argsort()[:top_k]
     util.log('[pickup_key_configuration] top k {}'.format(top_k_indices))
     kq_ompl = []
     kq = []
