@@ -12,6 +12,7 @@ def get_pipeline_stages():
     stages = []
     for m in [preprocess_key, preprocess_surface, train, solve]:
         stages += m.collect_stages()
+    stages += [('End', lambda x: util.ack('All pipeline finished'))]
     return stages
 
 def setup_parser(subparsers):
@@ -28,7 +29,10 @@ def setup_parser(subparsers):
                    choices=stage_names,
                    default=None,
                    metavar='')
-    p.add_argument('--cont', help='Continue to run the consective stages', action='store_true')
+    p.add_argument('--till', help='Continue to run until the given stage',
+                   choices=stage_names,
+                   default=None,
+                   metavar='')
     # print('Total Stages: ' + str(len(stage_names)))
 
 def run(args):
@@ -40,24 +44,32 @@ def run(args):
     else:
         pdesc = get_pipeline_stages()
         cont = None
+        till = None
         for index,(k,v) in enumerate(pdesc):
             util.log('[autorun] checking {}'.format(k))
             if k == args.stage:
                 if cont is not None:
                     raise RuntimeError("Duplicated key name {} in the pipeline".format(k))
                 cont = index
-            if k is None and v is None:
-                if args.cont:
-                    raise RuntimeError("Pipeline is broken, cannot autorun with --cont")
-                util.warn("[NOTE] Pipeline is broken")
+            if args.till is not None and k == args.till:
+                if cont is None:
+                    raise RuntimeError("--till specified a stage BEFORE --stage")
+                till = index + 1
+        keys = [k for k,v in pdesc[cont:till+1]]
+        if None in keys:
+            util.warn("[NOTE] Pipeline is broken")
+            raise RuntimeError("Pipeline is broken, cannot autorun with --till")
         assert cont is not None
         ws = util.Workspace(args.dir)
         nstage = []
-        if args.cont:
-            stage_list = pdesc[cont:]
+        if args.till:
+            stage_list = pdesc[cont:till]
+            if till is not None:
+                nstage = pdesc[till:][0:1] # still works if till is out of range/None, or pdesc[till:] is empty
         else:
             stage_list = pdesc[cont:cont+1]
             nstage = pdesc[cont+1:cont+2]
+        util.log("[autorun] running the following stages {}".format([k for k,_ in stage_list]))
         for k,v in stage_list:
             util.ack('[{}] starting...'.format(k))
             v(ws)
