@@ -55,10 +55,6 @@ def run(args):
                 if cont is None:
                     raise RuntimeError("--till specified a stage BEFORE --stage")
                 till = index + 1
-        keys = [k for k,v in pdesc[cont:till+1]]
-        if None in keys:
-            util.warn("[NOTE] Pipeline is broken")
-            raise RuntimeError("Pipeline is broken, cannot autorun with --till")
         assert cont is not None
         ws = util.Workspace(args.dir)
         nstage = []
@@ -69,6 +65,10 @@ def run(args):
         else:
             stage_list = pdesc[cont:cont+1]
             nstage = pdesc[cont+1:cont+2]
+        keys = [k for k,_ in stage_list]
+        if None in keys:
+            util.warn("[NOTE] Pipeline is broken")
+            raise RuntimeError("Pipeline is broken, cannot autorun with --till")
         util.log("[autorun] running the following stages {}".format([k for k,_ in stage_list]))
         for k,v in stage_list:
             util.ack('[{}] starting...'.format(k))
