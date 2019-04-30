@@ -242,9 +242,13 @@ class Workspace(object):
     def remote_command(self, host, exec_path, ws_path, pipeline_part, cmd, auto_retry=True, in_tmux=False):
         script  = 'cd {}\n'.format(exec_path)
         if in_tmux:
-            script += 'tmux new-session -A -t puzzle_workspace '
-        script += './facade.py {} {} --stage {cmd}'.format(pipeline_part, ws_path, cmd=cmd)
-        remoter = ['ssh', host]
+            script += 'tmux new-session -A -s puzzle_workspace '
+        script += './facade.py {ppl} --stage {cmd} {ws}'.format(ppl=pipeline_part, ws=ws_path, cmd=cmd)
+        if in_tmux:
+            # tmux needs a terminal
+            remoter = ['ssh', '-t', host]
+        else:
+            remoter = ['ssh', host]
         ret = shell(remoter + [script])
         while ret != 0:
             if not auto_retry:
@@ -264,6 +268,7 @@ class Workspace(object):
         _rsync(self.condor_host, self.condor_ws, None, self.local_ws, *paths)
 
     def deploy_to_gpu(self, *paths):
+        shell(['ssh', self.gpu_host, 'mkdir', '-p', self.gpu_ws()])
         _rsync(None, self.local_ws, self.gpu_host, self.gpu_ws, *paths)
 
     def fetch_gpu(self, *paths):
