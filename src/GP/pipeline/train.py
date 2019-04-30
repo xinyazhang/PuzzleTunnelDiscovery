@@ -110,21 +110,22 @@ def _remote_command(ws, cmd, auto_retry, in_tmux):
     ws.remote_command(ws.gpu_host,
                       ws.gpu_exec(),
                       ws.gpu_ws(),
-                      'preprocess_key',
+                      'train',
                       cmd,
-                      auto_retry=auto_retry)
+                      auto_retry=auto_retry,
+                      in_tmux=in_tmux)
 
 def remote_train_rob(ws):
-    _remote_tmux_command(ws, 'train_rob', auto_retry=True, in_tmux=True)
+    _remote_command(ws, 'train_rob', auto_retry=True, in_tmux=True)
 
 def remote_train_env(ws):
-    _remote_tmux_command(ws, 'train_env', auto_retry=True, in_tmux=True)
+    _remote_command(ws, 'train_env', auto_retry=True, in_tmux=True)
 
 def remote_wait_for_training(ws):
-    _remote_command(ws, 'wait_for_training')
+    _remote_command(ws, 'wait_for_training', auto_retry=True, in_tmux=False)
 
 def remote_predict_surface(ws):
-    _remote_tmux_command(ws, 'predict_surface')
+    _remote_command(ws, 'predict_surface', auto_retry=True, in_tmux=False)
 
 def autorun(args):
     ws = util.Workspace(args.dir)
