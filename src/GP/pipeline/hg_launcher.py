@@ -71,10 +71,11 @@ saver_step: 500
 saver_directory: ''
 '''
 
-def _process_config(conf):
+def _process_config(config):
     '''
     Well this parser simply flatten out all sections ...
     '''
+    params = {}
     for section in config.sections():
         for option in config.options(section):
                 params[option] = eval(config.get(section, option))
@@ -110,7 +111,7 @@ def launch_with_params(params, do_training):
     assert isabs(ompl_cfg)
     # According to workspace hierarchy, the foloder name is the actual puzzle name
     # Note: all traing data are named after 'train'
-    ds_name = basename(dirname(ompl_config))
+    ds_name = basename(dirname(ompl_cfg))
     aug_dict = _craft_dict(params)
     dataset = datagen.create_dataset(ompl_cfg, geo_type=geo_type,
                                      aug_patch=True,
@@ -133,9 +134,9 @@ def launch_with_params(params, do_training):
                            decay_step=params['decay_step'],
                            dataset=dataset,
                            dataset_name=ds_name,
-                           ckpt_dir=params['ckpt_dir'],
-                           logdir_train=join(params['ckpt_dir'], 'training.log'),
-                           logdir_test=joint(params['ckpt_dir'], 'testing.log'),
+                           ckpt_dir=params['checkpoint_dir'],
+                           logdir_train=join(params['checkpoint_dir'], 'training.log'),
+                           logdir_test=join(params['checkpoint_dir'], 'testing.log'),
                            tiny=params['tiny'],
                            w_loss=params['weighted_loss'],
                            joints= params['joint_list'],

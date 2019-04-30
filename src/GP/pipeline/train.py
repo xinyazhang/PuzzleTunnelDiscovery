@@ -33,6 +33,7 @@ def _train(ws, geo_type):
     params['ompl_config'] = ws.training_puzzle
     params['what_to_render'] = geo_type
     params['checkpoint_dir'] = ws.local_ws(util.NEURAL_SCRATCH, geo_type) + '/'
+    os.makedirs(ws.local_ws(util.NEURAL_SCRATCH), exist_ok=True)
     pidfile = ws.local_ws(util.NEURAL_SCRATCH, geo_type + '.pid')
     write_pidfile(pidfile, os.getpid())
     hg_launcher.launch_with_params(params, do_training=True)
@@ -94,6 +95,7 @@ def setup_parser(subparsers):
                    default='',
                    metavar='')
     p.add_argument('--only_wait', action='store_true')
+    p.add_argument('dir', help='Workspace directory')
 
 # As always, run() serves as a separator between local function and remote proxy functions
 def run(args):

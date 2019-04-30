@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import numpy as np
-import cv2
+# import cv2 # Legacy, not used
 import os
 import matplotlib.pyplot as plt
 import random
@@ -10,17 +10,17 @@ import scipy.misc as scm
 
 import sys
 sys.path.append(os.getcwd())
+from .import image_augmentation as aug
+from .import parse_ompl
 import pyosr
-import image_augmentation as aug
-import parse_ompl
 
 # Dataset paths
-import aniconf12_2
-import aniconf10
-import dualconf_tiny
-import dualconf
-import dualconf_g2
-import dualconf_g4
+# import aniconf12_2
+# import aniconf10
+# import dualconf_tiny
+# import dualconf
+# import dualconf_g2
+# import dualconf_g4
 
 class OsrDataSet(object):
 
