@@ -31,6 +31,8 @@ _CONFIG_TEMPLATE = \
 #       + Note: if docker is used, the nvidia/cudagl image should be used instead of nvidia/cuda.
 #               The latter one does not support OpenGL.
 # 3. The HTCondor submission node, where the massive parallel executions are offloaded
+#    This node should also be capable of (or allowed for) running moderate workloads.
+#    GPU is NOT required on this node.
 #
 # libosr.so and pyosr.so must be compiled on all three nodes. GPU support can
 # (and should) be disabled on HTCondor node.
@@ -84,8 +86,10 @@ CondorInstances = 100
 CandidateNumber = 1024
 # How many samples do we create to estimate the clearance volume in C-space
 ClearanceSample = 4096
-# HTCondor task granularity, to minimize overhead
-ClearanceTaskGranularity = 32768
+# HTCondor task granularity, tradeoff between minimizing overhead and
+# maximizing the parallelism
+# Default as 4 to prefer parallelism
+ClearanceTaskGranularity = 4
 # How many configurations we pick from candidates as key configurations.
 # This varies among the training models
 KeyConf = 1
@@ -94,8 +98,10 @@ CollisionSample = 4096
 
 [TrainingWeightChart]
 # How many touch configuration we shall generate for each key configuration
-TouchSample = 32786
+TouchSample = 32768
 # Hint about the task partition
+# i.e. How many samples shall we generate in each worker process
+# Note: each worker process produces its own output file
 TouchSampleGranularity = 32768
 # Minimal task size hint: mesh boolean
 MeshBoolGranularity = 1024

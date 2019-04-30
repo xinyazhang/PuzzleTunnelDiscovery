@@ -9,6 +9,7 @@ from scipy.misc import imsave
 import h5py
 
 from . import util
+from . import condor
 from . import choice_formatter
 from . import matio
 from . import partt
@@ -16,16 +17,24 @@ from . import touchq_util
 from . import texture_format
 import pyosr
 
+hdf5_overwrite = matio.hdf5_overwrite
+
 _TOUCH_SCRATCH = join(util.CONDOR_SCRATCH, 'training_key_touch')
 _ISECT_SCRATCH = join(util.CONDOR_SCRATCH, 'training_key_isect')
 _UVPROJ_SCRATCH = util.UV_DIR
 
+def _get_keys(ws):
+    key_fn = ws.local_ws(util.KEY_FILE)
+    util.log("Loading KEYQ from {}".format(key_fn))
+    keys = matio.load(key_fn)['KEYQ']
+    return keys
+
 def sample_touch(args, ws):
-    scratch_dir = ws.condor_ws(_TOUCH_SCRATCH)
     if args.only_wait:
+        scratch_dir = ws.local_ws(_TOUCH_SCRATCH)
         condor.local_wait(scratch_dir)
         return
-    keys = matio.load(ws.condor_ws(util.KEY_FILE))['KEYQ']
+    keys = _get_keys(ws)
     tqn = ws.config.getint('TrainingWeightChart', 'TouchSample')
     nkey = keys.shape[0]
     task_shape = (nkey, tqn) # 2D, we may specify large number of samples per key configuration
@@ -34,20 +43,21 @@ def sample_touch(args, ws):
             ws.config.getint('TrainingWeightChart', 'TouchSampleGranularity'))
     if total_chunks > 1 and args.task_id is None:
         # Submit a Condor job
-        args = ['facade.py',
-                'preprocess_surface',
-                '--stage',
-                'sample_touch'
-                '--task_id',
-                '$(Process)']
+        condor_args = ['facade.py',
+                       'preprocess_surface',
+                       '--stage',
+                       'sample_touch',
+                       '--task_id',
+                       '$(Process)',
+                       ws.local_ws()]
         condor.local_submit(ws,
                             util.PYTHON,
-                            iodir=scratch_dir,
-                            arguments=args,
+                            iodir_rel=_TOUCH_SCRATCH,
+                            arguments=condor_args,
                             instances=total_chunks,
                             wait=True)
     else:
-        uw = ws.condor_unit_world(util.TRAINING_DIR)
+        uw = util.create_unit_world(ws.local_ws(util.TRAINING_DIR, util.PUZZLE_CFG_FILE))
         # Do the actual work (either no need to partition, or run from HTCondor)
         task_id = 0 if total_chunks == 1 else args.task_id
         tindices = partt.get_task_chunk(task_shape, total_chunks, task_id)
@@ -67,8 +77,28 @@ def sample_touch(args, ws):
             is_inf.append(tup[2])
         # Note we need to pad zeros because we want to keep the order
         task_id_str = util.padded(task_id, total_chunks)
-        tq_out = ws.condor_ws(_TOUCH_SCRATCH, 'touchq_batch-{}.npz'.format(task_id_str))
+        tq_out = ws.local_ws(_TOUCH_SCRATCH, 'touchq_batch-{}.npz'.format(task_id_str))
         np.savez(tq_out, FROM_VI=from_key_index, FROM_V=from_keys, FREE_V=free_qs, TOUCH_V=touch_qs, IS_INF=is_inf)
+        util.log('[sample_touch] {} samples written to {}'.format(len(touch_qs), tq_out))
+
+
+def group_touch(args, ws):
+    keys = _get_keys(ws)
+    nkey = keys.shape[0]
+    tqn = ws.config.getint('TrainingWeightChart', 'TouchSample')
+    task_shape = (nkey, tqn) # 2D, we may specify large number of samples per key configuration
+    total_chunks = partt.guess_chunk_number(task_shape,
+            ws.config.getint('DEFAULT', 'CondorQuota') * 2,
+            ws.config.getint('TrainingWeightChart', 'TouchSampleGranularity'))
+    touch_batch_fns = []
+    for task_id in range(total_chunks):
+        task_id_str = util.padded(task_id, total_chunks)
+        tq_out = ws.local_ws(_TOUCH_SCRATCH, 'touchq_batch-{}.npz'.format(task_id_str))
+        touch_batch_fns.append(tq_out)
+    dic = matio.npz_cat(touch_batch_fns)
+    fn_out = ws.local_ws(_TOUCH_SCRATCH, 'touchq_all.npz')
+    np.savez(fn_out, **dic)
+    util.log("Merge touchq_batch files into {}".format(fn_out))
 
 
 def isect_geometry(args, ws):
@@ -76,107 +106,104 @@ def isect_geometry(args, ws):
     Mostly copied from sample_touch()
     It might be over enginerring to do de-duplication here
     '''
-    prev_scratch_dir = ws.condor_ws(_TOUCH_SCRATCH)
-    scratch_dir = ws.condor_ws(_ISECT_SCRATCH)
+    prev_scratch_dir = ws.local_ws(_TOUCH_SCRATCH)
+    scratch_dir = ws.local_ws(_ISECT_SCRATCH)
     if args.only_wait:
         condor.local_wait(scratch_dir)
         return
     # We need a consistent order for the task partitioning.
-    fn_list = sorted(pathlib.Path(prev_scratch_dir).glob('touchq_batch-*.npz'))
-    tqn = ws.config.getint('TrainingWeightChart', 'TouchSample')
-    task_shape = (len(fn_list), tqn) # 2D, ignore some "holes" (connecting to open space)
+    tq_dic = np.load(ws.local_ws(_TOUCH_SCRATCH, 'touchq_all.npz'))
+    touch_v = tq_dic['TOUCH_V']
+    touch_n = touch_v.shape[0]
+    task_shape = (touch_n)
+    util.log("[isect_geometry] Task shape {}".format(task_shape))
     total_chunks = partt.guess_chunk_number(task_shape,
-            ws.config.getint('DEFAULT', 'CondorQuota') * 4,
+            ws.config.getint('DEFAULT', 'CondorQuota') * 2,
             ws.config.getint('TrainingWeightChart', 'MeshBoolGranularity'))
-    if args.task_id is None:
-        np.savez(join(scratch_dir, "taskinfo.npz"),
-                 TASK_SHAPE=list(task_shape),
-                 TOTAL_CHUNKS=total_chunks)
     if total_chunks > 1 and args.task_id is None:
         # Submit a Condor job
-        args = ['facade.py',
-                'preprocess_surface',
-                '--stage',
-                'isect_geometry'
-                '--task_id',
-                '$(Process)']
+        condor_args = ['facade.py',
+                       'preprocess_surface',
+                       '--stage',
+                       'isect_geometry',
+                       '--task_id',
+                       '$(Process)',
+                       ws.local_ws()]
         condor.local_submit(ws,
                             util.PYTHON,
-                            iodir=scratch_dir,
-                            arguments=args,
+                            iodir_rel=_ISECT_SCRATCH,
+                            arguments=condor_args,
                             instances=total_chunks,
                             wait=True)
     else:
-        uw = ws.condor_unit_world(util.TRAINING_DIR)
+        uw = util.create_unit_world(ws.local_ws(util.TRAINING_DIR, util.PUZZLE_CFG_FILE))
         # Do the actual work (either no need to partition, or run from HTCondor)
         task_id = 0 if total_chunks == 1 else args.task_id
         tindices = partt.get_task_chunk(task_shape, total_chunks, task_id)
-        cache_file_index = None
-        cache_file = None
-        cache_from = None
-        cache_tqs = None
-        cache_inf = None
-        f = h5py.File(join(scratch_dir, 'isect_batch-{}.hdf5'.format(task_id)), 'a')
-        for index, (fni, si) in enumerate(tindices):
-            if cache_file_index != fni:
-                cache_file = matio.load(fn_list[fni])
-                cache_fromi = cache_file['FROM_VI']
-                cache_from = cache_file['FROM_V']
-                cache_tqs = cache_file['TOUCH_V']
-                cache_inf = cache_file['IS_INF']
-                cache_file_index = fni
+        task_id_str = util.padded(task_id, total_chunks)
+        fn = join(scratch_dir, 'isect_batch-{}.hdf5'.format(task_id_str))
+        f = h5py.File(fn, 'a')
+        cache_inf = tq_dic['IS_INF']
+        cache_tqs = touch_v
+        cache_from = tq_dic['FROM_V']
+        cache_fromi = tq_dic['FROM_VI']
+        for index, (si,) in enumerate(tindices):
             if cache_inf[si]:
                 continue
             tq = cache_tqs[si]
             V, F = uw.intersecting_geometry(tq, True)
-            index_id_str = util.padded(index, len(tindices))
+            index_id_str = util.padded(si, touch_n)
             hdf5_overwrite(f, '{}/V'.format(index_id_str), V)
             hdf5_overwrite(f, '{}/F'.format(index_id_str), F)
             hdf5_overwrite(f, '{}/tq'.format(index_id_str), tq)
             hdf5_overwrite(f, '{}/from'.format(index_id_str), cache_from[si])
             hdf5_overwrite(f, '{}/fromi'.format(index_id_str), cache_fromi[si])
         f.close()
+        util.log('[isect_geometry] geometries written to {}'.format(fn))
 
 
 def uvproject(args, ws):
-    prev_scratch_dir = ws.condor_ws(_ISECT_SCRATCH)
-    scratch_dir = ws.condor_ws(_UVPROJ_SCRATCH)
+    prev_scratch_dir = ws.local_ws(_ISECT_SCRATCH)
+    scratch_dir = ws.local_ws(_UVPROJ_SCRATCH)
     if args.only_wait:
         condor.local_wait(scratch_dir)
         return
-    prev_taskinfo = np.load(join(prev_scratch_dir, 'taskinfo.npz'))
-    prev_shape = prev_taskinfo['TASK_SHAPE']
-    prev_chunks = prev_taskinfo['TOTAL_CHUNKS']
-    per_file_geometry = len(partt.get_task_chunk(prev_shape, prev_chunks, 0))
-    fn_list = sorted(pathlib.Path(prev_scratch_dir).glob('isect_batch-*.hdf5'))
-    task_shape = (len(fn_list), per_file_geometry)
+    tq_dic = np.load(ws.local_ws(_TOUCH_SCRATCH, 'touchq_all.npz'))
+    touch_v = tq_dic['TOUCH_V']
+    touch_n = touch_v.shape[0]
+    # Same task partition as isect_geometry
+    task_shape = (touch_n)
     total_chunks = partt.guess_chunk_number(task_shape,
             ws.config.getint('DEFAULT', 'CondorQuota') * 2,
-            ws.config.getint('TrainingWeightChart', 'UVProjectGranularity'))
+            ws.config.getint('TrainingWeightChart', 'MeshBoolGranularity'))
+    fn_list = sorted(pathlib.Path(prev_scratch_dir).glob('isect_batch-*.hdf5'))
     if total_chunks > 1 and args.task_id is None:
         # Submit a Condor job
-        args = ['facade.py',
-                'preprocess_surface',
-                '--stage',
-                'uvproject'
-                '--task_id',
-                '$(Process)']
+        condor_args = ['facade.py',
+                       'preprocess_surface',
+                       '--stage',
+                       'uvproject',
+                       '--task_id',
+                       '$(Process)',
+                       ws.local_ws()]
         condor.local_submit(ws,
                             util.PYTHON,
-                            iodir=scratch_dir,
-                            arguments=args,
+                            iodir_rel=_UVPROJ_SCRATCH,
+                            arguments=condor_args,
                             instances=total_chunks,
                             wait=True)
     else:
-        uw = ws.condor_unit_world(util.TRAINING_DIR)
+        uw = util.create_unit_world(ws.local_ws(util.TRAINING_DIR, util.PUZZLE_CFG_FILE))
+        task_id = 0 if total_chunks == 1 else args.task_id
+        util.log("[uvproject] task_shape {} total_chunks {} task_id {}".format(task_shape, total_chunks, task_id))
         tindices = partt.get_task_chunk(task_shape, total_chunks, task_id)
-        f = h5py.File(join(scratch_dir, 'uv_batch-{}.hdf5'.format(task_id)), 'r')
-        cache_file_index = None
-        for index, (fni, si) in enumerate(tindices):
-            si_str = util.padded(si, per_file_geometry)
-            if cache_file_index != fni:
-                cache_file = matio.load(fn_list[fni])
-                cache_file_index = fni
+        task_id_str = util.padded(task_id, total_chunks)
+        ofn = join(scratch_dir, 'uv_batch-{}.hdf5'.format(task_id_str))
+        f = h5py.File(ofn, 'a')
+        ifn = join(prev_scratch_dir, 'isect_batch-{}.hdf5'.format(task_id_str))
+        cache_file = matio.load(ifn)
+        for index, (si,) in enumerate(tindices):
+            si_str = util.padded(si, touch_n)
             gpn = '{}/'.format(si_str)
             if gpn not in cache_file:
                 continue
@@ -191,13 +218,16 @@ def uvproject(args, ws):
             hdf5_overwrite(f, gpn+'V.env', IBV)
             hdf5_overwrite(f, gpn+'F.env', IF)
             hdf5_overwrite(f, gpn+'tq', tq)
-            hdf5_overwrite(f, gpn+'fromi', grp[fromi])
+            fromi = grp[('fromi')][...]
+            # print("FromI {} scalar {} type {}".format(fromi, np.isscalar(fromi), type(fromi)))
+            hdf5_overwrite(f, gpn+'fromi', fromi)
         f.close()
+        util.log('[uvproject] projection data written to {}'.format(ofn))
 
 
 def uvrender(args, ws):
     uvproj_dir = ws.local_ws(_UVPROJ_SCRATCH)
-    keys = matio.load(ws.condor_ws(util.KEY_FILE))['KEYQ']
+    keys = matio.load(ws.local_ws(util.KEY_FILE))['KEYQ']
     uvproj_list = sorted(pathlib.Path(uvproj_dir).glob('uv_batch-*.hdf5'))
     r = util.create_offscreen_renderer(ws.local_ws(util.TRAINING_DIR, PUZZLE_CFG_FILE))
     TYPE_TO_FLAG = {'rob' : r.BARY_RENDERING_ROBOT,
@@ -253,6 +283,7 @@ def screen_weight(args, ws):
 
 function_dict = {
         'sample_touch' : sample_touch,
+        'group_touch' : group_touch,
         'isect_geometry' : isect_geometry,
         'uvproject' : uvproject,
         'uvrender' : uvrender,
@@ -289,6 +320,9 @@ def _remote_command(ws, cmd, auto_retry=True):
 def remote_sample_touch(ws):
     _remote_command(ws, 'sample_touch')
 
+def remote_group_touch(ws):
+    _remote_command(ws, 'group_touch')
+
 def remote_isect_geometry(ws):
     _remote_command(ws, 'isect_geometry')
 
@@ -303,6 +337,7 @@ def autorun(args):
 
 def collect_stages():
     return [ ('sample_touch', remote_sample_touch),
+             ('group_touch', remote_group_touch),
              ('isect_geometry', remote_isect_geometry),
              ('uvproject', remote_uvproject),
              ('fetch_groundtruth', lambda ws: ws.fetch_condor(util.UV_DIR + '/')),

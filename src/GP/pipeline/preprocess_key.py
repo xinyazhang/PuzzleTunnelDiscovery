@@ -69,15 +69,25 @@ def interpolate_trajectory(args, ws):
     candidate_file = _get_candidate_file(ws)
     # Do not process only_wait, we need to restart if ssh is broken
     Qs = []
-    for fn in pathlib.Path(scratch_dir).glob("traj_*.npz"):
+    DEBUG = False
+    if DEBUG:
+        uw = util.create_unit_world(ws.local_ws(util.TRAINING_DIR, util.PUZZLE_CFG_FILE))
+        util.log("[DEBUG] Reference 21.884796142578125 17.07219123840332 2.7253246307373047")
+    for fn in sorted(pathlib.Path(scratch_dir).glob("traj_*.npz")):
         d = matio.load(fn)
         if d['FLAG_IS_COMPLETE'] == 0:
             continue
+        util.log('[interpolate_trajectory] interpolating trajectory {}'.format(fn))
         traj = d['OMPL_TRAJECTORY']
         metrics = pyosr.path_metrics(traj)
         npoint = ws.config.getint('TrainingKeyConf', 'CandidateNumber')
         dtau = metrics[-1] / float(npoint)
         Qs += [pyosr.path_interpolate(traj, metrics, dtau * i) for i in range(npoint)]
+        if DEBUG:
+            utraj = uw.translate_ompl_to_unit(traj)
+            dout = fn.stem+'.unit.txt'
+            matio.savetxt(dout, utraj)
+            util.log('[DEBUG][interpolate_trajectory] dump unitary path to {}'.format(dout))
     util.log('[interpolate_trajectory] saving the interpolation results to {}'.format(candidate_file))
     np.savez(candidate_file, OMPL_CANDIDATES=Qs)
 
@@ -97,6 +107,12 @@ def estimate_clearance_volume(args, ws):
     nq = Qs.shape[0]
     #uw = ws.condor_unit_world(util.TRAINING_DIR)
     uw = util.create_unit_world(ws.local_ws(util.TRAINING_DIR, util.PUZZLE_CFG_FILE))
+    DEBUG = False
+    if DEBUG:
+        unit_qs = uw.translate_ompl_to_unit(Qs)
+        for uq in progressbar(unit_qs):
+            assert uw.is_valid_state(uq)
+        return
     task_shape = (nq)
     total_chunks = partt.guess_chunk_number(task_shape,
             ws.config.getint('DEFAULT', 'CondorQuota') * 2,
@@ -125,13 +141,14 @@ def estimate_clearance_volume(args, ws):
         tindices = partt.get_task_chunk(task_shape, total_chunks, task_id)
         npoint = ws.config.getint('TrainingKeyConf', 'ClearanceSample')
         # NOTE: THE COMMA, TODO: check all loops that's using get_task_chunk
+        unit_qs = uw.translate_ompl_to_unit(Qs)
         for qi, in progressbar(tindices):
-            free_vertices, touch_vertices, to_inf, free_tau, touch_tau = touchq_util.calc_touch(uw, Qs[qi], npoint, uw.recommended_cres)
+            free_vertices, touch_vertices, to_inf, free_tau, touch_tau = touchq_util.calc_touch(uw, unit_qs[qi], npoint, uw.recommended_cres)
             qi_str = util.padded(qi, nq)
             out_fn = join(scratch_dir, 'unitary_clearance_from_keycan-{}.npz'.format(qi_str))
             np.savez(out_fn,
                      FROM_V_OMPL=Qs[qi],
-                     FROM_V=uw.translate_to_unit_state(Qs[qi]),
+                     FROM_V=unit_qs[qi],
                      FREE_V=free_vertices,
                      TOUCH_V=touch_vertices,
                      IS_INF=to_inf,
@@ -143,22 +160,36 @@ def pickup_key_configuration(args, ws):
     os.makedirs(scratch_dir, exist_ok=True)
     top_k = ws.config.getint('TrainingKeyConf', 'KeyConf')
     fn_list = []
-    median_list = []
     # Do not process only_wait, we need to restart if ssh is broken
     for fn in pathlib.Path(scratch_dir).glob('unitary_clearance_from_keycan-*.npz'):
+        fn_list.append(fn)
+    fn_list = sorted(fn_list)
+    median_list = []
+    max_list = []
+    min_list = []
+    mean_list = []
+    stddev_list = []
+    for fn in progressbar(fn_list[:]):
         d = matio.load(fn)
         distances = pyosr.multi_distance(d['FROM_V'], d['FREE_V'])
-        fn_list.append(fn)
         median_list.append(np.median(distances))
+        max_list.append(np.max(distances))
+        min_list.append(np.min(distances))
+        mean_list.append(np.mean(distances))
+        stddev_list.append(np.std(distances))
     top_k_indices = np.array(median_list).argsort()[:top_k]
+    util.log('[pickup_key_configuration] top k {}'.format(top_k_indices))
     kq_ompl = []
     kq = []
-    for fn in fn_list[top_k_indices]:
+    for k in top_k_indices:
+        fn = fn_list[k]
         d = matio.load(fn)
         kq_ompl.append(d['FROM_V_OMPL'])
         kq.append(d['FROM_V'])
     key_out = ws.local_ws(util.KEY_FILE)
-    np.savez(key_out, KEYQ_OMPL=kq_ompl, KEYQ=kq)
+    stat_out = np.array([median_list, max_list, min_list, mean_list, stddev_list])
+    util.log('[pickup_key_configuration] writting results to {}'.format(key_out))
+    np.savez(key_out, KEYQ_OMPL=kq_ompl, KEYQ=kq, _STAT=stat_out)
 
 # We decided not to use reflections because we may leak internal functions to command line
 function_dict = {

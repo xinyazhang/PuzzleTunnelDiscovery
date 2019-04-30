@@ -5,3 +5,5 @@
 3. ~~Use vanilla state to tackle with the change of OMPL center from objautouv~~
    + Fixed, but it's still recommended to use objautouv-ed geometries in the
        beginning
+4. ~~Inconsistency between OMPL state and Unitary state.~~
+

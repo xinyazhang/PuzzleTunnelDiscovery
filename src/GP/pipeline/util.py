@@ -275,6 +275,9 @@ class Workspace(object):
                 continue
             yield puzzle_fn, ent
 
+def trim_suffix(fn):
+    return os.path.splitext(fn)[0]
+
 def padded(current:int, possible_max:int):
     return str(current).zfill(len(str(possible_max)))
 

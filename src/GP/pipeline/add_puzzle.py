@@ -98,7 +98,7 @@ def copy_puzzle(tgt_dir, puzzle_file, chart_resolution):
         util.log('''[copy_puzzle] \t san: {}'''.format(san_gq))
 
 def add_testing_puzzle(ws, fn):
-    fn_base = os.path.splitext(basename(fn))[0]
+    fn_base = util.trim_suffix(basename(fn))
     tgt_dir = join(ws.testing_dir, fn_base)
     if os.path.isdir(tgt_dir):
         do_override = util.ask_user("{} is already existing, override?".format(tgt_dir))

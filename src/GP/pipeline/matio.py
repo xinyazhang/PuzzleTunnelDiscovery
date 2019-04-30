@@ -24,4 +24,25 @@ def load(fn):
 def hdf5_overwrite(f, path, ds):
     if path in f:
         del f[path]
-    f.create_dataset(path, data=ds, compression='lzf')
+    if np.isscalar(ds) or np.ndim(ds) == 0:
+        # Scalar datasets don't support chunk/filter options
+        f.create_dataset(path, data=ds)
+    else:
+        f.create_dataset(path, data=ds, compression='lzf')
+
+def savetxt(fn, a):
+    np.savetxt(fn, a, fmt='%.17g')
+
+def npz_cat(fns):
+    dlist = {}
+    for fn in fns:
+        d = np.load(fn)
+        for k,v in d.items(): # Python 3 syntax
+            if k not in dlist:
+                dlist[k] = [v]
+            else:
+                dlist[k].append(v)
+    dcat = {}
+    for k,v in dlist.items():
+        dcat[k] = np.concatenate(dlist[k])
+    return dcat

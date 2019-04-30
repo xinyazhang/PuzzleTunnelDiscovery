@@ -9,8 +9,9 @@ def sample_one_touch(uw, q0, stepping):
     to = pyosr.apply(q0, tr, aa)
     return uw.transit_state_to_with_contact(q0, to, stepping)
 
-def calc_touch(uw, vertex, batch_size, stepping):
-    q0 = uw.translate_to_unit_state(vertex)
+def calc_touch(uw, q0, batch_size, stepping):
+    #q0 = uw.translate_to_unit_state(vertex)
+    # assert uw.is_valid_state(q0)
     N_RET = 5
     ret_lists = [[] for i in range(N_RET)]
     for i in range(batch_size):
