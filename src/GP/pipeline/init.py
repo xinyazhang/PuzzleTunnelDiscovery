@@ -16,6 +16,7 @@ def setup_parser(subparsers):
 def run(args):
     ws = util.Workspace(args.dir, init=True)
     os.makedirs(ws.dir, exist_ok=True)
+    os.makedirs(ws.training_dir, exist_ok=True)
     ws.touch_signature()
     envconfig.init_config_file(args, ws)
     add_puzzle.copy_puzzle(ws.training_dir, args.training_puzzle, ws.chart_resolution)
