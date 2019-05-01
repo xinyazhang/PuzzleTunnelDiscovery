@@ -60,9 +60,10 @@ def wait_for_training(args, ws):
                     pid = int(s)
                     break
         ret = 1
+        util.log('[wait_for_training] waiting pid {} for file {}'.format(pid, pidfile))
         while ret != 0:
             ret = util.pwait(pid)
-        print("{} (pid: {}) waited".format(geo_type, pid))
+        util.log("[wait_for_training] {} (pid: {}) waited".format(geo_type, pid))
         write_pidfile(pidfile, -1)
 
 def predict_surface(args, ws):

@@ -320,5 +320,5 @@ def ack(s):
 
 def pwait(pid):
     if pid < 0:
-        return
+        return 0
     return subprocess.run(['tail', '--pid={}'.format(pid), '-f', '/dev/null'])
