@@ -19,7 +19,9 @@ def run(args):
     os.makedirs(ws.training_dir, exist_ok=True)
     ws.touch_signature()
     envconfig.init_config_file(args, ws)
-    add_puzzle.copy_puzzle(ws.training_dir, args.training_puzzle, ws.chart_resolution)
+    if not add_puzzle.copy_puzzle(ws.training_dir, args.training_puzzle, ws.chart_resolution):
+        util.fatal('[init] Could not add puzzle {}'.format(args.training_puzzle))
+        return
     for p in args.test_puzzle:
         add_puzzle.add_testing_puzzle(ws, p)
     util.ack("[init] workspace initalized: {}".format(ws.dir))

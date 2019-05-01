@@ -16,6 +16,7 @@ def setup_parser(subparsers):
     p.add_argument('puzzles', help='One or more OMPL .cfg file(s)', nargs='+')
 
 def copy_puzzle_geometry(obj_from, target_file, chart_resolution):
+    util.log('[copy_puzzle_geometry] {} -> {}'.format(obj_from, target_file))
     if os.path.isfile(target_file):
         if not util.ask_user("{} exists, overwriting?".format(target_file)):
             return
@@ -49,7 +50,7 @@ def copy_puzzle(tgt_dir, puzzle_file, chart_resolution):
     except configparser.NoOptionError as e:
         util.warn('[copy_puzzle] missing collision_resolution in puzzle {}'.format(puzzle_file))
         util.warn('[copy_puzzle] This puzzle will not be added')
-        return
+        return False
     # Copy geometry
     os.makedirs(tgt_dir, exist_ok=True)
     copy_puzzle_geometry(cfg.env_fn, join(tgt_dir, cfg.env_fn_base), chart_resolution)
@@ -74,10 +75,10 @@ def copy_puzzle(tgt_dir, puzzle_file, chart_resolution):
     new_gq = new_uw.translate_vanilla_to_ompl(van_gq)
     if not new_uw.is_valid_state(new_uw.translate_ompl_to_unit(new_iq)[0]):
         util.fatal("[copy_puzzle] The update geometry renders its initial OMPL state invalid")
-        return
+        return False
     if not new_uw.is_valid_state(new_uw.translate_ompl_to_unit(new_gq)[0]):
         util.fatal("[copy_puzzle] The update geometry renders its goal OMPL state invalid")
-        return
+        return False
     # Sanity check
     san_iq = new_uw.translate_ompl_to_vanilla(new_iq)
     san_gq = new_uw.translate_ompl_to_vanilla(new_gq)
@@ -96,6 +97,7 @@ def copy_puzzle(tgt_dir, puzzle_file, chart_resolution):
         util.log('''[copy_puzzle] \t van: {}'''.format(van_gq))
         util.log('''[copy_puzzle] \t new: {}'''.format(new_gq))
         util.log('''[copy_puzzle] \t san: {}'''.format(san_gq))
+    return True
 
 def add_testing_puzzle(ws, fn):
     fn_base = util.trim_suffix(basename(fn))
