@@ -34,6 +34,8 @@ def _train(ws, geo_type):
     params['ompl_config'] = ws.training_puzzle
     params['what_to_render'] = geo_type
     params['checkpoint_dir'] = ws.local_ws(util.NEURAL_SCRATCH, geo_type) + '/'
+    params['suppress_hot'] = 0.0
+    params['suppress_cold'] = 0.7
     os.makedirs(ws.local_ws(util.NEURAL_SCRATCH), exist_ok=True)
     pidfile = ws.local_ws(util.NEURAL_SCRATCH, geo_type + '.pid')
     write_pidfile(pidfile, os.getpid())
@@ -66,25 +68,31 @@ def wait_for_training(args, ws):
         util.log("[wait_for_training] {} (pid: {}) waited".format(geo_type, pid))
         write_pidfile(pidfile, -1)
 
-def predict_surface(args, ws):
+def _predict_surface(args, ws, geo_type):
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
-        for geo_type in ['rob', 'env']:
-            params = hg_launcher.create_default_config()
-            params['ompl_config'] = ws.training_puzzle
-            params['what_to_render'] = geo_type
-            params['checkpoint_dir'] = ws.local_ws(util.NEURAL_SCRATCH, geo_type) + '/'
-            print("Predicting {}:{}".format(puzzle_fn, geo_type))
-            hg_launcher.launch_with_params(params, do_training=False)
-            src = ws.local_ws(util.NEURAL_SCRATCH, geo_type, '{}-atex.npz'.format(puzzle_name))
-            dst = ws.local_ws(util.TESTING_DIR, puzzle_name, '{}-atex.npz'.format(geo_type))
-            print("Copy surface prediction file {} => {}".format(src, dst))
-            shutil.copy(src, dst)
+        params = hg_launcher.create_default_config()
+        params['ompl_config'] = ws.training_puzzle
+        params['what_to_render'] = geo_type
+        params['checkpoint_dir'] = ws.local_ws(util.NEURAL_SCRATCH, geo_type) + '/'
+        util.log("[prediction] Predicting {}:{}".format(puzzle_fn, geo_type))
+        hg_launcher.launch_with_params(params, do_training=False)
+        src = ws.local_ws(util.NEURAL_SCRATCH, geo_type, '{}-atex.npz'.format(puzzle_name))
+        dst = ws.local_ws(util.TESTING_DIR, puzzle_name, '{}-atex.npz'.format(geo_type))
+        util.log("[prediction] Copy surface prediction file {} => {}".format(src, dst))
+        shutil.copy(src, dst)
+
+def predict_rob(args, ws):
+    _predict_surface(args, ws, 'rob')
+
+def predict_env(args, ws):
+    _predict_surface(args, ws, 'env')
 
 function_dict = {
         'train_rob' : train_rob,
         'train_env' : train_env,
         'wait_for_training' : wait_for_training,
-        'predict_surface' : predict_surface
+        'predict_rob' : predict_rob,
+        'predict_env' : predict_env,
 }
 
 def setup_parser(subparsers):
@@ -125,8 +133,11 @@ def remote_train_env(ws):
 def remote_wait_for_training(ws):
     _remote_command(ws, 'wait_for_training', auto_retry=True, in_tmux=False)
 
-def remote_predict_surface(ws):
-    _remote_command(ws, 'predict_surface', auto_retry=True, in_tmux=False)
+def remote_predict_rob(ws):
+    _remote_command(ws, 'predict_rob', auto_retry=True, in_tmux=False)
+
+def remote_predict_env(ws):
+    _remote_command(ws, 'predict_env', auto_retry=True, in_tmux=False)
 
 def autorun(args):
     ws = util.Workspace(args.dir)
@@ -141,6 +152,7 @@ def collect_stages():
              ('train_rob', remote_train_rob),
              ('train_env', remote_train_env),
              ('wait_for_training', remote_wait_for_training),
-             ('predict_surface', remote_predict_surface),
+             ('predict_rob', remote_predict_rob),
+             ('predict_env', remote_predict_env),
              ('fetch_from_gpu', _fetch),
            ]

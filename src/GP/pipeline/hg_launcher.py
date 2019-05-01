@@ -152,7 +152,7 @@ def launch_with_params(params, do_training):
         # Alternatively we can let TF handles this.
         model.training_init(nEpochs=params['nepochs'], epochSize=params['epoch_size'], saveStep=params['saver_step'], dataset=None)
     else:
-        model.testing_init(nEpochs=1, epochSize=params['prediction_epoch_size'], saveStep=0, dataset=None, load=params['ckpt_dir'])
+        model.testing_init(nEpochs=1, epochSize=params['prediction_epoch_size'], saveStep=0, dataset=None, load=params['checkpoint_dir'])
 
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
