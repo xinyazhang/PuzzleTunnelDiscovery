@@ -17,6 +17,7 @@ except ImportError:
 from . import util
 from . import condor
 from . import choice_formatter
+from . import parse_ompl
 from . import matio
 from . import partt
 from . import touchq_util
@@ -286,17 +287,28 @@ def uvrender(args, ws):
                 afb += w
                 afb_uw += uniform_weight
                 np.clip(afb_uw, 0, 1.0, out=afb_uw) # afb_uw is supposed to be binary
-        np.savez(ws.local_ws(util.TRAINING_DIR, '{}_chart.npz'.format(rname)),
+        chart_fn = ws.local_ws(util.TRAINING_DIR, '{}_chart.npz'.format(rname))
+        np.savez(chart_fn,
                  WEIGHTED=afb,
                  UNIFORM_WEIGHTED=afb_uw)
+        util.ack('[uvrender] {} rendered'.format(chart_fn))
         rgb = np.zeros(list(afb.shape) + [3])
         rgb[...,1] = afb
-        imsave(ws.local_ws(util.TRAINING_DIR, '{}_chart.png'.format(rname)), rgb)
+        chart_fn = ws.local_ws(util.TRAINING_DIR, '{}_chart.png'.format(rname))
+        imsave(chart_fn, rgb)
+        util.ack('[uvrender] {} rendered'.format(chart_fn))
         rgb[...,1] = afb_uw
+        chart_fn = ws.local_ws(util.TRAINING_DIR, '{}_chart_uniform_weight.png'.format(rname))
         imsave(ws.local_ws(util.TRAINING_DIR, '{}_chart_uniform_weight.png'.format(rname)), rgb)
+        util.ack('[uvrender] {} rendered'.format(chart_fn))
 
 
 def screen_weight(args, ws):
+    puzzle = ws.local_ws(util.TRAINING_DIR, util.PUZZLE_CFG_FILE)
+    cfg, _ = parse_ompl.parse_simple(puzzle)
+    fns = {}
+    fns['rob'] = cfg.rob_fn
+    fns['env'] = cfg.env_fn
     for geo_type in ['rob', 'env']:
         d = matio.load(ws.local_ws(util.TRAINING_DIR, '{}_chart.npz'.format(geo_type)))
         img = d['WEIGHTED'] # Unlike condor_touch_configuration, we only have one file here
@@ -308,8 +320,14 @@ def screen_weight(args, ws):
             m = np.mean(nz)
             img[img < m] = 0.0
             print("[screen_weight] geo {} loop {}: sum {}".format(geo_type, i+1, np.sum(img)))
-        imsave(ws.local_ws(util.TRAINING_DIR, '{}_chart_screened.png'.format(geo_type)), img)
-
+        rgb = np.zeros(list(img.shape) + [3])
+        rgb[...,1] = img
+        imsave(ws.local_ws(util.TRAINING_DIR, '{}_chart_screened.png'.format(geo_type)), rgb)
+        rgb[np.nonzero(rgb)] = 1.0
+        fn = ws.local_ws(util.TRAINING_DIR, '{}_chart_screened_uniform.png'.format(geo_type))
+        imsave(fn, rgb)
+        final_fn = pathlib.Path(fns[geo_type])
+        imsave(final_fn.with_suffix('.png'), rgb)
 
 function_dict = {
         'sample_touch' : sample_touch,
