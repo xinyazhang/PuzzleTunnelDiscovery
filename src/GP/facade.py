@@ -9,7 +9,8 @@ import colorama
 def main():
     colorama.init()
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    subparsers = parser.add_subparsers(dest='command', required=True)
+    subparsers = parser.add_subparsers(dest='command')
+    subparsers.required = True
     # In the order that users general use
     pipeline.init.setup_parser(subparsers)
     pipeline.add_puzzle.setup_parser(subparsers)
