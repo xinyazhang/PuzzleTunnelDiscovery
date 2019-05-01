@@ -5,7 +5,7 @@ import os
 # import matplotlib.pyplot as plt
 import random
 import time
-from skimage import transform
+# from skimage import transform
 import scipy.misc as scm
 
 import sys

@@ -31,13 +31,12 @@ SOLVER_SCRATCH = 'solver_scratch'
 # Used by multiple pipeline parts
 #
 # Note: we use UPPERCASE KEY to indicate this is training data/ground truth.
-#       the LOWERCASE key indicates this file contains predictions
 KEY_FILE = os.path.join(TRAINING_DIR, 'KEY.npz')
 UV_DIR = os.path.join(CONDOR_SCRATCH, 'training_key_uvproj')
 
 PIXMARGIN = 2
 
-KEY_PREDICTION = 'key.npz'
+KEY_PREDICTION = 'forest_roots.npz'
 PDS_SUBDIR = 'pds'
 
 RDT_FOREST_ALGORITHM_ID = 15
@@ -275,10 +274,10 @@ class Workspace(object):
         _rsync(self.gpu_host, self.gpu_ws, None, self.local_ws, *paths)
 
     def test_puzzle_generator(self):
-        for ent in os.listdir(self.local_ws(util.TESTING_DIR)):
-            puzzle_fn = self.local_ws(util.TESTING_DIR, ent, 'puzzle.cfg')
-            if not isdir(ent) or not isfile(puzzle_fn):
-                util.log("Cannot find puzzle file {}, continue to next dir".format(puzzle_fn))
+        for ent in os.listdir(self.local_ws(TESTING_DIR)):
+            puzzle_fn = self.local_ws(TESTING_DIR, ent, 'puzzle.cfg')
+            if not os.path.isfile(puzzle_fn):
+                log("Cannot find puzzle file {} continue to next dir".format(puzzle_fn))
                 continue
             yield puzzle_fn, ent
 

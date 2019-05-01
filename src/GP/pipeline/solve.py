@@ -10,7 +10,7 @@ import numpy as np
 import copy
 import multiprocessing
 from scipy.misc import imsave, imread
-import progressbar
+from progressbar import progressbar
 
 from . import util
 from . import choice_formatter
@@ -21,6 +21,9 @@ except:
 from . import condor
 from . import matio
 from . import atlas
+from . import texture_format
+from . import parse_ompl
+import pyosr
 
 #
 # Functions to process workspaces locally
@@ -44,7 +47,6 @@ def _predict_atlas2prim(tup):
     r = util.create_offscreen_renderer(puzzle_fn, ws.chart_resolution)
     r.uv_feedback = True
     r.avi = False
-    io_dir = self._args.out_dir
     for geo_type,flags in zip(['rob', 'env'], [pyosr.Renderer.NO_SCENE_RENDERING, pyosr.Renderer.NO_ROBOT_RENDERING]):
         r.render_mvrgbd(pyosr.Renderer.UV_MAPPINNG_RENDERING|flags)
         atlas2prim = np.copy(r.mvpid.reshape((r.pbufferWidth, r.pbufferHeight)))
@@ -70,7 +72,7 @@ def _predict_worker(tup):
     key_conf = []
     nrot = ws.config.getint('Prediction', 'NumberOfRotations')
     margin = ws.config.getfloat('Prediction', 'Margin')
-    batch_size = ws.config.getfloat('Prediction', 'SurfacePairsToSample')
+    batch_size = ws.config.getint('Prediction', 'SurfacePairsToSample')
     for i in progressbar(range(batch_size)):
         tup1 = rob_sampler.sample(uw)
         tup2 = env_sampler.sample(uw)
@@ -83,15 +85,18 @@ def _predict_worker(tup):
     cfg, config = parse_ompl.parse_simple(puzzle_fn)
     iq = parse_ompl.tup_to_ompl(cfg.iq_tup)
     gq = parse_ompl.tup_to_ompl(cfg.gq_tup)
-    qs_ompl = uw.translate_unit_to_ompl(qs)
+    util.log("[predict_keyconf(worker)] sampled {} keyconf from puzzle {}".format(len(key_conf), puzzle_name))
+    qs_ompl = uw.translate_unit_to_ompl(key_conf)
     ompl_q = np.concatenate((iq, gq, qs_ompl), axis=0)
     key_fn = ws.local_ws(util.TESTING_DIR, puzzle_name, util.KEY_PREDICTION)
+    util.log("[predict_keyconf(worker)] save to key file {}".format(key_fn))
     np.savez(key_fn, KEYQ_OMPL=ompl_q)
 
 def predict_keyconf(args, ws):
     task_tup = []
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
         task_tup.append((ws.dir, puzzle_fn, puzzle_name))
+        util.log('[predict_keyconf] found puzzle {} at {}'.format(puzzle_name, puzzle_fn))
     if 'auto' == ws.config.get('Prediction', 'NumberOfPredictionProcesses'):
         ncpu = None
     else:
@@ -183,6 +188,7 @@ def setup_parser(subparsers):
     p.add_argument('--only_wait', action='store_true')
     p.add_argument('--task_id', help='Feed $(Process) from HTCondor', type=int, default=None)
     p.add_argument('--current_trial', help='Trial to solve the puzzle', type=int, default=0)
+    p.add_argument('dir', help='Workspace directory')
 
 def run(args):
     if args.stage in function_dict:
@@ -214,7 +220,7 @@ def remote_connect_forest(ws):
 def collect_stages():
     ret = [ ('predict_keyconf', lambda ws: predict_keyconf(None, ws)),
             ('upload_keyconf_to_condor', lambda ws: ws.deploy_to_condor(util.TESTING_DIR + '/')),
-            ('sample_pds', remote_sample_pds) if 'se3solver' in sys.modules else (None, None),
+            ('sample_pds', remote_sample_pds),
             ('forest_rdt', remote_forest_rdt),
             ('forest_edges', remote_forest_edges),
             ('connect_forest', remote_connect_forest),

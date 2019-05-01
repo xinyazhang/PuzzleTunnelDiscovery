@@ -44,11 +44,10 @@ class AtlasSampler(object):
     def __init__(self, atlas2prim_fn, surface_prediction_fn, geo_type, geo_id):
         self._geo_type = geo_type
         self._geo_id = geo_id
-        tp = self._tp = task_partitioner
         # FIXME: Notify users to run corresponding commands when files not found
         self._atlas2prim = np.load(atlas2prim_fn)['PRIM']
         d = np.load(surface_prediction_fn)
-        self._atlas = d[d.keys()[0]] # Load the first element
+        self._atlas = d['ATEX'] # Load the first element
         #np.clip(self._atlas, 0.0, None, out=self._atlas) # Clips out negative weights
         self._atlas -= np.min(self._atlas) # All elements must be non-negative
         print("Atlas resolution {}".format(self._atlas.shape))
