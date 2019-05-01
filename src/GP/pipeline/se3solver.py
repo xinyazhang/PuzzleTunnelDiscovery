@@ -10,12 +10,16 @@ import os
 from os.path import abspath, dirname, join, isdir
 import itertools
 
+from . import util
 sys.path.insert(0, os.getcwd())
-import pyse3ompl as plan
+try:
+    import pyse3ompl as plan
+    PLANNER_PRM = plan.PLANNER_PRM
+    PLANNER_RDT = plan.PLANNER_RDT
+except ImportError as e:
+    util.warn(str(e))
+    util.warn("[WARNING] CANNOT IMPORT pyse3ompl. This node is incapable of RDT forest planning")
 from . import parse_ompl
-
-PLANNER_PRM = plan.PLANNER_PRM
-PLANNER_RDT = plan.PLANNER_RDT
 PDS_FLAG_TERMINATE = 1
 
 def create_driver(args):
