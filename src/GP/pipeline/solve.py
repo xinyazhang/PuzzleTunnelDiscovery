@@ -209,8 +209,9 @@ def run(args):
 #
 def _remote_command(ws, cmd, auto_retry=True):
     ws.remote_command(ws.condor_host,
-                      ws.condor_exec,
-                      'preprocess_surface', cmd, auto_retry=auto_retry)
+                      ws.condor_exec(),
+                      ws.condor_ws(),
+                      'solve', cmd, auto_retry=auto_retry)
 
 def remote_sample_pds(ws):
     _remote_command(ws, 'sample_pds')
