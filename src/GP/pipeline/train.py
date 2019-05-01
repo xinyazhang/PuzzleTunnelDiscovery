@@ -13,8 +13,9 @@ from . import util
 from . import choice_formatter
 try:
     from . import hg_launcher
-except:
+except ImportError as e:
     util.warn("[WARNING] CANNOT IMPORT hg_launcher. This node is incapable of training/prediction")
+    # Note: do NOT raise exceptions in modules loaded by __init__.py
 
 def _deploy(ws):
     ws.deploy_to_gpu(util.WORKSPACE_SIGNATURE_FILE,

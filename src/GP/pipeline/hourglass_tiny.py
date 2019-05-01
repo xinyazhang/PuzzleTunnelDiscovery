@@ -28,13 +28,19 @@ Abstract:
 """
 
 import time
-import tensorflow as tf
 import numpy as np
 import sys
 import datetime
 import os
 from scipy.misc import imsave
 import progressbar
+
+from . import util
+try:
+    import tensorflow as tf
+except ImportError as e:
+    util.warn("[WARNING] CANNOT IMPORT tensorflow. This node is incapable of training/prediction")
+    raise e
 
 class HourglassModel():
     """ HourglassModel class: (to be renamed)

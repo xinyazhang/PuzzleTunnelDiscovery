@@ -8,8 +8,13 @@ from os.path import join,dirname,basename,isabs
 import six.moves.configparser as configparser
 import sys
 
-from . import hourglass_tiny
-HourglassModel = hourglass_tiny.HourglassModel
+from . import util
+try:
+    from . import hourglass_tiny
+    HourglassModel = hourglass_tiny.HourglassModel
+except ImportError as e:
+    util.warn(str(e))
+    raise e
 from . import hg_datagen as datagen
 
 _CONFIG_TEMPLATE= \
