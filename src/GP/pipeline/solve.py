@@ -16,7 +16,8 @@ from . import util
 from . import choice_formatter
 try:
     from . import se3solver
-except:
+except ImportError as e:
+    util.warn(str(e))
     util.warn("[WARNING] CANNOT IMPORT se3solver. Some function will be disabled and the pipeline is broken")
 from . import condor
 from . import matio
@@ -31,7 +32,8 @@ import pyosr
 
 def _trial_id(ws, trial):
     max_trial = ws.config.getint('Solver', 'Trials', fallback=1)
-    util.padded(trial, max(trial, max_trial))
+    # util.log('[_trial_id] trial {} max_trial {}'.format(trial, max_trial))
+    return util.padded(trial, max(trial, max_trial))
 
 def _puzzle_pds(ws, puzzle_name, trial):
     pds_dir = ws.local_ws(util.SOLVER_SCRATCH,
@@ -106,36 +108,40 @@ def predict_keyconf(args, ws):
     pcpu = multiprocessing.Pool(ncpu)
     pcpu.map(_predict_worker, task_tup)
 
-def TmpDriverArgs(object):
+class TmpDriverArgs(object):
     pass
 
 def sample_pds(args, ws):
-    if 'se3solver' not in sys.modules:
+    if 'pipeline.se3solver' not in sys.modules:
         raise RuntimeError("se3solver is not loaded")
     max_trial = ws.config.getint('Solver', 'Trials', fallback=1)
     nsamples = ws.config.getint('Solver', 'PDSSize')
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+        util.log('[sample_pds] sampling puzzle {}'.format(puzzle_name))
         driver_args = TmpDriverArgs()
         driver_args.puzzle = puzzle_fn
-        driver_args.planner_id = se3solver.PLANNER_RDT
-        driver_args.sampler_id = sampler_id
+        driver_args.planner_id = se3solver.PLANNER_PRM
+        driver_args.sampler_id = 0
         driver = se3solver.create_driver(driver_args)
         uw = util.create_unit_world(puzzle_fn)
         for i in range(max_trial):
+            # util.log('[sample_pds] trial id {}'.format(_trial_id(ws, 0)))
             Q = driver.presample(nsamples)
-            uQ = ws.translate_ompl_to_unit(Q)
+            uQ = uw.translate_ompl_to_unit(Q)
             n = Q.shape[0]
             QF = np.zeros((n, 1), dtype=np.uint32)
-            for uq in uQ:
+            for j, uq in enumerate(uQ):
                 if uw.is_disentangled(uq):
-                    QF[j] = PDS_FLAG_TERMINATE
+                    QF[j] = se3solver.PDS_FLAG_TERMINATE
             fn = _puzzle_pds(ws, puzzle_name, i)
             np.savez(fn, Q=Q, QF=QF)
+            util.log('[sample_pds] samples stored at {}'.format(fn))
 
 def forest_rdt(args, ws):
-    trial_str = 'trial-{}'.format(_trial_id(args.current_trial))
+    trial_str = 'trial-{}'.format(_trial_id(ws, args.current_trial))
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
-        scratch_dir = ws.local_ws(util.SOLVER_SCRATCH, puzzle_name, trial_str)
+        rel_scratch_dir = os.path.join(util.SOLVER_SCRATCH, puzzle_name, trial_str)
+        scratch_dir = ws.local_ws(rel_scratch_dir)
         if args.only_wait:
             condor.local_wait(scratch_dir)
             continue
@@ -147,7 +153,7 @@ def forest_rdt(args, ws):
         condor_job_args = ['se3solver.py',
                 'solve', puzzle_fn,
                 util.RDT_FOREST_ALGORITHM_ID,
-                ws.config('Solver', 'TimeThreshold'),
+                ws.config.getfloat('Solver', 'TimeThreshold'),
                 '--samset', _puzzle_pds(ws, puzzle_name, args.current_trial),
                 '--replace_istate',
                 'file={},offset=$$([$(Process)]),size=1,out={}'.format(key_fn, scratch_dir)
@@ -155,13 +161,14 @@ def forest_rdt(args, ws):
         keys = matio.load(key_fn)
         condor.local_submit(ws,
                             util.PYTHON,
-                            iodir=scratch_dir,
+                            iodir_rel=rel_scratch_dir,
                             arguments=condor_job_args,
                             instances=keys['KEYQ_OMPL'].shape[0],
                             wait=False) # do NOT wait here, we have to submit EVERY puzzle at once
-    only_wait_args = copy.deepcopy(args)
-    only_wait_args.only_wait = True
-    forest_rdt(only_wait_args, ws)
+    if not args.only_wait:
+        only_wait_args = copy.deepcopy(args)
+        only_wait_args.only_wait = True
+        forest_rdt(only_wait_args, ws)
 
 def forest_edges(args, ws):
     raise NotImplemented("forest_edges")

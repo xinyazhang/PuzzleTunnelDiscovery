@@ -8,3 +8,4 @@ from . import preprocess_surface
 from . import hg_datagen
 from . import train
 from . import solve
+from . import se3solver
