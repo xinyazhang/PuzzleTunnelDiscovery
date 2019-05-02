@@ -17,6 +17,7 @@ def main():
     parser.add_argument('--sbudget', help='Number of samples limit, in additional to time limit', type=int ,default=-1)
     parser.add_argument('--out', help='Output complete planning data', default='')
     parser.add_argument('--trajectory_out', help='Output complete planning data', default='')
+    parser.add_argument('--bloom_out', help='Output bloom results', default=None)
     parser.add_argument('--sampler_id', help='Valid state sampler', type=int, default=0)
     parser.add_argument('--saminj', help='Sample injection file', type=str, default='')
     parser.add_argument('--samset', help='Predefined sample set', type=str, default='')

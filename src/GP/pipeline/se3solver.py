@@ -124,7 +124,8 @@ def solve(args):
                 if os.path.exists(ssc_fn) and os.path.exists(tree_fn):
                     print("skipping exising file {} and {}".format(ssc_fn, tree_fn))
                     continue
-            _,_ = driver.solve(args.days, return_ve = False, sbudget=args.sbudget, record_compact_tree=record_compact_tree, continuous_motion_validator=ccd)
+            return_ve = args.bloom_out is not None
+            V,_ = driver.solve(args.days, return_ve=return_ve, sbudget=args.sbudget, record_compact_tree=record_compact_tree, continuous_motion_validator=ccd)
             '''
             if isdir(out_path):
                 savemat('{}/tree-{}.mat'.format(out_path, index), dict(V=V, E=E), do_compression=True)
@@ -136,8 +137,11 @@ def solve(args):
             if record_compact_tree:
                 CNVI, CNV, CE = driver.get_compact_graph()
                 savemat(tree_fn, dict(CNVI=CNVI, CNV=CNV, CE=CE), do_compression=True)
+            if args.bloom_out:
+                np.savez(args.bloom_out, BLOOM=V)
     else:
-        driver.solve(args.days, args.out, sbudget=args.sbudget)
+        return_ve = args.bloom_out is not None
+        V, _ = driver.solve(args.days, args.out, sbudget=args.sbudget, return_ve=return_ve)
         if args.trajectory_out:
             is_complete = (driver.latest_solution_status == plan.EXACT_SOLUTION)
             np.savez(args.trajectory_out, OMPL_TRAJECTORY=driver.latest_solution, FLAG_IS_COMPLETE=is_complete)
