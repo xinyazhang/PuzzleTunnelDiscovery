@@ -71,9 +71,10 @@ def wait_for_training(args, ws):
 def _predict_surface(args, ws, geo_type):
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
         params = hg_launcher.create_default_config()
-        params['ompl_config'] = ws.training_puzzle
+        params['ompl_config'] = puzzle_fn
         params['what_to_render'] = geo_type
         params['checkpoint_dir'] = ws.local_ws(util.NEURAL_SCRATCH, geo_type) + '/'
+        params['dataset_name'] = puzzle_name # Enforce the generated filename
         util.log("[prediction] Predicting {}:{}".format(puzzle_fn, geo_type))
         hg_launcher.launch_with_params(params, do_training=False)
         src = ws.local_ws(util.NEURAL_SCRATCH, geo_type, '{}-atex.npz'.format(puzzle_name))

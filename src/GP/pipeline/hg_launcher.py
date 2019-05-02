@@ -116,7 +116,7 @@ def launch_with_params(params, do_training):
     assert isabs(ompl_cfg)
     # According to workspace hierarchy, the foloder name is the actual puzzle name
     # Note: all traing data are named after 'train'
-    ds_name = basename(dirname(ompl_cfg))
+    ds_name = basename(dirname(ompl_cfg)) if 'dataset_name' not in params else params['dataset_name']
     aug_dict = _craft_dict(params)
     dataset = datagen.create_dataset(ompl_cfg, geo_type=geo_type,
                                      aug_patch=True,
