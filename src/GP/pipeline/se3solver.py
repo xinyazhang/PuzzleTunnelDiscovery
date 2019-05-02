@@ -47,6 +47,8 @@ def create_driver(args):
     if cdres is None:
         cdres = config.getfloat('problem', 'collision_resolution')
     driver.set_cdres(cdres)
+    if hasattr(args, 'solver_option_vector') and args.solver_option_vector:
+        driver.set_option_vector(args.solver_option_vector)
 
     return driver
 
