@@ -119,8 +119,10 @@ Margin                      = 1e-6
 [Solver]
 # Number of samples in the PreDefined Sample set
 PDSSize = 4194304
+PDSBloom = 3072
 # Maximum trials before cancel
 Trials = 1
+
 
 # In day(s), 0.01 ~= 14 minutes, 0.02 ~= 0.5 hour
 TimeThreshold = 0.02

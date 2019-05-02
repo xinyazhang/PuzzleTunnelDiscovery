@@ -43,6 +43,9 @@ def _puzzle_pds(ws, puzzle_name, trial):
     fn ='{}.npz'.format(_trial_id(ws, trial))
     return join(pds_dir, fn)
 
+def _rel_bloom_scratch(ws, puzzle_fn, trial):
+    return join(util.SOLVER_SCRATCH, puzzle_fn, util.PDS_SUBDIR, 'bloom-'+_trial_id(ws, trial))
+
 def _predict_atlas2prim(tup):
     ws_dir, puzzle_fn, puzzle_name = tup
     ws = util.Workspace(ws_dir)
@@ -111,7 +114,7 @@ def predict_keyconf(args, ws):
 class TmpDriverArgs(object):
     pass
 
-def sample_pds(args, ws):
+def _sample_pds_old(args, ws):
     if 'pipeline.se3solver' not in sys.modules:
         raise RuntimeError("se3solver is not loaded")
     max_trial = ws.config.getint('Solver', 'Trials', fallback=1)
@@ -137,6 +140,52 @@ def sample_pds(args, ws):
             np.savez(fn, Q=Q, QF=QF)
             util.log('[sample_pds] samples stored at {}'.format(fn))
 
+# Bloom from roots
+def sample_pds(args, ws):
+    if not args.only_wait:
+        for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+            rel_bloom = _rel_bloom_scratch(ws, puzzle_name, args.current_trial)
+            util.log('[sample_pds]  rel_bloom {}'.format(rel_bloom))
+            scratch_dir = ws.local_ws(rel_bloom)
+            key_fn = ws.local_ws(util.TESTING_DIR, puzzle_name, util.KEY_PREDICTION)
+            condor_job_args = ['se3solver.py',
+                    'solve',
+                    '--replace_istate',
+                    'file={},offset=$$([$(Process)]),size=1,out={}'.format(key_fn, scratch_dir),
+                    '--bloom_out',
+                    join(scratch_dir, 'bloom-from_$(Process).npz'),
+                    puzzle_fn,
+                    util.RDT_FOREST_ALGORITHM_ID,
+                    1.0,
+                    '--bloom_limit',
+                    ws.config.getint('Solver', 'PDSBloom')
+                              ]
+            keys = matio.load(key_fn)
+            condor.local_submit(ws,
+                                util.PYTHON,
+                                iodir_rel=rel_bloom,
+                                arguments=condor_job_args,
+                                instances=keys['KEYQ_OMPL'].shape[0],
+                                wait=False) # do NOT wait here, we have to submit EVERY puzzle at once
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+        rel_bloom = _rel_bloom_scratch(ws, puzzle_name, args.current_trial)
+        scratch_dir = ws.local_ws(rel_bloom)
+        condor.local_wait(scratch_dir)
+        pds_fn = _puzzle_pds(ws, puzzle_name, args.current_trial)
+        Q_list = []
+        for fn in sorted(pathlib.Path(scratch_dir).glob("bloom-from_*.npz")):
+            d = matio.load(fn)
+            Q_list.append(d['BLOOM'])
+        Q = np.concatenate(Q_list, axis=0)
+        uw = util.create_unit_world(puzzle_fn)
+        uQ = uw.translate_ompl_to_unit(Q)
+        QF = np.zeros((Q.shape[0], 1), dtype=np.uint32)
+        for j, uq in enumerate(uQ):
+            if uw.is_disentangled(uq):
+                QF[j] = se3solver.PDS_FLAG_TERMINATE
+        np.savez(pds_fn, Q=Q, QF=QF)
+        util.log('[sample_pds] samples stored at {}'.format(pds_fn))
+
 def forest_rdt(args, ws):
     trial_str = 'trial-{}'.format(_trial_id(ws, args.current_trial))
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
@@ -151,12 +200,13 @@ def forest_rdt(args, ws):
         # file=mkobs-claw/key.ompl.withig.npz,offset=$$([$(Process)*1]),size=1,out=mkobs-claw/trial-1/pdsrdt/
         key_fn = ws.local_ws(util.TESTING_DIR, puzzle_name, util.KEY_PREDICTION)
         condor_job_args = ['se3solver.py',
-                'solve', puzzle_fn,
-                util.RDT_FOREST_ALGORITHM_ID,
-                ws.config.getfloat('Solver', 'TimeThreshold'),
+                'solve',
                 '--samset', _puzzle_pds(ws, puzzle_name, args.current_trial),
                 '--replace_istate',
-                'file={},offset=$$([$(Process)]),size=1,out={}'.format(key_fn, scratch_dir)
+                'file={},offset=$$([$(Process)]),size=1,out={}'.format(key_fn, scratch_dir),
+                puzzle_fn,
+                util.RDT_FOREST_ALGORITHM_ID,
+                ws.config.getfloat('Solver', 'TimeThreshold')
                           ]
         keys = matio.load(key_fn)
         condor.local_submit(ws,
@@ -171,10 +221,41 @@ def forest_rdt(args, ws):
         forest_rdt(only_wait_args, ws)
 
 def forest_edges(args, ws):
-    raise NotImplemented("forest_edges")
+#pdsrdt-g9ae-1-edges.hdf5:
+#    ./pds_edge.py --pdsflags dual/pdsrdt-g9ae-1/pds-4m.0.npz --out pdsrdt-g9ae-1-edges.hdf5 `ls -v dual/pdsrdt-g9ae-1/pdsrdt/ssc-*.mat`
+    trial_str = 'trial-{}'.format(_trial_id(ws, args.current_trial))
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+        rel_scratch_dir = os.path.join(util.SOLVER_SCRATCH, puzzle_name, trial_str)
+        shell_script = './pds_edge.py --pdsflags '
+        shell_script += _puzzle_pds(ws, puzzle_name, args.current_trial)
+        shell_script += ' --out {}'.format(ws.local_ws(rel_scratch_dir, 'edges.hdf5'))
+        shell_script += ' `ls -v {}/ssc-*.mat`'.format(ws.local_ws(rel_scratch_dir))
+        util.shell(['bash', '-c', shell_script])
 
 def connect_forest(args, ws):
-    raise NotImplemented("connect_forest")
+# pdsrdt-g9ae-1-path-1.txt: pdsrdt-g9ae-1-edges-1.hdf5
+#   ./forest_dijkstra.py --indir dual/pdsrdt-g9ae-1/pdsrdt-1/ \
+#               --forest_edge pdsrdt-g9ae-1-edges-1.hdf5 \
+#               --rootf dual/pdsrdt-g9ae-1/postscreen-1_withig.npz \
+#               --pdsf dual/pdsrdt-g9ae-1/pds-4m.0.npz \
+#               --out pdsrdt-g9ae-1-path-1.txt
+#
+    trial_str = 'trial-{}'.format(_trial_id(ws, args.current_trial))
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+        key_fn = ws.local_ws(util.TESTING_DIR, puzzle_name, util.KEY_PREDICTION)
+        rel_scratch_dir = join(util.SOLVER_SCRATCH, puzzle_name, trial_str)
+        rel_edges = join(rel_scratch_dir, 'edges.hdf5')
+        shell_script = './forest_dijkstra.py'
+        shell_script += ' --indir '
+        shell_script += ws.local_ws(rel_scratch_dir)
+        shell_script += ' --forest_edge '
+        shell_script += ws.local_ws(rel_edges)
+        shell_script += ' --rootf '
+        shell_script += key_fn
+        shell_script += ' --pdsf '
+        shell_script += _puzzle_pds(ws, puzzle_name, args.current_trial)
+        shell_script += ' --out {}'.format(ws.local_ws(rel_scratch_dir, 'path.txt'))
+        util.shell(['bash', '-c', shell_script])
 
 function_dict = {
         'predict_keyconf' : predict_keyconf,
