@@ -6,7 +6,7 @@ import os
 import subprocess
 import pathlib
 import numpy as np
-from scipy.misc import imsave
+from imageio import imwrite as imsave
 import h5py
 import multiprocessing
 try:

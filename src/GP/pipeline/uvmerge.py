@@ -3,7 +3,7 @@
 from base import *
 import task_partitioner
 import numpy as np
-from scipy.misc import imsave
+from imageio import imwrite as imsave
 import npz_mean
 
 def setup_parser(subparsers):

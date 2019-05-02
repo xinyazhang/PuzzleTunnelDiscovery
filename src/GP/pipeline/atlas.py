@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.interpolate import interp2d
 NAN = np.NAN
-from scipy.misc import imsave
+from imageio import imwrite as imsave
 import texture_format
 
 def _uv_to_pix(u, v, raster_shape):

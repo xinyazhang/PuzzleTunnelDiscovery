@@ -9,7 +9,8 @@ import pathlib
 import numpy as np
 import copy
 import multiprocessing
-from scipy.misc import imsave, imread
+from imageio import imwrite as imsave
+from imageio import imread
 from progressbar import progressbar
 
 from . import util

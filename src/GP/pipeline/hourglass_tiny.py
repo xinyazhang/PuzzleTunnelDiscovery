@@ -32,7 +32,7 @@ import numpy as np
 import sys
 import datetime
 import os
-from scipy.misc import imsave
+from imageio import imwrite as imsave
 import progressbar
 
 from . import util

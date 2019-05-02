@@ -6,7 +6,7 @@ from os.path import join
 import subprocess
 import pathlib
 import numpy as np
-from scipy.misc import imsave
+from imageio import imwrite as imsave
 import shutil
 
 from . import util
