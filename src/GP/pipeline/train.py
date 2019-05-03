@@ -8,6 +8,7 @@ import pathlib
 import numpy as np
 from imageio import imwrite as imsave
 import shutil
+from multiprocessing import Process
 
 from . import util
 from . import choice_formatter
@@ -84,7 +85,12 @@ def _predict_surface(args, ws, geo_type):
         params['checkpoint_dir'] = ws.local_ws(util.NEURAL_SCRATCH, geo_type) + '/'
         params['dataset_name'] = puzzle_name # Enforce the generated filename
         util.log("[prediction] Predicting {}:{}".format(puzzle_fn, geo_type))
-        hg_launcher.launch_with_params(params, do_training=False)
+        # NEVER call launch_with_params in the same process for multiple times
+        # TODO: add assertion to handle this problem
+        proc = Process(target=hg_launcher.launch_with_params, args=(params, False))
+        # hg_launcher.launch_with_params(params, do_training=False)
+        proc.start()
+        proc.join()
         src = ws.local_ws(util.NEURAL_SCRATCH, geo_type, '{}-atex.npz'.format(puzzle_name))
         dst = ws.local_ws(util.TESTING_DIR, puzzle_name, '{}-atex.npz'.format(geo_type))
         util.log("[prediction] Copy surface prediction file {} => {}".format(src, dst))
