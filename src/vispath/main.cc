@@ -45,6 +45,22 @@ bool play = false;
 bool first_draw = false;
 bool show_all = false;
 bool load_all = false;
+
+bool anchor_mode = false;
+struct Anchor {
+	size_t data_index;
+	size_t geometry_id;
+	Eigen::Vector3d bary;
+	Eigen::Vector3d unit_surface_point;
+	Eigen::Vector3d unit_normal;
+
+	Eigen::MatrixXd colors;
+
+	double angle = 0.0;
+};
+
+std::unordered_map<size_t, Anchor> anchors;
+bool trajector_drawn = false;
 };
 
 void usage()
@@ -69,6 +85,43 @@ size_t load_geometry_to_viewer(Viewer& viewer, const uint32_t geo_id, bool overw
 	viewer.data().dirty = igl::opengl::MeshGL::DIRTY_ALL;
 
 	return ret;
+}
+
+bool update_trajectory_visualization(Viewer& viewer)
+{
+	if (anchors.find(rob_data_index) == anchors.end())
+		return false;
+	Eigen::Vector4d hanchor;
+	hanchor(0) = anchors[rob_data_index].unit_surface_point(0);
+	hanchor(1) = anchors[rob_data_index].unit_surface_point(1);
+	hanchor(2) = anchors[rob_data_index].unit_surface_point(2);
+	hanchor(3) = 1.0;
+	std::vector<Eigen::Vector4d> std_pts;
+	Eigen::MatrixXd e3_pts, pc_color;
+	Eigen::MatrixXi e3_edges;
+	double t = 0; // do NOT use tau, which is global
+	while (t < total_miles) {
+		osr::StateVector st = osr::path_interpolate(Qs, miles, t);
+		std_pts.emplace_back(osr::translate_state_to_transform(st) * hanchor);
+		std::cerr << "Points: " << std_pts.size() << std::endl;
+		t += speed;
+	}
+	e3_pts.resize(std_pts.size(), 3);
+	e3_edges.resize(e3_pts.rows() - 1, 2);
+	pc_color.resize(1, 3);
+	pc_color.row(0) << 0.0, 1.0, 0.0;
+	for (size_t i = 0; i < std_pts.size(); i++) {
+		e3_pts.row(i) = std_pts[i].head<3>();
+	}
+	for (size_t i = 0; i < e3_pts.rows() - 1; i++) {
+		std::cerr << "edges: " << i << std::endl;
+		e3_edges.row(i) << i, i + 1;
+	}
+	std::cerr << "setting edges" << std::endl;
+	// viewer.data_list[env_data_index].set_points(e3_pts, pc_color);
+	viewer.data_list[env_data_index].set_edges(e3_pts, e3_edges, pc_color);
+	trajector_drawn = true;
+	return true;
 }
 
 bool predraw(Viewer& viewer)
@@ -104,16 +157,25 @@ bool predraw(Viewer& viewer)
 	}
 	if (!play)
 		return false;
-	
+
 	osr::StateVector q = osr::path_interpolate(Qs, miles, tau);
 	osr::StateTrans qt = std::get<0>(osr::decompose(q));
 	viewer.core.camera_center = qt.cast<float>() * viewer.core.camera_zoom * viewer.core.camera_base_zoom;
 	rob_data.set_transform(osr::translate_state_to_transform(q).matrix());
-	Eigen::MatrixXd pc_color(1, 3), pc_point(1, 3);
-	pc_point.row(0) = qt;
-	pc_color.row(0) << 0.0, 0.0, 1.0;
-	// Do NOT set to rob data, because it's translated
-	viewer.data_list[env_data_index].set_points(pc_point, pc_color);
+	if (!trajector_drawn) {
+		Eigen::MatrixXd pc_color(1 + anchors.size(), 3), pc_point(1 + anchors.size(), 3);
+		pc_point.row(0) = qt;
+		pc_color.row(0) << 0.0, 0.0, 1.0;
+		size_t i = 1;
+		for (const auto& anchor_pair : anchors) {
+			pc_point.row(i) = anchor_pair.second.unit_surface_point;
+			pc_color.row(i) << 0.0, 1.0, 0.0;
+			// std::cerr << "visualize anchor point " << pc_point.row(i) << std::endl;
+			i++;
+		}
+		// Do NOT set to rob data, because it's translated
+		viewer.data_list[env_data_index].set_points(pc_point, pc_color);
+	}
 	bool valid = uw.isValid(q);
 	std::cerr << "tau: " << tau << "\tvalid: " << valid << std::endl;
 #if 0
@@ -149,6 +211,10 @@ bool key_up(Viewer& viewer, unsigned int key, int modifier)
 {
 	// std::cerr << key << std::endl;
 	if (key == 'p' or key == 'P') {
+		if (modifier & GLFW_MOD_CONTROL) {
+			if (update_trajectory_visualization(viewer))
+				return false;
+		}
 		play = !play;
 		first_draw = true;
 	} else if (key == '=') {
@@ -163,6 +229,15 @@ bool key_up(Viewer& viewer, unsigned int key, int modifier)
 		first_draw = true;
 		show_all = !show_all;
 		load_all = show_all;
+	} else if (key == 'k' or key == 'K') {
+		// "K": Switch between 'anchor selection' and 'anchor align' mode.
+		anchor_mode = !anchor_mode;
+		if (anchor_mode) {
+			auto& rob_data = viewer.data_list[rob_data_index];
+			osr::StateVector q;
+			osr::state_vector_set_identity(q);
+			rob_data.set_transform(osr::translate_state_to_transform(q).matrix());
+		}
 	}
 	return false;
 }
@@ -177,7 +252,7 @@ void load_path(const std::string& fn)
 		std::getline(fin, line);
 		std::stringstream linein(line);
 		int i = 0;
-		while (linein >> q(i))
+		while (i < osr::kStateDimension && linein >> q(i))
 			i++;
 		if (i == 0)
 			break;
@@ -212,6 +287,57 @@ void load_path(const std::string& fn)
 	total_miles = dist;
 }
 
+bool mouse_up(Viewer& viewer, int button, int modifier)
+{
+	// std::cerr << "modifier " << modifier << std::endl;
+	// Anchor mode only set
+	if (!anchor_mode) {
+		return false;
+	}
+	if (!(modifier & GLFW_MOD_CONTROL))
+		return false;
+	// Update the anchor point
+	int fid;
+	Eigen::Vector3d bc;
+	double x = viewer.current_mouse_x;
+	double y = viewer.core.viewport(3) - viewer.current_mouse_y;
+	auto& rob_data = viewer.data_list[rob_data_index];
+	const auto& V = rob_data.V;
+        const auto& F = rob_data.F;
+        bool unproj = igl::unproject_onto_mesh(Eigen::Vector2f(x,y),
+	                             viewer.core.view * viewer.data().transforms[0],
+	                             viewer.core.proj,
+	                             viewer.core.viewport,
+	                             V, F,
+	                             fid, bc);
+
+	std::cerr << "unproject result: " << unproj << " from (" << x << ", " << y << ")" << std::endl;
+
+	if (unproj) {
+		Anchor& ac = anchors[rob_data_index];
+		auto cd = uw.getCDModel(UnitWorld::GEO_ROB);
+		ac.unit_normal = cd->faceNormals().row(fid);
+		ac.bary = bc;
+
+		ac.unit_surface_point =
+			  bc(0) * V.row(F(fid, 0))
+			+ bc(1) * V.row(F(fid, 1))
+			+ bc(2) * V.row(F(fid, 2));
+		rob_data.dirty |= igl::opengl::MeshGL::DIRTY_ALL;
+
+		Eigen::MatrixXd pc_color(anchors.size(), 3), pc_point(anchors.size(), 3);
+		size_t i = 0;
+		for (const auto& anchor_pair : anchors) {
+			pc_point.row(i) = anchor_pair.second.unit_surface_point;
+			pc_color.row(i) << 0.0, 1.0, 0.0;
+			i++;
+		}
+		// Do NOT set to rob data, because it's translated
+		viewer.data_list[env_data_index].set_points(pc_point, pc_color);
+	}
+	return false;
+}
+
 int main(int argc, const char* argv[])
 {
 	if (argc < 5) {
@@ -235,6 +361,7 @@ int main(int argc, const char* argv[])
 	// Default configuration
 	viewer.callback_key_up = &key_up;
 	viewer.callback_pre_draw = &predraw;
+	viewer.callback_mouse_up = &mouse_up;
 	viewer.selected_data_index = rob_data_index;
 	viewer.core.is_animating = true;
 
