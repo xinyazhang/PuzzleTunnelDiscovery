@@ -176,6 +176,10 @@ def sample_pds(args, ws):
         Q_list = []
         for fn in sorted(pathlib.Path(scratch_dir).glob("bloom-from_*.npz")):
             d = matio.load(fn)
+            s = d['BLOOM'].shape
+            if s[0] == 0:
+                continue
+            assert s[1] == 7, "{}'s shape is {}".format(fn, s)
             Q_list.append(d['BLOOM'])
         Q = np.concatenate(Q_list, axis=0)
         uw = util.create_unit_world(puzzle_fn)
