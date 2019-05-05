@@ -508,6 +508,21 @@ target_link_directories(pyse3ompl BEFORE PRIVATE ${EXTERNAL_PROJECTS_INSTALL_PRE
 target_link_libraries(pyse3ompl PRIVATE ompl ompl_app_base)
 FINALIZE(pyse3ompl)
 
+ExternalProject_Add(ext_libgeokey
+	PREFIX ${EXTERNAL_PROJECTS_PREFIX}
+	SOURCE_DIR ${CMAKE_SOURCE_DIR}/third-party/libgeokey/
+	CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${EXTERNAL_PROJECTS_INSTALL_PREFIX}
+	BUILD_COMMAND make -j ${NCPU}
+	BUILD_ALWAYS 1)
+
+SET(EASY_LOCAL_SRC)
+AUX_SOURCE_DIRECTORY(lib/pygeokey/ EASY_LOCAL_SRC)
+pybind11_add_module(pygeokey ${EASY_LOCAL_SRC})
+add_dependencies(pygeokey ext_libgeokey)
+target_include_directories(pygeokey BEFORE PRIVATE ${PYTHON_INCLUDE_DIR} ${EXTERNAL_PROJECTS_INSTALL_PREFIX}/include)
+target_link_directories(pygeokey BEFORE PRIVATE ${EXTERNAL_PROJECTS_INSTALL_PREFIX}/lib ${EXTERNAL_PROJECTS_INSTALL_PREFIX}/lib64)
+target_link_libraries(pygeokey PRIVATE geokey)
+
 add_custom_command(TARGET pyosr POST_BUILD
 	COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/src/GP/facade.py ${CMAKE_SOURCE_DIR}/bin/facade.py
 )

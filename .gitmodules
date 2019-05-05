@@ -11,3 +11,7 @@
 	path = third-party/ompl.app
 	url = git@github.com:xinyazhang/ompl.app.git
 	branch = goct-1.4.1
+[submodule "third-party/libgeokey"]
+	path = third-party/libgeokey
+	url = git@gitlab.com:belfer2470/important-points-and-key-configurations.git
+	branch = linux
