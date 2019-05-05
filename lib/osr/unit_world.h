@@ -281,7 +281,8 @@ public:
 	                      const StateTrans& env_surface_point,
 	                      const StateTrans& env_surface_normal,
 	                      StateScalar margin,
-	                      int denominator);
+	                      int denominator,
+	                      bool only_median = false);
 
 	std::shared_ptr<Scene> getScene(uint32_t geo);
 	std::shared_ptr<CDModel> getCDModel(uint32_t geo);

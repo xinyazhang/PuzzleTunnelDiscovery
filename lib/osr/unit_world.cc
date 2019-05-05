@@ -1406,7 +1406,8 @@ UnitWorld::enumFreeConfiguration(const StateTrans& rob_surface_point,
                                  const StateTrans& env_surface_point,
                                  const StateTrans& env_surface_normal,
                                  StateScalar margin,
-                                 int denominator)
+                                 int denominator,
+                                 bool only_median)
 {
 	StateTrans rob_o = rob_surface_point + rob_surface_normal * margin;
 	StateTrans env_o = env_surface_point + env_surface_normal * margin;
@@ -1424,6 +1425,7 @@ UnitWorld::enumFreeConfiguration(const StateTrans& rob_surface_point,
 	int trials = 0;
 	double delta = 2 * M_PI / double(denominator);
 	std::vector<StateVector> valid_states;
+	std::vector<StateVector> current_valid_segment;
 	for (int i = 0; i < denominator; i++) {
 		// Step 2 Rotation
 		Quat rot_2(AA(i * delta, env_surface_normal));
@@ -1432,8 +1434,19 @@ UnitWorld::enumFreeConfiguration(const StateTrans& rob_surface_point,
 		// Step 3 Translation
 		StateTrans trans = env_o - (rot_accum * rob_o);
 		q = compose(trans, rot_accum);
-		if (isValid(q))
-			valid_states.emplace_back(q);
+		bool valid = isValid(q);
+		if (!only_median) {
+			if (valid)
+				valid_states.emplace_back(q);
+		} else {
+			if (valid) {
+				current_valid_segment.emplace_back(q);
+			} else if (!current_valid_segment.empty()) {
+				auto mid = current_valid_segment.begin() + current_valid_segment.size() / 2; 
+				valid_states.emplace_back(*mid);
+				current_valid_segment.clear();
+			}
+		}
 	}
 	ArrayOfStates ret;
 	ret.resize(valid_states.size(), kStateDimension);

@@ -207,6 +207,7 @@ PYBIND11_PLUGIN(pyosr) {
 		     py::arg("env_surface_normal"),
 		     py::arg("margin"),
 		     py::arg("denominator"),
+		     py::arg("only_median") = false,
 		     py::call_guard<py::gil_scoped_release>())
 		.def_readonly_static("GEO_ENV", &UnitWorld::GEO_ENV)
 		.def_readonly_static("GEO_ROB", &UnitWorld::GEO_ROB)
