@@ -9,3 +9,4 @@ from . import hg_datagen
 from . import train
 from . import solve
 from . import se3solver
+from . import baseline

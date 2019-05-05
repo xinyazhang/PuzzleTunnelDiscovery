@@ -174,7 +174,8 @@ def sample_pds(args, ws):
         condor.local_wait(scratch_dir)
         pds_fn = _puzzle_pds(ws, puzzle_name, args.current_trial)
         Q_list = []
-        for fn in sorted(pathlib.Path(scratch_dir).glob("bloom-from_*.npz")):
+        fn_list = sorted(pathlib.Path(scratch_dir).glob("bloom-from_*.npz"))
+        for fn in progressbar(fn_list):
             d = matio.load(fn)
             s = d['BLOOM'].shape
             if s[0] == 0:

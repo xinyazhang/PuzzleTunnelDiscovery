@@ -27,6 +27,7 @@ TESTING_DIR = 'test'
 CONDOR_SCRATCH = 'condor_scratch'
 NEURAL_SCRATCH = 'nn_scratch'
 SOLVER_SCRATCH = 'solver_scratch'
+BASELINE_SCRATCH = 'baseline_scratch'
 # Protocol files/directories
 # Used by multiple pipeline parts
 #
