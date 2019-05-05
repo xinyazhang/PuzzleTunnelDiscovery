@@ -11,7 +11,7 @@ import copy
 import multiprocessing
 from imageio import imwrite as imsave
 from imageio import imread
-from progressbar import progressbar
+from progressbar import progressbar, ProgressBar
 
 from . import util
 from . import choice_formatter
@@ -79,15 +79,21 @@ def _predict_worker(tup):
     nrot = ws.config.getint('Prediction', 'NumberOfRotations')
     margin = ws.config.getfloat('Prediction', 'Margin')
     batch_size = ws.config.getint('Prediction', 'SurfacePairsToSample')
-    for i in progressbar(range(batch_size)):
-        tup1 = rob_sampler.sample(uw)
-        tup2 = env_sampler.sample(uw)
-        qs_raw = uw.enum_free_configuration(tup1[0], tup1[1], tup2[0], tup2[1],
-                                            margin,
-                                            denominator=nrot)
-        qs = [q for q in qs_raw if not uw.is_disentangled(q)] # Trim disentangled state
-        for q in qs:
-            key_conf.append(q)
+    #for i in progressbar(range(batch_size)):
+    with ProgressBar(max_value=batch_size) as bar:
+        while True:
+            tup1 = rob_sampler.sample(uw)
+            tup2 = env_sampler.sample(uw)
+            qs_raw = uw.enum_free_configuration(tup1[0], tup1[1], tup2[0], tup2[1],
+                                                margin,
+                                                denominator=nrot,
+                                                only_median=True)
+            qs = [q for q in qs_raw if not uw.is_disentangled(q)] # Trim disentangled state
+            for q in qs:
+                key_conf.append(q)
+                bar.update(min(batch_size, len(key_conf)))
+            if len(key_conf) > batch_size:
+                break
     cfg, config = parse_ompl.parse_simple(puzzle_fn)
     iq = parse_ompl.tup_to_ompl(cfg.iq_tup)
     gq = parse_ompl.tup_to_ompl(cfg.gq_tup)
