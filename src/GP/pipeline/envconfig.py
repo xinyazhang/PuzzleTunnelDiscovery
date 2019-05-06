@@ -116,6 +116,11 @@ NumberOfRotations           = 64
 SurfacePairsToSample        = 1024
 Margin                      = 1e-6
 
+[GeometriK]
+
+KeyPointAttempts  = 12
+KeyConfigRotations = 64
+
 [Solver]
 # Number of samples in the PreDefined Sample set
 PDSSize = 4194304

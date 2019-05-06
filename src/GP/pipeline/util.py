@@ -37,7 +37,8 @@ UV_DIR = os.path.join(CONDOR_SCRATCH, 'training_key_uvproj')
 
 PIXMARGIN = 2
 
-KEY_PREDICTION = 'forest_roots.npz'
+KEY_POINT_FMT = 'geometrik_key_point_of_{}-{}.npz'
+KEY_PREDICTION_FMT = 'forest_roots-{}.npz'
 PDS_SUBDIR = 'pds'
 
 RDT_FOREST_ALGORITHM_ID = 15
@@ -287,6 +288,16 @@ class Workspace(object):
                 log("Cannot find puzzle file {} continue to next dir".format(puzzle_fn))
                 continue
             yield puzzle_fn, ent
+
+    def keypoint_prediction_file(self, puzzle_name, geo_type, trial_override=None):
+        trial = self.current_trial if trial_override is None else trial_override
+        return self.local_ws(TESTING_DIR, puzzle_name,
+                             KEY_POINT_FMT.format(geo_type, trial))
+
+    def keyconf_prediction_file(self, puzzle_name, trial_override=None):
+        trial = self.current_trial if trial_override is None else trial_override
+        return self.local_ws(TESTING_DIR, puzzle_name,
+                             KEY_PREDICTION_FMT.format(trial))
 
     def set_current_trial(self, trial):
         if trial is not None:
