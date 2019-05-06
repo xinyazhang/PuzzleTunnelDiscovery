@@ -22,6 +22,7 @@ def main():
     pipeline.solve.setup_parser(subparsers)
     # Modules not a part of the auto pipeline
     pipeline.baseline.setup_parser(subparsers)
+    pipeline.tools.setup_parser(subparsers)
 
     args = parser.parse_args()
     assert args.command in dir(pipeline), 'Cannot find command {} in {}'.format(args.command, dir(pipeline))
