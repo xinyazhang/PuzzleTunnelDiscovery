@@ -33,6 +33,7 @@ def setup_parser(subparsers):
                    choices=stage_names,
                    default=None,
                    metavar='')
+    p.add_argument('--current_trial', help='Trial to solve the puzzle', type=int, default=None)
     # print('Total Stages: ' + str(len(stage_names)))
 
 def run(args):
@@ -57,6 +58,7 @@ def run(args):
                 till = index + 1
         assert cont is not None
         ws = util.Workspace(args.dir)
+        ws.current_trial = args.current_trial
         nstage = []
         if args.till:
             stage_list = pdesc[cont:till]

@@ -148,6 +148,7 @@ class Workspace(object):
         self._uw_dic = {}
         if not init:
             self.verify_signature()
+        self._current_trial = 0
 
     def get_path(self, optname):
         return self.config.get('DEFAULT', optname)
@@ -239,11 +240,16 @@ class Workspace(object):
             self._uw_dic[puzzle_dir] = create_unit_world(self.condor_ws(puzzle_dir, PUZZLE_CFG_FILE))
         return self._uw_dic[puzzle_dir]
 
-    def remote_command(self, host, exec_path, ws_path, pipeline_part, cmd, auto_retry=True, in_tmux=False):
+    def remote_command(self, host, exec_path, ws_path,
+                       pipeline_part, cmd,
+                       auto_retry=True, in_tmux=False, with_trial=False):
         script  = 'cd {}\n'.format(exec_path)
         if in_tmux:
             script += 'tmux new-session -A -s puzzle_workspace '
-        script += './facade.py {ppl} --stage {cmd} {ws}'.format(ppl=pipeline_part, ws=ws_path, cmd=cmd)
+        script += './facade.py {ppl} --stage {cmd} '.format(ppl=pipeline_part, cmd=cmd)
+        if with_trial:
+            script += ' --current_trial {} '.format(self.current_trial)
+        script += ' {ws}'.format(ws=ws_path)
         if in_tmux:
             # tmux needs a terminal
             remoter = ['ssh', '-t', host]
@@ -281,6 +287,15 @@ class Workspace(object):
                 log("Cannot find puzzle file {} continue to next dir".format(puzzle_fn))
                 continue
             yield puzzle_fn, ent
+
+    def set_current_trial(self, trial):
+        if trial is not None:
+            self._current_trial = trial
+
+    def get_current_trial(self):
+        return self._current_trial
+
+    current_trial = property(get_current_trial, set_current_trial)
 
 def trim_suffix(fn):
     return os.path.splitext(fn)[0]

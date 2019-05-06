@@ -152,7 +152,7 @@ def _sample_pds_old(args, ws):
 def sample_pds(args, ws):
     if not args.only_wait:
         for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
-            rel_bloom = _rel_bloom_scratch(ws, puzzle_name, args.current_trial)
+            rel_bloom = _rel_bloom_scratch(ws, puzzle_name, ws.current_trial)
             util.log('[sample_pds]  rel_bloom {}'.format(rel_bloom))
             scratch_dir = ws.local_ws(rel_bloom)
             key_fn = ws.local_ws(util.TESTING_DIR, puzzle_name, util.KEY_PREDICTION)
@@ -176,10 +176,10 @@ def sample_pds(args, ws):
                                 instances=keys['KEYQ_OMPL'].shape[0],
                                 wait=False) # do NOT wait here, we have to submit EVERY puzzle at once
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
-        rel_bloom = _rel_bloom_scratch(ws, puzzle_name, args.current_trial)
+        rel_bloom = _rel_bloom_scratch(ws, puzzle_name, ws.current_trial)
         scratch_dir = ws.local_ws(rel_bloom)
         condor.local_wait(scratch_dir)
-        pds_fn = _puzzle_pds(ws, puzzle_name, args.current_trial)
+        pds_fn = _puzzle_pds(ws, puzzle_name, ws.current_trial)
         Q_list = []
         fn_list = sorted(pathlib.Path(scratch_dir).glob("bloom-from_*.npz"))
         for fn in progressbar(fn_list):
@@ -200,7 +200,7 @@ def sample_pds(args, ws):
         util.log('[sample_pds] samples stored at {}'.format(pds_fn))
 
 def forest_rdt(args, ws):
-    trial_str = 'trial-{}'.format(_trial_id(ws, args.current_trial))
+    trial_str = 'trial-{}'.format(_trial_id(ws, ws.current_trial))
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
         rel_scratch_dir = os.path.join(util.SOLVER_SCRATCH, puzzle_name, trial_str)
         scratch_dir = ws.local_ws(rel_scratch_dir)
@@ -214,7 +214,7 @@ def forest_rdt(args, ws):
         key_fn = ws.local_ws(util.TESTING_DIR, puzzle_name, util.KEY_PREDICTION)
         condor_job_args = ['se3solver.py',
                 'solve',
-                '--samset', _puzzle_pds(ws, puzzle_name, args.current_trial),
+                '--samset', _puzzle_pds(ws, puzzle_name, ws.current_trial),
                 '--replace_istate',
                 'file={},offset=$$([$(Process)]),size=1,out={}'.format(key_fn, scratch_dir),
                 puzzle_fn,
@@ -236,11 +236,11 @@ def forest_rdt(args, ws):
 def forest_edges(args, ws):
 #pdsrdt-g9ae-1-edges.hdf5:
 #    ./pds_edge.py --pdsflags dual/pdsrdt-g9ae-1/pds-4m.0.npz --out pdsrdt-g9ae-1-edges.hdf5 `ls -v dual/pdsrdt-g9ae-1/pdsrdt/ssc-*.mat`
-    trial_str = 'trial-{}'.format(_trial_id(ws, args.current_trial))
+    trial_str = 'trial-{}'.format(_trial_id(ws, ws.current_trial))
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
         rel_scratch_dir = os.path.join(util.SOLVER_SCRATCH, puzzle_name, trial_str)
         shell_script = './pds_edge.py --pdsflags '
-        shell_script += _puzzle_pds(ws, puzzle_name, args.current_trial)
+        shell_script += _puzzle_pds(ws, puzzle_name, ws.current_trial)
         shell_script += ' --out {}'.format(ws.local_ws(rel_scratch_dir, 'edges.hdf5'))
         shell_script += ' `ls -v {}/ssc-*.mat`'.format(ws.local_ws(rel_scratch_dir))
         util.shell(['bash', '-c', shell_script])
@@ -253,7 +253,7 @@ def connect_forest(args, ws):
 #               --pdsf dual/pdsrdt-g9ae-1/pds-4m.0.npz \
 #               --out pdsrdt-g9ae-1-path-1.txt
 #
-    trial_str = 'trial-{}'.format(_trial_id(ws, args.current_trial))
+    trial_str = 'trial-{}'.format(_trial_id(ws, ws.current_trial))
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
         key_fn = ws.local_ws(util.TESTING_DIR, puzzle_name, util.KEY_PREDICTION)
         rel_scratch_dir = join(util.SOLVER_SCRATCH, puzzle_name, trial_str)
@@ -266,7 +266,7 @@ def connect_forest(args, ws):
         shell_script += ' --rootf '
         shell_script += key_fn
         shell_script += ' --pdsf '
-        shell_script += _puzzle_pds(ws, puzzle_name, args.current_trial)
+        shell_script += _puzzle_pds(ws, puzzle_name, ws.current_trial)
         shell_script += ' --out {}'.format(ws.local_ws(rel_scratch_dir, 'path.txt'))
         util.shell(['bash', '-c', shell_script])
 
@@ -294,6 +294,7 @@ def setup_parser(subparsers):
 def run(args):
     if args.stage in function_dict:
         ws = util.Workspace(args.dir)
+        ws.current_trial = args.current_trial
         function_dict[args.stage](args, ws)
     else:
         print("Unknown solve pipeline stage {}".format(args.stage))
@@ -305,7 +306,8 @@ def _remote_command(ws, cmd, auto_retry=True):
     ws.remote_command(ws.condor_host,
                       ws.condor_exec(),
                       ws.condor_ws(),
-                      'solve', cmd, auto_retry=auto_retry)
+                      'solve', cmd, auto_retry=auto_retry,
+                      with_trial=True)
 
 def remote_sample_pds(ws):
     _remote_command(ws, 'sample_pds')
@@ -331,6 +333,7 @@ def collect_stages():
 
 def autorun(args):
     ws = util.Workspace(args.dir)
+    ws.current_trial = args.current_trial
     pdesc = collect_stages()
     for _,func in pdesc:
         func(ws)
