@@ -102,7 +102,8 @@ def _predict_worker(tup):
     ompl_q = np.concatenate((iq, gq, qs_ompl), axis=0)
     key_fn = ws.local_ws(util.TESTING_DIR, puzzle_name, util.KEY_PREDICTION)
     util.log("[predict_keyconf(worker)] save to key file {}".format(key_fn))
-    np.savez(key_fn, KEYQ_OMPL=ompl_q)
+    unit_q = uw.translate_ompl_to_unit(ompl_q)
+    np.savez(key_fn, KEYQ_OMPL=ompl_q, KEYQ_UNIT=unit_q)
 
 def predict_keyconf(args, ws):
     task_tup = []
