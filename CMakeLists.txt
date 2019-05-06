@@ -522,6 +522,7 @@ add_dependencies(pygeokey ext_libgeokey)
 target_include_directories(pygeokey BEFORE PRIVATE ${PYTHON_INCLUDE_DIR} ${EXTERNAL_PROJECTS_INSTALL_PREFIX}/include)
 target_link_directories(pygeokey BEFORE PRIVATE ${EXTERNAL_PROJECTS_INSTALL_PREFIX}/lib ${EXTERNAL_PROJECTS_INSTALL_PREFIX}/lib64)
 target_link_libraries(pygeokey PRIVATE geokey)
+FINALIZE(pygeokey)
 
 add_custom_command(TARGET pyosr POST_BUILD
 	COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/src/GP/facade.py ${CMAKE_SOURCE_DIR}/bin/facade.py
