@@ -24,7 +24,7 @@ def plan(args, ws):
                 'solve',
                 puzzle_fn,
                 util.RDT_FOREST_ALGORITHM_ID,
-                0.1]
+                args.time_limit]
         condor.local_submit(ws,
                             util.PYTHON,
                             iodir_rel=rel_scratch_dir,
