@@ -14,12 +14,16 @@ def setup_parser(subparsers):
     p = subparsers.add_parser('add_puzzle', help='Add a puzzle to solve, the puzzle will be named after its file name')
     p.add_argument('dir', help='Workspace directory')
     p.add_argument('puzzles', help='One or more OMPL .cfg file(s)', nargs='+')
+    p.add_argument('--vanilla', help='Do not add uv texture to the geometry', action='store_true')
 
-def copy_puzzle_geometry(obj_from, target_file, chart_resolution):
+def _copy_puzzle_geometry(obj_from, target_file, chart_resolution, vanilla):
     util.log('[copy_puzzle_geometry] {} -> {}'.format(obj_from, target_file))
     if os.path.isfile(target_file):
         if not util.ask_user("{} exists, overwriting?".format(target_file)):
             return
+    if vanilla:
+        shutil.copy(obj_from, target_file)
+        return
     res = 128.0
     while util.shell(['./objautouv',
                       '-f',
@@ -42,7 +46,7 @@ We cannot simply copy the .cfg file from OMPL because
 Side effect:
     tgt_dir will be created if not exist
 '''
-def copy_puzzle(tgt_dir, puzzle_file, chart_resolution):
+def copy_puzzle(tgt_dir, puzzle_file, chart_resolution, vanilla=False):
     cfg, config = parse_ompl.parse_simple(puzzle_file)
     # Sanity check
     try:
@@ -53,10 +57,10 @@ def copy_puzzle(tgt_dir, puzzle_file, chart_resolution):
         return False
     # Copy geometry
     os.makedirs(tgt_dir, exist_ok=True)
-    copy_puzzle_geometry(cfg.env_fn, join(tgt_dir, cfg.env_fn_base), chart_resolution)
+    _copy_puzzle_geometry(cfg.env_fn, join(tgt_dir, cfg.env_fn_base), chart_resolution, vanilla)
     if cfg.env_fn != cfg.rob_fn:
         assert cfg.env_fn_base != cfg.rob_fn_base
-        copy_puzzle_geometry(cfg.rob_fn, join(tgt_dir, cfg.rob_fn_base), chart_resolution)
+        _copy_puzzle_geometry(cfg.rob_fn, join(tgt_dir, cfg.rob_fn_base), chart_resolution, vanilla)
     # Change geometry file name
     config.set("problem", "world", cfg.env_fn_base)
     config.set("problem", "robot", cfg.rob_fn_base)
@@ -65,6 +69,9 @@ def copy_puzzle(tgt_dir, puzzle_file, chart_resolution):
     with open(tgt_cfg, 'w') as f:
         config.write(f)
         util.ack('''[copy_puzzle] copy configuration file {} => {}'''.format(puzzle_file, abspath(tgt_cfg)))
+    if vanilla:
+        return True
+    # Update the OMPL states
     old_uw = util.create_unit_world(puzzle_file)
     new_uw = util.create_unit_world(tgt_cfg)
     old_iq = parse_ompl.tup_to_ompl(cfg.iq_tup)
@@ -99,19 +106,19 @@ def copy_puzzle(tgt_dir, puzzle_file, chart_resolution):
         util.log('''[copy_puzzle] \t san: {}'''.format(san_gq))
     return True
 
-def add_testing_puzzle(ws, fn):
+def add_testing_puzzle(args, ws, fn):
     fn_base = util.trim_suffix(basename(fn))
     tgt_dir = join(ws.testing_dir, fn_base)
     if os.path.isdir(tgt_dir):
         do_override = util.ask_user("{} is already existing, override?".format(tgt_dir))
         if not do_override:
             return
-    copy_puzzle(tgt_dir, fn, ws.chart_resolution)
+    copy_puzzle(tgt_dir, fn, ws.chart_resolution, vanilla=args.vanilla)
 
 def _mt_add_testing_puzzle(arg_tup):
     args, puzzle = arg_tup
     ws = util.Workspace(args.dir)
-    add_testing_puzzle(ws, puzzle)
+    add_testing_puzzle(args, ws, puzzle)
 
 def run(args):
     pcpu = multiprocessing.Pool()
