@@ -158,8 +158,7 @@ def forest_rdt(args, ws):
                 'file={},offset=$$([$(Process)]),size=1,out={}'.format(key_fn, scratch_dir),
                 puzzle_fn,
                 util.RDT_FOREST_ALGORITHM_ID,
-                ws.config.getfloat('Solver', 'TimeThreshold')
-                          ]
+                1.0]
         keys = matio.load(key_fn)
         condor.local_submit(ws,
                             util.PYTHON,
