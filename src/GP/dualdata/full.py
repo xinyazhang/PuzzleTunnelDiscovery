@@ -1,4 +1,4 @@
-from template import *
+from .template import *
 
 STICK_LENGTH = 61.60
 

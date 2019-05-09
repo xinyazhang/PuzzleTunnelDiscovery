@@ -1,4 +1,4 @@
-from template import *
+from .template import *
 
 STICK_LENGTH_X = 2 * HOLLOW_SQUARE_SIZE + 3 * STICK_WIDTH
 # Note, we need additional grids to block easy solution

@@ -1,4 +1,4 @@
-from template import *
+from .template import *
 
 STICK_LENGTH_X = 2 * HOLLOW_SQUARE_SIZE + 3 * STICK_WIDTH
 STICK_LENGTH_Y = HOLLOW_SQUARE_SIZE + 2 * STICK_WIDTH
