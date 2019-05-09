@@ -31,6 +31,8 @@ def plan(args, ws):
                             arguments=condor_job_args,
                             instances=args.nrepeats,
                             wait=False) # do NOT wait here, we have to submit EVERY puzzle at once
+    if args.no_wait:
+        return
     if not args.only_wait:
         only_wait_args = copy.deepcopy(args)
         only_wait_args.only_wait = True
@@ -39,6 +41,7 @@ def plan(args, ws):
 def setup_parser(subparsers):
     p = subparsers.add_parser('baseline', help='Final step to solve the puzzle')
     p.add_argument('--only_wait', action='store_true')
+    p.add_argument('--no_wait', action='store_true')
     p.add_argument('--current_trial', help='Trial to solve the puzzle', type=int, required=True)
     p.add_argument('--nrepeats', help='Number of repeats', type=int, default=100)
     p.add_argument('--planner_id', help='Planner ID', type=int, default=util.RDT_FOREST_ALGORITHM_ID)
