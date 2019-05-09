@@ -123,4 +123,6 @@ def _mt_add_testing_puzzle(arg_tup):
 def run(args):
     pcpu = multiprocessing.Pool()
     mpargs = [ (args, puzzle) for puzzle in args.puzzles]
-    pcpu.map(_mt_add_testing_puzzle, mpargs)
+    #pcpu.map(_mt_add_testing_puzzle, mpargs)
+    for e in mpargs:
+        _mt_add_testing_puzzle(e)
