@@ -39,7 +39,7 @@ def plan(args, ws):
         plan(only_wait_args, ws)
 
 def setup_parser(subparsers):
-    p = subparsers.add_parser('baseline', help='Final step to solve the puzzle')
+    p = subparsers.add_parser('baseline', help='Solve all testing puzzle with baseline algorithms')
     p.add_argument('--only_wait', action='store_true')
     p.add_argument('--no_wait', action='store_true')
     p.add_argument('--current_trial', help='Trial to solve the puzzle', type=int, required=True)

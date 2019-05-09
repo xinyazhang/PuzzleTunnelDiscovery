@@ -19,7 +19,9 @@ def main():
     # Occationally users want to run pipeline stages individually
     pipeline.preprocess_key.setup_parser(subparsers)
     pipeline.preprocess_surface.setup_parser(subparsers)
+    pipeline.geometrik.setup_parser(subparsers)
     pipeline.train.setup_parser(subparsers)
+    pipeline.keyconf.setup_parser(subparsers)
     pipeline.solve.setup_parser(subparsers)
     # Modules not a part of the auto pipeline
     pipeline.baseline.setup_parser(subparsers)

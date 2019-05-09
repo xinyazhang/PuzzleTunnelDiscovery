@@ -109,7 +109,7 @@ function_dict = {
 
 
 def setup_parser(subparsers):
-    p = subparsers.add_parser('solve', help='Sample key configuration from surface distribution',
+    p = subparsers.add_parser('keyconf', help='Sample key configuration from surface distribution',
                               formatter_class=choice_formatter.Formatter)
     p.add_argument('--stage',
                    choices=list(function_dict.keys()),
