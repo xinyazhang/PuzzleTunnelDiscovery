@@ -72,14 +72,21 @@ def _sample_key_conf_worker(wag):
 
 def sample_key_conf(args, ws):
     task_args = _get_task_args(ws, per_geometry=False)
-    # for wag in task_args:
-    #     _sample_key_conf_worker(wag)
-    pcpu = multiprocessing.Pool()
-    pcpu.map(_sample_key_conf_worker, task_args)
+    for wag in task_args:
+         _sample_key_conf_worker(wag)
+    # pcpu = multiprocessing.Pool()
+    # pcpu.map(_sample_key_conf_worker, task_args)
+
+def deploy_geometrik_to_condor(args, ws):
+    ws.deploy_to_condor(util.WORKSPACE_SIGNATURE_FILE,
+                        util.WORKSPACE_CONFIG_FILE,
+                        util.CONDOR_TEMPLATE,
+                        util.TESTING_DIR+'/')
 
 function_dict = {
         'sample_key_point' : sample_key_point,
         'sample_key_conf' : sample_key_conf,
+        'deploy_geometrik_to_condor' : deploy_geometrik_to_condor,
 }
 
 def setup_parser(subparsers):
@@ -112,6 +119,7 @@ def autorun(args):
 def collect_stages():
     ret = [
             ('sample_key_point', lambda ws: sample_key_point(None, ws)),
-            ('sample_key_conf', lambda ws: sample_key_conf(None, ws))
+            ('sample_key_conf', lambda ws: sample_key_conf(None, ws)),
+            ('deploy_geometrik_to_condor', lambda ws: deploy_geometrik_to_condor(None, ws))
           ]
     return ret
