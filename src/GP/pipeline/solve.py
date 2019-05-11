@@ -197,7 +197,8 @@ def connect_forest(args, ws):
 #
     trial_str = 'trial-{}'.format(_trial_id(ws, ws.current_trial))
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
-        key_fn = ws.local_ws(util.TESTING_DIR, puzzle_name, util.KEY_PREDICTION)
+        # key_fn = ws.local_ws(util.TESTING_DIR, puzzle_name, util.KEY_PREDICTION)
+        key_fn = ws.keyconf_prediction_file(puzzle_name)
         rel_scratch_dir = join(util.SOLVER_SCRATCH, puzzle_name, trial_str)
         rel_edges = join(rel_scratch_dir, 'edges.hdf5')
         shell_script = './forest_dijkstra.py'
