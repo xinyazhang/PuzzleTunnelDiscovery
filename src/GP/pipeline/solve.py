@@ -200,6 +200,7 @@ def connect_forest(args, ws):
         key_fn = ws.keyconf_prediction_file(puzzle_name)
         rel_scratch_dir = join(util.SOLVER_SCRATCH, puzzle_name, trial_str)
         rel_edges = join(rel_scratch_dir, 'edges.hdf5')
+        path_out = ws.local_ws(rel_scratch_dir, 'path.txt')
         shell_script = './forest_dijkstra.py'
         shell_script += ' --indir '
         shell_script += ws.local_ws(rel_scratch_dir)
@@ -209,8 +210,19 @@ def connect_forest(args, ws):
         shell_script += key_fn
         shell_script += ' --pdsf '
         shell_script += _puzzle_pds(ws, puzzle_name, ws.current_trial)
-        shell_script += ' --out {}'.format(ws.local_ws(rel_scratch_dir, 'path.txt'))
-        util.shell(['bash', '-c', shell_script])
+        shell_script += ' --out {}'.format(path_out)
+        ret = util.shell(['bash', '-c', shell_script])
+        if ret != 0:
+            util.fatal("[solve] FALIED TO SOLVE PUZZLE {}".format(puzzle_name))
+            continue
+        util.ack("Saving OMPL solution of {} to {}".format(puzzle_name, path_out))
+
+        ompl_q = matio.load(path_out)
+        uw = util.create_unit_world(puzzle_fn)
+        unit_q = uw.translate_ompl_to_unit(ompl_q)
+        sol_out = ws.solution_file(puzzle_name, type_name='unit')
+        matio.savetxt(sol_out, unit_q)
+        util.ack("Saving UNIT solution of {} to {}".format(puzzle_name, sol_out))
 
 function_dict = {
         'sample_pds' : sample_pds,

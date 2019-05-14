@@ -39,6 +39,7 @@ PIXMARGIN = 2
 
 KEY_POINT_FMT = 'geometrik_key_point_of_{}-{}.npz'
 KEY_PREDICTION_FMT = 'forest_roots-{}.npz'
+SOLUTION_FMT = 'path-{trial}.{type_name}.txt'
 PDS_SUBDIR = 'pds'
 
 RDT_FOREST_ALGORITHM_ID = 15
@@ -298,6 +299,11 @@ class Workspace(object):
         trial = self.current_trial if trial_override is None else trial_override
         return self.local_ws(TESTING_DIR, puzzle_name,
                              KEY_PREDICTION_FMT.format(trial))
+
+    def solution_file(self, puzzle_name, type_name, trial_override=None):
+        trial = self.current_trial if trial_override is None else trial_override
+        return self.local_ws(TESTING_DIR, puzzle_name,
+                             SOLUTION_FMT.format(trial=trial, type_name=type_name))
 
     def set_current_trial(self, trial):
         if trial is not None:
