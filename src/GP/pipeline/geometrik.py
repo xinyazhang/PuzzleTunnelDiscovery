@@ -66,10 +66,14 @@ def _sample_key_conf_worker(wag):
     kqs, _, _ = ks.get_all_key_configs(env_kps, rob_kps,
                                        ws.config.getint('GeometriK', 'KeyConfigRotations'))
     uw = util.create_unit_world(wag.puzzle_fn)
+    cfg, config = parse_ompl.parse_simple(wag.puzzle_fn)
+    iq = parse_ompl.tup_to_ompl(cfg.iq_tup)
+    gq = parse_ompl.tup_to_ompl(cfg.gq_tup)
     ompl_q = uw.translate_vanilla_to_ompl(kqs)
+    ompl_q = np.concatenate((iq, gq, ompl_q), axis=0)
     kfn = ws.keyconf_prediction_file(wag.puzzle_name)
     np.savez(kfn,
-             KEYQ_AMBIENT=kqs,
+             KEYQ_AMBIENT_NOIG=kqs,
              KEYQ_OMPL=ompl_q)
     util.log('[sample_key_conf] save key confs to {}'.format(kfn))
 
