@@ -146,7 +146,7 @@ def estimate_clearance_volume(args, ws):
             free_vertices, touch_vertices, to_inf, free_tau, touch_tau = touchq_util.calc_touch(uw, unit_qs[qi], npoint, uw.recommended_cres)
             qi_str = util.padded(qi, nq)
             out_fn = join(scratch_dir, 'unitary_clearance_from_keycan-{}.npz'.format(qi_str))
-            np.savez(out_fn,
+            np.savez_compressed(out_fn,
                      FROM_V_OMPL=Qs[qi],
                      FROM_V=unit_qs[qi],
                      FREE_V=free_vertices,
