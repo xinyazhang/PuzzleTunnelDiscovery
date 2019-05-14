@@ -86,8 +86,9 @@ def _predict_worker(tup):
     key_fn = ws.keyconf_prediction_file(puzzle_name)
     util.log("[predict_keyconf(worker)] save to key file {}".format(key_fn))
     unit_q = uw.translate_ompl_to_unit(ompl_q)
-    np.savez(key_fn, KEYQ_OMPL=ompl_q, KEYQ_UNIT=unit_q)
-
+    # np.savez(key_fn, KEYQ_OMPL=ompl_q, KEYQ_UNIT=unit_q)
+    np.savez(key_fn, KEYQ_OMPL=ompl_q)
+    matio.savetxt(key_fn + 'unit.txt', unit_q)
 
 def predict_keyconf(args, ws):
     task_tup = []
