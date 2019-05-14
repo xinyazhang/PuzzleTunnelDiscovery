@@ -18,6 +18,7 @@ Chunk the forest from (8196, 7144574) to (8196, 1545980)
 ./pds_edge.py --pdsflags /u/zxy/scratch/auto-mkobs3d/bin/workspace/duet.test/solver_scratch/dual-g9/pds/0.npz --out /u/zxy/scratch/auto-mkobs3d/bin/workspace/duet.test/solver_scratch/dual-g9/trial-0/edges.hdf5 `ls -v /u/zxy/scratch/auto-mkobs3d/bin/workspace/duet.test/solver_scratch/dual-g9/trial-0/ssc-*.mat`
 100% (117113857008 of 117113857008) |####| Elapsed Time: 1:38:58 Time: 1:38:58
 ```
+8. unitary_clearance_from_keycan: npz to hdf5
 99. Add the following things to dockerfile ...
     + sudo apt install cgal-dev
     + sudo apt install CGAL-dev
