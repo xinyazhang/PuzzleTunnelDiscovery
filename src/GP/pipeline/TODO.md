@@ -6,7 +6,18 @@
    + Fixed, but it's still recommended to use objautouv-ed geometries in the
        beginning
 4. ~~Inconsistency between OMPL state and Unitary state.~~
-5. Add the following things to dockerfile ...
+5. Replace NetworkX with [graph-tool](https://graph-tool.skewed.de/)
+6. current `pds_edge.py` is still too slow
+```
+./pds_edge.py --pdsflags /scratch/cluster/zxy/auto-mkobs3d/bin/workspace/duet.test/solver_scratch/dual-g9/pds/0.npz --out /scratch/cluster/zxy/auto-mkobs3d/bin/workspace/duet.test/solver_scratch/dual-g9/trial-0/edges.hdf5 `ls -v /scratch/cluster/zxy/auto-mkobs3d/bin/workspace/duet.test/solver_scratch/dual-g9/trial-0/ssc-*.mat`
+Chunk the forest from (8196, 7144574) to (8196, 1545980)
+100% (117113857008 of 117113857008) |#######################################################################################################################################| Elapsed Time: 2:08:27 Time:  2:08:27
+```
+```
+./pds_edge.py --pdsflags /u/zxy/scratch/auto-mkobs3d/bin/workspace/duet.test/solver_scratch/dual-g9/pds/0.npz --out /u/zxy/scratch/auto-mkobs3d/bin/workspace/duet.test/solver_scratch/dual-g9/trial-0/edges.hdf5 `ls -v /u/zxy/scratch/auto-mkobs3d/bin/workspace/duet.test/solver_scratch/dual-g9/trial-0/ssc-*.mat`
+100% (117113857008 of 117113857008) |####| Elapsed Time: 1:38:58 Time: 1:38:58
+```
+99. Add the following things to dockerfile ...
     + sudo apt install cgal-dev
     + sudo apt install CGAL-dev
     + apt search cgal
