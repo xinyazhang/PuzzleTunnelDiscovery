@@ -12,7 +12,8 @@ from . import condor
 
 def read_roots(args):
     uw = util.create_unit_world(args.puzzle_fn)
-    ompl_q = matio.load(args.roots)[args.roots_key]
+    ompl_q = matio.load(args.roots, key=args.roots_key)
+    print("OMPL_Q {}".format(ompl_q.shape))
     unit_q = uw.translate_ompl_to_unit(ompl_q)
     matio.savetxt(args.out, unit_q)
 
