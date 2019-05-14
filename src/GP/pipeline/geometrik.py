@@ -24,6 +24,7 @@ def _get_task_args(ws, per_geometry):
         cfg, config = parse_ompl.parse_simple(puzzle_fn)
         wag = WorkerArgs()
         wag.dir = ws.dir
+        wag.current_trial = ws.current_trial
         wag.puzzle_fn = puzzle_fn
         wag.puzzle_name = puzzle_name
         wag.env_fn = cfg.env_fn
@@ -41,6 +42,7 @@ def _get_task_args(ws, per_geometry):
 
 def _sample_key_point_worker(wag):
     ws = util.Workspace(wag.dir)
+    ws.current_trial = wag.current_trial
     kpp = pygeokey.KeyPointProber(wag.geo_fn)
     natt = ws.config.getint('GeometriK', 'KeyPointAttempts')
     util.log("[sample_key_point] probing {} for {} attempts".format(wag.geo_fn, natt))
@@ -58,6 +60,10 @@ def sample_key_point(args, ws):
 
 def _sample_key_conf_worker(wag):
     ws = util.Workspace(wag.dir)
+    ws.current_trial = wag.current_trial
+    kfn = ws.keyconf_prediction_file(wag.puzzle_name)
+    util.log('[sample_key_conf] trial {}'.format(ws.current_trial))
+    util.log('[sample_key_conf] sampling to {}'.format(kfn))
     env_kps_fn = ws.keypoint_prediction_file(wag.puzzle_name, 'env')
     rob_kps_fn = ws.keypoint_prediction_file(wag.puzzle_name, 'rob')
     env_kps = matio.load(env_kps_fn)['KEY_POINT_AMBIENT']
