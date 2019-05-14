@@ -2,6 +2,7 @@ from . import util
 from . import init
 from . import mimic
 from . import add_puzzle
+from . import add_extra
 from . import envconfig
 from . import autorun
 from . import matio

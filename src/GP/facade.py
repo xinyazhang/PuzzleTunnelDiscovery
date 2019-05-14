@@ -15,6 +15,7 @@ def main():
     pipeline.init.setup_parser(subparsers)
     pipeline.mimic.setup_parser(subparsers)
     pipeline.add_puzzle.setup_parser(subparsers)
+    pipeline.add_extra.setup_parser(subparsers)
     pipeline.autorun.setup_parser(subparsers)
     pipeline.autorun2.setup_parser(subparsers)
     # Occationally users want to run pipeline stages individually
