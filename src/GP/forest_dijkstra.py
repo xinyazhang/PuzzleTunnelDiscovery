@@ -4,6 +4,9 @@
 Solve the SSSP problem in forest, with NetworkX
 '''
 
+import sys, os
+sys.path.append(os.getcwd())
+
 import argparse
 import numpy as np
 from scipy.io import loadmat,savemat
@@ -12,7 +15,7 @@ from progressbar import progressbar
 import itertools
 import os
 import networkx as nx
-import h5py
+from pipeline import matio
 
 VIRTUAL_OPEN_SPACE_NODE = 1j
 
@@ -27,6 +30,11 @@ def _lsv(indir, prefix, suffix):
         ret.append(fn)
 
 def _load(fefn, ds_name='E'):
+    d = matio.load(fefn)
+    if ds_name is None:
+        ds_name = list(d.keys())[0]
+    return d[ds_name] if ds_name in d else None
+'''
     if fefn.endswith('.npz'):
         d = np.load(fefn)
         if ds_name is None:
@@ -39,6 +47,7 @@ def _load(fefn, ds_name='E'):
         d = h5py.File(fefn, 'r')
         return d[ds_name][:] if ds_name in d else None
     raise NotImplementedError("Parser for file {} is not implemented".format(fefn))
+'''
 
 class TreePathFinder(object):
     def __init__(self, root, ssc_fn, ct_fn, pds, pds_ids, pds_flags):
@@ -55,7 +64,7 @@ class TreePathFinder(object):
         G = self._G = nx.Graph()
         G.add_nodes_from([-1]) # One root
         G.add_nodes_from(pds_ids)
-        # print(self._ct_edges[:10])
+        # print(self._ct_edges[:20])
         G.add_edges_from(self._ct_edges)
 
     def get_node_conf(self, node):
@@ -83,6 +92,7 @@ class TreePathFinder(object):
                 if (self._pds_flags[n] & PDS_FLAG_TERMINATE) != 0:
                     print("Substitute leaf {} with {}".format(leaf, n))
                     leaf = n
+                    # print('CT edges\n{}'.format(self._ct_edges))
                     break
         assert self._ssc[0, leaf] != 0
         ids = nx.shortest_path(self._G, -1, leaf)
@@ -137,6 +147,9 @@ class ForestPathFinder(object):
             G.add_edges_from(edges)
 
     def _solve_root_and_pds(self):
+        #self._sssp = [-1, 48, -608, 357, -607, 1j]
+        # self._sssp = [357, -607, 1j]
+        # return
         # self._sssp = [-1, 4162147, -612, 726372, -725, 3776176, -367, 4131349, -941, 1420526, -41, 3918338, -743, 3488854, -773, 1442466, -525, 3888572, -767, 214122, -764, 3361120, -840, 1449284, -815, 4154340, -2]
         # self._sssp = self._sssp[:2] # First few segment
         # print(self._sssp)
@@ -145,11 +158,22 @@ class ForestPathFinder(object):
         G.add_nodes_from([-1 - i for i in range(self._nroots)]) # Root nodes
         G.add_nodes_from(self._pds_ids)
         print("Loading edges from {}".format(self._args.forest_edge))
-        tups = _load(self._args.forest_edge)
-        print("Loading openset from {}".format(self._args.forest_edge))
-        self.openset = _load(self._args.forest_edge, 'OpenTree')
-        if self.openset is not None:
-            G.add_nodes_from([VIRTUAL_OPEN_SPACE_NODE])
+        tups = _load(self._args.forest_edge)[:].astype(np.int64)
+        if False:
+            print("OpenSet algorithm is disabled")
+            self.openset = None
+        else:
+            print("Loading openset from {}".format(self._args.forest_edge))
+            self.openset = _load(self._args.forest_edge, 'OpenTree')[:]
+            if self.openset is not None:
+                G.add_nodes_from([VIRTUAL_OPEN_SPACE_NODE])
+                print('Open set shape {}'.format(self.openset.shape))
+                # print('Open set data {}'.format(list(self.openset)))
+        '''
+        Correct the pds milestone ID from 1-indexed to 0-indexed
+        We used 1-indexed ID because 0 was reserved as "no edge"
+        '''
+        tups[:, 2] -= 1
         # print('Open set shape {}'.format(self.openset.shape))
         # exit()
         edges_1 = tups[:,[0,2]]
@@ -157,11 +181,12 @@ class ForestPathFinder(object):
         # print(tups[:5])
         edges_1[:,0] = -1 - edges_1[:,0]
         edges_2[:,0] = -1 - edges_2[:,0]
-        # print(edges_1[:5])
-        # print(edges_2[:5])
+        print(edges_1[:5])
+        print(edges_2[:5])
         #return
         G.add_edges_from(edges_1)
         G.add_edges_from(edges_2)
+        # print(nx.shortest_path(G, -1, -1026))
         # -1: Root 0 (init), -2: Root 1 (goal)
         init_tree = -1
         goal_tree = -2
@@ -175,11 +200,12 @@ class ForestPathFinder(object):
             '''
             virtual_edges = []
             for root in self.openset:
+                # print("add edge ({} {})".format(-1 - root, VIRTUAL_OPEN_SPACE_NODE))
                 virtual_edges.append((-1 - root, VIRTUAL_OPEN_SPACE_NODE))
             G.add_edges_from(virtual_edges)
             goal_tree = VIRTUAL_OPEN_SPACE_NODE
         self._sssp = nx.shortest_path(G, init_tree, goal_tree)
-        print(self._sssp)
+        print('Forest-level shortest path {}'.format(self._sssp))
 
     def _solve_in_single_tree(self, n_from, n_to):
         if isinstance(n_from, complex):

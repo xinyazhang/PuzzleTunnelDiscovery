@@ -9,35 +9,16 @@ Note:
     User is responsible to guarantee this.
 '''
 
+import sys, os
+sys.path.append(os.getcwd())
+
 import argparse
 import numpy as np
 from scipy.io import loadmat
 import h5py
 import scipy.sparse as sparse
 from progressbar import progressbar
-
-def print_edge_sparse(args):
-    cl = []
-    for fn in progressbar(args.files):
-        cl.append(loadmat(fn)['C'])
-    print("Stacking sparse matrices")
-    mc = sparse.vstack(cl, format='csr')
-    print("Colwise summing")
-    cws = mc.sum(axis=0)
-    nv = cws.shape[1]
-    #print(cws.shape)
-    edges = sparse.lil_matrix((nv, nv), dtype=np.int8)
-    for i in progressbar(range(nv)):
-        s = cws[0,i]
-        if s < 2:
-            continue
-        rows,_ = mc[:,i].nonzero()
-        '''
-        for r,c in zip(rows[:-1], rows[1:]):
-            edges[r,c] = 1
-            #print("{},{}".format(r,c))
-        '''
-    #savemat(args.out, dict(E=edges), do_compression=True)
+from pipeline import matio
 
 def print_edge(args):
     OPENSPACE_FLAG = 1
@@ -45,9 +26,11 @@ def print_edge(args):
         QF = np.load(args.pdsflags)['QF']
     else:
         QF = None
+    f = h5py.File(args.out, mode='a')
+    '''
+    # old code
     E = None
     r = 0
-    f = h5py.File(args.out, mode='a')
     for fn in progressbar(args.files):
         rowdata = loadmat(fn)['C']
         if E is None:
@@ -56,11 +39,68 @@ def print_edge(args):
         r += 1
     root_from, pds_to = E.nonzero()
     forest_edge = np.transpose(np.array([root_from, pds_to], dtype=np.int32))
-    if 'FE' in f:
-        del f['FE']
-    f.create_dataset('FE', data=forest_edge, compression='lzf')
+    matio.hdf5_overwrite(f, 'EE', forest_edge)
     f.flush()
     del forest_edge
+    '''
+    N = len(args.files) # N: number of roots
+    K = None            # K: PDS size
+    ds_Edense = None
+    total_nz = 0
+    for i,fn in enumerate(progressbar(args.files)):
+        row_data = matio.load(fn)['C'].todense()
+        if K is None:
+            K = row_data.shape[1]
+        if ds_Edense is None:
+            ds_Edense = matio.hdf5_open(f, 'Edense', shape=(N, K),
+                                        dtype=np.int8,
+                                        chunks=True,
+                                        compression='lzf')
+        # Performance ?
+        ds_Edense.write_direct(row_data, source_sel=np.s_[:, :], dest_sel=np.s_[i, :])
+        total_nz += len(row_data.nonzero()[0])
+    f.flush()
+    print("Total number of NZ elemtns {}".format(total_nz))
+
+    inter_tree_dtype = np.uint32 if K < np.iinfo(np.uint32).max else np.uint64
+    inter_tree_max = np.iinfo(inter_tree_dtype).max
+    ITE = inter_tree_edge = np.zeros((N, N), dtype=inter_tree_dtype)
+
+    col_data = np.zeros((N, 1), dtype=np.int8)
+    # Iterate through all PDS milestones, to construct ITE
+    # ITE is O(N^2) which is managable in memory
+    for i in progressbar(range(K)):
+        col = K - 1 - i # from K-1 to 0, so ITE keeps the smallest PDS milestone
+        ds_Edense.read_direct(col_data, source_sel=np.s_[:, col], dest_sel=np.s_[:, 0])
+        if np.sum(col_data) < 2:
+            continue
+        # trees connected by PDS milestone col
+        star_from_pds = col_data.nonzero()[0]
+        # Keep the edge number low by NOT constructing a clique
+        # We are supposed to trim the duplicated path in forest_dijkstra
+        edge_from = star_from_pds[:-1]
+        edge_to = star_from_pds[1:]
+        '''
+        We uses 0 to represent 'No edges', so PDS Milestone I will be denoted as I+1
+        '''
+        ITE[edge_from, edge_to] = col + 1
+
+    roots_to_open = set()
+    if QF is not None:
+        nz = np.where(QF & OPENSPACE_FLAG != 0)[0]
+        for i in progressbar(nz):
+            ds_Edense.read_direct(col_data, source_sel=np.s_[:, i], dest_sel=np.s_[:, 0])
+            rows = col_data.nonzero()[0].tolist()
+            roots_to_open.update(rows)
+        roots_to_open_list = np.array(list(roots_to_open), dtype=ITE.dtype)
+        matio.hdf5_overwrite(f, 'OpenTree', roots_to_open_list)
+
+    edge_from, edge_to = ITE.nonzero()
+    edge = np.transpose(np.array([edge_from, edge_to, ITE[edge_from, edge_to]], dtype=ITE.dtype))
+    matio.hdf5_overwrite(f, 'Etup', edge)
+
+    '''
+    # old code
     cws = E.sum(axis=0)
     nv = cws.shape[0]
     Edense = np.zeros((len(args.files), len(args.files)), dtype=np.int32)
@@ -88,21 +128,18 @@ def print_edge(args):
     # del edge_to
     edge_from, edge_to = Edense.nonzero()
     roots_to_open_list = np.array(list(roots_to_open), dtype=np.int64)
-    '''
+    """
     if len(roots_to_open) >= 2:
         # Add a chain that connects all roots with openspace leaf.
         # This is not enough for path planning, but good enough for disjoint set algorithm
         edge_from = np.append(edge_from, roots_to_open_list[:-1])
         edge_to = np.append(edge_to, roots_to_open_list[1:])
-    '''
+    """
     edge = np.transpose(np.array([edge_from, edge_to, Edense[edge_from, edge_to]], dtype=np.int32))
     #savemat(args.out, dict(E=edge, FE=forest_edge), do_compression=True)
-    if 'E' in f:
-        del f['E']
-    f.create_dataset('E', data=edge, compression='lzf')
-    if 'OpenTree' in f:
-        del f['OpenTree']
-    f.create_dataset('OpenTree', data=roots_to_open_list, compression='lzf')
+    matio.hdf5_overwrite(f, 'E', edge)
+    matio.hdf5_overwrite(f, 'OpenTree', roots_to_open_list)
+    '''
     f.close()
 
 def main():
@@ -117,4 +154,5 @@ def main():
     print_edge(args)
 
 if __name__ == '__main__':
-    main()
+    import cProfile
+    cProfile.run('main()')

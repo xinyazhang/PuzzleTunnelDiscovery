@@ -45,7 +45,7 @@ def collect_ITE(files, buf, ITE, low, high, pbar=None, QF=None, roots_to_open=No
             edge_to = star_from_pds[1:]
             ITE[edge_from, edge_to] = global_col + 1
             pbar += N
-        if QF[i] & _OPENSPACE_FLAG == 0:
+        if QF is not None and (QF[global_col] & _OPENSPACE_FLAG != 0):
             rows = col_data.nonzero()[0].tolist()
             roots_to_open.update(rows)
 
@@ -58,10 +58,11 @@ def print_edge(args):
     N = len(args.files)                     # N: number of roots
     K = matio.load(args.files[0])['C'].shape[1]  # K: PDS size
 
-    inter_tree_dtype = np.uint32 if K < np.iinfo(np.uint32).max else np.uint64
+    #inter_tree_dtype = np.uint32 if K < np.iinfo(np.uint32).max else np.uint64
+    inter_tree_dtype = np.int64
     inter_tree_max = np.iinfo(inter_tree_dtype).max
     memory_limit = _total_memory() * 0.5
-    pds_limit_per_run = min(K, int(memory_limit / 4 / N))
+    pds_limit_per_run = min(K, int(memory_limit / N))
     ITE = inter_tree_edge = np.zeros((N, N), dtype=inter_tree_dtype)
     per_run_buffer = np.zeros((N, pds_limit_per_run), dtype=np.int8)
     sep = list(range(K, 0, -pds_limit_per_run))
