@@ -9,7 +9,7 @@ from . import add_puzzle
 def setup_parser(subparsers):
     p = subparsers.add_parser('init', help='Initialize a directory as workspace')
     p.add_argument('dir', help='Workspace directory')
-    p.add_argument('training_puzzle', help='Puzzle as training data')
+    p.add_argument('--training_puzzle', help='Puzzle as training data', required=True)
     p.add_argument('--condor', help='Condor Template file', required=True)
     p.add_argument('--test_puzzle', help='Workspace directory', nargs='*', default=[])
 

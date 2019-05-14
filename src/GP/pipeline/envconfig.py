@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
-from os.path import join
+from os.path import join, normpath
 from six.moves import configparser
 import subprocess
 
@@ -49,22 +49,19 @@ _CONFIG_TEMPLATE = \
 # Note: each type of node only stores necessary files for its compute task,
 # in order to save harddrive space.
 [DEFAULT]
-# The facade.py path on local node
-LocalExecPath = {localpath}
-
 # Host name of GPU node, SSH host alias can be used
-GPUHost = TODO
+GPUHost = {GPUHost}
 # facade.py path on GPU node
-GPUExecPath = TODO
+GPUExecPath = {GPUExecPath}
 # Workspace path on GPU node
-GPUWorkspacePath = TODO
+GPUWorkspacePath = {GPUWorkspacePath}
 
 # Host name of HTCondor submission node, SSH host alias can be used
-CondorHost = TODO
+CondorHost = {CondorHost}
 # facade.py path on HTCondor node
-CondorExecPath = TODO
+CondorExecPath = {CondorExecPath}
 # Workspace path on NTCondor node
-CondorWorkspacePath = TODO
+CondorWorkspacePath = {CondorWorkspacePath}
 
 # How many jobs are you authroized to run in parallel on HTCondor
 # This is a hint for tasks partitioning
@@ -133,12 +130,23 @@ Trials = 1
 TimeThreshold = 0.02
 '''
 
-def init_config_file(args, ws):
+def init_config_file(args, ws, oldws=None):
     try:
         condor.extract_template(open(args.condor, 'r'), open(ws.condor_template, 'w'))
         cfg = ws.configuration_file
         if not os.path.isfile(cfg):
-            print(_CONFIG_TEMPLATE.format(localpath=os.getcwd()), file=open(cfg, 'w'))
+            dic = {}
+            if oldws is not None:
+                rel_old_to_new = os.path.relpath(ws.dir, start=oldws.dir)
+                dic = {
+                        'GPUHost': oldws.config.get('DEFAULT', 'GPUHost'),
+                        'GPUExecPath': oldws.config.get('DEFAULT', 'GPUExecPath'),
+                        'GPUWorkspacePath': normpath(join(oldws.config.get('DEFAULT', 'GPUWorkspacePath'), rel_old_to_new)),
+                        'CondorHost': oldws.config.get('DEFAULT', 'CondorHost'),
+                        'CondorExecPath': oldws.config.get('DEFAULT', 'CondorExecPath'),
+                        'CondorWorkspacePath': normpath(join(oldws.config.get('DEFAULT', 'CondorWorkspacePath'), rel_old_to_new)),
+                      }
+            print(_CONFIG_TEMPLATE.format(**dic), file=open(cfg, 'w'))
         EDITOR = os.environ.get('EDITOR', 'vim')
         subprocess.run([EDITOR, cfg])
     except FileNotFoundError as e:

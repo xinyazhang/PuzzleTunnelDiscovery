@@ -13,6 +13,7 @@ def main():
     subparsers.required = True
     # In the order that users general use
     pipeline.init.setup_parser(subparsers)
+    pipeline.mimic.setup_parser(subparsers)
     pipeline.add_puzzle.setup_parser(subparsers)
     pipeline.autorun.setup_parser(subparsers)
     pipeline.autorun2.setup_parser(subparsers)

@@ -204,8 +204,11 @@ class Workspace(object):
     def touch_signature(self):
         pathlib.Path(self.signature_file).touch()
 
+    def test_signature(self):
+        return os.path.isfile(self.signature_file) and os.path.isfile(self.condor_template)
+
     def verify_signature(self):
-        if not os.path.isfile(self.signature_file):
+        if not self.test_signature():
             fatal("{} is not initialized as a puzzle workspace. Exiting".format(self.workspace_dir))
             exit()
 

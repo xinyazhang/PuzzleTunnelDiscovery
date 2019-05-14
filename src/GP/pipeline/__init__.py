@@ -1,5 +1,6 @@
 from . import util
 from . import init
+from . import mimic
 from . import add_puzzle
 from . import envconfig
 from . import autorun
