@@ -33,6 +33,7 @@ BASELINE_SCRATCH = 'baseline_scratch'
 #
 # Note: we use UPPERCASE KEY to indicate this is training data/ground truth.
 KEY_FILE = os.path.join(TRAINING_DIR, 'KEY.npz')
+TRAJECTORY_DIR = os.path.join(CONDOR_SCRATCH, 'training_trajectory')
 UV_DIR = os.path.join(CONDOR_SCRATCH, 'training_key_uvproj')
 
 PIXMARGIN = 2
