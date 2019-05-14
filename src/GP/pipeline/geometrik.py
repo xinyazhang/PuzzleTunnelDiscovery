@@ -78,9 +78,8 @@ def _sample_key_conf_worker(wag):
     ompl_q = uw.translate_vanilla_to_ompl(kqs)
     ompl_q = np.concatenate((iq, gq, ompl_q), axis=0)
     kfn = ws.keyconf_prediction_file(wag.puzzle_name)
-    np.savez(kfn,
-             KEYQ_AMBIENT_NOIG=kqs,
-             KEYQ_OMPL=ompl_q)
+    #np.savez(kfn, KEYQ_AMBIENT_NOIG=kqs, KEYQ_OMPL=ompl_q)
+    np.savez(kfn, KEYQ_OMPL=ompl_q)
     util.log('[sample_key_conf] save key confs to {}'.format(kfn))
 
 def sample_key_conf(args, ws):
