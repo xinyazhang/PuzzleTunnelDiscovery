@@ -63,6 +63,8 @@ def sample_touch(args, ws):
                             instances=total_chunks,
                             wait=True)
     else:
+        if args.task_id is None:
+            os.makedirs(ws.local_ws(_TOUCH_SCRATCH), exist_ok=True)
         uw = util.create_unit_world(ws.local_ws(util.TRAINING_DIR, util.PUZZLE_CFG_FILE))
         # Do the actual work (either no need to partition, or run from HTCondor)
         task_id = 0 if total_chunks == 1 else args.task_id
