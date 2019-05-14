@@ -118,10 +118,18 @@ def launch_with_params(params, do_training):
     # Note: all traing data are named after 'train'
     ds_name = basename(dirname(ompl_cfg)) if 'dataset_name' not in params else params['dataset_name']
     aug_dict = _craft_dict(params)
-    dataset = datagen.create_dataset(ompl_cfg, geo_type=geo_type,
-                                     aug_patch=True,
-                                     aug_scaling=0.5,
-                                     aug_dict=aug_dict)
+    if 'all_ompl_configs' in params:
+        dataset = dataset.create_multidataset(params['all_ompl_configs'],
+                                              geo_type=geo_type,
+                                              aug_patch=True,
+                                              aug_scaling=0.5,
+                                              aug_dict=aug_dict)
+    else:
+        dataset = datagen.create_dataset(ompl_cfg, geo_type=geo_type,
+                                         aug_patch=True,
+                                         aug_scaling=0.5,
+                                         aug_dict=aug_dict)
+
     params['num_joints'] = dataset.d_dim
     assert params['weighted_loss'] is False, "No support for weighted loss for now"
 

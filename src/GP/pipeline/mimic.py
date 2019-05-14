@@ -16,7 +16,7 @@ def run(args):
     oldws = util.Workspace(args.old)
     ws = util.Workspace(args.dir, init=True)
     if ws.test_signature():
-        util.fatal("{} is already initialized".format(new_ws.dir))
+        util.fatal("{} is already initialized".format(ws.dir))
         exit()
     args.condor = oldws.condor_template
     os.makedirs(ws.dir, exist_ok=True)

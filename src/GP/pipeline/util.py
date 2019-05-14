@@ -23,6 +23,7 @@ CONDOR_TEMPLATE = 'template.condor'
 PUZZLE_CFG_FILE = 'puzzle.cfg' # In every puzzle directory
 # Top level Directories
 TRAINING_DIR = 'train'
+EXTRA_TRAINING_DIR = 'extrain'
 TESTING_DIR = 'test'
 CONDOR_SCRATCH = 'condor_scratch'
 NEURAL_SCRATCH = 'nn_scratch'
@@ -286,11 +287,20 @@ class Workspace(object):
     def fetch_gpu(self, *paths):
         _rsync(self.gpu_host, self.gpu_ws, None, self.local_ws, *paths)
 
+    def training_puzzle_generator(self):
+        yield self.training_puzzle, 'train'
+        for ent in os.listdir(self.local_ws(EXTRA_TRAINING_DIR)):
+            puzzle_fn = self.local_ws(EXTRA_TRAINING_DIR, ent, 'puzzle.cfg')
+            if not os.path.isfile(puzzle_fn):
+                log("Cannot find puzzle file {}. continue to next dir".format(puzzle_fn))
+                continue
+            yield puzzle_fn, ent
+
     def test_puzzle_generator(self):
         for ent in os.listdir(self.local_ws(TESTING_DIR)):
             puzzle_fn = self.local_ws(TESTING_DIR, ent, 'puzzle.cfg')
             if not os.path.isfile(puzzle_fn):
-                log("Cannot find puzzle file {} continue to next dir".format(puzzle_fn))
+                log("Cannot find puzzle file {}. continue to next dir".format(puzzle_fn))
                 continue
             yield puzzle_fn, ent
 

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
-from os.path import join
+from os.path import join, isdir
 import subprocess
 import pathlib
 import numpy as np
@@ -22,6 +22,9 @@ def _deploy(ws):
                      util.WORKSPACE_CONFIG_FILE,
                      util.TRAINING_DIR+'/',
                      util.TESTING_DIR+'/')
+    if isdir(ws.local_ws(util.EXTRA_TRAINING_DIR)):
+        ws.deploy_to_gpu(util.EXTRA_TRAINING_DIR + '/')
+
 def _fetch(ws):
     ws.fetch_gpu(util.TESTING_DIR+'/')
 
@@ -32,6 +35,11 @@ def write_pidfile(pidfile, pid):
 def _train(ws, geo_type):
     params = hg_launcher.create_default_config()
     params['ompl_config'] = ws.training_puzzle
+    if isdir(ws.local_ws(util.EXTRA_TRAINING_DIR)):
+        all_omplcfgs = []
+        for puzzle_fn, puzzle_name in ws.training_puzzle_generator():
+            all_omplcfgs.append(puzzle_fn)
+        params['all_ompl_configs'] = all_omplcfgs
     params['what_to_render'] = geo_type
     params['checkpoint_dir'] = ws.local_ws(util.NEURAL_SCRATCH, geo_type) + '/'
     params['suppress_hot'] = 0.0
