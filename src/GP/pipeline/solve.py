@@ -97,7 +97,7 @@ def sample_pds(args, ws):
             condor_job_args = ['se3solver.py',
                     'solve',
                     '--replace_istate',
-                    'file={},offset=$$([$(Process)]),size=1,out={}'.format(key_fn, scratch_dir),
+                    'file={},key=KEYQ_OMPL,offset=$$([$(Process)]),size=1,out={}'.format(key_fn, scratch_dir),
                     '--bloom_out',
                     join(scratch_dir, 'bloom-from_$(Process).npz'),
                     puzzle_fn,
@@ -158,7 +158,7 @@ def forest_rdt(args, ws):
                 'solve',
                 '--samset', _puzzle_pds(ws, puzzle_name, ws.current_trial),
                 '--replace_istate',
-                'file={},offset=$$([$(Process)]),size=1,out={}'.format(key_fn, scratch_dir),
+                'file={},key=KEYQ_OMPL,offset=$$([$(Process)]),size=1,out={}'.format(key_fn, scratch_dir),
                 puzzle_fn,
                 util.RDT_FOREST_ALGORITHM_ID,
                 1.0]
