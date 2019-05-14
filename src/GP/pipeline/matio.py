@@ -17,9 +17,16 @@ _SUFFIX_TO_LOADER = {
         '.hdf5': _load_hdf5
         }
 
-def load(fn):
+def load(fn, key=None):
     p = pathlib.PosixPath(fn)
-    return _SUFFIX_TO_LOADER[p.suffix](fn)
+    if p.suffix not in _SUFFIX_TO_LOADER:
+        raise NotImplementedError("Parser for {} file is not implemented".format(p.suffix))
+    d = _SUFFIX_TO_LOADER[p.suffix](fn)
+    if p.suffix == '.txt':
+        return d
+    if key is not None:
+        return d[key]
+    return d
 
 def hdf5_overwrite(f, path, ds):
     if path in f:
@@ -29,6 +36,11 @@ def hdf5_overwrite(f, path, ds):
         f.create_dataset(path, data=ds)
     else:
         f.create_dataset(path, data=ds, compression='lzf')
+
+def hdf5_open(f, path, shape, dtype, **kwds):
+    if path in f:
+        del f[path]
+    return f.create_dataset(path, shape=shape, dtype=dtype, **kwds)
 
 def savetxt(fn, a):
     np.savetxt(fn, a, fmt='%.17g')
