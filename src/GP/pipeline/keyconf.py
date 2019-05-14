@@ -28,8 +28,9 @@ from . import parse_ompl
 
 def _predict_atlas2prim(tup):
     import pyosr
-    ws_dir, puzzle_fn, puzzle_name = tup
+    ws_dir, puzzle_fn, puzzle_name, trial = tup
     ws = util.Workspace(ws_dir)
+    ws.current_trial = trial
     r = util.create_offscreen_renderer(puzzle_fn, ws.chart_resolution)
     r.uv_feedback = True
     r.avi = False
@@ -47,8 +48,9 @@ def _predict_atlas2prim(tup):
 
 
 def _predict_worker(tup):
-    ws_dir, puzzle_fn, puzzle_name = tup
+    ws_dir, puzzle_fn, puzzle_name, trial = tup
     ws = util.Workspace(ws_dir)
+    ws.current_trial = trial
     uw = util.create_unit_world(puzzle_fn)
     rob_sampler = atlas.AtlasSampler(ws.local_ws(util.TESTING_DIR, puzzle_name, 'rob-a2p.npz'),
                                      ws.local_ws(util.TESTING_DIR, puzzle_name, 'rob-atex.npz'),
@@ -90,7 +92,7 @@ def _predict_worker(tup):
 def predict_keyconf(args, ws):
     task_tup = []
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
-        task_tup.append((ws.dir, puzzle_fn, puzzle_name))
+        task_tup.append((ws.dir, puzzle_fn, puzzle_name, ws.current_trial))
         util.log('[predict_keyconf] found puzzle {} at {}'.format(puzzle_name, puzzle_fn))
     if 'auto' == ws.config.get('Prediction', 'NumberOfPredictionProcesses'):
         ncpu = None
@@ -140,6 +142,7 @@ def collect_stages():
 
 def autorun(args):
     ws = util.Workspace(args.dir)
+    ws.current_trial = args.current_trial
     pdesc = collect_stages()
     for _,func in pdesc:
         func(ws)
