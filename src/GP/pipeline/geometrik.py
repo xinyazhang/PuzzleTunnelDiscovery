@@ -10,7 +10,10 @@ from . import choice_formatter
 from . import util
 from . import parse_ompl
 from . import matio
-import pygeokey
+try:
+    import pygeokey
+except ImportError as e:
+    util.warn("[WARNING] CANNOT IMPORT pygeokey. This node is incapable of geometric based prediction")
 
 class WorkerArgs(object):
     pass

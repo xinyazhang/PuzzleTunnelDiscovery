@@ -22,7 +22,6 @@ from . import matio
 from . import partt
 from . import touchq_util
 from . import texture_format
-import pyosr
 
 hdf5_overwrite = matio.hdf5_overwrite
 
@@ -232,6 +231,7 @@ def uvproject(args, ws):
         util.log('[uvproject] projection data written to {}'.format(ofn))
 
 def _uvrender_worker(uv_args):
+    import pyosr
     args_dir, uvproj_list = uv_args
     ws = util.Workspace(args_dir)
     r = util.create_offscreen_renderer(ws.local_ws(util.TRAINING_DIR, util.PUZZLE_CFG_FILE))

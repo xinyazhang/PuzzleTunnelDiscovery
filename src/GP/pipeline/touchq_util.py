@@ -1,9 +1,9 @@
 import numpy as np
 import math
 from . import uw_random
-import pyosr
 
 def sample_one_touch(uw, q0, stepping):
+    import pyosr
     tr = uw_random.random_on_sphere(1.0)
     aa = uw_random.random_within_sphere(2 * math.pi)
     to = pyosr.apply(q0, tr, aa)

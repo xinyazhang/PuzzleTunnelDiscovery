@@ -26,7 +26,6 @@ from . import matio
 from . import atlas
 from . import texture_format
 from . import parse_ompl
-import pyosr
 
 #
 # Functions to process workspaces locally

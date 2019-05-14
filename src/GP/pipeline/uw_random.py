@@ -1,7 +1,6 @@
 import numpy as np
 import random
 from math import sqrt,pi,sin,cos
-import pyosr
 
 def random_state(scale=1.0):
     tr = scale * (np.random.rand(3) - 0.5)
@@ -78,6 +77,10 @@ def random_path(uw, max_stepping, node_num, scale=0.5):
     keys = [state]
     ratio = 0.0
     actions = []
+    '''
+    Lazy import
+    '''
+    import pyosr
     for i in range(node_num - 1):
         done = False
         while not done:

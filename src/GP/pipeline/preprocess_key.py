@@ -18,7 +18,6 @@ from . import partt
 from . import touchq_util
 from . import parse_ompl
 from . import condor
-import pyosr
 
 # Pipeline local file
 # 
@@ -65,6 +64,7 @@ def find_trajectory(args, ws):
 
 
 def interpolate_trajectory(args, ws):
+    import pyosr
     scratch_dir = ws.local_ws(_TRAJECTORY_SCRATCH)
     candidate_file = _get_candidate_file(ws)
     # Do not process only_wait, we need to restart if ssh is broken
@@ -156,6 +156,7 @@ def estimate_clearance_volume(args, ws):
                      TOUCH_TAU=touch_tau)
 
 def pickup_key_configuration(args, ws):
+    import pyosr
     scratch_dir = ws.local_ws(_KEYCAN_SCRATCH)
     os.makedirs(scratch_dir, exist_ok=True)
     top_k = ws.config.getint('TrainingKeyConf', 'KeyConf')

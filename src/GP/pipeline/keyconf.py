@@ -25,10 +25,9 @@ from . import matio
 from . import atlas
 from . import texture_format
 from . import parse_ompl
-import pyosr
-
 
 def _predict_atlas2prim(tup):
+    import pyosr
     ws_dir, puzzle_fn, puzzle_name = tup
     ws = util.Workspace(ws_dir)
     r = util.create_offscreen_renderer(puzzle_fn, ws.chart_resolution)
