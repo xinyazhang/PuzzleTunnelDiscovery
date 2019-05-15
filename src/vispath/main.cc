@@ -223,7 +223,7 @@ bool key_up(Viewer& viewer, unsigned int key, int modifier)
 	} else if (key == '-') {
 		speed /= 2.0;
 		std::cout << "current speed: " << speed << std::endl;
-	} else if (key == GLFW_KEY_KP_MULTIPLY || ((key == GLFW_KEY_KP_8) && (modifier & GLFW_MOD_SHIFT))) {
+	} else if (key == GLFW_KEY_KP_MULTIPLY || ((key == GLFW_KEY_8) && (modifier & GLFW_MOD_SHIFT))) {
 		// * enters show_all mode unconditionally Press p to play
 		play = false;
 		first_draw = true;
