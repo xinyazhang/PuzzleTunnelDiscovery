@@ -84,16 +84,6 @@ def sample_pds(args, ws):
             util.log('[sample_pds]  rel_bloom {}'.format(rel_bloom))
             scratch_dir = ws.local_ws(rel_bloom)
             key_fn = ws.keyconf_prediction_file(puzzle_name)
-            if not os.path.exists(key_fn):
-                util.warn("[sample_pds] forest root file {} does not exist")
-                probe_trial = ws.current_trial - 1
-                while probe_trial >= 0:
-                    key_fn_0 = ws.keyconf_prediction_file(puzzle_name, trial_override=probe_trial)
-                    if os.path.exists(key_fn_0):
-                        break
-                    probe_trial -= 1
-                shutil.copy(key_fn_0, key_fn)
-                util.warn("[sample_pds] copy {} to {} as forest root file".format(key_fn_0, key_fn))
             condor_job_args = ['se3solver.py',
                     'solve',
                     '--replace_istate',

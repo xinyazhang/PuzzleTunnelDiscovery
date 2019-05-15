@@ -311,8 +311,23 @@ class Workspace(object):
 
     def keyconf_prediction_file(self, puzzle_name, trial_override=None):
         trial = self.current_trial if trial_override is None else trial_override
-        return self.local_ws(TESTING_DIR, puzzle_name,
-                             KEY_PREDICTION_FMT.format(trial))
+        ret = self.local_ws(TESTING_DIR, puzzle_name,
+                            KEY_PREDICTION_FMT.format(trial))
+        if not os.path.exists(ret):
+            warn("[sample_pds] forest root file {} does not exist")
+            probe_trial = self.current_trial - 1
+            while probe_trial >= 0:
+                key_fn_0 = self.local_ws(TESTING_DIR, puzzle_name,
+                                         KEY_PREDICTION_FMT.format(probe_trial))
+                if os.path.exists(key_fn_0):
+                    break
+                probe_trial -= 1
+            if probe_trial < 0:
+                fatal("[util.keyconf_prediction_file] Cannot {}, nor any old old prediction files".format(ret))
+            link_target = KEY_PREDICTION_FMT.format(probe_trial)
+            os.symlink(link_target, ret)
+            warn("[util.keyconf_prediction_file] sylink {} to {} as forest root file".format(link_target, ret))
+        return ret
 
     def solution_file(self, puzzle_name, type_name, trial_override=None):
         trial = self.current_trial if trial_override is None else trial_override
