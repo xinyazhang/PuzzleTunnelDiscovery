@@ -134,11 +134,14 @@ def solve(args):
             '''
             if args.samset:
                 savemat(ssc_fn, dict(C=driver.get_sample_set_connectivity()), do_compression=True)
+                util.log("saving ssc matrix {}".format(ssc_fn))
             if record_compact_tree:
                 CNVI, CNV, CE = driver.get_compact_graph()
                 savemat(tree_fn, dict(CNVI=CNVI, CNV=CNV, CE=CE), do_compression=True)
+                util.log("saving compact tree {}".format(tree_fn))
             if args.bloom_out:
                 np.savez(args.bloom_out, BLOOM=V)
+                util.log("saving bloom results to {}".format(args.bloom_out))
     else:
         return_ve = args.bloom_out is not None
         V, _ = driver.solve(args.days, args.out, sbudget=args.sbudget, return_ve=return_ve)
