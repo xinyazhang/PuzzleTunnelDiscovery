@@ -79,6 +79,8 @@ CondorInstances = 100
 
 # In this section, we use numerical method to approximate the minimal clearance
 [TrainingKeyConf]
+# Limit the number of trajectories
+TrajectoryLimit = -1
 # Number of points on each solution trajectory as candidate key configurations
 CandidateNumber = 1024
 # How many samples do we create to estimate the clearance volume in C-space
