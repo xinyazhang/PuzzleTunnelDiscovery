@@ -127,7 +127,7 @@ def launch_with_params(params, do_training):
     ds_name = basename(dirname(ompl_cfg)) if 'dataset_name' not in params else params['dataset_name']
     aug_dict = _craft_dict(params)
     if 'all_ompl_configs' in params:
-        dataset = dataset.create_multidataset(params['all_ompl_configs'],
+        dataset = datagen.create_multidataset(params['all_ompl_configs'],
                                               geo_type=geo_type,
                                               aug_patch=True,
                                               aug_scaling=0.5,

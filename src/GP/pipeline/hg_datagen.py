@@ -226,7 +226,7 @@ class MultiPuzzleDataSet(object):
 
     def add_puzzle(self, rob, env, flat_surface=False):
         ds = OsrDataSet(rob=rob, env=env, center=None, res=self.res, flat_surface=flat_surface)
-        self.subds.append(ds)
+        self.renders.append(ds)
 
     def _aux_generator(self, batch_size=16, stacks=4, normalize=True, sample_set='train', emit_gt=False):
         is_training = True if sample_set == 'train' else False
@@ -270,7 +270,7 @@ class MultiPuzzleDataSet(object):
                 r.avi = False
                 r.render_mvrgbd(self.render_flag|pyosr.Renderer.HAS_NTR_RENDERING)
                 if is_training:
-                    rgbd = r.mvrgb.reshape(r.rgb_shape)
+                    rgbd = r.mvrgb.reshape(subds.rgb_shape)
                     if emit_gt:
                         gt_img[i] = rgbd[...,0:3]
                     hm = rgbd[:,:,1:2] # The green region
