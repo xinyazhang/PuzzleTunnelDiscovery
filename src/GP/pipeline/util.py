@@ -208,7 +208,7 @@ class Workspace(object):
         pathlib.Path(self.signature_file).touch()
 
     def test_signature(self):
-        return os.path.isfile(self.signature_file) and os.path.isfile(self.condor_template)
+        return os.path.isfile(self.signature_file)
 
     def verify_signature(self):
         if not self.test_signature():
