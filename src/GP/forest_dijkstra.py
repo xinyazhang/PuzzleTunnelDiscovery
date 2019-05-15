@@ -119,7 +119,7 @@ class ForestPathFinder(object):
         args = self._args
         #d = np.load(args.rootf)
         #self._roots = d[list(d.keys())[0]]
-        self._roots = _load(args.rootf, ds_name=None)
+        self._roots = _load(args.rootf, ds_name='KEYQ_OMPL')
         self._ssc_files = _lsv(args.indir, args.prefix_ssc, '.mat')
         self._pds_size = loadmat(self._ssc_files[0])['C'].shape[1]
         self._pds_ids = [i for i in range(self._pds_size)]
