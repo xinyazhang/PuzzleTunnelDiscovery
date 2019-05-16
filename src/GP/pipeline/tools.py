@@ -37,6 +37,15 @@ def visrobgt(args):
     args.geo_type = 'rob'
     _visgt(args)
 
+def visnnpred(args):
+    ws = util.Workspace(args.dir)
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+        cfg, config = parse_ompl.parse_simple(puzzle_fn)
+        p = pathlib.Path(puzzle_fn)
+        d = p.parents[0]
+        util.shell(['./vistexture', cfg.env_fn, str(d / 'env-atex.png')])
+        util.shell(['./vistexture', cfg.rob_fn, str(d / 'rob-atex.png')])
+
 def vistraj(args):
     ws = util.Workspace(args.dir)
     ws.fetch_condor(util.TRAJECTORY_DIR + '/')
@@ -79,12 +88,32 @@ def plotstat(args):
     cfg, config = parse_ompl.parse_simple(ws.training_puzzle)
     util.shell(['./vispath', cfg.env_fn, cfg.rob_fn, 'keyq.unit.txt', '0.5'])
 
+def viskey(args):
+    ws = util.Workspace(args.dir)
+    ws.current_trial = args.current_trial
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+        key_fn = ws.keyconf_prediction_file(puzzle_name, for_read=False)
+        if not isfile(key_fn):
+            util.log("[viskey] Could not find {}".format(key_fn))
+            continue
+        keys = matio.load(key_fn)['KEYQ_OMPL']
+        uw = util.create_unit_world(puzzle_fn)
+        if args.range:
+            keys = keys[util.rangestring_to_list(args.range)]
+        ukeys = uw.translate_ompl_to_unit(keys)
+        matio.savetxt('viskey.tmp.txt', ukeys)
+
+        cfg, _ = parse_ompl.parse_simple(puzzle_fn)
+        util.shell(['./vispath', cfg.env_fn, cfg.rob_fn, 'viskey.tmp.txt', '0.5'])
+
 function_dict = {
         'read_roots' : read_roots,
         'visenvgt' : visenvgt,
         'visrobgt' : visrobgt,
         'vistraj' : vistraj,
         'plotstat' : plotstat,
+        'visnnpred' : visnnpred,
+        'viskey' : viskey,
 }
 
 def setup_parser(subparsers):
@@ -95,15 +124,21 @@ def setup_parser(subparsers):
     p.add_argument('puzzle_fn', help='OMPL config')
     p.add_argument('roots', help='NPZ file of roots')
     p.add_argument('out', help='output txt file')
-    p = toolp.add_parser('visenvgt', help='Call vistexture to visualize the training data')
+    p = toolp.add_parser('visenvgt', help='Call vistexture to visualize the training texture')
     p.add_argument('dir', help='Workspace directory')
-    p = toolp.add_parser('visrobgt', help='Call vistexture to visualize the training data')
+    p = toolp.add_parser('visrobgt', help='Call vistexture to visualize the training texture')
     p.add_argument('dir', help='Workspace directory')
-    p = toolp.add_parser('vistraj', help='Call vistexture to visualize the training data')
+    p = toolp.add_parser('vistraj', help='Call vistexture to visualize the training trajectory')
     p.add_argument('--traj_id', help='Trajectory ID', default=0)
     p.add_argument('dir', help='Workspace directory')
-    p = toolp.add_parser('plotstat', help='Call vistexture to visualize the training data')
+    p = toolp.add_parser('plotstat', help='Call vistexture to show the statistics of the training trajectory')
     p.add_argument('--top_k', help='Top K', type=int, default=None)
+    p.add_argument('dir', help='Workspace directory')
+    p = toolp.add_parser('visnnpred', help='Call vistexture to visualize the prediction results')
+    p.add_argument('dir', help='Workspace directory')
+    p = toolp.add_parser('viskey', help='Use vispath to visualize the key configuration')
+    p.add_argument('--current_trial', help='Trial to predict the keyconf', type=int, default=None)
+    p.add_argument('--range', help='Trial to predict the keyconf', default='')
     p.add_argument('dir', help='Workspace directory')
 
 def run(args):

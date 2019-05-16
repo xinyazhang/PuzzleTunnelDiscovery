@@ -384,3 +384,15 @@ def pwait(pid):
     if pid < 0:
         return 0
     return subprocess.run(['tail', '--pid={}'.format(pid), '-f', '/dev/null'])
+
+def rangestring_to_list(x):
+    result = []
+    for part in x.split(','):
+        if '-' in part:
+            a, b = part.split('-')
+            a, b = int(a), int(b)
+            result.extend(range(a, b + 1))
+        else:
+            a = int(part)
+            result.append(a)
+    return result
