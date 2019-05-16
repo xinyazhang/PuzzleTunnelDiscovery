@@ -61,7 +61,7 @@ def sample_key_point(args, ws):
 def _sample_key_conf_worker(wag):
     ws = util.Workspace(wag.dir)
     ws.current_trial = wag.current_trial
-    kfn = ws.keyconf_prediction_file(wag.puzzle_name)
+    kfn = ws.keyconf_prediction_file(wag.puzzle_name, for_read=False)
     util.log('[sample_key_conf] trial {}'.format(ws.current_trial))
     util.log('[sample_key_conf] sampling to {}'.format(kfn))
     env_kps_fn = ws.keypoint_prediction_file(wag.puzzle_name, 'env')
@@ -77,7 +77,6 @@ def _sample_key_conf_worker(wag):
     gq = parse_ompl.tup_to_ompl(cfg.gq_tup)
     ompl_q = uw.translate_vanilla_to_ompl(kqs)
     ompl_q = np.concatenate((iq, gq, ompl_q), axis=0)
-    kfn = ws.keyconf_prediction_file(wag.puzzle_name)
     #np.savez(kfn, KEYQ_AMBIENT_NOIG=kqs, KEYQ_OMPL=ompl_q)
     np.savez(kfn, KEYQ_OMPL=ompl_q)
     util.log('[sample_key_conf] save key confs to {}'.format(kfn))

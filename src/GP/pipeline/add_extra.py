@@ -23,7 +23,7 @@ def _copy(src, tgt):
 
 def add_extra_training_data(ws, ex):
     exws = util.Workspace(ex)
-    puzzle_file = ws.training_puzzle
+    puzzle_file = exws.training_puzzle
     exp = Path(ex)
     tgt_dir = ws.local_ws(util.EXTRA_TRAINING_DIR, exp.name)
     os.makedirs(tgt_dir)

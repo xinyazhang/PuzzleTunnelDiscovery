@@ -83,7 +83,7 @@ def _predict_worker(tup):
     util.log("[predict_keyconf(worker)] sampled {} keyconf from puzzle {}".format(len(key_conf), puzzle_name))
     qs_ompl = uw.translate_unit_to_ompl(key_conf)
     ompl_q = np.concatenate((iq, gq, qs_ompl), axis=0)
-    key_fn = ws.keyconf_prediction_file(puzzle_name)
+    key_fn = ws.keyconf_prediction_file(puzzle_name, for_read=False)
     util.log("[predict_keyconf(worker)] save to key file {}".format(key_fn))
     unit_q = uw.translate_ompl_to_unit(ompl_q)
     # np.savez(key_fn, KEYQ_OMPL=ompl_q, KEYQ_UNIT=unit_q)

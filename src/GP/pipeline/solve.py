@@ -141,7 +141,7 @@ def forest_rdt(args, ws):
         # file=mkobs-claw/key.ompl.withig.npz,offset=$$([$(Process)*1]),size=1,out=mkobs-claw/trial-1/pdsrdt/
         #key_fn = ws.local_ws(util.TESTING_DIR, puzzle_name, util.KEY_PREDICTION)
 
-        # Note: no need to probe the key configuration, which has been done in sample_pds and 
+        # Note: no need to probe the key configuration, which has been done in sample_pds and
         #       ws.keyconf_prediction_file should always point to a valid keyconf
         key_fn = ws.keyconf_prediction_file(puzzle_name)
         condor_job_args = ['se3solver.py',
@@ -278,3 +278,4 @@ def autorun(args):
     pdesc = collect_stages()
     for _,func in pdesc:
         func(ws)
+

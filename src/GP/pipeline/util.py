@@ -309,11 +309,11 @@ class Workspace(object):
         return self.local_ws(TESTING_DIR, puzzle_name,
                              KEY_POINT_FMT.format(geo_type, trial))
 
-    def keyconf_prediction_file(self, puzzle_name, trial_override=None):
+    def keyconf_prediction_file(self, puzzle_name, for_read=True, trial_override=None):
         trial = self.current_trial if trial_override is None else trial_override
         ret = self.local_ws(TESTING_DIR, puzzle_name,
                             KEY_PREDICTION_FMT.format(trial))
-        if not os.path.exists(ret):
+        if for_read and not os.path.exists(ret):
             warn("[sample_pds] forest root file {} does not exist")
             probe_trial = self.current_trial - 1
             while probe_trial >= 0:
