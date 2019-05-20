@@ -34,7 +34,10 @@ def write_pidfile(pidfile, pid):
         print(pid, file=f)
 
 def _train(ws, geo_type):
-    params = hg_launcher.create_default_config()
+    if ws.nn_profile:
+        params = hg_launcher.create_config_from_profile(ws.nn_profile)
+    else:
+        params = hg_launcher.create_default_config()
     params['ompl_config'] = ws.training_puzzle
     if isdir(ws.local_ws(util.EXTRA_TRAINING_DIR)):
         all_omplcfgs = []
@@ -42,7 +45,7 @@ def _train(ws, geo_type):
             all_omplcfgs.append(puzzle_fn)
         params['all_ompl_configs'] = all_omplcfgs
     params['what_to_render'] = geo_type
-    params['checkpoint_dir'] = ws.local_ws(util.NEURAL_SCRATCH, geo_type) + '/'
+    params['checkpoint_dir'] = ws.checkpoint_dir(geo_type) + '/'
     params['suppress_hot'] = 0.0
     params['suppress_cold'] = 0.7
     os.makedirs(ws.local_ws(util.NEURAL_SCRATCH), exist_ok=True)
@@ -82,7 +85,7 @@ def _predict_surface(args, ws, geo_type):
         params = hg_launcher.create_default_config()
         params['ompl_config'] = puzzle_fn
         params['what_to_render'] = geo_type
-        params['checkpoint_dir'] = ws.local_ws(util.NEURAL_SCRATCH, geo_type) + '/'
+        params['checkpoint_dir'] = ws.checkpoint_dir(geo_type) + '/'
         params['dataset_name'] = puzzle_name # Enforce the generated filename
         util.log("[prediction] Predicting {}:{}".format(puzzle_fn, geo_type))
         # NEVER call launch_with_params in the same process for multiple times
@@ -120,12 +123,14 @@ def setup_parser(subparsers):
                    default='',
                    metavar='')
     p.add_argument('--only_wait', action='store_true')
+    p.add_argument('--nn_profile', help="NN Profile", default='')
     p.add_argument('dir', help='Workspace directory')
 
 # As always, run() serves as a separator between local function and remote proxy functions
 def run(args):
     if args.stage in function_dict:
         ws = util.Workspace(args.dir)
+        ws.nn_profile = args.nn_profile
         function_dict[args.stage](args, ws)
     else:
         print("Unknown train pipeline stage {}".format(args.stage))
@@ -156,6 +161,7 @@ def remote_predict_env(ws):
 
 def autorun(args):
     ws = util.Workspace(args.dir)
+    ws.nn_profile = args.nn_profile
     _deploy(ws)
     remote_train(ws)
     remote_wait_for_training(ws)

@@ -153,6 +153,7 @@ class Workspace(object):
         if not init:
             self.verify_signature()
         self._current_trial = 0
+        self.nn_profile = ''
 
     def get_path(self, optname):
         return self.config.get('DEFAULT', optname)
@@ -214,6 +215,11 @@ class Workspace(object):
             fatal("{} is not initialized as a puzzle workspace. Exiting".format(self.workspace_dir))
             exit()
 
+    def verify_training_puzzle(self):
+        if not os.path.isfile(self.training_puzzle):
+            fatal("{} is not initialized with a training puzzle. Exiting".format(self.dir))
+            exit()
+
     @property
     def training_dir(self):
         return self.local_ws(TRAINING_DIR)
@@ -256,6 +262,8 @@ class Workspace(object):
         script += './facade.py {ppl} --stage {cmd} '.format(ppl=pipeline_part, cmd=cmd)
         if with_trial:
             script += ' --current_trial {} '.format(self.current_trial)
+        if self.nn_profile:
+            script += ' --nn_profile {} '.format(self.nn_profile)
         script += ' {ws}'.format(ws=ws_path)
         if in_tmux:
             # tmux needs a terminal
@@ -286,6 +294,13 @@ class Workspace(object):
 
     def fetch_gpu(self, *paths):
         _rsync(self.gpu_host, self.gpu_ws, None, self.local_ws, *paths)
+
+    def checkpoint_dir(self, geo_type):
+        if self.nn_profile:
+            name = '{}.{}'.format(geo_type, self.nn_profile)
+        else:
+            name = geo_type
+        return self.local_ws(NEURAL_SCRATCH, name)
 
     def training_puzzle_generator(self):
         yield self.training_puzzle, 'train'

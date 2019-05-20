@@ -30,6 +30,7 @@ def run_pipeline(ppl_stages, args):
     assert cont is not None
     ws = util.Workspace(args.dir)
     ws.current_trial = args.current_trial
+    ws.nn_profile = args.nn_profile
     nstage = []
     if args.till:
         stage_list = pdesc[cont:till]
@@ -68,6 +69,7 @@ def setup_autorun_parser(subparsers, name, pdesc):
                    default=None,
                    metavar='')
     p.add_argument('--current_trial', help='Trial to solve the puzzle', type=int, default=None)
+    p.add_argument('--nn_profile', help='NN profile', default='')
     # print('Total Stages: ' + str(len(stage_names)))
 
 

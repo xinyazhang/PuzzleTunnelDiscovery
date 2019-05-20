@@ -99,6 +99,14 @@ def create_default_config():
     config.read_string(_CONFIG_TEMPLATE)
     return _process_config(config)
 
+def create_config_from_profile(name):
+    ret = create_default_config()
+    if name == 'hg4':
+        ret['nStacks'] = 4
+    else:
+        raise NotImplemented("Unknown profile {}".format(name))
+    return ret
+
 def _craft_dict(params):
     dic = {}
     for k in ['suppress_hot', 'red_noise', 'suppress_cold']:
