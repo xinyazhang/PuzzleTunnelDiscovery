@@ -5,6 +5,11 @@ sys.path.append(os.getcwd())
 import argparse
 import pipeline
 import colorama
+try:
+    import argcomplete
+    USE_ARGCOMPLETE = True
+except ImportError as e:
+    USE_ARGCOMPLETE = False
 
 def main():
     colorama.init()
@@ -29,6 +34,8 @@ def main():
     pipeline.baseline.setup_parser(subparsers)
     pipeline.tools.setup_parser(subparsers)
 
+    if USE_ARGCOMPLETE:
+        argcomplete.autocomplete(parser)
     args = parser.parse_args()
     assert args.command in dir(pipeline), 'Cannot find command {} in {}'.format(args.command, dir(pipeline))
     getattr(pipeline, args.command).run(args)
