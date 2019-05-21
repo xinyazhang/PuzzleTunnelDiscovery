@@ -13,7 +13,7 @@ def main():
         d = np.load(fn)
         if 'ATEX' not in d:
             continue
-        atex = d['ATEX']
+        atex = d['ATEX'].astype(np.float32)
         gatex = np.zeros(shape=(atex.shape[0], atex.shape[1], 3))
         ma = np.max(atex)
         mi = np.min(atex)
