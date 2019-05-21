@@ -10,7 +10,7 @@ def setup_parser(subparsers):
     p = subparsers.add_parser('mimic', help='Initialize a workspace with a template workspace')
     p.add_argument('old', help='Template workspace directory')
     p.add_argument('dir', help='New workspace directory')
-    p.add_argument('--training_puzzle', help='Puzzle as training data', required=True)
+    p.add_argument('--training_puzzle', help='Puzzle as training data', default='')
 
 def run(args):
     oldws = util.Workspace(args.old)
@@ -23,9 +23,12 @@ def run(args):
     os.makedirs(ws.training_dir, exist_ok=True)
     ws.touch_signature()
     envconfig.init_config_file(args, ws, oldws=oldws)
-    if not add_puzzle.copy_puzzle(ws.training_dir, args.training_puzzle, ws.chart_resolution):
-        util.fatal('[init] Could not add puzzle {}'.format(args.training_puzzle))
-        return
+    if args.training_puzzle:
+        if not add_puzzle.copy_puzzle(ws.training_dir, args.training_puzzle, ws.chart_resolution):
+            util.fatal('[init] Could not add puzzle {}'.format(args.training_puzzle))
+            return
+    else:
+        util.warn('[init] NO TRAINING PUZZLE WAS SPECIFIED. This workspace is incapable of NN pipeline')
     util.ack("[init] workspace initalized: {}".format(ws.dir))
     util.ack("[init] The following puzzle has been added as training sample")
     util.ack("[init] \t{}".format(args.training_puzzle))

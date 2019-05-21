@@ -9,7 +9,7 @@ from . import add_puzzle
 def setup_parser(subparsers):
     p = subparsers.add_parser('init', help='Initialize a directory as workspace')
     p.add_argument('dir', help='Workspace directory')
-    p.add_argument('--training_puzzle', help='Puzzle as training data', required=True)
+    p.add_argument('--training_puzzle', help='Puzzle as training data', default='')
     p.add_argument('--condor', help='Condor Template file', required=True)
     p.add_argument('--test_puzzle', help='Workspace directory', nargs='*', default=[])
 
@@ -19,9 +19,12 @@ def run(args):
     os.makedirs(ws.training_dir, exist_ok=True)
     ws.touch_signature()
     envconfig.init_config_file(args, ws)
-    if not add_puzzle.copy_puzzle(ws.training_dir, args.training_puzzle, ws.chart_resolution):
-        util.fatal('[init] Could not add puzzle {}'.format(args.training_puzzle))
-        return
+    if args.training_puzzle:
+        if not add_puzzle.copy_puzzle(ws.training_dir, args.training_puzzle, ws.chart_resolution):
+            util.fatal('[init] Could not add puzzle {}'.format(args.training_puzzle))
+            return
+    else:
+        util.warn('[init] NO TRAINING PUZZLE WAS SPECIFIED. This workspace is incapable of NN pipeline')
     for p in args.test_puzzle:
         add_puzzle.add_testing_puzzle(ws, p)
     util.ack("[init] workspace initalized: {}".format(ws.dir))
