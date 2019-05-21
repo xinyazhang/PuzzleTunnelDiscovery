@@ -3,7 +3,7 @@
 
 import sys
 import os
-from os.path import join, isdir, isfile
+from os.path import join, isdir, isfile, dirname
 import subprocess
 import pathlib
 import numpy as np
@@ -48,6 +48,7 @@ def _predict_atlas2prim(tup):
 
 
 def _predict_worker(tup):
+    DEBUG = True
     ws_dir, puzzle_fn, puzzle_name, trial = tup
     ws = util.Workspace(ws_dir)
     ws.current_trial = trial
@@ -58,25 +59,50 @@ def _predict_worker(tup):
     env_sampler = atlas.AtlasSampler(ws.local_ws(util.TESTING_DIR, puzzle_name, 'env-a2p.npz'),
                                      ws.local_ws(util.TESTING_DIR, puzzle_name, 'env-atex.npz'),
                                      'env', uw.GEO_ENV)
+    if DEBUG:
+        rob_sampler.enable_debugging()
+        env_sampler.enable_debugging()
     key_conf = []
     nrot = ws.config.getint('Prediction', 'NumberOfRotations')
     margin = ws.config.getfloat('Prediction', 'Margin')
     batch_size = ws.config.getint('Prediction', 'SurfacePairsToSample')
     #for i in progressbar(range(batch_size)):
-    with ProgressBar(max_value=batch_size) as bar:
-        while True:
-            tup1 = rob_sampler.sample(uw)
-            tup2 = env_sampler.sample(uw)
-            qs_raw = uw.enum_free_configuration(tup1[0], tup1[1], tup2[0], tup2[1],
-                                                margin,
-                                                denominator=nrot,
-                                                only_median=True)
-            qs = [q for q in qs_raw if not uw.is_disentangled(q)] # Trim disentangled state
-            for q in qs:
-                key_conf.append(q)
-                bar.update(min(batch_size, len(key_conf)))
-            if len(key_conf) > batch_size:
-                break
+    if False:
+        with ProgressBar(max_value=batch_size) as bar:
+            while True:
+                tup1 = rob_sampler.sample(uw)
+                tup2 = env_sampler.sample(uw)
+                qs_raw = uw.enum_free_configuration(tup1[0], tup1[1], tup2[0], tup2[1],
+                                                    margin,
+                                                    denominator=nrot,
+                                                    only_median=True)
+                #qs = [q for q in qs_raw if not uw.is_disentangled(q)] # Trim disentangled state
+                for q in qs:
+                    key_conf.append(q)
+                    bar.update(min(batch_size, len(key_conf)))
+                if len(key_conf) > batch_size:
+                    break
+    else:
+        with ProgressBar(max_value=batch_size) as bar:
+            tups1 = rob_sampler.get_top_k_surface_tups(uw, 64)
+            tups2 = env_sampler.get_top_k_surface_tups(uw, 64)
+            for tup1 in tups1:
+                for tup2 in tups2:
+                    # print("tup1 {}".format(tup1))
+                    # print("tup2 {}".format(tup2))
+                    sys.stdout.flush()
+                    qs_raw = uw.enum_free_configuration(tup1[0], tup1[1], tup2[0], tup2[1],
+                                                        margin,
+                                                        denominator=nrot,
+                                                        only_median=True)
+                    qs = [q for q in qs_raw if not uw.is_disentangled(q)] # Trim disentangled state
+                    for q in qs:
+                        key_conf.append(q)
+                        bar.update(min(batch_size, len(key_conf)))
+                    if len(key_conf) > batch_size:
+                        break
+                if len(key_conf) > batch_size:
+                    break
     cfg, config = parse_ompl.parse_simple(puzzle_fn)
     iq = parse_ompl.tup_to_ompl(cfg.iq_tup)
     gq = parse_ompl.tup_to_ompl(cfg.gq_tup)
@@ -89,6 +115,9 @@ def _predict_worker(tup):
     # np.savez(key_fn, KEYQ_OMPL=ompl_q, KEYQ_UNIT=unit_q)
     np.savez(key_fn, KEYQ_OMPL=ompl_q)
     matio.savetxt(key_fn + 'unit.txt', unit_q)
+    if DEBUG:
+        rob_sampler.dump_debugging(prefix=dirname(str(key_fn))+'/')
+        env_sampler.dump_debugging(prefix=dirname(str(key_fn))+'/')
 
 def predict_keyconf(args, ws):
     task_tup = []
@@ -101,8 +130,10 @@ def predict_keyconf(args, ws):
         ncpu = ws.config.getint('Prediction', 'NumberOfPredictionProcesses')
     pgpu = multiprocessing.Pool(1)
     pgpu.map(_predict_atlas2prim, task_tup)
-    pcpu = multiprocessing.Pool(ncpu)
-    pcpu.map(_predict_worker, task_tup)
+    # pcpu = multiprocessing.Pool(ncpu)
+    # pcpu.map(_predict_worker, task_tup)
+    for tup in task_tup:
+        _predict_worker(tup)
 
 
 function_dict = {
@@ -143,6 +174,7 @@ def collect_stages():
 
 def autorun(args):
     ws = util.Workspace(args.dir)
+    ws.verify_training_puzzle()
     ws.current_trial = args.current_trial
     pdesc = collect_stages()
     for _,func in pdesc:
