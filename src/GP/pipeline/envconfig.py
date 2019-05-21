@@ -137,7 +137,6 @@ def init_config_file(args, ws, oldws=None):
         condor.extract_template(open(args.condor, 'r'), open(ws.condor_template, 'w'))
         cfg = ws.configuration_file
         if not os.path.isfile(cfg):
-            dic = {}
             if oldws is not None:
                 rel_old_to_new = os.path.relpath(ws.dir, start=oldws.dir)
                 dic = {
@@ -146,7 +145,16 @@ def init_config_file(args, ws, oldws=None):
                         'GPUWorkspacePath': normpath(join(oldws.config.get('DEFAULT', 'GPUWorkspacePath'), rel_old_to_new)),
                         'CondorHost': oldws.config.get('DEFAULT', 'CondorHost'),
                         'CondorExecPath': oldws.config.get('DEFAULT', 'CondorExecPath'),
-                        'CondorWorkspacePath': normpath(join(oldws.config.get('DEFAULT', 'CondorWorkspacePath'), rel_old_to_new)),
+                        'CondorWorkspacePath': normpath(join(oldws.config.get('DEFAULT', 'CondorWorkspacePath'), rel_old_to_new))
+                      }
+            else:
+                dic = {
+                        'GPUHost': '',
+                        'GPUExecPath': '',
+                        'GPUWorkspacePath': '',
+                        'CondorHost': '',
+                        'CondorExecPath': '',
+                        'CondorWorkspacePath': '',
                       }
             print(_CONFIG_TEMPLATE.format(**dic), file=open(cfg, 'w'))
         EDITOR = os.environ.get('EDITOR', 'vim')
