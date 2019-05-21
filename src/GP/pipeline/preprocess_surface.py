@@ -381,6 +381,7 @@ def remote_uvproject(ws):
 
 def autorun(args):
     ws = util.Workspace(args.dir)
+    ws.verify_training_puzzle()
     pdesc = collect_stages()
     for _,func in pdesc:
         func(ws)

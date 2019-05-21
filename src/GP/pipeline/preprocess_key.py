@@ -247,6 +247,7 @@ def remote_pickup_key_configuration(ws):
 
 def autorun(args):
     ws = util.Workspace(args.dir)
+    ws.verify_training_puzzle()
     ws.deploy_to_condor(util.WORKSPACE_SIGNATURE_FILE,
                         util.WORKSPACE_CONFIG_FILE,
                         util.CONDOR_TEMPLATE,
