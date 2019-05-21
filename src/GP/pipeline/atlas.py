@@ -1,8 +1,17 @@
 import numpy as np
+import sys
+
 from scipy.interpolate import interp2d
 NAN = np.NAN
 from imageio import imwrite as imsave
 import texture_format
+
+from . import matio
+
+def _save_green(ofn, ns):
+    gatex = np.zeros(shape=(ns.shape[0], ns.shape[1], 3))
+    gatex[:,:,1] = ns
+    imsave(ofn, gatex)
 
 def _uv_to_pix(u, v, raster_shape):
     '''
@@ -49,7 +58,15 @@ class AtlasSampler(object):
         d = np.load(surface_prediction_fn)
         self._atlas = d['ATEX'] # Load the first element
         #np.clip(self._atlas, 0.0, None, out=self._atlas) # Clips out negative weights
-        self._atlas -= np.min(self._atlas) # All elements must be non-negative
+        print("RAW ATLAS Sum {} Max {} Min {} Mean {} Stddev {}".format(
+            np.sum(self._atlas),
+            np.max(self._atlas),
+            np.min(self._atlas),
+            np.mean(self._atlas),
+            np.std(self._atlas)
+            ))
+        #self._atlas -= np.min(self._atlas) # All elements must be non-negative
+        np.clip(self._atlas, a_min=0.0, a_max=None, out=self._atlas) # All elements must be non-negative
         print("Atlas resolution {}".format(self._atlas.shape))
         self._nzpix = np.nonzero(self._atlas)
         self._nzpixweight = self._atlas[self._nzpix]
@@ -59,6 +76,20 @@ class AtlasSampler(object):
         print("NZ pix coord mins {} {}".format(np.min(self._nzpix[0]), np.min(self._nzpix[1])))
         self._nzpixweight /= nzsum
         self._nzpix_idx = np.array([i for i in range(len(self._nzpix[0]))], dtype=np.int32)
+        print("ATLAS Sum {} Max {} Min {} Mean {} Stddev {}".format(
+            np.sum(self._atlas),
+            np.max(self._atlas),
+            np.min(self._atlas),
+            np.mean(self._atlas),
+            np.std(self._atlas)
+            ))
+        print("NZPIXWEIGHT Sum {} Max {} Min {} Mean {} Stddev {}".format(
+            np.sum(self._nzpixweight),
+            np.max(self._nzpixweight),
+            np.min(self._nzpixweight),
+            np.mean(self._nzpixweight),
+            np.std(self._nzpixweight)
+            ))
         # print("nz {}".format(self._nzpix))
         # print("atlas2prim[nz] {}".format(self._atlas2prim[self._nzpix]))
         self._nzprim, self._nzcount = np.unique(self._atlas2prim[self._nzpix], return_counts=True)
@@ -84,6 +115,71 @@ class AtlasSampler(object):
         self._nzcount = self._nzcount.astype(float) / np.sum(self._nzcount)
         print(self._nzprim)
 
+        self._debug_nsample = None
+
+    def enable_debugging(self):
+        self._debug_nsample = np.zeros(shape=self._atlas.shape, dtype=np.int32)
+        self._debug_vsample = np.zeros(shape=self._atlas.shape, dtype=np.int32)
+        self._debug_v3d = []
+        self._debug_allnsample = np.zeros(shape=self._atlas.shape, dtype=np.int32)
+
+    def dump_debugging(self, prefix='./'):
+        #np.savez('{}debug-{}-nsample.npz'.format(prefix, self._geo_type), ATEX=self._debug_nsample)
+        _save_green('{}debug-{}-nsample.png'.format(prefix, self._geo_type), self._debug_nsample)
+        _save_green('{}debug-{}-vsample.png'.format(prefix, self._geo_type), self._debug_vsample)
+        matio.savetxt('{}debug-{}-v3d.txt'.format(prefix, self._geo_type), self._debug_v3d)
+
+    def debug_surface_sampler(self, ofn):
+        fatlas = np.copy(self._atlas)
+        for i in range(12):
+            print("FATLAS Sum {} Max {} Min {} Mean {} Median {} Stddev {}".format(
+                np.sum(fatlas),
+                np.max(fatlas),
+                np.min(fatlas),
+                np.mean(fatlas),
+                np.median(fatlas),
+                np.std(fatlas)
+                ))
+            nzmedian = np.median(fatlas[fatlas.nonzero()])
+            fatlas[fatlas < nzmedian] = 0.0
+            print("{} fatlas nz {}".format(i, len(np.nonzero(fatlas)[0])))
+        ns = np.zeros(shape=self._atlas.shape, dtype=np.int32)
+        ns[fatlas.nonzero()] = 255
+        _save_green(ofn, ns)
+        return
+        li_indices = np.random.choice(self._nzpix_idx, size=(262144), p=self._nzpixweight)
+        # li_indices = self._nzpixweight.argsort()[:64]
+        bbins = np.bincount(li_indices)
+        print('bbins.shape {}'.format(bbins.shape))
+        pi_indices = np.array([self._nzpix[0][:len(bbins)], self._nzpix[1][:len(bbins)]])
+        print('pi_indices.shape {}'.format(pi_indices.shape))
+        ns = np.zeros(shape=self._atlas.shape, dtype=np.int32)
+        ns[pi_indices[0], pi_indices[1]] += bbins
+        _save_green(ofn, ns)
+
+    def get_top_k_surface_tups(self, r, top_k):
+        li_indices = self._nzpixweight.argsort()
+        res = self._atlas.shape
+        pres = 1.0 / np.array(res) # Pertubation magnitude
+        tups = []
+        for idx in li_indices:
+            pix = np.array([self._nzpix[0][idx], self._nzpix[1][idx]])
+            prim = self._atlas2prim[pix[0], pix[1]]
+            if prim < 0:
+                print("Cannot find prim from pix {}".format(pix))
+                continue
+            uv = pix * pres
+            print("probing {}".format(idx))
+            sys.stdout.flush()
+            surface_uv = texture_format.uv_numpy_to_surface(uv)
+            v3d, normal, valid = tup = r.uv_to_surface(self._geo_id, prim, surface_uv, return_unit=True)
+            if valid:
+                tups.append(tup)
+                self._debug_v3d.append(v3d)
+                if len(tups) >= top_k:
+                    break
+        return tups
+
     def sample(self, r, unit=True):
         fail = 0
         res = self._atlas.shape
@@ -108,10 +204,16 @@ class AtlasSampler(object):
             prim = self._atlas2prim[pix[0], pix[1]]
             if prim < 0:
                 continue
+            if self._debug_nsample is not None:
+                self._debug_nsample[pix[0], pix[1]] += 1
             uv = pix * pres + pert
             surface_uv = texture_format.uv_numpy_to_surface(uv)
             v3d, normal, valid = r.uv_to_surface(self._geo_id, prim, surface_uv, return_unit=unit)
             # print("uv {} (pix {}) to {} {} {} in prim {}".format(uv, pix, v3d, normal, valid, prim))
             if valid:
                 break
+        if self._debug_vsample is not None:
+            self._debug_vsample[pix[0], pix[1]] += 1
+        if self._debug_v3d is not None:
+            self._debug_v3d.append(v3d)
         return v3d, normal, uv
