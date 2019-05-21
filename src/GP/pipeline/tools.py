@@ -12,6 +12,7 @@ from . import util
 from . import matio
 from . import condor
 from . import parse_ompl
+from . import atlas
 
 def read_roots(args):
     uw = util.create_unit_world(args.puzzle_fn)
@@ -45,6 +46,29 @@ def visnnpred(args):
         d = p.parents[0]
         util.shell(['./vistexture', cfg.env_fn, str(d / 'env-atex.png')])
         util.shell(['./vistexture', cfg.rob_fn, str(d / 'rob-atex.png')])
+
+def visnnsample(args):
+    import pyosr
+    ws = util.Workspace(args.dir)
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+        cfg, config = parse_ompl.parse_simple(puzzle_fn)
+        if args.puzzle_name and puzzle_name != args.puzzle_name:
+            continue
+        p = pathlib.Path(puzzle_fn)
+        d = p.parents[0]
+        env_tex_fn = str(d / 'env-atex-dbg.png')
+        rob_tex_fn = str(d / 'rob-atex-dbg.png')
+        if args.update:
+            rob_sampler = atlas.AtlasSampler(ws.local_ws(util.TESTING_DIR, puzzle_name, 'rob-a2p.npz'),
+                                             ws.local_ws(util.TESTING_DIR, puzzle_name, 'rob-atex.npz'),
+                                             'rob', pyosr.UnitWorld.GEO_ROB)
+            env_sampler = atlas.AtlasSampler(ws.local_ws(util.TESTING_DIR, puzzle_name, 'env-a2p.npz'),
+                                             ws.local_ws(util.TESTING_DIR, puzzle_name, 'env-atex.npz'),
+                                             'env', pyosr.UnitWorld.GEO_ENV)
+            env_sampler.debug_surface_sampler(env_tex_fn)
+            rob_sampler.debug_surface_sampler(rob_tex_fn)
+        util.shell(['./vistexture', cfg.env_fn, env_tex_fn])
+        util.shell(['./vistexture', cfg.rob_fn, rob_tex_fn])
 
 def vistraj(args):
     ws = util.Workspace(args.dir)
@@ -92,6 +116,8 @@ def viskey(args):
     ws = util.Workspace(args.dir)
     ws.current_trial = args.current_trial
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+        if args.puzzle_name and args.puzzle_name != puzzle_name:
+            continue
         key_fn = ws.keyconf_prediction_file(puzzle_name, for_read=False)
         if not isfile(key_fn):
             util.log("[viskey] Could not find {}".format(key_fn))
@@ -113,6 +139,7 @@ function_dict = {
         'vistraj' : vistraj,
         'plotstat' : plotstat,
         'visnnpred' : visnnpred,
+        'visnnsample' : visnnsample,
         'viskey' : viskey,
 }
 
@@ -136,9 +163,14 @@ def setup_parser(subparsers):
     p.add_argument('dir', help='Workspace directory')
     p = toolp.add_parser('visnnpred', help='Call vistexture to visualize the prediction results')
     p.add_argument('dir', help='Workspace directory')
+    p = toolp.add_parser('visnnsample', help='Call vistexture to visualize the prediction results')
+    p.add_argument('--puzzle_name', help='Only show one specific puzzle', default='')
+    p.add_argument('--update', help='Only show one specific puzzle', action='store_true')
+    p.add_argument('dir', help='Workspace directory')
     p = toolp.add_parser('viskey', help='Use vispath to visualize the key configuration')
     p.add_argument('--current_trial', help='Trial to predict the keyconf', type=int, default=None)
-    p.add_argument('--range', help='Trial to predict the keyconf', default='')
+    p.add_argument('--range', help='Range of key confs, e.g. 1,2,3,4-7,11', default='')
+    p.add_argument('--puzzle_name', help='Only show one specific puzzle', default='')
     p.add_argument('dir', help='Workspace directory')
 
 def run(args):
