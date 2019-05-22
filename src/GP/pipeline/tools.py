@@ -115,13 +115,20 @@ def plotstat(args):
 def viskey(args):
     ws = util.Workspace(args.dir)
     ws.current_trial = args.current_trial
-    for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
-        if args.puzzle_name and args.puzzle_name != puzzle_name:
-            continue
-        key_fn = ws.keyconf_prediction_file(puzzle_name, for_read=False)
-        if not isfile(key_fn):
-            util.log("[viskey] Could not find {}".format(key_fn))
-            continue
+    def puzgen(args):
+        if args.puzzle_name and args.puzzle_name == 'train':
+            yield ws.training_puzzle, 'train', ws.local_ws(util.KEY_FILE)
+        else:
+            for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+                if args.puzzle_name and args.puzzle_name != puzzle_name:
+                    continue
+                key_fn = ws.keyconf_prediction_file(puzzle_name, for_read=False)
+                if not isfile(key_fn):
+                    util.log("[viskey] Could not find {}".format(key_fn))
+                    continue
+                yield puzzle_fn, puzzle_name, key_fn
+        return
+    for puzzle_fn, puzzle_name, key_fn in puzgen(args):
         keys = matio.load(key_fn)['KEYQ_OMPL']
         uw = util.create_unit_world(puzzle_fn)
         if args.range:
@@ -155,10 +162,10 @@ def setup_parser(subparsers):
     p.add_argument('dir', help='Workspace directory')
     p = toolp.add_parser('visrobgt', help='Call vistexture to visualize the training texture')
     p.add_argument('dir', help='Workspace directory')
-    p = toolp.add_parser('vistraj', help='Call vistexture to visualize the training trajectory')
+    p = toolp.add_parser('vistraj', help='Call vispath to visualize the training trajectory')
     p.add_argument('--traj_id', help='Trajectory ID', default=0)
     p.add_argument('dir', help='Workspace directory')
-    p = toolp.add_parser('plotstat', help='Call vistexture to show the statistics of the training trajectory')
+    p = toolp.add_parser('plotstat', help='Call matplotlib and vispath to show the statistics of the training trajectory')
     p.add_argument('--top_k', help='Top K', type=int, default=None)
     p.add_argument('dir', help='Workspace directory')
     p = toolp.add_parser('visnnpred', help='Call vistexture to visualize the prediction results')
