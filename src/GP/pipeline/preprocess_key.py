@@ -74,7 +74,7 @@ def interpolate_trajectory(args, ws):
         uw = util.create_unit_world(ws.local_ws(util.TRAINING_DIR, util.PUZZLE_CFG_FILE))
         util.log("[DEBUG] Reference 21.884796142578125 17.07219123840332 2.7253246307373047")
     traj_files = sorted(pathlib.Path(scratch_dir).glob("traj_*.npz"))
-    ntraj = ws.config.getint('TrainingKeyConf', 'TrajectoryLimit', fallback=None)
+    ntraj = ws.config.getint('TrainingKeyConf', 'TrajectoryLimit', fallback=-1)
     if ntraj < 0:
         ntraj = None
     for fn in traj_files[:ntraj]:
