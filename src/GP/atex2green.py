@@ -16,7 +16,8 @@ def main():
         if 'ATEX' not in d:
             continue
         atex = d['ATEX'].astype(np.float32)
-        np.clip(atex, a_min=args.clipmin, a_max=args.clipmax, out=atex)
+        if args.clipmin is not None or args.clipmax is not None:
+            np.clip(atex, a_min=args.clipmin, a_max=args.clipmax, out=atex)
         gatex = np.zeros(shape=(atex.shape[0], atex.shape[1], 3))
         ma = np.max(atex)
         mi = np.min(atex)
