@@ -139,6 +139,60 @@ def viskey(args):
         cfg, _ = parse_ompl.parse_simple(puzzle_fn)
         util.shell(['./vispath', cfg.env_fn, cfg.rob_fn, 'viskey.tmp.txt', '0.5'])
 
+def vistouchv(args):
+    ws = util.Workspace(args.dir)
+    candidate_file = ws.local_ws(util.KEY_CANDIDATE_FILE)
+    Qs = matio.load(candidate_file)['OMPL_CANDIDATES']
+    nq = Qs.shape[0]
+    qi_str = util.padded(args.key_id, nq)
+    clearance_fn = ws.local_ws(util.PREP_KEY_CAN_SCRATCH, 'unitary_clearance_from_keycan-{}.npz'.format(qi_str))
+    ukeys = matio.load(clearance_fn)['TOUCH_V']
+    matio.savetxt('vistouchv.tmp.txt', ukeys)
+    cfg, _ = parse_ompl.parse_simple(ws.training_puzzle)
+    util.shell(['./vispath', cfg.env_fn, cfg.rob_fn, 'vistouchv.tmp.txt', '0.5'])
+
+def animate(args):
+    ws = util.Workspace(args.dir)
+    ws.current_trial = args.current_trial
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+        cfg, config = parse_ompl.parse_simple(puzzle_fn)
+        if args.puzzle_name and puzzle_name != args.puzzle_name:
+            continue
+        sol_out = ws.solution_file(puzzle_name, type_name='unit')
+        if os.path.exists(sol_out):
+            util.shell(['./vispath', cfg.env_fn, cfg.rob_fn, sol_out, '0.5'])
+        else:
+            util.warn("[tools.animate] Could not locate solution file {}".format(sol_out))
+
+def vistouchdisp(args):
+    ws = util.Workspace(args.dir)
+    candidate_file = ws.local_ws(util.KEY_CANDIDATE_FILE)
+    Qs = matio.load(candidate_file)['OMPL_CANDIDATES']
+    nq = Qs.shape[0]
+    qi_str = util.padded(args.key_id, nq)
+    clearance_fn = ws.local_ws(util.PREP_KEY_CAN_SCRATCH, 'unitary_clearance_from_keycan-{}.npz'.format(qi_str))
+    d = matio.load(clearance_fn)
+    ukeys = d['TOUCH_V']
+    fromv = d['FROM_V']
+    import pyosr
+    from mpl_toolkits import mplot3d
+    import matplotlib.pyplot as plt
+    from sklearn.preprocessing import normalize
+
+    diff = pyosr.multi_differential(fromv, ukeys, with_se3=False)
+    trs = diff[:,0:3]
+    # trs = normalize(trs)
+    print(trs.shape)
+    aas = diff[:,3:6]
+    # aas = normalize(aas)
+    fig1 = plt.figure(1)
+    ax = plt.axes(projection='3d')
+    ax.scatter3D(trs[:,0], trs[:,1], trs[:,2])
+    fig2 = plt.figure(2)
+    ax = plt.axes(projection='3d')
+    ax.scatter3D(aas[:,0], aas[:,1], aas[:,2])
+    plt.show()
+
 function_dict = {
         'read_roots' : read_roots,
         'visenvgt' : visenvgt,
@@ -148,6 +202,9 @@ function_dict = {
         'visnnpred' : visnnpred,
         'visnnsample' : visnnsample,
         'viskey' : viskey,
+        'vistouchv' : vistouchv,
+        'vistouchdisp' : vistouchdisp,
+        'animate' : animate,
 }
 
 def setup_parser(subparsers):
@@ -177,6 +234,16 @@ def setup_parser(subparsers):
     p = toolp.add_parser('viskey', help='Use vispath to visualize the key configuration')
     p.add_argument('--current_trial', help='Trial to predict the keyconf', type=int, default=None)
     p.add_argument('--range', help='Range of key confs, e.g. 1,2,3,4-7,11', default='')
+    p.add_argument('--puzzle_name', help='Only show one specific puzzle', default='')
+    p.add_argument('dir', help='Workspace directory')
+    p = toolp.add_parser('vistouchv', help='Visualize the touch configurations in clearance estimation')
+    p.add_argument('--key_id', help='Key ID in KeyCan.npz. Top K can be found at KEY.npz:_TOP_K', type=int, required=True)
+    p.add_argument('dir', help='Workspace directory')
+    p = toolp.add_parser('vistouchdisp', help='Visualize the displacement of touch configurations from clearance estimation')
+    p.add_argument('--key_id', help='Key ID in KeyCan.npz. Top K can be found at KEY.npz:_TOP_K', type=int, required=True)
+    p.add_argument('dir', help='Workspace directory')
+    p = toolp.add_parser('animate', help='Show the animation of solution with vispath')
+    p.add_argument('--current_trial', help='Trial to predict the keyconf', type=int, default=None)
     p.add_argument('--puzzle_name', help='Only show one specific puzzle', default='')
     p.add_argument('dir', help='Workspace directory')
 
