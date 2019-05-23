@@ -23,7 +23,7 @@ def plan(args, ws):
         condor_job_args = ['se3solver.py',
                 'solve',
                 puzzle_fn,
-                util.RDT_FOREST_ALGORITHM_ID,
+                args.planner_id,
                 args.time_limit]
         condor.local_submit(ws,
                             util.PYTHON,
