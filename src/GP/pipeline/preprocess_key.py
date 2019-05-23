@@ -195,7 +195,7 @@ def pickup_key_configuration(args, ws):
     key_out = ws.local_ws(util.KEY_FILE)
     stat_out = np.array([median_list, max_list, min_list, mean_list, stddev_list])
     util.log('[pickup_key_configuration] writting results to {}'.format(key_out))
-    np.savez(key_out, KEYQ_OMPL=kq_ompl, KEYQ=kq, _STAT=stat_out)
+    np.savez(key_out, KEYQ_OMPL=kq_ompl, KEYQ=kq, _STAT=stat_out, _TOP_K=top_k_indices)
 
 # We decided not to use reflections because we may leak internal functions to command line
 function_dict = {
