@@ -33,6 +33,8 @@ BASELINE_SCRATCH = 'baseline_scratch'
 # Used by multiple pipeline parts
 #
 # Note: we use UPPERCASE KEY to indicate this is training data/ground truth.
+PREP_KEY_CAN_SCRATCH = os.path.join(CONDOR_SCRATCH, 'training_key_can')
+KEY_CANDIDATE_FILE = os.path.join(TRAINING_DIR, 'KeyCan.npz')
 KEY_FILE = os.path.join(TRAINING_DIR, 'KEY.npz')
 TRAJECTORY_DIR = os.path.join(CONDOR_SCRATCH, 'training_trajectory')
 UV_DIR = os.path.join(CONDOR_SCRATCH, 'training_key_uvproj')

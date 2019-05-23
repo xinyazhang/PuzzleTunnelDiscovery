@@ -24,11 +24,10 @@ from . import condor
 # Here we always use "trajectory" to represent the curve in configuration space
 # and "path" always refers to the path in a file system.
 _TRAJECTORY_SCRATCH = join(util.CONDOR_SCRATCH, 'training_trajectory')
-_KEYCAN_SCRATCH = join(util.CONDOR_SCRATCH, 'training_key_can')
-_CANDIDATE_FILE = 'KeyCan.npz'
+_KEYCAN_SCRATCH = util.PREP_KEY_CAN_SCRATCH
 
 def _get_candidate_file(ws):
-    return ws.local_ws(util.TRAINING_DIR, _CANDIDATE_FILE)
+    return ws.local_ws(util.KEY_CANDIDATE_FILE)
 
 '''
 System Architecture:
