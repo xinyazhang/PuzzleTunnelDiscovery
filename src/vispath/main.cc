@@ -61,6 +61,8 @@ struct Anchor {
 
 std::unordered_map<size_t, Anchor> anchors;
 bool trajector_drawn = false;
+
+int current_node = 0;
 };
 
 void usage()
@@ -229,6 +231,19 @@ bool key_up(Viewer& viewer, unsigned int key, int modifier)
 		first_draw = true;
 		show_all = !show_all;
 		load_all = show_all;
+	} else if (Qs_has_rotation && key == GLFW_KEY_PAGE_UP) {
+		auto& rob_data = viewer.data_list[rob_data_index];
+		current_node += 1;
+		current_node %= Qs.rows();
+		osr::StateVector q = Qs.row(current_node).transpose();
+		rob_data.set_transform(osr::translate_state_to_transform(q).matrix(), 0);
+	} else if (Qs_has_rotation && key == GLFW_KEY_PAGE_DOWN) {
+		auto& rob_data = viewer.data_list[rob_data_index];
+		current_node -= 1;
+		current_node += Qs.rows();
+		current_node %= Qs.rows();
+		osr::StateVector q = Qs.row(current_node).transpose();
+		rob_data.set_transform(osr::translate_state_to_transform(q).matrix(), 0);
 	} else if (key == 'k' or key == 'K') {
 		// "K": Switch between 'anchor selection' and 'anchor align' mode.
 		anchor_mode = !anchor_mode;
