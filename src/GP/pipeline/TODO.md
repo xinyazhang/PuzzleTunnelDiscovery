@@ -18,7 +18,20 @@ Chunk the forest from (8196, 7144574) to (8196, 1545980)
 ./pds_edge.py --pdsflags /u/zxy/scratch/auto-mkobs3d/bin/workspace/duet.test/solver_scratch/dual-g9/pds/0.npz --out /u/zxy/scratch/auto-mkobs3d/bin/workspace/duet.test/solver_scratch/dual-g9/trial-0/edges.hdf5 `ls -v /u/zxy/scratch/auto-mkobs3d/bin/workspace/duet.test/solver_scratch/dual-g9/trial-0/ssc-*.mat`
 100% (117113857008 of 117113857008) |####| Elapsed Time: 1:38:58 Time: 1:38:58
 ```
-8. unitary_clearance_from_keycan: npz to hdf5
+8. `unitary_clearance_from_keycan`: npz to hdf5
+9. NN improvements:
+    * float32 -> float16
+    * Higher res (64->256) by adding 2 to HourglassModel.__init__(nLow=)
+    * relu -> elu
+    * better accuracy report (currently it's L2 of argmax, which is esp. horrible for geometries)
+    * negative loss value? Needs better understanding of
+      `sigmoid_cross_entropy_with_logits`!
+10. GT improvements:
+    * traj to surface -> enumerating surface points
+      + Use cached last hit primitive to accelerate the collision detection
+    * Clearance estimation: SE(3) -> R(3)
+11. geometrik is deterministic
+    * replace rand() with C++ equivalents
 99. Add the following things to dockerfile ...
     + sudo apt install cgal-dev
     + sudo apt install CGAL-dev
