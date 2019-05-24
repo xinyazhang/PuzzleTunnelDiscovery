@@ -306,7 +306,10 @@ class Workspace(object):
 
     def training_puzzle_generator(self):
         yield self.training_puzzle, 'train'
-        for ent in os.listdir(self.local_ws(EXTRA_TRAINING_DIR)):
+        exdir = self.local_ws(EXTRA_TRAINING_DIR)
+        if not os.path.isdir(exdir):
+            return
+        for ent in os.listdir(exdir):
             puzzle_fn = self.local_ws(EXTRA_TRAINING_DIR, ent, 'puzzle.cfg')
             if not os.path.isfile(puzzle_fn):
                 log("Cannot find puzzle file {}. continue to next dir".format(puzzle_fn))

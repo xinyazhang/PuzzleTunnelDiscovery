@@ -530,6 +530,7 @@ class HourglassModel():
             sum_ = [None] * self.nStack
             if self.tiny:
                 with tf.name_scope('stacks'):
+                    # TODO: set sum_[-1] as r3 to eliminate the specialized treatment of stage_0
                     with tf.name_scope('stage_0'):
                         hg[0] = self._hourglass(r3, self.nLow, self.nFeat, 'hourglass')
                         drop[0] = tf.layers.dropout(hg[0], rate = self.dropout_rate, training = self.training, name = 'dropout')

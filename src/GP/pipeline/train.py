@@ -80,9 +80,12 @@ def wait_for_training(args, ws):
         util.log("[wait_for_training] {} (pid: {}) waited".format(geo_type, pid))
         write_pidfile(pidfile, -1)
 
-def _predict_surface(args, ws, geo_type):
-    for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
-        params = hg_launcher.create_default_config()
+def _predict_surface(args, ws, geo_type, generator):
+    for puzzle_fn, puzzle_name in generator():
+        if ws.nn_profile:
+            params = hg_launcher.create_config_from_profile(ws.nn_profile)
+        else:
+            params = hg_launcher.create_default_config()
         params['ompl_config'] = puzzle_fn
         params['what_to_render'] = geo_type
         params['checkpoint_dir'] = ws.checkpoint_dir(geo_type) + '/'
@@ -94,16 +97,22 @@ def _predict_surface(args, ws, geo_type):
         # hg_launcher.launch_with_params(params, do_training=False)
         proc.start()
         proc.join()
-        src = ws.local_ws(util.NEURAL_SCRATCH, geo_type, '{}-atex.npz'.format(puzzle_name))
-        dst = ws.local_ws(util.TESTING_DIR, puzzle_name, '{}-atex.npz'.format(geo_type))
+        src = join(ws.checkpoint_dir(geo_type), '{}-atex.npz'.format(puzzle_name))
+        dst = join(pathlib.Path(puzzle_fn).parent, '{}-atex.npz'.format(geo_type))
         util.log("[prediction] Copy surface prediction file {} => {}".format(src, dst))
         shutil.copy(src, dst)
 
 def predict_rob(args, ws):
-    _predict_surface(args, ws, 'rob')
+    _predict_surface(args, ws, 'rob', ws.test_puzzle_generator)
 
 def predict_env(args, ws):
-    _predict_surface(args, ws, 'env')
+    _predict_surface(args, ws, 'env', ws.test_puzzle_generator)
+
+def validate_rob(args, ws):
+    _predict_surface(args, ws, 'rob', ws.training_puzzle_generator)
+
+def validate_env(args, ws):
+    _predict_surface(args, ws, 'env', ws.training_puzzle_generator)
 
 function_dict = {
         'train_rob' : train_rob,
@@ -111,6 +120,8 @@ function_dict = {
         'wait_for_training' : wait_for_training,
         'predict_rob' : predict_rob,
         'predict_env' : predict_env,
+        'validate_rob' : validate_rob,
+        'validate_env' : validate_env,
 }
 
 def setup_parser(subparsers):
