@@ -12,15 +12,15 @@
 #include <igl/writeOBJ.h>
 #include <tritri/tritri_igl.h>
 #include <tritri/tritri_cop.h>
-#include <ode/ode.h>
 #if PYOSR_HAS_CGAL
 #include <meshbool/join.h>
 #endif
 
+#include "ode_data.h"
+
 namespace osr {
 
 using std::tie;
-using ArrayOfPoints = UnitWorld::ArrayOfPoints;
 
 const uint32_t UnitWorld::GEO_ENV;
 const uint32_t UnitWorld::GEO_ROB;
@@ -29,18 +29,6 @@ auto glm2Eigen(const glm::mat4& m)
 {
 	StateMatrix ret;
 	ret.setZero();
-#if 0
-	for (int i = 0; i < 4; i++)
-		for (int j = 0; j < 4; j++) {
-			// We have to print these numbers otherwise there
-			// would be errors. Probably a compiler's bug
-			std::cout << m[i][j] << std::endl;
-			ret(i, j) = m[j][i];
-		}
-	for (int i = 0; i < 4; i++)
-		for (int j = 0; j < 4; j++)
-			ret(i,j) = m[i][j];
-#endif
 	// GLM uses column major
 	ret << m[0][0], m[1][0], m[2][0], m[3][0],
 	       m[0][1], m[1][1], m[2][1], m[3][1],
@@ -55,119 +43,6 @@ auto glm2Eigen(const glm::vec3& v)
 	rv << v[0], v[1], v[2];
 	return rv;
 }
-
-struct UnitWorld::OdeData {
-	static void init_ode()
-	{
-		static bool initialized = false;
-		if (initialized)
-			return ;
-		dInitODE();
-		dQuaternion q;
-		dQSetIdentity(q);
-		if (q[0] != 1.0) {
-			throw std::runtime_error("ODE is not using W-first quaterion anymore!");
-		}
-		initialized = true;
-	}
-
-	OdeData(const CDModel& robot)
-	{
-		init_ode();
-
-		world = dWorldCreate();
-		space = dHashSpaceCreate(0);
-		body = dBodyCreate(world);
-		/*
-		 * Note: alternatively we can pretend every robot is a solid
-		 * sphere, which could simplify the concept and the process.
-		 *
-		 * But let's try this first.
-		 */
-		setMass(1.0, robot);
-	}
-
-	void setMass(StateScalar mass,
-	             const CDModel& robot)
-	{
-#if 0
-		auto com = robot.centerOfMass();
-		auto MI = robot.inertiaTensor();
-		dMassSetParameters(&m, 1.0,
-		                   com(0), com(1), com(2),
-		                   MI(0,0), MI(1,1), MI(2,2),
-		                   MI(0,1), MI(0,2), MI(1,2));
-#endif
-		dMassSetSphere(&m, mass, 1.0); // mass is density, radius = 1.0
-		dBodySetMass(body, &m);
-	}
-
-	~OdeData()
-	{
-		dBodyDestroy(body);
-		dSpaceDestroy(space);
-		dWorldDestroy(world);
-	}
-
-	dWorldID world;
-	dSpaceID space;
-	dBodyID body;
-	dMass m;
-
-	void setState(const StateVector& q)
-	{
-		dBodySetPosition(body, q(0), q(1), q(2));
-		// Note: ODE also use w-first notation
-		dBodySetQuaternion(body, &q(3));
-	}
-
-	void applyForce(const ArrayOfPoints& fpos,
-	                const ArrayOfPoints& fdir,
-	                const Eigen::Matrix<StateScalar, -1, 1>& fmag
-	               )
-	{
-		int N = fpos.rows();
-#if 0
-		std::cerr << std::endl;
-		std::cerr << "----------------------------------------------------" << std::endl;
-		std::cerr << "fpos\n " << fpos << std::endl;
-		std::cerr << "fdir\n " << fdir << std::endl;
-		std::cerr << "fmag\n " << fmag << std::endl;
-		std::cerr << "----------------------------------------------------" << std::endl;
-		std::cerr << std::endl;
-#endif
-		for (int i = 0; i < N; i++) {
-			Eigen::Matrix<StateScalar, 3, 1> force;
-			force = (fmag(i) * fdir.row(i)).transpose();
-			if (force.norm() == 0.0)
-				continue;
-			if (force.hasNaN() || fpos.hasNaN())
-				continue;
-			dBodyAddForceAtPos(body,
-			                   force(0), force(1), force(2),
-			                   fpos(i,0), fpos(i,1), fpos(i,2)
-			                  );
-		}
-	}
-
-	StateVector
-	stepping(StateScalar dt)
-	{
-		dWorldStep(world, dt);
-		auto pos = dBodyGetPosition(body);
-		auto quat = dBodyGetQuaternion(body);
-		StateVector ret;
-		ret << pos[0], pos[1], pos[2],
-		       quat[0], quat[1], quat[2], quat[3];
-		return ret;
-	}
-
-	void resetVelocity()
-	{
-		dBodySetLinearVel(body, 0, 0, 0);
-		dBodySetAngularVel(body, 0, 0, 0);
-	}
-};
 
 
 UnitWorld::UnitWorld()

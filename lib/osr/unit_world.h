@@ -11,6 +11,7 @@
 namespace osr {
 class Scene;
 class CDModel;
+struct OdeData;
 
 class UnitWorld {
 public:
@@ -201,8 +202,6 @@ public:
 	                           const VMatrix& V,
 	                           const FMatrix& F);
 
-	using ArrayOfPoints = Eigen::Matrix<StateScalar, -1, kActionDimension>;
-
 	std::tuple<
 		ArrayOfPoints, // Segment beginnings
 		ArrayOfPoints, // Segment ends
@@ -321,8 +320,6 @@ protected:
 	// pp: PreProcess
 	ArrayOfStates ppToUnitStates(const ArrayOfStates& qs,
 	                             bool qs_are_unit_states);
-
-	struct OdeData;
 
 	std::unique_ptr<OdeData> ode_;
 
