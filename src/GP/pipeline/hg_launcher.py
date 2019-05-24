@@ -102,7 +102,8 @@ def create_default_config():
 def create_config_from_profile(name):
     ret = create_default_config()
     if name == 'hg4':
-        ret['nStacks'] = 4
+        ret['nstacks'] = 4
+        util.log("[create_config_from_profile] {}".format(ret))
     else:
         raise NotImplemented("Unknown profile {}".format(name))
     return ret
@@ -141,6 +142,7 @@ def launch_with_params(params, do_training):
     params['num_joints'] = dataset.d_dim
     assert params['weighted_loss'] is False, "No support for weighted loss for now"
 
+    util.log("[hg_launcher] create module with params {}".format(params))
     model = HourglassModel(nFeat=params['nfeats'],
                            nStack=params['nstacks'],
                            nModules=params['nmodules'],
