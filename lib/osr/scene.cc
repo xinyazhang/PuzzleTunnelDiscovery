@@ -191,6 +191,7 @@ bool Scene::hasUV() const
 	auto visitor = [&has_uv] (std::shared_ptr<const Mesh> mesh) {
 		has_uv = has_uv && mesh->hasUV();
 	};
+	visitMesh(visitor);
 	return has_uv;
 }
 
