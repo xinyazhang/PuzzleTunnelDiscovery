@@ -118,7 +118,7 @@ public:
 	/*
 	 * Translate from/to unscale and uncentralized world coordinates
 	 * to/from the unit cube coordinates
-	 * 
+	 *
 	 * Note: do NOT pass OMPL states to these two functions.
 	 *       1. They do NOT handle the translation between w-first and w-last.
 	 *       2. The reference point used by these functions may be
@@ -133,7 +133,7 @@ public:
 	//       enforceRobotCenter.
 	ArrayOfStates translateUnitStateToOMPLState(const ArrayOfStates& qs,
 	                                            bool to_angle_axis = false) const;
-	// Note: do not pass by const& because the implementation does need a copy 
+	// Note: do not pass by const& because the implementation does need a copy
 	ArrayOfStates translateOMPLStateToUnitState(ArrayOfStates qs) const;
 	// Translate the OMPL state to Vanillay State, which is the direct
 	// translation from the geometry's own coordinate system.
@@ -142,6 +142,10 @@ public:
 	ArrayOfStates translateOMPLStateToVanillaState(const ArrayOfStates& qs) const;
 
 	ArrayOfStates translateVanillaStateToUnitState(ArrayOfStates qs) const;
+
+	Eigen::MatrixXd translateVanillaPointsToUnitPoints(uint32_t geo,
+							   const Eigen::MatrixXd& pts) const;
+
 	StateVector applyPertubation(const StateVector& state) const;
 	StateVector unapplyPertubation(const StateVector& state) const;
 

@@ -159,6 +159,7 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("translate_vanilla_to_ompl", &UnitWorld::translateVanillaStateToOMPLState)
 		.def("translate_ompl_to_vanilla", &UnitWorld::translateOMPLStateToVanillaState)
 		.def("translate_vanilla_to_unit", &UnitWorld::translateVanillaStateToUnitState)
+		.def("translate_vanilla_pts_to_unit", &UnitWorld::translateVanillaPointsToUnitPoints)
 		.def("calculate_visibility_matrix", &UnitWorld::calculateVisibilityMatrix, py::call_guard<py::gil_scoped_release>())
 		.def("calculate_visibility_matrix2", &UnitWorld::calculateVisibilityMatrix2,
 				py::arg("qs0"),

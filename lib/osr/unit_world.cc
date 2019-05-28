@@ -647,6 +647,22 @@ UnitWorld::translateVanillaStateToUnitState(ArrayOfStates qs) const
 	return translateOMPLStateToUnitState(translateVanillaStateToOMPLState(qs));
 }
 
+Eigen::MatrixXd
+UnitWorld::translateVanillaPointsToUnitPoints(uint32_t geo,
+                                              const Eigen::MatrixXd& pts) const
+{
+	Eigen::MatrixXd afpts;
+	afpts.resize(pts.rows(), 4);
+	if (geo == GEO_ENV) {
+		afpts = pts.block(0, 0, pts.rows(), 3);
+	} else {
+		auto oc = robot_->getOMPLCenter();
+		afpts = pts.block(0, 0, pts.rows(), 3).rowwise() - glm2Eigen(oc).transpose();
+	}
+	afpts.col(3) = Eigen::VectorXd::Constant(pts.rows(), 1.0);
+	return (calib_mat_ * afpts.transpose()).transpose().block(0, 0, pts.rows(), 3);
+}
+
 ArrayOfStates
 UnitWorld::translateOMPLStateToUnitState(ArrayOfStates qs) const
 {
