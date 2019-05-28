@@ -5,17 +5,23 @@ import argparse
 import pathlib
 from imageio import imwrite
 
+def sigmoid(x):
+    return 1.0 / (1.0 + np.exp(-x))
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("files", help=".npz atex files", nargs='+')
     p.add_argument("--clipmin", help="clip the value before saving", type=float, default=None)
     p.add_argument("--clipmax", help="clip the value before saving", type=float, default=None)
+    p.add_argument("--sigmoid", help="Apply sigmoid()", action='store_true')
     args = p.parse_args()
     for fn in args.files:
         d = np.load(fn)
         if 'ATEX' not in d:
             continue
         atex = d['ATEX'].astype(np.float32)
+        if args.sigmoid:
+            atex = sigmoid(atex)
         if args.clipmin is not None or args.clipmax is not None:
             np.clip(atex, a_min=args.clipmin, a_max=args.clipmax, out=atex)
         gatex = np.zeros(shape=(atex.shape[0], atex.shape[1], 3))
