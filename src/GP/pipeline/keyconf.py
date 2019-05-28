@@ -46,6 +46,26 @@ def _predict_atlas2prim(tup):
                  UV=atlas2uv)
         imsave(ws.local_ws(util.TESTING_DIR, puzzle_name, geo_type+'-a2p.png'), atlas2prim) # This is for debugging
 
+def generate_atlas2prim(args, ws):
+    task_tup = []
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+        task_tup.append((ws.dir, puzzle_fn, puzzle_name, ws.current_trial))
+    pgpu = multiprocessing.Pool(1)
+    pgpu.map(_predict_atlas2prim, task_tup)
+
+def export_keyconf(ws, uw, puzzle_fn, puzzle_name, key_conf):
+    cfg, config = parse_ompl.parse_simple(puzzle_fn)
+    iq = parse_ompl.tup_to_ompl(cfg.iq_tup)
+    gq = parse_ompl.tup_to_ompl(cfg.gq_tup)
+    util.log("[predict_keyconf(worker)] sampled {} keyconf from puzzle {}".format(len(key_conf), puzzle_name))
+    qs_ompl = uw.translate_unit_to_ompl(key_conf)
+    ompl_q = np.concatenate((iq, gq, qs_ompl), axis=0)
+    key_fn = ws.keyconf_prediction_file(puzzle_name, for_read=False)
+    util.log("[predict_keyconf(worker)] save to key file {}".format(key_fn))
+    unit_q = uw.translate_ompl_to_unit(ompl_q)
+    # np.savez(key_fn, KEYQ_OMPL=ompl_q, KEYQ_UNIT=unit_q)
+    np.savez(key_fn, KEYQ_OMPL=ompl_q)
+    matio.savetxt(key_fn + 'unit.txt', unit_q)
 
 def _predict_worker(tup):
     DEBUG = True
@@ -76,7 +96,7 @@ def _predict_worker(tup):
                                                     margin,
                                                     denominator=nrot,
                                                     only_median=True)
-                #qs = [q for q in qs_raw if not uw.is_disentangled(q)] # Trim disentangled state
+                qs = [q for q in qs_raw if not uw.is_disentangled(q)] # Trim disentangled state
                 for q in qs:
                     key_conf.append(q)
                     bar.update(min(batch_size, len(key_conf)))
@@ -103,23 +123,12 @@ def _predict_worker(tup):
                         break
                 if len(key_conf) > batch_size:
                     break
-    cfg, config = parse_ompl.parse_simple(puzzle_fn)
-    iq = parse_ompl.tup_to_ompl(cfg.iq_tup)
-    gq = parse_ompl.tup_to_ompl(cfg.gq_tup)
-    util.log("[predict_keyconf(worker)] sampled {} keyconf from puzzle {}".format(len(key_conf), puzzle_name))
-    qs_ompl = uw.translate_unit_to_ompl(key_conf)
-    ompl_q = np.concatenate((iq, gq, qs_ompl), axis=0)
-    key_fn = ws.keyconf_prediction_file(puzzle_name, for_read=False)
-    util.log("[predict_keyconf(worker)] save to key file {}".format(key_fn))
-    unit_q = uw.translate_ompl_to_unit(ompl_q)
-    # np.savez(key_fn, KEYQ_OMPL=ompl_q, KEYQ_UNIT=unit_q)
-    np.savez(key_fn, KEYQ_OMPL=ompl_q)
-    matio.savetxt(key_fn + 'unit.txt', unit_q)
+    export_keyconf(ws, uw, puzzle_fn, puzzle_name, key_conf)
     if DEBUG:
         rob_sampler.dump_debugging(prefix=dirname(str(key_fn))+'/')
         env_sampler.dump_debugging(prefix=dirname(str(key_fn))+'/')
 
-def predict_keyconf(args, ws):
+def predict_keyconf(args, ws, worker=_predict_worker):
     task_tup = []
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
         task_tup.append((ws.dir, puzzle_fn, puzzle_name, ws.current_trial))
@@ -128,16 +137,70 @@ def predict_keyconf(args, ws):
         ncpu = None
     else:
         ncpu = ws.config.getint('Prediction', 'NumberOfPredictionProcesses')
-    pgpu = multiprocessing.Pool(1)
-    pgpu.map(_predict_atlas2prim, task_tup)
     # pcpu = multiprocessing.Pool(ncpu)
     # pcpu.map(_predict_worker, task_tup)
     for tup in task_tup:
-        _predict_worker(tup)
+        worker(tup)
 
+def _predict_2d_worker(tup):
+    ws_dir, puzzle_fn, puzzle_name, trial = tup
+    ws = util.Workspace(ws_dir)
+    ws.current_trial = trial
+    uw = util.create_unit_world(puzzle_fn)
+    rob_sampler = atlas.AtlasSampler(ws.local_ws(util.TESTING_DIR, puzzle_name, 'rob-a2p.npz'),
+                                     ws.local_ws(util.TESTING_DIR, puzzle_name, 'rob-atex.npz'),
+                                     'rob', uw.GEO_ROB)
+    env_sampler = atlas.AtlasSampler(ws.local_ws(util.TESTING_DIR, puzzle_name, 'env-a2p.npz'),
+                                     ws.local_ws(util.TESTING_DIR, puzzle_name, 'env-atex.npz'),
+                                     'env', uw.GEO_ENV)
+    rob_sampler.enable_debugging()
+    env_sampler.enable_debugging()
+    key_conf = []
+    # nrot = ws.config.getint('Prediction', 'NumberOfRotations')
+    nrot = 6
+    margin = ws.config.getfloat('Prediction', 'Margin')
+    batch_size = 128
+    with ProgressBar(max_value=batch_size) as bar:
+        while True:
+            for i in range(12):
+                tup1 = rob_sampler.sample(uw)
+                tup2 = env_sampler.sample(uw)
+                qs_raw = uw.enum_2drot_free_configuration(tup1[0], tup1[1], tup[3],
+                                                          tup2[0], tup2[1], tup[3],
+                                                          margin,
+                                                          altitude_divider=nrot,
+                                                          azimuth_divider=nrot,
+                                                          return_all=True)
+                # qs = [q for q in qs_raw if not uw.is_disentangled(q)] # Trim disentangled state
+                qs = qs_raw
+                for q in qs_raw:
+                    key_conf.append(q)
+                    bar.update(min(batch_size, len(key_conf)))
+                #if len(key_conf) > batch_size:
+            if len(key_conf) > 0:
+                break
+    cfg, config = parse_ompl.parse_simple(puzzle_fn)
+    iq = parse_ompl.tup_to_ompl(cfg.iq_tup)
+    gq = parse_ompl.tup_to_ompl(cfg.gq_tup)
+    util.log("[predict_keyconf_2d (worker)] sampled {} keyconf from puzzle {}".format(len(key_conf), puzzle_name))
+    qs_ompl = uw.translate_unit_to_ompl(key_conf)
+    ompl_q = np.concatenate((iq, gq, qs_ompl), axis=0)
+    key_fn = ws.keyconf_prediction_file(puzzle_name, for_read=False)
+    util.log("[predict_keyconf_2d (worker)] save to key file {}".format(key_fn))
+    unit_q = uw.translate_ompl_to_unit(ompl_q)
+    # np.savez(key_fn, KEYQ_OMPL=ompl_q, KEYQ_UNIT=unit_q)
+    # np.savez(key_fn, KEYQ_OMPL=ompl_q)
+    matio.savetxt(key_fn + '.unit.txt', unit_q)
+    rob_sampler.dump_debugging(prefix=dirname(str(key_fn))+'/')
+    env_sampler.dump_debugging(prefix=dirname(str(key_fn))+'/')
+
+def predict_keyconf_2d(args, ws):
+    predict_keyconf(args, ws, worker=_predict_2d_worker)
 
 function_dict = {
+        'generate_atlas2prim' : generate_atlas2prim,
         'predict_keyconf' : predict_keyconf,
+        'predict_keyconf_2d' : predict_keyconf_2d,
 }
 
 
@@ -167,7 +230,9 @@ def run(args):
 # Automatic functions start here
 #
 def collect_stages():
-    ret = [ ('predict_keyconf', lambda ws: predict_keyconf(None, ws)),
+    ret = [
+            ('generate_atlas2prim', lambda ws: generate_atlas2prim(None, ws)),
+            ('predict_keyconf', lambda ws: predict_keyconf(None, ws)),
             ('upload_keyconf_to_condor', lambda ws: ws.deploy_to_condor(util.TESTING_DIR + '/'))
           ]
     return ret

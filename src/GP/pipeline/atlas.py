@@ -55,8 +55,12 @@ class AtlasSampler(object):
         self._geo_id = geo_id
         # FIXME: Notify users to run corresponding commands when files not found
         self._atlas2prim = np.load(atlas2prim_fn)['PRIM']
-        d = np.load(surface_prediction_fn)
-        self._atlas = d['ATEX'] # Load the first element
+        if surface_prediction_fn is not None:
+            d = np.load(surface_prediction_fn)
+            self._atlas = d['ATEX']
+        else:
+            # surface_prediction_fn is None -> uniform distribution
+            self._atlas = np.clip(self._atlas2prim + 1, a_min=0, a_max=1).astype(np.float64)
         #np.clip(self._atlas, 0.0, None, out=self._atlas) # Clips out negative weights
         print("RAW ATLAS Sum {} Max {} Min {} Mean {} Stddev {}".format(
             np.sum(self._atlas),
@@ -116,6 +120,9 @@ class AtlasSampler(object):
         print(self._nzprim)
 
         self._debug_nsample = None
+        self._debug_vsample = None
+        self._debug_v3d = []
+        self._debug_allnsample = None
 
     def enable_debugging(self):
         self._debug_nsample = np.zeros(shape=self._atlas.shape, dtype=np.int32)
@@ -216,4 +223,4 @@ class AtlasSampler(object):
             self._debug_vsample[pix[0], pix[1]] += 1
         if self._debug_v3d is not None:
             self._debug_v3d.append(v3d)
-        return v3d, normal, uv
+        return v3d, normal, uv, prim
