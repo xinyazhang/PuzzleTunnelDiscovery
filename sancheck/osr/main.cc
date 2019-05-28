@@ -1,5 +1,6 @@
 #include <osr/osr_render.h>
 #include <osr/osr_init.h>
+#include <osr/pngimage.h>
 #include <stdio.h>
 #include <iostream>
 #include <fstream>
@@ -18,9 +19,18 @@ void worker(char* argv[])
 	renderer.setup();
 	renderer.loadModelFromFile(argv[1]);
 	renderer.angleModel(0.0f, 0.0f);
-	std::ofstream fout("osrsc_worker.bin");
+#if 0
+	std::ofstream fout("osrsc_worker.png");
 	renderer.render_depth_to(fout);
 	fout.close();
+#else
+	renderer.views.resize(1,2);
+	renderer.views << 0.0, 0.0;
+	renderer.render_mvrgbd();
+	osr::writePNG("osrsc_worker.png",
+		      renderer.pbufferWidth, renderer.pbufferHeight,
+		      renderer.mvrgb.data());
+#endif
 }
 
 
@@ -36,9 +46,14 @@ int main(int argc, char *argv[])
 	renderer.setup();
 	renderer.loadModelFromFile(argv[1]);
 	renderer.angleModel(0.0f, 0.0f);
-	std::ofstream fout("osrsc.bin");
-	renderer.render_depth_to(fout);
-	fout.close();
+	renderer.views.resize(1,2);
+	renderer.views << 0.0, 0.0;
+	// renderer.render_depth_to(fout);
+	renderer.render_mvrgbd();
+	printf("MAIN THREAD RENDERING %d %d\n", renderer.mvrgb.size());
+	osr::writePNG("osrsc.png",
+		      renderer.pbufferWidth, renderer.pbufferHeight,
+		      renderer.mvrgb.data());
 	printf("MAIN THREAD TESTING FINISHED\n");
 	std::thread t1(worker, argv);
 
