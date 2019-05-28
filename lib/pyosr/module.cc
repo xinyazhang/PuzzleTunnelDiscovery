@@ -69,6 +69,8 @@ PYBIND11_PLUGIN(pyosr) {
 		.def("setName", &Pet::setName)
 		.def("getName", &Pet::getName);
 #endif
+	m.def("get_identity_state_vector", &osr::get_identity_state_vector,
+	      "Return the identity state");
 	m.def("decompose_2", &osr::decompose_2,
 	      "Decompose the SE(3) state vector into a translation vector and a 3x3 rotation matrix");
 	m.def("decompose_3", &osr::decompose_3,
@@ -229,6 +231,10 @@ PYBIND11_PLUGIN(pyosr) {
 		     py::arg("flags") = 0,
 		     py::call_guard<py::gil_scoped_release>())
 		.def("add_barycentric", &Renderer::addBarycentric,
+		     py::arg("F"),
+		     py::arg("V"),
+		     py::arg("target"),
+		     py::arg("weight") = 1.0,
 		     py::call_guard<py::gil_scoped_release>())
 		.def("clear_barycentric", &Renderer::clearBarycentric,
 		     py::call_guard<py::gil_scoped_release>())

@@ -91,11 +91,12 @@ public:
 
 	void addBarycentric(const UnitWorld::FMatrix& F,
 	                    const UnitWorld::VMatrix& V,
-	                    uint32_t target);
+	                    uint32_t target,
+	                    float weight = 1.0);
 
 	void clearBarycentric(uint32_t target);
 
-	RMMatrixXb
+	RMMatrixXf
 	renderBarycentric(uint32_t target,
 	                  Eigen::Vector2i res,
 	                  const std::string& svg_fn = std::string());
@@ -140,12 +141,16 @@ private:
 	 */
 	using BaryUV = Eigen::Matrix<float, -1, 2, Eigen::RowMajor>;
 	using BaryBary = Eigen::Matrix<float, -1, 3, Eigen::RowMajor>;
+	using BaryWeight = Eigen::Matrix<float, 1, -1, Eigen::RowMajor>;
+
 	struct BaryRenderData {
 		std::vector<BaryUV> uv_array;
 		std::vector<BaryBary> bary_array;
+		std::vector<BaryWeight> weight_array;
 
 		BaryUV cache_uv;
 		BaryBary cache_bary;
+		BaryWeight cache_weight;
 
 		void sync(); // update cache
 		void clear();
@@ -163,6 +168,7 @@ private:
 	GLuint bary_vao_ = 0;
 	GLuint bary_vbo_uv_ = 0;
 	GLuint bary_vbo_bary_ = 0;
+	GLuint bary_vbo_weight_ = 0;
 	GLuint bary_ibo_ = 0;
 
 	StateTrans final_scaling_;

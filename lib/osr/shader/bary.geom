@@ -4,7 +4,9 @@ layout (triangles) in;
 layout (triangle_strip, max_vertices = 3) out;
 in vec2 geoUV[];
 in vec3 geoBary[];
+in float geoWeight[];
 out vec3 fragBary;
+out float fragWeight;
 void main() {
 	int n;
 	for (n = 0; n < gl_in.length(); n++) {
@@ -14,6 +16,7 @@ void main() {
 		gl_Position = vec4(2.0 * blend - 1.0, 0.0, 1.0);
 		// gl_Position = vec4(2.0 * geoUV[n] - 1.0, 0.0, 1.0);
 		fragBary = geoBary[n];
+		fragWeight = geoWeight[n];
                 EmitVertex();
 	}
 	EndPrimitive();

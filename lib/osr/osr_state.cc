@@ -345,4 +345,11 @@ void state_vector_set_identity(StateVector& q)
 	q << 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0;
 }
 
+StateVector get_identity_state_vector()
+{
+	StateVector q;
+	state_vector_set_identity(q);
+	return q;
+}
+
 }

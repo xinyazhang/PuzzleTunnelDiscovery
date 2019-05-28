@@ -61,6 +61,7 @@ StateTrans action_to_axis(int action);
 Eigen::MatrixXf get_permutation_to_world(const Eigen::MatrixXf& views, int view);
 
 void state_vector_set_identity(StateVector&);
+StateVector get_identity_state_vector();
 
 }
 

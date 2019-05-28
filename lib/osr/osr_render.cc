@@ -522,7 +522,8 @@ Renderer::getBaryTarget(uint32_t target)
 void
 Renderer::addBarycentric(const UnitWorld::FMatrix& F,
                          const UnitWorld::VMatrix& V,
-                         uint32_t target)
+                         uint32_t target,
+                         float weight)
 {
 	auto target_scene = getBaryTarget(target);
 	auto target_mesh = target_scene->getUniqueMesh();
@@ -549,6 +550,7 @@ Renderer::addBarycentric(const UnitWorld::FMatrix& F,
 	}
 	brds_[target].uv_array.emplace_back(uv);
 	brds_[target].bary_array.emplace_back(V.cast<float>());
+	brds_[target].weight_array.emplace_back(BaryWeight::Constant(1, V.rows(), weight));
 }
 
 void
@@ -558,7 +560,7 @@ Renderer::clearBarycentric(uint32_t target)
 	brds_[target].clear();
 }
 
-Renderer::RMMatrixXb
+Renderer::RMMatrixXf
 Renderer::renderBarycentric(uint32_t target,
                             Eigen::Vector2i res,
                             const std::string& svg_fn)
@@ -572,11 +574,12 @@ Renderer::renderBarycentric(uint32_t target,
 		CHECK_GL_ERROR(glGenTextures(1, &bary_texture_));
 		CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D, bary_texture_));
 		// Not sure if we need allocate space before calling glTexParameteri
-		CHECK_GL_ERROR(glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, res(0), res(1), 0, GL_RED, GL_UNSIGNED_BYTE, 0));
+		CHECK_GL_ERROR(glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, res(0), res(1), 0, GL_RED, GL_FLOAT, 0));
 		CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
-		CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)); }
+		CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+	}
 	// Resize on demand
-	CHECK_GL_ERROR(glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, res(0), res(1), 0, GL_RED, GL_UNSIGNED_BYTE, 0));
+	CHECK_GL_ERROR(glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, res(0), res(1), 0, GL_RED, GL_FLOAT, 0));
 
 	// Framebuffer creation
 	if (!bary_fb_) {
@@ -634,6 +637,7 @@ Renderer::renderBarycentric(uint32_t target,
 		CHECK_GL_ERROR(glGenVertexArrays(1, &bary_vao_));
 		CHECK_GL_ERROR(glGenBuffers(1, &bary_vbo_uv_));
 		CHECK_GL_ERROR(glGenBuffers(1, &bary_vbo_bary_));
+		CHECK_GL_ERROR(glGenBuffers(1, &bary_vbo_weight_));
 #if 0
 		CHECK_GL_ERROR(glGenBuffers(1, &bary_ibo_));
 #endif
@@ -724,6 +728,14 @@ Renderer::renderBarycentric(uint32_t target,
 					     0, 0));
 	CHECK_GL_ERROR(glEnableVertexAttribArray(1));
 #endif
+	CHECK_GL_ERROR(glBindBuffer(GL_ARRAY_BUFFER, bary_vbo_weight_));
+	CHECK_GL_ERROR(glBufferData(GL_ARRAY_BUFFER,
+	                            brd.cache_weight.size() * sizeof(float),
+	                            brd.cache_weight.data(), GL_STATIC_DRAW));
+	CHECK_GL_ERROR(glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE,
+					     0, 0));
+	CHECK_GL_ERROR(glEnableVertexAttribArray(2));
+
 	CHECK_GL_ERROR(glBindBuffer(GL_ARRAY_BUFFER, 0));
 
 #if 0
@@ -735,13 +747,17 @@ Renderer::renderBarycentric(uint32_t target,
 	                            index_data, GL_STATIC_DRAW));
 	CHECK_GL_ERROR(glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, 0));
 #else
+	CHECK_GL_ERROR(glEnable(GL_BLEND));
+	CHECK_GL_ERROR(glBlendEquation(GL_FUNC_ADD));
+	CHECK_GL_ERROR(glBlendFunc(GL_ONE, GL_ONE));
 	CHECK_GL_ERROR(glDrawArrays(GL_TRIANGLES, 0, brd.cache_uv.rows()));
+	CHECK_GL_ERROR(glDisable(GL_BLEND));
 #endif
 	CHECK_GL_ERROR(glFinish());
 	CHECK_GL_ERROR(glBindVertexArray(0));
 
-	RMMatrixXb pixels(res(0), res(1));
-	CHECK_GL_ERROR(glReadPixels(0, 0, res(0), res(1), GL_RED, GL_UNSIGNED_BYTE, pixels.data()));
+	RMMatrixXf pixels(res(0), res(1));
+	CHECK_GL_ERROR(glReadPixels(0, 0, res(0), res(1), GL_RED, GL_FLOAT, pixels.data()));
 
 	return pixels;
 }
@@ -850,10 +866,12 @@ void Renderer::BaryRenderData::sync()
 		total += uv.rows();
 	cache_uv.resize(total, 2);
 	cache_bary.resize(total, 3);
+	cache_weight.resize(1, total);
 	size_t cursor = 0;
 	for (size_t i = 0; i < uv_array.size(); i++) {
 		cache_uv.block(cursor, 0, uv_array[i].rows(), 2) = uv_array[i];
 		cache_bary.block(cursor, 0, bary_array[i].rows(), 3) = bary_array[i];
+		cache_weight.block(0, cursor, weight_array[i].cols(), 1) = weight_array[i];
 		cursor += uv_array[i].rows();
 	}
 #else
@@ -891,6 +909,7 @@ void Renderer::BaryRenderData::clear()
 {
 	uv_array.clear();
 	bary_array.clear();
+	weight_array.clear();
 }
 
 
