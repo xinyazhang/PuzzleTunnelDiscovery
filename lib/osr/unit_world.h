@@ -287,6 +287,20 @@ public:
 	                      int denominator,
 	                      bool only_median = false);
 
+	ArrayOfStates
+	enum2DRotationFreeConfiguration(const StateTrans& rob_surface_point,
+	                                const StateTrans& rob_surface_normal,
+	                                const int rob_prim_id,
+	                                const StateTrans& env_surface_point,
+	                                const StateTrans& env_surface_normal,
+	                                const int env_prim_id,
+				        StateScalar init_margin,
+				        int azimuth_divider,
+				        int altitude_divider,
+				        bool return_all = false,
+				        bool enable_mt = true);
+
+
 	std::shared_ptr<Scene> getScene(uint32_t geo);
 	std::shared_ptr<CDModel> getCDModel(uint32_t geo);
 
@@ -332,6 +346,13 @@ protected:
 	                      const FMatrix& targetF,
 	                      const VMatrix& V,
 	                      const FMatrix& F);
+
+	void
+	extractTriangle(uint32_t geo_id,
+	                int prim,
+	                Eigen::Vector3d v[3],
+	                Eigen::Vector2f uv[3],
+	                Eigen::Vector3d *fn) const;
 
 	double recCres_;
 };

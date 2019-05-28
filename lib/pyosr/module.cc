@@ -212,6 +212,19 @@ PYBIND11_PLUGIN(pyosr) {
 		     py::arg("denominator"),
 		     py::arg("only_median") = false,
 		     py::call_guard<py::gil_scoped_release>())
+		.def("enum_2drot_free_configuration", &UnitWorld::enum2DRotationFreeConfiguration,
+		     py::arg("rob_surface_point"),
+		     py::arg("rob_surface_normal"),
+		     py::arg("rob_prim_id"),
+		     py::arg("env_surface_point"),
+		     py::arg("env_surface_normal"),
+		     py::arg("env_prim_id"),
+		     py::arg("margin"),
+		     py::arg("altitude_divider"),
+		     py::arg("azimuth_divider"),
+		     py::arg("return_all") = false,
+		     py::arg("enable_mt") = true,
+		     py::call_guard<py::gil_scoped_release>())
 		.def_readonly_static("GEO_ENV", &UnitWorld::GEO_ENV)
 		.def_readonly_static("GEO_ROB", &UnitWorld::GEO_ROB)
 		.def_property("recommended_cres", &UnitWorld::getRecommendedCres, &UnitWorld::setRecommendedCres)

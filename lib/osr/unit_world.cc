@@ -5,6 +5,7 @@
 #include <glm/gtx/io.hpp>
 #include <atomic>
 #include <stdexcept>
+#include <queue>
 #include <random>
 #include <igl/doublearea.h>
 #include <igl/cross.h>
@@ -44,6 +45,16 @@ auto glm2Eigen(const glm::vec3& v)
 	return rv;
 }
 
+ArrayOfStates
+vectorToEigenMatrix(const std::vector<StateVector>& vec)
+{
+	ArrayOfStates ret;
+	ret.resize(vec.size(), kStateDimension);
+	for (size_t i = 0; i < vec.size(); i++) {
+		ret.row(i) = vec[i];
+	}
+	return ret;
+}
 
 UnitWorld::UnitWorld()
 {
@@ -130,6 +141,7 @@ UnitWorld::angleModel(float latitude, float longitude)
 	scene_->rotate(glm::radians(latitude), 1, 0, 0);      // latitude
 	scene_->rotate(glm::radians(longitude), 0, 1, 0);     // longitude
 	calib_mat_ = glm2Eigen(scene_->getCalibrationTransform());
+	std::cerr << "Calibration matrix " << calib_mat_ << std::endl;
 	inv_calib_mat_ = calib_mat_.inverse();
 	cd_scene_.reset(new CDModel(*scene_));
 	if (robot_) {
@@ -1117,21 +1129,10 @@ UnitWorld::sampleOverPrimitive(uint32_t geo_id,
                                int prim,
                                bool return_unit) const
 {
-	auto cd = getCDModel(geo_id);
-	auto geo = getScene(geo_id);
-	auto target_mesh = geo->getUniqueMesh();
-	const auto& indices = target_mesh->getIndices();
-	unsigned int vi[] = { indices[3 * prim + 0],
-	                      indices[3 * prim + 1],
-	                      indices[3 * prim + 2] };
 	Eigen::Vector3d v[3];
-	v[0] = cd->vertices().row(vi[0]);
-	v[1] = cd->vertices().row(vi[1]);
-	v[2] = cd->vertices().row(vi[2]);
 	Eigen::Vector2f uv[3];
-	uv[0] = target_mesh->getUV().row(vi[0]);
-	uv[1] = target_mesh->getUV().row(vi[1]);
-	uv[2] = target_mesh->getUV().row(vi[2]);
+	Eigen::Vector3d ret_normal;
+	extractTriangle(geo_id, prim, v, uv, &ret_normal);
 
 	std::random_device rd;  //Will be used to obtain a seed for the random number engine
 	std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
@@ -1160,7 +1161,6 @@ UnitWorld::sampleOverPrimitive(uint32_t geo_id,
 	Eigen::Vector2f interp_uv = alpha * uv[0] + beta * uv[1] + gamma * uv[2];
 
 	Eigen::Vector3d ret_pos = interp_v;
-	Eigen::Vector3d ret_normal = cd->faceNormals().row(prim);
 	if (!return_unit) {
 #if 0 // Geometry stored in CDModel is already unit
 		Transform tfs[2];
@@ -1171,6 +1171,7 @@ UnitWorld::sampleOverPrimitive(uint32_t geo_id,
 		ret_pos = tfs[geo_id] * ret_pos;
 		ret_normal = tfs[geo_id].linear() * ret_normal;
 #endif
+		auto geo = getScene(geo_id);
 		Eigen::Matrix4d tfmat = glm2Eigen(geo->getCalibrationTransform()).inverse();
 		Transform tf(tfmat);
 		ret_pos = tf * ret_pos;
@@ -1191,21 +1192,11 @@ UnitWorld::uvToSurface(uint32_t geo_id,
                        const Eigen::Vector2f& target_uv,
                        bool return_unit) const
 {
-	auto cd = getCDModel(geo_id);
-	auto geo = getScene(geo_id);
-	auto target_mesh = geo->getUniqueMesh();
-	const auto& indices = target_mesh->getIndices();
-	unsigned int vi[] = { indices[3 * prim + 0],
-	                      indices[3 * prim + 1],
-	                      indices[3 * prim + 2] };
 	Eigen::Vector3d v[3];
-	v[0] = cd->vertices().row(vi[0]);
-	v[1] = cd->vertices().row(vi[1]);
-	v[2] = cd->vertices().row(vi[2]);
 	Eigen::Vector2f uv[3];
-	uv[0] = target_mesh->getUV().row(vi[0]);
-	uv[1] = target_mesh->getUV().row(vi[1]);
-	uv[2] = target_mesh->getUV().row(vi[2]);
+	Eigen::Vector3d ret_normal;
+
+	extractTriangle(geo_id, prim, v, uv, &ret_normal);
 	//
 	// target_uv = alpha * uv[0] + beta * uv[1] + gamma * uv[2]
 	// alpha + beta + gamma = 1.0
@@ -1233,8 +1224,8 @@ UnitWorld::uvToSurface(uint32_t geo_id,
 	valid = valid && (std::max(gamma, std::max(alpha, beta)) <= 1.0);
 
 	Eigen::Vector3d ret_pos = alpha * v[0] + beta * v[1] + gamma * v[2];
-	Eigen::Vector3d ret_normal = cd->faceNormals().row(prim);
 	if (!return_unit) {
+		auto geo = getScene(geo_id);
 		Eigen::Matrix4d tfmat = glm2Eigen(geo->getCalibrationTransform()).inverse();
 		Transform tf(tfmat);
 		ret_pos = tf * ret_pos;
@@ -1333,18 +1324,147 @@ UnitWorld::enumFreeConfiguration(const StateTrans& rob_surface_point,
 			if (valid) {
 				current_valid_segment.emplace_back(q);
 			} else if (!current_valid_segment.empty()) {
-				auto mid = current_valid_segment.begin() + current_valid_segment.size() / 2; 
+				auto mid = current_valid_segment.begin() + current_valid_segment.size() / 2;
 				valid_states.emplace_back(*mid);
 				current_valid_segment.clear();
 			}
 		}
 	}
-	ArrayOfStates ret;
-	ret.resize(valid_states.size(), kStateDimension);
-	for (size_t i = 0; i < valid_states.size(); i++) {
-		ret.row(i) = valid_states[i];
+	return vectorToEigenMatrix(valid_states);
+}
+
+ArrayOfStates
+UnitWorld::enum2DRotationFreeConfiguration(const StateTrans& rob_surface_point,
+                                           const StateTrans& rob_surface_normal,
+                                           const int rob_prim_id,
+                                           const StateTrans& env_surface_point,
+                                           const StateTrans& env_surface_normal,
+                                           const int env_prim_id,
+                                           StateScalar margin,
+                                           int azimuth_divider,
+                                           int altitude_divider,
+                                           bool return_all,
+                                           bool enable_mt)
+{
+	Eigen::Vector3d rob_v[3], env_v[3];
+	extractTriangle(GEO_ROB, rob_prim_id, rob_v, nullptr, nullptr);
+	extractTriangle(GEO_ENV, env_prim_id, env_v, nullptr, nullptr);
+	Eigen::Vector3d tan_env = (env_v[1] - env_v[0]).normalized();
+
+	StateTrans rob_o = rob_surface_point;
+	StateTrans env_o = env_surface_point + env_surface_normal * margin;
+
+	ArrayOfStates qs;
+	qs.resize(azimuth_divider * altitude_divider, kStateDimension);
+	Eigen::VectorXi valids = Eigen::VectorXi::Constant(azimuth_divider * altitude_divider, 0);
+
+	auto linear_idx = [azimuth_divider](int alt_id, int azi_id) -> int {
+		return alt_id * azimuth_divider + azi_id;
+	};
+	auto grid_idx = [azimuth_divider](int lin_id) -> Eigen::Vector2i {
+		Eigen::Vector2i ret;
+		ret << lin_id / azimuth_divider, lin_id % azimuth_divider;
+		return ret;
+	};
+
+	using Quat = Eigen::Quaternion<StateScalar>;
+	using AA = Eigen::AngleAxis<StateScalar>;
+
+	// Step 1: align normals
+	Quat rot_1;
+	rot_1.setFromTwoVectors(rob_surface_normal, -env_surface_normal);
+
+	double delta_altitude = 0.5 * M_PI / double(altitude_divider);
+	double delta_azimuth = 2.0 * M_PI / double(altitude_divider);
+	for (int i = 0; i < altitude_divider; i++) {
+		double alt = i * delta_altitude;
+		// Step 2: apply altitude
+		Quat rot_2(AA(i * delta_altitude, tan_env));
+		// Step 2.5: calculate the margin so the rob triangle won't
+		//           hit the env triangle when applying rotations
+		double alt_margin;
+		{
+			Quat rot_accum = rot_2 * rot_1;
+			StateTrans align_point = env_o - (rot_accum * rob_o);
+			Eigen::Vector3d alt_rob_v[3];
+			alt_rob_v[0] = rot_accum * rob_v[0] + align_point;
+			alt_rob_v[1] = rot_accum * rob_v[1] + align_point;
+			alt_rob_v[2] = rot_accum * rob_v[2] + align_point;
+			Eigen::Vector3d pd; // Penetration depth
+			pd(0) = env_surface_normal.dot(alt_rob_v[0] - env_surface_point);
+			pd(1) = env_surface_normal.dot(alt_rob_v[1] - env_surface_point);
+			pd(2) = env_surface_normal.dot(alt_rob_v[2] - env_surface_point);
+			double pen = pd.minCoeff();
+			if (pen > 0)
+				alt_margin = margin;
+			else
+				alt_margin = -pen + margin;
+		}
+		StateTrans alt_env_o = env_surface_point + env_surface_normal * alt_margin;
+		for (int j = 0; j < azimuth_divider; j++) {
+			Quat rot_3(AA(j * delta_azimuth, env_surface_normal));
+			Quat rot_accum = rot_3 * rot_2 * rot_1;
+			StateTrans trans = alt_env_o - (rot_accum * rob_o);
+
+			int qi = linear_idx(i, j);
+			qs.row(qi) = compose(trans, rot_accum);
+		}
 	}
-	return ret;
+
+#pragma omp parallel for if (enable_mt)
+	for (int i = 0; i < qs.rows(); i++) {
+#if 0
+		valids(i) = isValid(qs.row(i));
+#else
+		// Debugging
+		valids(i) = 1;
+#endif
+	}
+
+	if (return_all) {
+		ArrayOfStates ret;
+		ret.resize(valids.sum(), qs.cols());
+		int ret_idx = 0;
+		for (int i = 0; i < qs.rows(); i++) {
+			if (valids(i)) {
+				ret.row(ret_idx) = qs.row(i);
+				ret_idx += 1;
+			}
+		}
+		return ret;
+	}
+	std::vector<StateVector> outstandings;
+
+	for (int i = 0; i < altitude_divider; i++) {
+		for (int j = 0; j < azimuth_divider; j++) {
+			int idx = linear_idx(i, j);
+			if (!valids(i))
+				continue;
+			std::queue<int> ccq; // connected component queue
+			ccq.push(idx);
+			while (!ccq.empty()) {
+				int cur = ccq.front();
+				ccq.pop();
+				Eigen::Vector2i cur2d = grid_idx(cur);
+				for (int dx = -1; dx <= 1; dx += 2) {
+					for (int dy = -1; dy <= 1; dy += 2) {
+						Eigen::Vector2i prob;
+						prob << dx, dy;
+						prob += cur2d;
+						prob(0) = (prob(0) + altitude_divider) % altitude_divider;
+						prob(1) = (prob(1) + azimuth_divider) % azimuth_divider;
+						int prob1d = linear_idx(prob(0), prob(1));
+						if (valids(prob1d)) {
+							ccq.push(prob1d);
+							valids(prob1d) = 0;
+						}
+					}
+				}
+			}
+			outstandings.emplace_back(qs.row(i));
+		}
+	}
+	return vectorToEigenMatrix(outstandings);
 }
 
 std::shared_ptr<Scene>
@@ -1381,6 +1501,35 @@ std::shared_ptr<const CDModel>
 UnitWorld::getCDModel(uint32_t geo) const
 {
 	return const_cast<UnitWorld*>(this)->getCDModel(geo);
+}
+
+void
+UnitWorld::extractTriangle(uint32_t geo_id,
+                           int prim,
+                           Eigen::Vector3d v[3],
+                           Eigen::Vector2f uv[3],
+                           Eigen::Vector3d *fn) const
+{
+	auto cd = getCDModel(geo_id);
+	auto geo = getScene(geo_id);
+	auto target_mesh = geo->getUniqueMesh();
+	const auto& indices = target_mesh->getIndices();
+	unsigned int vi[] = { indices[3 * prim + 0],
+	                      indices[3 * prim + 1],
+	                      indices[3 * prim + 2] };
+	if (v) {
+		v[0] = cd->vertices().row(vi[0]);
+		v[1] = cd->vertices().row(vi[1]);
+		v[2] = cd->vertices().row(vi[2]);
+	}
+	if (uv) {
+		uv[0] = target_mesh->getUV().row(vi[0]);
+		uv[1] = target_mesh->getUV().row(vi[1]);
+		uv[2] = target_mesh->getUV().row(vi[2]);
+	}
+	if (fn) {
+		*fn = cd->faceNormals().row(prim);
+	}
 }
 
 }
