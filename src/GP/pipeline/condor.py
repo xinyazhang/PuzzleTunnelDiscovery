@@ -55,6 +55,7 @@ def local_submit(ws,
     shutil.copy(ws.condor_template, local_sub)
     with open(local_sub, 'a') as f:
         print('Executable = {}'.format(xfile), file=f)
+        print('environment = "OMP_NUM_THREADS=1"', file=f)
         print('Output = {}/$(Process).out'.format(local_scratch), file=f)
         print('Error = {}/$(Process).err'.format(local_scratch), file=f)
         print('Log = {}/log'.format(local_scratch), file=f)
