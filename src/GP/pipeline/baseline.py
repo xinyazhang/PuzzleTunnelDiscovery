@@ -8,10 +8,12 @@ import copy
 
 from . import util
 from . import condor
+from . import parse_ompl
 
 def plan(args, ws):
     trial_str = 'trial-{}'.format(args.current_trial)
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+        _, config = parse_ompl.parse_simple(puzzle_fn)
         rel_scratch_dir = join(util.BASELINE_SCRATCH,
                                puzzle_name,
                                'planner-{}'.format(args.planner_id),
@@ -22,6 +24,8 @@ def plan(args, ws):
             continue
         condor_job_args = ['se3solver.py',
                 'solve',
+                '--cdres', config.getfloat('problem', 'collision_resolution', fallback=0.0001),
+                '--trajectory_out', '{}/traj_$(Process).npz'.format(scratch_dir),
                 puzzle_fn,
                 args.planner_id,
                 args.time_limit]

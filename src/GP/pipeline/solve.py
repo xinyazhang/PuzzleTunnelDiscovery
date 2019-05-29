@@ -80,12 +80,14 @@ def _sample_pds_old(args, ws):
 def sample_pds(args, ws):
     if not args.only_wait:
         for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+            _, config = parse_ompl.parse_simple(puzzle_fn)
             rel_bloom = _rel_bloom_scratch(ws, puzzle_name, ws.current_trial)
             util.log('[sample_pds]  rel_bloom {}'.format(rel_bloom))
             scratch_dir = ws.local_ws(rel_bloom)
             key_fn = ws.keyconf_prediction_file(puzzle_name)
             condor_job_args = ['se3solver.py',
                     'solve',
+                    '--cdres', config.getfloat('problem', 'collision_resolution', fallback=0.0001),
                     '--replace_istate',
                     'file={},key=KEYQ_OMPL,offset=$$([$(Process)]),size=1,out={}'.format(key_fn, scratch_dir),
                     '--bloom_out',
@@ -131,6 +133,7 @@ def forest_rdt(args, ws):
     trial_str = 'trial-{}'.format(_trial_id(ws, ws.current_trial))
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
         rel_scratch_dir = os.path.join(util.SOLVER_SCRATCH, puzzle_name, trial_str)
+        _, config = parse_ompl.parse_simple(puzzle_fn)
         scratch_dir = ws.local_ws(rel_scratch_dir)
         if args.only_wait:
             condor.local_wait(scratch_dir)
@@ -146,6 +149,7 @@ def forest_rdt(args, ws):
         key_fn = ws.keyconf_prediction_file(puzzle_name)
         condor_job_args = ['se3solver.py',
                 'solve',
+                '--cdres', config.getfloat('problem', 'collision_resolution', fallback=0.0001),
                 '--samset', _puzzle_pds(ws, puzzle_name, ws.current_trial),
                 '--replace_istate',
                 'file={},key=KEYQ_OMPL,offset=$$([$(Process)]),size=1,out={}'.format(key_fn, scratch_dir),
