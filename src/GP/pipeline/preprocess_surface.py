@@ -248,36 +248,52 @@ def _uvrender_worker(uv_args):
     chart_resolution = np.array([ws.chart_resolution, ws.chart_resolution], dtype=np.int32)
     afb = None
     afb_uw = None # Uniform weight
-    for fn in uvproj_list:
-        util.log('[uvrender_worker] rendering {} file {}'.format(rname, fn))
+    util.log('[uvrender_worker] rendering {} {}'.format(rname, uvproj_list))
+    for fn in progressbar(uvproj_list):
         if DUMMY:
             continue
         f = matio.load(fn)
         i = 0
-        for grn, grp in progressbar(f.items()):
+        buffed = 0
+        for grn, grp in f.items():
             IBV = grp['V.{}'.format(rname)][:]
             IF = grp['F.{}'.format(rname)][:]
             tq = grp['tq']
             iq = keys[grp['fromi']]
-            r.clear_barycentric(rflag)
-            r.add_barycentric(IF, IBV, rflag)
-            fb = r.render_barycentric(rflag, chart_resolution, svg_fn='')
-            uniform_weight = texture_format.texture_to_file(fb.astype(np.float32))
             distance = np.clip(pyosr.distance(tq, iq), 1e-4, None)
-            w = uniform_weight * (1.0 / distance)
-            if afb is None:
-                afb = w
-                afb_uw = uniform_weight
-            else:
-                afb += w
-                afb_uw += uniform_weight
-                np.clip(afb_uw, 0, 1.0, out=afb_uw) # afb_uw is supposed to be binary
+            w = 1.0 / distance
+            r.add_barycentric(IF, IBV, rflag, w)
+            buffed += IF.shape[0]
+            # util.log("Buffered {}".format(buffed))
+            if buffed > 32 * 1024:
+                fb = r.render_barycentric(rflag, chart_resolution, svg_fn='')
+                fb = texture_format.texture_to_file(fb)
+                uniform_weight = fb.astype(np.float32)
+                if afb is None:
+                    afb = fb
+                    afb_uw = uniform_weight
+                else:
+                    afb += fb
+                    afb_uw += uniform_weight
+                    afb_uw[np.nonzero(afb_uw)] = 1.0
+                r.clear_barycentric(rflag)
+                buffed = 0
             '''
             if i > 16:
                 break
             i += 1
             '''
         # break
+        if buffed > 0:
+            fb = r.render_barycentric(rflag, chart_resolution, svg_fn='')
+            uniform_weight = texture_format.texture_to_file(fb.astype(np.float32))
+            if afb is None:
+                afb = fb
+                afb_uw = uniform_weight
+            else:
+                afb += fb
+                afb_uw += uniform_weight
+                afb_uw[np.nonzero(afb_uw)] = 1.0
     ret = {}
     ret[rname] = (afb, afb_uw)
     return ret
@@ -286,13 +302,14 @@ def uvrender(args, ws):
     uvproj_dir = ws.local_ws(_UVPROJ_SCRATCH)
     uvproj_list = sorted(pathlib.Path(uvproj_dir).glob('uv_batch-*.hdf5'))
     ncpu = os.cpu_count()
-    pgpu = multiprocessing.Pool(processes=ncpu)
+    pgpu = multiprocessing.Pool(processes=4)
 
     uv_chunks = partt.chunk_it(uvproj_list, ncpu)
     uv_args = [(ws.local_ws(), chunk, 'rob') for chunk in uv_chunks]
     uv_args +=[(ws.local_ws(), chunk, 'env') for chunk in uv_chunks]
     util.log('[uvrender] uv_args {}'.format(uv_args))
-    USE_MP = False
+    # USE_MP = False
+    USE_MP = True
     if USE_MP:
         tup_list = pgpu.map(_uvrender_worker, uv_args)
     else:

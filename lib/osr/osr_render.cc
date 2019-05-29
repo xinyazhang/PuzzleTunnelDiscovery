@@ -910,6 +910,17 @@ void Renderer::BaryRenderData::clear()
 	uv_array.clear();
 	bary_array.clear();
 	weight_array.clear();
+
+	if (bary_vao_) {
+		// Clear graphics memory
+		CHECK_GL_ERROR(glBindBuffer(GL_ARRAY_BUFFER, bary_vbo_uv_));
+		CHECK_GL_ERROR(glBufferData(GL_ARRAY_BUFFER, 0, NULL, GL_STATIC_DRAW));
+		CHECK_GL_ERROR(glBindBuffer(GL_ARRAY_BUFFER, bary_vbo_bary_));
+		CHECK_GL_ERROR(glBufferData(GL_ARRAY_BUFFER, 0, NULL, GL_STATIC_DRAW));
+		CHECK_GL_ERROR(glBindBuffer(GL_ARRAY_BUFFER, bary_vbo_weight_));
+		CHECK_GL_ERROR(glBufferData(GL_ARRAY_BUFFER, 0, NULL, GL_STATIC_DRAW));
+		CHECK_GL_ERROR(glBindBuffer(GL_ARRAY_BUFFER, 0));
+	}
 }
 
 
