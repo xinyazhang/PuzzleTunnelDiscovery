@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import sys
 from os.path import join
 import os
 import subprocess
@@ -126,7 +127,7 @@ def isect_geometry(args, ws):
     task_shape = (touch_n)
     util.log("[isect_geometry] Task shape {}".format(task_shape))
     total_chunks = partt.guess_chunk_number(task_shape,
-            ws.config.getint('DEFAULT', 'CondorQuota') * 2,
+            ws.config.getint('DEFAULT', 'CondorQuota') * 6,
             ws.config.getint('TrainingWeightChart', 'MeshBoolGranularity'))
     if total_chunks > 1 and args.task_id is None:
         # Submit a Condor job
@@ -150,12 +151,12 @@ def isect_geometry(args, ws):
         tindices = partt.get_task_chunk(task_shape, total_chunks, task_id)
         task_id_str = util.padded(task_id, total_chunks)
         fn = join(scratch_dir, 'isect_batch-{}.hdf5'.format(task_id_str))
-        f = h5py.File(fn, 'a')
+        f = matio.hdf5_safefile(fn)
         cache_inf = tq_dic['IS_INF']
         cache_tqs = touch_v
         cache_from = tq_dic['FROM_V']
         cache_fromi = tq_dic['FROM_VI']
-        for index, (si,) in enumerate(tindices):
+        for index, (si,) in enumerate(progressbar(tindices)):
             if cache_inf[si]:
                 continue
             tq = cache_tqs[si]
@@ -182,7 +183,7 @@ def uvproject(args, ws):
     # Same task partition as isect_geometry
     task_shape = (touch_n)
     total_chunks = partt.guess_chunk_number(task_shape,
-            ws.config.getint('DEFAULT', 'CondorQuota') * 2,
+            ws.config.getint('DEFAULT', 'CondorQuota') * 6,
             ws.config.getint('TrainingWeightChart', 'MeshBoolGranularity'))
     fn_list = sorted(pathlib.Path(prev_scratch_dir).glob('isect_batch-*.hdf5'))
     if total_chunks > 1 and args.task_id is None:
@@ -207,7 +208,7 @@ def uvproject(args, ws):
         tindices = partt.get_task_chunk(task_shape, total_chunks, task_id)
         task_id_str = util.padded(task_id, total_chunks)
         ofn = join(scratch_dir, 'uv_batch-{}.hdf5'.format(task_id_str))
-        f = h5py.File(ofn, 'a')
+        f = matio.hdf5_safefile(ofn)
         ifn = join(prev_scratch_dir, 'isect_batch-{}.hdf5'.format(task_id_str))
         cache_file = matio.load(ifn)
         for index, (si,) in enumerate(tindices):
