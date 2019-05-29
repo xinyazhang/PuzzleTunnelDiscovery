@@ -5,6 +5,7 @@ from os.path import join, abspath, expanduser
 import subprocess
 import pathlib
 import numpy as np
+import h5py
 import os
 try:
     from progressbar import progressbar
@@ -19,6 +20,8 @@ from . import touchq_util
 from . import parse_ompl
 from . import condor
 
+hdf5_overwrite = matio.hdf5_overwrite
+
 # Pipeline local file
 # 
 # Here we always use "trajectory" to represent the curve in configuration space
@@ -27,7 +30,7 @@ _TRAJECTORY_SCRATCH = join(util.CONDOR_SCRATCH, 'training_trajectory')
 _KEYCAN_SCRATCH = util.PREP_KEY_CAN_SCRATCH
 
 def _get_candidate_file(ws):
-    return ws.local_ws(util.KEY_CANDIDATE_FILE)
+    return ws.local_ws(util.MT_KEY_CANDIDATE_FILE)
 
 '''
 System Architecture:
@@ -75,8 +78,9 @@ def interpolate_trajectory(args, ws):
     traj_files = sorted(pathlib.Path(scratch_dir).glob("traj_*.npz"))
     ntraj = ws.config.getint('TrainingKeyConf', 'TrajectoryLimit', fallback=-1)
     if ntraj < 0:
-        ntraj = None
-    for fn in traj_files[:ntraj]:
+        ntraj = len(traj_files)
+    f = matio.hdf5_safefile(candidate_file)
+    for i, fn in enumerate(traj_files[:ntraj]):
         d = matio.load(fn)
         if d['FLAG_IS_COMPLETE'] == 0:
             continue
@@ -85,14 +89,17 @@ def interpolate_trajectory(args, ws):
         metrics = pyosr.path_metrics(traj)
         npoint = ws.config.getint('TrainingKeyConf', 'CandidateNumber')
         dtau = metrics[-1] / float(npoint)
-        Qs += [pyosr.path_interpolate(traj, metrics, dtau * i) for i in range(npoint)]
+        Qs = [pyosr.path_interpolate(traj, metrics, dtau * i) for i in range(npoint)]
         if DEBUG:
+            raise NotImplementedError() # TODO: Update the debugging code or replace it
             utraj = uw.translate_ompl_to_unit(traj)
             dout = fn.stem+'.unit.txt'
             matio.savetxt(dout, utraj)
             util.log('[DEBUG][interpolate_trajectory] dump unitary path to {}'.format(dout))
+        hdf5_overwrite(f, 'traj_{}'.format(util.padded(i, ntraj)), Qs)
     util.log('[interpolate_trajectory] saving the interpolation results to {}'.format(candidate_file))
-    np.savez(candidate_file, OMPL_CANDIDATES=Qs)
+    #np.savez(candidate_file, OMPL_CANDIDATES=Qs)
+    f.close()
 
 
 '''
@@ -106,8 +113,10 @@ def estimate_clearance_volume(args, ws):
         return
     # Prepare the data and task description
     candidate_file = _get_candidate_file(ws)
-    Qs = matio.load(candidate_file)['OMPL_CANDIDATES']
-    nq = Qs.shape[0]
+    cf = matio.load(candidate_file)
+    trajs = sorted(list(cf.keys()))
+    ntraj = len(trajs)
+    nq = cf[trajs[0]].shape[0]
     #uw = ws.condor_unit_world(util.TRAINING_DIR)
     uw = util.create_unit_world(ws.local_ws(util.TRAINING_DIR, util.PUZZLE_CFG_FILE))
     DEBUG = False
@@ -116,7 +125,7 @@ def estimate_clearance_volume(args, ws):
         for uq in progressbar(unit_qs):
             assert uw.is_valid_state(uq)
         return
-    task_shape = (nq)
+    task_shape = (ntraj, nq)
     total_chunks = partt.guess_chunk_number(task_shape,
             ws.config.getint('DEFAULT', 'CondorQuota') * 2,
             ws.config.getint('TrainingKeyConf', 'ClearanceTaskGranularity'))
@@ -144,11 +153,30 @@ def estimate_clearance_volume(args, ws):
         tindices = partt.get_task_chunk(task_shape, total_chunks, task_id)
         npoint = ws.config.getint('TrainingKeyConf', 'ClearanceSample')
         # NOTE: THE COMMA, TODO: check all loops that's using get_task_chunk
-        unit_qs = uw.translate_ompl_to_unit(Qs)
-        for qi, in progressbar(tindices):
+        cached_traj = None
+        batch_str = util.padded(task_id, total_chunks)
+        out_fn = ws.local_ws(scratch_dir, 'unitary_clearance_from_keycan-batch_{}.hdf5'.format(batch_str))
+        f = matio.hdf5_safefile(out_fn)
+        # tindices = tindices[:4]
+        for traj_id, qi in progressbar(tindices):
+            traj_name = trajs[traj_id]
+            if cached_traj != traj_id:
+                Qs = cf[traj_name]
+                nq = Qs.shape[0]
+                unit_qs = uw.translate_ompl_to_unit(Qs)
+                cached_traj = traj_id
             free_vertices, touch_vertices, to_inf, free_tau, touch_tau = touchq_util.calc_touch(uw, unit_qs[qi], npoint, uw.recommended_cres)
+            # out_fn = join(scratch_dir, 'unitary_clearance_from_keycan-{}.npz'.format(qi_str))
             qi_str = util.padded(qi, nq)
-            out_fn = join(scratch_dir, 'unitary_clearance_from_keycan-{}.npz'.format(qi_str))
+            gpn = traj_name + '/' + qi_str + '/'
+            hdf5_overwrite(f, gpn+'FROM_V_OMPL', Qs[qi])
+            hdf5_overwrite(f, gpn+'FROM_V', unit_qs[qi])
+            hdf5_overwrite(f, gpn+'FREE_V', free_vertices)
+            hdf5_overwrite(f, gpn+'TOUCH_V', touch_vertices)
+            hdf5_overwrite(f, gpn+'IS_INF', to_inf)
+            hdf5_overwrite(f, gpn+'FREE_TAU', free_tau)
+            hdf5_overwrite(f, gpn+'TOUCH_TAU', touch_tau)
+            '''
             np.savez_compressed(out_fn,
                      FROM_V_OMPL=Qs[qi],
                      FROM_V=unit_qs[qi],
@@ -157,8 +185,10 @@ def estimate_clearance_volume(args, ws):
                      IS_INF=to_inf,
                      FREE_TAU=free_tau,
                      TOUCH_TAU=touch_tau)
+            '''
+        f.close()
 
-def pickup_key_configuration(args, ws):
+def pickup_key_configuration_old(args, ws):
     import pyosr
     scratch_dir = ws.local_ws(_KEYCAN_SCRATCH)
     os.makedirs(scratch_dir, exist_ok=True)
@@ -195,6 +225,53 @@ def pickup_key_configuration(args, ws):
     stat_out = np.array([median_list, max_list, min_list, mean_list, stddev_list])
     util.log('[pickup_key_configuration] writting results to {}'.format(key_out))
     np.savez(key_out, KEYQ_OMPL=kq_ompl, KEYQ=kq, _STAT=stat_out, _TOP_K=top_k_indices)
+
+def pickup_key_configuration(args, ws):
+    import pyosr
+    scratch_dir = ws.local_ws(_KEYCAN_SCRATCH)
+    os.makedirs(scratch_dir, exist_ok=True)
+    '''
+    Pick up top_k from each trajectory
+    '''
+    top_k = ws.config.getint('TrainingKeyConf', 'KeyConf')
+    candidate_file = _get_candidate_file(ws)
+    cf = matio.load(candidate_file)
+    trajs = sorted(list(cf.keys()))
+    ntraj = len(trajs)
+    util.log('[pickup_key_configuration] # of trajs {}'.format(ntraj))
+    nq = cf[trajs[0]].shape[0]
+    traj_stat_list = {}
+    for traj_name in trajs:
+        traj_stat_list[traj_name] = np.full((nq, 5), np.finfo(np.float64).max, dtype=np.float64)
+    fn_list = sorted(pathlib.Path(scratch_dir).glob('unitary_clearance_from_keycan-batch_*.hdf5'))
+    '''
+    Load distances to traj_mean_list (dict of dict of index to list)
+    '''
+    stat_out = np.full((ntraj, nq, 5), np.finfo(np.float64).max, dtype=np.float64)
+    for fn in progressbar(fn_list):
+        #util.log("loading {}".format(fn))
+        d = matio.load(fn)
+        # trajectory level
+        for traj_name in d.keys():
+            traj_id = int(traj_name[len('traj_'):])
+            traj_grp = d[traj_name]
+            for q_name in traj_grp.keys():
+                q = traj_grp[q_name]
+                distances = pyosr.multi_distance(q['FROM_V'], q['FREE_V'])
+                idx = int(str(q_name))
+                stat_out[traj_id, idx] = np.array([np.median(distances), np.max(distances), np.min(distances), np.mean(distances), np.std(distances)])
+    kq_ompl = []
+    top_k_indices = []
+    for i, traj_name in enumerate(progressbar(trajs)):
+        stats = traj_stat_list[traj_name]
+        current_top_k_indices = np.array(stats[:,3]).argsort()[:top_k]
+        for k in current_top_k_indices:
+            kq_ompl.append(cf[traj_name][k])
+            top_k_indices.append([i, k])
+    uw = util.create_unit_world(ws.local_ws(util.TRAINING_DIR, util.PUZZLE_CFG_FILE))
+    kq = uw.translate_ompl_to_unit(kq_ompl)
+    key_out = ws.local_ws(util.KEY_FILE)
+    np.savez(key_out, KEYQ_OMPL=kq_ompl, KEYQ=kq, _STAT=stat_out, _TOP_K_PER_TRAJ=top_k_indices)
 
 # We decided not to use reflections because we may leak internal functions to command line
 function_dict = {

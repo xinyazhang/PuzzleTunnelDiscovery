@@ -28,6 +28,17 @@ def load(fn, key=None):
         return d[key]
     return d
 
+'''
+hdf5_safefile:
+    h5py.File(..., 'a') would fail if the file is broken.
+    So we create this wrapper to deal with the broken file
+'''
+def hdf5_safefile(fn):
+    try:
+        return h5py.File(fn, 'a')
+    except:
+        return h5py.File(fn, 'w')
+
 def hdf5_overwrite(f, path, ds):
     if path in f:
         del f[path]
