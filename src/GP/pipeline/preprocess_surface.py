@@ -233,40 +233,53 @@ def uvproject(args, ws):
         f.close()
         util.log('[uvproject] projection data written to {}'.format(ofn))
 
+# DUMMY = True
+DUMMY = False
+
 def _uvrender_worker(uv_args):
     import pyosr
-    args_dir, uvproj_list = uv_args
+    args_dir, uvproj_list, rname = uv_args
     ws = util.Workspace(args_dir)
     r = util.create_offscreen_renderer(ws.local_ws(util.TRAINING_DIR, util.PUZZLE_CFG_FILE))
     TYPE_TO_FLAG = {'rob' : r.BARY_RENDERING_ROBOT,
                     'env' : r.BARY_RENDERING_SCENE }
-    ret = {}
     keys = _get_keys(ws)
-    for rname, rflag in TYPE_TO_FLAG.items():
-        chart_resolution = np.array([ws.chart_resolution, ws.chart_resolution], dtype=np.int32)
-        afb = None
-        afb_uw = None # Uniform weight
-        for fn in (uvproj_list):
-            f = matio.load(fn)
-            for grn, grp in f.items():
-                IBV = grp['V.{}'.format(rname)][:]
-                IF = grp['F.{}'.format(rname)][:]
-                tq = grp['tq']
-                iq = keys[grp['fromi']]
-                r.clear_barycentric(rflag)
-                r.add_barycentric(IF, IBV, rflag)
-                fb = r.render_barycentric(rflag, chart_resolution, svg_fn='')
-                uniform_weight = texture_format.texture_to_file(fb.astype(np.float32))
-                distance = np.clip(pyosr.distance(tq, iq), 1e-4, None)
-                w = uniform_weight * (1.0 / distance)
-                if afb is None:
-                    afb = w
-                    afb_uw = uniform_weight
-                else:
-                    afb += w
-                    afb_uw += uniform_weight
-                    np.clip(afb_uw, 0, 1.0, out=afb_uw) # afb_uw is supposed to be binary
-        ret[rname] = (afb, afb_uw)
+    rflag = TYPE_TO_FLAG[rname]
+    chart_resolution = np.array([ws.chart_resolution, ws.chart_resolution], dtype=np.int32)
+    afb = None
+    afb_uw = None # Uniform weight
+    for fn in uvproj_list:
+        util.log('[uvrender_worker] rendering {} file {}'.format(rname, fn))
+        if DUMMY:
+            continue
+        f = matio.load(fn)
+        i = 0
+        for grn, grp in progressbar(f.items()):
+            IBV = grp['V.{}'.format(rname)][:]
+            IF = grp['F.{}'.format(rname)][:]
+            tq = grp['tq']
+            iq = keys[grp['fromi']]
+            r.clear_barycentric(rflag)
+            r.add_barycentric(IF, IBV, rflag)
+            fb = r.render_barycentric(rflag, chart_resolution, svg_fn='')
+            uniform_weight = texture_format.texture_to_file(fb.astype(np.float32))
+            distance = np.clip(pyosr.distance(tq, iq), 1e-4, None)
+            w = uniform_weight * (1.0 / distance)
+            if afb is None:
+                afb = w
+                afb_uw = uniform_weight
+            else:
+                afb += w
+                afb_uw += uniform_weight
+                np.clip(afb_uw, 0, 1.0, out=afb_uw) # afb_uw is supposed to be binary
+            '''
+            if i > 16:
+                break
+            i += 1
+            '''
+        # break
+    ret = {}
+    ret[rname] = (afb, afb_uw)
     return ret
 
 def uvrender(args, ws):
@@ -276,13 +289,27 @@ def uvrender(args, ws):
     pgpu = multiprocessing.Pool(processes=ncpu)
 
     uv_chunks = partt.chunk_it(uvproj_list, ncpu)
-    uv_args = [(ws.local_ws(), chunk) for chunk in uv_chunks]
-    tup_list = pgpu.map(_uvrender_worker, uv_args)
+    uv_args = [(ws.local_ws(), chunk, 'rob') for chunk in uv_chunks]
+    uv_args +=[(ws.local_ws(), chunk, 'env') for chunk in uv_chunks]
+    util.log('[uvrender] uv_args {}'.format(uv_args))
+    USE_MP = False
+    if USE_MP:
+        tup_list = pgpu.map(_uvrender_worker, uv_args)
+    else:
+        tup_list = []
+        for a in uv_args:
+            tup_list.append(_uvrender_worker(a))
+    # util.log('[tup_list] {}'.format(tup_list))
     for rname in ['rob', 'env']:
         afb = None
         afb_uw = None # Uniform weight
         for dent in tup_list:
+            if rname not in dent:
+                continue
             w, uniform_weight = dent[rname]
+            if w is None or uniform_weight is None:
+                continue
+            # util.warn('[uvrender] w {} uniform_weight {}'.format(w.shape, uniform_weight.shape))
             if afb is None:
                 afb = w
                 afb_uw = uniform_weight
@@ -291,20 +318,51 @@ def uvrender(args, ws):
                 afb_uw += uniform_weight
                 np.clip(afb_uw, 0, 1.0, out=afb_uw) # afb_uw is supposed to be binary
         chart_fn = ws.local_ws(util.TRAINING_DIR, '{}_chart.npz'.format(rname))
-        np.savez(chart_fn,
-                 WEIGHTED=afb,
-                 UNIFORM_WEIGHTED=afb_uw)
+        if not DUMMY:
+            np.savez(chart_fn,
+                     WEIGHTED=afb,
+                     UNIFORM_WEIGHTED=afb_uw)
         util.ack('[uvrender] {} rendered'.format(chart_fn))
-        rgb = np.zeros(list(afb.shape) + [3])
-        rgb[...,1] = afb
+        if not DUMMY:
+            rgb = np.zeros(list(afb.shape) + [3])
+            rgb[...,1] = afb
         chart_fn = ws.local_ws(util.TRAINING_DIR, '{}_chart.png'.format(rname))
-        imsave(chart_fn, rgb)
+        if not DUMMY:
+            imsave(chart_fn, rgb)
         util.ack('[uvrender] {} rendered'.format(chart_fn))
-        rgb[...,1] = afb_uw
         chart_fn = ws.local_ws(util.TRAINING_DIR, '{}_chart_uniform_weight.png'.format(rname))
-        imsave(ws.local_ws(util.TRAINING_DIR, '{}_chart_uniform_weight.png'.format(rname)), rgb)
+        if not DUMMY:
+            rgb[...,1] = afb_uw
+            imsave(ws.local_ws(util.TRAINING_DIR, '{}_chart_uniform_weight.png'.format(rname)), rgb)
         util.ack('[uvrender] {} rendered'.format(chart_fn))
 
+def _debug_uvrender(args, ws):
+    import pyosr
+    r = util.create_offscreen_renderer(ws.local_ws(util.TRAINING_DIR, util.PUZZLE_CFG_FILE))
+    q = pyosr.get_identity_state_vector()
+    V, F = r.get_robot_geometry(q, True)
+    util.ack("V {} F {}".format(V.shape, F.shape))
+    IF, IBV = r.intersecting_to_robot_surface(q, True, V, F)
+    IF_1, IBV_1 = r.intersecting_to_robot_surface(q, True, V, F[:32])
+    IF_2, IBV_2 = r.intersecting_to_robot_surface(q, True, V, F[16:48])
+    util.ack("IF {} IBV {}".format(IF.shape, IBV.shape))
+    rflag = r.BARY_RENDERING_ROBOT
+    r.clear_barycentric(rflag)
+    r.add_barycentric(IF_1, IBV_1, rflag, 127.0)
+    r.add_barycentric(IF_2, IBV_2, rflag, 127.0)
+    # r.add_barycentric(IF, IBV, rflag, 32.0)
+    # r.add_barycentric(IF, IBV, rflag, 2.0)
+    chart_resolution = np.array([ws.chart_resolution, ws.chart_resolution], dtype=np.int32)
+    fb = r.render_barycentric(rflag, chart_resolution, svg_fn='')
+    util.ack("fb {}".format(fb.shape))
+    max_loc = np.unravel_index(np.argmax(fb), fb.shape)
+    util.ack("_debug_uvrender: max {} (loc: {} sc: {}) min {} mean {}".format(np.max(fb),
+        max_loc,
+        fb[max_loc],
+        np.min(fb),
+        np.mean(fb)))
+    fb = texture_format.texture_to_file(fb).astype(np.uint8)
+    imsave('gray.tmp.png', fb)
 
 def screen_weight(args, ws):
     puzzle = ws.local_ws(util.TRAINING_DIR, util.PUZZLE_CFG_FILE)
@@ -339,6 +397,7 @@ function_dict = {
         'uvproject' : uvproject,
         'uvrender' : uvrender,
         'screen_weight' : screen_weight,
+        '_debug_uvrender' : _debug_uvrender,
 }
 
 def setup_parser(subparsers):
