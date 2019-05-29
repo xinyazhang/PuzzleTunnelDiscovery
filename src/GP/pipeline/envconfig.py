@@ -120,6 +120,11 @@ Margin                      = 1e-6
 KeyPointAttempts  = 12
 KeyConfigRotations = 64
 
+[RoboGeoK]
+KeyPointAttempts = 32
+EnvKeyPoints = 1024
+KeyConfigRotations = 64
+
 [Solver]
 # Number of samples in the PreDefined Sample set
 PDSSize = 4194304

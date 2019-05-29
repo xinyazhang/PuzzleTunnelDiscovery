@@ -19,3 +19,5 @@ from . import baseline
 from . import tools
 from . import keyconf
 from . import autorun2
+from . import autorun3
+from . import robogeok
