@@ -117,7 +117,7 @@ def _craft_dict(params):
             dic[k] = 0.0
     return dic
 
-def launch_with_params(params, do_training):
+def launch_with_params(params, do_training, load=False):
     print('--Creating Dataset')
     assert 'ompl_config' in params
     ompl_cfg = params['ompl_config']
@@ -168,7 +168,9 @@ def launch_with_params(params, do_training):
     if do_training:
         # TODO: passing load= to continue if checkpoint presents
         # Alternatively we can let TF handles this.
-        model.training_init(nEpochs=params['nepochs'], epochSize=params['epoch_size'], saveStep=params['saver_step'], dataset=None)
+        load_dir = params['checkpoint_dir'] if load else None
+        util.ack('[launch_with_params] load dir {}'.format(load_dir))
+        model.training_init(nEpochs=params['nepochs'], epochSize=params['epoch_size'], saveStep=params['saver_step'], dataset=None, load=load_dir)
     else:
         model.testing_init(nEpochs=1, epochSize=params['prediction_epoch_size'], saveStep=0, dataset=None, load=params['checkpoint_dir'])
 

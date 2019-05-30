@@ -33,7 +33,7 @@ def write_pidfile(pidfile, pid):
     with open(pidfile, 'w') as f:
         print(pid, file=f)
 
-def _train(ws, geo_type):
+def _train(args, ws, geo_type):
     if ws.nn_profile:
         params = hg_launcher.create_config_from_profile(ws.nn_profile)
     else:
@@ -51,18 +51,18 @@ def _train(ws, geo_type):
     os.makedirs(ws.local_ws(util.NEURAL_SCRATCH), exist_ok=True)
     pidfile = ws.local_ws(util.NEURAL_SCRATCH, geo_type + '.pid')
     write_pidfile(pidfile, os.getpid())
-    hg_launcher.launch_with_params(params, do_training=True)
+    hg_launcher.launch_with_params(params, do_training=True, load=args.load)
     write_pidfile(pidfile, -1)
 
 def train_rob(args, ws):
     if args.only_wait:
         print("Note: --only_wait has no effect in train_rob")
-    _train(ws, 'rob')
+    _train(args, ws, 'rob')
 
 def train_env(args, ws):
     if args.only_wait:
         print("Note: --only_wait has no effect in train_env")
-    _train(ws, 'env')
+    _train(args, ws, 'env')
 
 def wait_for_training(args, ws):
     for geo_type in ['rob', 'env']:
@@ -135,6 +135,7 @@ def setup_parser(subparsers):
                    metavar='')
     p.add_argument('--only_wait', action='store_true')
     p.add_argument('--nn_profile', help="NN Profile", default='')
+    p.add_argument('--load', help="Load existing checkpoints and continue", action='store_true')
     p.add_argument('dir', help='Workspace directory')
 
 # As always, run() serves as a separator between local function and remote proxy functions

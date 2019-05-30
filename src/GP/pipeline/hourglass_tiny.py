@@ -438,7 +438,10 @@ class HourglassModel():
                 self._init_weight()
                 self._define_saver_summary()
                 if load is not None:
-                    self.saver.restore(self.Session, load)
+                    self.saver.restore(self.Session, tf.train.latest_checkpoint(load))
+                    print("Loading model from {}".format(load))
+                else:
+                    print("Start from scratching")
                     #try:
                         #    self.saver.restore(self.Session, load)
                     #except Exception:
