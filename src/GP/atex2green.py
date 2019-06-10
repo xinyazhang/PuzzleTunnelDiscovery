@@ -13,6 +13,7 @@ def main():
     p.add_argument("files", help=".npz atex files", nargs='+')
     p.add_argument("--clipmin", help="clip the value before saving", type=float, default=None)
     p.add_argument("--clipmax", help="clip the value before saving", type=float, default=None)
+    p.add_argument("--binary_thresh", help="Turn the texture into binary", type=float, default=None)
     p.add_argument("--sigmoid", help="Apply sigmoid()", action='store_true')
     args = p.parse_args()
     for fn in args.files:
@@ -24,6 +25,10 @@ def main():
             atex = sigmoid(atex)
         if args.clipmin is not None or args.clipmax is not None:
             np.clip(atex, a_min=args.clipmin, a_max=args.clipmax, out=atex)
+        if args.binary_thresh is not None:
+            old_atex = np.copy(atex)
+            atex[old_atex >= args.binary_thresh] = 1.0
+            atex[old_atex < args.binary_thresh] = 0.0
         gatex = np.zeros(shape=(atex.shape[0], atex.shape[1], 3))
         ma = np.max(atex)
         mi = np.min(atex)
