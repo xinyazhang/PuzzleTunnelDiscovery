@@ -442,7 +442,7 @@ bool predraw(Viewer& viewer)
 	if (manual_mode && manual_sforce && !is_latest_state_free) {
 		constexpr double STIFFNESS = 1e6;
 		constexpr double D_TIME = 1e-3;
-		using ArrayOfPoints = osr::UnitWorld::ArrayOfPoints;
+		using ArrayOfPoints = osr::ArrayOfPoints;
 		ArrayOfPoints sbegins, sends;
 		Eigen::Matrix<osr::StateScalar, -1, 1> smags, fmags;
 		Eigen::Matrix<int, -1, 2> findices;
