@@ -6,7 +6,11 @@ import pathlib
 from imageio import imwrite
 
 def sigmoid(x):
-    return 1.0 / (1.0 + np.exp(-x))
+    from scipy.special import expit
+    return expit(x)
+
+def show_stat(x):
+    print("min {} max {} avg {} median {} stddev {}".format(np.min(x), np.max(x), np.mean(x), np.median(x), np.std(x)))
 
 def main():
     p = argparse.ArgumentParser()
@@ -22,7 +26,10 @@ def main():
             continue
         atex = d['ATEX'].astype(np.float32)
         if args.sigmoid:
-            atex = sigmoid(atex)
+            nz = np.nonzero(atex)
+            show_stat(atex[nz])
+            atex[nz] = sigmoid(atex[nz])
+            show_stat(atex)
         if args.clipmin is not None or args.clipmax is not None:
             np.clip(atex, a_min=args.clipmin, a_max=args.clipmax, out=atex)
         if args.binary_thresh is not None:
