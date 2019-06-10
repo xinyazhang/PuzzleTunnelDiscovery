@@ -255,34 +255,37 @@ def _uvrender_worker(uv_args):
         f = matio.load(fn)
         i = 0
         buffed = 0
-        for grn, grp in f.items():
-            IBV = grp['V.{}'.format(rname)][:]
-            IF = grp['F.{}'.format(rname)][:]
-            tq = grp['tq']
-            iq = keys[grp['fromi']]
-            distance = np.clip(pyosr.distance(tq, iq), 1e-4, None)
-            w = 1.0 / distance
-            r.add_barycentric(IF, IBV, rflag, w)
-            buffed += IF.shape[0]
-            # util.log("Buffered {}".format(buffed))
-            if buffed > 32 * 1024:
-                fb = r.render_barycentric(rflag, chart_resolution, svg_fn='')
-                fb = texture_format.texture_to_file(fb)
-                uniform_weight = fb.astype(np.float32)
-                if afb is None:
-                    afb = fb
-                    afb_uw = uniform_weight
-                else:
-                    afb += fb
-                    afb_uw += uniform_weight
-                    afb_uw[np.nonzero(afb_uw)] = 1.0
-                r.clear_barycentric(rflag)
-                buffed = 0
-            '''
-            if i > 16:
-                break
-            i += 1
-            '''
+        try:
+            for grn, grp in f.items():
+                IBV = grp['V.{}'.format(rname)][:]
+                IF = grp['F.{}'.format(rname)][:]
+                tq = grp['tq']
+                iq = keys[grp['fromi']]
+                distance = np.clip(pyosr.distance(tq, iq), 1e-4, None)
+                w = 1.0 / distance
+                r.add_barycentric(IF, IBV, rflag, w)
+                buffed += IF.shape[0]
+                # util.log("Buffered {}".format(buffed))
+                if buffed > 32 * 1024:
+                    fb = r.render_barycentric(rflag, chart_resolution, svg_fn='')
+                    fb = texture_format.texture_to_file(fb)
+                    uniform_weight = fb.astype(np.float32)
+                    if afb is None:
+                        afb = fb
+                        afb_uw = uniform_weight
+                    else:
+                        afb += fb
+                        afb_uw += uniform_weight
+                        afb_uw[np.nonzero(afb_uw)] = 1.0
+                    r.clear_barycentric(rflag)
+                    buffed = 0
+                '''
+                if i > 16:
+                    break
+                i += 1
+                '''
+        except RuntimeError as e:
+            util.warn("Cannot access file {}".format(fn))
         # break
         if buffed > 0:
             fb = r.render_barycentric(rflag, chart_resolution, svg_fn='')
