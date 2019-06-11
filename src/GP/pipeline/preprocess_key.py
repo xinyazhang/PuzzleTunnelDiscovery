@@ -239,17 +239,18 @@ def pickup_key_configuration(args, ws):
     trajs = sorted(list(cf.keys()))
     ntraj = len(trajs)
     util.log('[pickup_key_configuration] # of trajs {}'.format(ntraj))
+    util.log('[pickup_key_configuration] actual trajs {}'.format(trajs))
     nq = cf[trajs[0]].shape[0]
-    traj_stat_list = {}
-    for traj_name in trajs:
-        traj_stat_list[traj_name] = np.full((nq, 5), np.finfo(np.float64).max, dtype=np.float64)
     fn_list = sorted(pathlib.Path(scratch_dir).glob('unitary_clearance_from_keycan-batch_*.hdf5'))
+    # fn_list = fn_list[:3] # Debug
     '''
     Load distances to traj_mean_list (dict of dict of index to list)
     '''
-    stat_out = np.full((ntraj, nq, 5), np.finfo(np.float64).max, dtype=np.float64)
+    # CAVEAT: stat_out may not be continuous
+    # stat_out = np.full((ntraj, nq, 5), np.finfo(np.float64).max, dtype=np.float64)
+    stat_dict = {} # np.full((ntraj, nq, 5), np.finfo(np.float64).max, dtype=np.float64)
     for fn in progressbar(fn_list):
-        #util.log("loading {}".format(fn))
+        # util.log("loading {}".format(fn)) # Debug
         d = matio.load(fn)
         # trajectory level
         for traj_name in d.keys():
@@ -259,19 +260,34 @@ def pickup_key_configuration(args, ws):
                 q = traj_grp[q_name]
                 distances = pyosr.multi_distance(q['FROM_V'], q['FREE_V'])
                 idx = int(str(q_name))
-                stat_out[traj_id, idx] = np.array([np.median(distances), np.max(distances), np.min(distances), np.mean(distances), np.std(distances)])
+                util.log("checking traj_name {} traj_id {} idx {}".format(traj_name, traj_id, idx)) # Debug
+                m = np.mean(distances)
+                if traj_id not in stat_dict:
+                    stat_dict[traj_id] = np.full((nq, 5), np.finfo(np.float64).max, dtype=np.float64)
+                stat_dict[traj_id][idx] = np.array([np.median(distances), np.max(distances), np.min(distances), m, np.std(distances)])
+                # util.log("checking traj_name {} traj_id {} idx {} mean {}".format(traj_name, traj_id, idx, m)) # Debug
     kq_ompl = []
     top_k_indices = []
-    for i, traj_name in enumerate(progressbar(trajs)):
-        stats = traj_stat_list[traj_name]
+    for traj_name in progressbar(trajs):
+        # util.log("checking traj_name {}".format(traj_name)) # Debug
+        traj_id = int(traj_name[len('traj_'):])
+        stats = stat_dict[traj_id]
         current_top_k_indices = np.array(stats[:,3]).argsort()[:top_k]
+        # util.log("stat of traj_name {} traj_id {} top_k {}".format(traj_name, traj_id, current_top_k_indices)) # Debug
         for k in current_top_k_indices:
             kq_ompl.append(cf[traj_name][k])
-            top_k_indices.append([i, k])
+            top_k_indices.append([traj_id, k])
     uw = util.create_unit_world(ws.local_ws(util.TRAINING_DIR, util.PUZZLE_CFG_FILE))
     kq = uw.translate_ompl_to_unit(kq_ompl)
     key_out = ws.local_ws(util.KEY_FILE)
-    np.savez(key_out, KEYQ_OMPL=kq_ompl, KEYQ=kq, _STAT=stat_out, _TOP_K_PER_TRAJ=top_k_indices)
+    # np.savez(key_out, KEYQ_OMPL=kq_ompl, KEYQ=kq, _STAT=stat_out, _TOP_K_PER_TRAJ=top_k_indices)
+    stat_keys = []
+    stat_values = []
+    for key, value in stat_dict.items():
+        stat_keys.append(key)
+        stat_values.append(value)
+    np.savez(key_out, KEYQ_OMPL=kq_ompl, KEYQ=kq, _STAT_KEYS=stat_keys, _STAT_VALUES=stat_values, _TOP_K_PER_TRAJ=top_k_indices)
+    util.ack('[pickup_key_configuration] key configurations are written to {}'.format(key_out))
 
 # We decided not to use reflections because we may leak internal functions to command line
 function_dict = {
