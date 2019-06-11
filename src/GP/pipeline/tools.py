@@ -169,6 +169,40 @@ def visimp(args):
         matio.savetxt('visimp.vanilla.txt', np.concatenate((pts[:, 0:3], pts[:,3:6]), axis=0))
         util.shell(['./vispath', cfg.env_fn, cfg.rob_fn, 'visimp.tmp.txt', '0.5'])
 
+
+def visnotch(args):
+    # FIXME: this function is mostly copied from visimp
+    import pygeokey
+    class WorkerArgs(object):
+        pass
+    ws = util.Workspace(args.dir)
+    #for puzzle_fn, puzzle_name in ws.training_puzzle_generator():
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+        cfg, config = parse_ompl.parse_simple(puzzle_fn)
+        wag = WorkerArgs()
+        wag.dir = ws.dir
+        wag.current_trial = ws.current_trial
+        wag.puzzle_fn = puzzle_fn
+        wag.puzzle_name = puzzle_name
+        wag.env_fn = cfg.env_fn
+        wag.rob_fn = cfg.rob_fn
+        wag.geo_type = 'env'
+        wag.geo_fn = cfg.env_fn
+        kpp = pygeokey.KeyPointProber(wag.geo_fn)
+        while True:
+            pts = kpp.probe_notch_points(args.pairs)
+            if pts.shape[0] > 0:
+                break
+            util.log("Found 0 key points, try again")
+        uw = util.create_unit_world(wag.puzzle_fn)
+        util.log("Found {} key points".format(pts.shape[0]))
+        unit_imp_1 = uw.translate_vanilla_pts_to_unit(uw.GEO_ROB, pts[:, 0:3])
+        unit_imp_2 = uw.translate_vanilla_pts_to_unit(uw.GEO_ROB, pts[:, 3:6])
+        matio.savetxt('visimp.tmp.txt', np.concatenate((unit_imp_1, unit_imp_2), axis=0))
+        matio.savetxt('visimp.vanilla.txt', np.concatenate((pts[:, 0:3], pts[:,3:6]), axis=0))
+        util.shell(['./vispath', cfg.env_fn, cfg.rob_fn, 'visimp.tmp.txt', '0.5'])
+
+
 def vistouchv(args):
     ws = util.Workspace(args.dir)
     candidate_file = ws.local_ws(util.KEY_CANDIDATE_FILE)
@@ -233,6 +267,7 @@ function_dict = {
         'visnnsample' : visnnsample,
         'viskey' : viskey,
         'visimp' : visimp,
+        'visnotch' : visnotch,
         'vistouchv' : vistouchv,
         'vistouchdisp' : vistouchdisp,
         'animate' : animate,
@@ -268,6 +303,9 @@ def setup_parser(subparsers):
     p.add_argument('--puzzle_name', help='Only show one specific puzzle', default='')
     p.add_argument('dir', help='Workspace directory')
     p = toolp.add_parser('visimp', help='Visualize "Important Points" from geometric hueristics')
+    p.add_argument('--pairs', help='How many pairs of points to generate', type=int, default=12)
+    p.add_argument('dir', help='Workspace directory')
+    p = toolp.add_parser('visnotch', help='Visualize Notch from geometric hueristics')
     p.add_argument('--pairs', help='How many pairs of points to generate', type=int, default=12)
     p.add_argument('dir', help='Workspace directory')
     p = toolp.add_parser('vistouchv', help='Visualize the touch configurations in clearance estimation')

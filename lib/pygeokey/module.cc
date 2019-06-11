@@ -8,14 +8,14 @@
 
 namespace py = pybind11;
 
-// For older pybind11
-// Replace this with PYBIND11_MODULE(osr, m) after pybind11 v2.2.0
 PYBIND11_MODULE(pygeokey, m) {
 	using namespace geokeyconf;
 	py::class_<KeyPointProber>(m, "KeyPointProber")
 		.def(py::init<const std::string&>())
 		.def("probe_key_points", &KeyPointProber::probeKeyPoints)
+		.def("probe_notch_points", &KeyPointProber::probeNotchPoints)
 		.def_property("alpha", &KeyPointProber::getAlpha, &KeyPointProber::setAlpha)
+		.def_property("local_min_thresh", &KeyPointProber::getLocalMinThresh, &KeyPointProber::setLocalMinThresh)
 		;
 	py::class_<KeySampler>(m, "KeySampler")
 		.def(py::init<const std::string&, const std::string&>())

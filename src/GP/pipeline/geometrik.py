@@ -48,15 +48,22 @@ def _sample_key_point_worker(wag):
     util.log("[sample_key_point] probing {} for {} attempts".format(wag.geo_fn, natt))
     pts = kpp.probe_key_points(natt)
     kps_fn = ws.keypoint_prediction_file(wag.puzzle_name, wag.geo_type)
-    util.log("[sample_key_point] writing {} points to {}".format(pts.shape[0], kps_fn))
-    np.savez(kps_fn, KEY_POINT_AMBIENT=pts)
+    util.log("[sample_key_point] Initializing mcs for {}".format(wag.geo_fn))
+    kpp.probe_notch_points(0)
+    util.log("[sample_key_point] Probing notches for {}".format(wag.geo_fn))
+    npts = kpp.probe_notch_points(natt)
+    util.log("[sample_key_point] writing {} points and {} notches to {}".format(pts.shape[0], npts.shape[0], kps_fn))
+    np.savez(kps_fn, KEY_POINT_AMBIENT=pts, NOTCH_POINT_AMBIENT=npts)
 
 def sample_key_point(args, ws):
     task_args = _get_task_args(ws, per_geometry=True)
-    #for wag in task_args:
-    #    _sample_key_point_worker(wag)
-    pcpu = multiprocessing.Pool()
-    pcpu.map(_sample_key_point_worker, task_args)
+    USE_MP = False
+    if USE_MP:
+        pcpu = multiprocessing.Pool()
+        pcpu.map(_sample_key_point_worker, task_args)
+    else:
+        for wag in task_args:
+            _sample_key_point_worker(wag)
 
 def _sample_key_conf_worker(wag):
     ws = util.Workspace(wag.dir)
