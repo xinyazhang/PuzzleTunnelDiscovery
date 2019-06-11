@@ -2,6 +2,7 @@ import numpy as np
 import h5py
 from scipy.io import loadmat,savemat
 import pathlib
+import lzma
 
 def _load_csv(fn):
     return np.loadtxt(fn, delimiter=',')
@@ -9,12 +10,17 @@ def _load_csv(fn):
 def _load_hdf5(fn):
     return h5py.File(fn, 'r')
 
+def _load_hdf5_xz(fn):
+    input_file = lzma.open(fn, 'r')
+    return h5py.File(input_file, 'r')
+
 _SUFFIX_TO_LOADER = {
         '.npz': np.load,
         '.txt': np.loadtxt,
         '.csv': _load_csv,
         '.mat': loadmat,
-        '.hdf5': _load_hdf5
+        '.hdf5': _load_hdf5,
+        '.hdf5.xz': _load_hdf5_xz
         }
 
 def load(fn, key=None):
