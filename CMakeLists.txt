@@ -9,6 +9,12 @@ set (mkobs3d_VERSION_MINOR 5)
 
 include(ProcessorCount)
 ProcessorCount(NCPU)
+
+# External project
+include(ExternalProject)
+set(EXTERNAL_PROJECTS_PREFIX ${CMAKE_BINARY_DIR}/external)
+set(EXTERNAL_PROJECTS_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/installed)
+
 FIND_PACKAGE(PkgConfig REQUIRED)
 
 message(STATUS "Initial CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
@@ -186,13 +192,18 @@ message(STATUS "AFTER MPFR CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
 
 message(STATUS "CGAL_FOUND: ${CGAL_FOUND}")
 
-# FCL (Flexible Collision Library) support
-SET(FCL_BUILD_TESTS OFF CACHE BOOL "Disable testcases for fcl" FORCE)
-# SET(CMAKE_BUILD_TYPE Debug)
-ADD_SUBDIRECTORY(third-party/fcl/)
-# Prioritize bundled fcl.
-INCLUDE_DIRECTORIES(BEFORE SYSTEM ${CMAKE_BINARY_DIR}/third-party/fcl/include/)
-INCLUDE_DIRECTORIES(BEFORE SYSTEM ${CMAKE_SOURCE_DIR}/third-party/fcl/include/)
+ExternalProject_Add(ext_fcl
+	PREFIX ${EXTERNAL_PROJECTS_PREFIX}
+	SOURCE_DIR ${CMAKE_SOURCE_DIR}/third-party/fcl/
+	CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release -DFCL_BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=${EXTERNAL_PROJECTS_INSTALL_PREFIX}
+	BUILD_COMMAND make -j ${NCPU})
+
+function(use_fcl TGT)
+	add_dependencies(${TGT} ext_fcl)
+	target_include_directories("${TGT}" BEFORE PRIVATE ${EXTERNAL_PROJECTS_INSTALL_PREFIX}/include)
+	target_link_directories("${TGT}" BEFORE PRIVATE ${EXTERNAL_PROJECTS_INSTALL_PREFIX}/lib ${EXTERNAL_PROJECTS_INSTALL_PREFIX}/lib64)
+	target_link_libraries("${TGT}" fcl)
+endfunction()
 
 # SET(CMAKE_BUILD_TYPE Debug)
 
@@ -318,15 +329,18 @@ if (USE_GPU)
 SET(viscommon renderer ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY})
 
 EASYADD(freecube)
-TARGET_LINK_LIBRARIES(freecube fcl omplaux ${CMAKE_THREAD_LIBS_INIT} ${viscommon})
+TARGET_LINK_LIBRARIES(freecube omplaux ${CMAKE_THREAD_LIBS_INIT} ${viscommon})
+use_fcl(freecube)
 
-SET(octbuildercommon goct vecio fcl omplaux ${CMAKE_THREAD_LIBS_INIT})
+SET(octbuildercommon goct vecio omplaux ${CMAKE_THREAD_LIBS_INIT})
 
 EASYADD(octbuilder)
 TARGET_LINK_LIBRARIES(octbuilder ${octbuildercommon} ${viscommon})
+use_fcl(octbuilder)
 
 EASYADD(naivebuilder)
 TARGET_LINK_LIBRARIES(naivebuilder ${octbuildercommon} ${viscommon})
+use_fcl(naivebuilder)
 
 endif (USE_GPU)
 
@@ -355,6 +369,7 @@ if (${OpenVDB_FOUND})
 	if (USE_GPU)
 		EASYADD(tbuilder)
 		target_link_libraries(tbuilder ${octbuildercommon} ${viscommon} erocol)
+		use_fcl(tbuilder)
 	endif (USE_GPU)
 
 	target_link_libraries(omplaux erocol)
@@ -377,13 +392,15 @@ TARGET_LINK_LIBRARIES(omplaux ccdxx)
 # TODO: remove deps on fcl
 EASYADD(trmap)
 target_link_directories(trmap PRIVATE ${CCD_LIBRARY_DIRS})
-TARGET_LINK_LIBRARIES(trmap omplaux fcl)
+TARGET_LINK_LIBRARIES(trmap omplaux)
+use_fcl(trmap)
 
 # Off-Screen Renderer for RL (reinforcement learning)
 # However if OpenGL is disabled, then the renderer part is not compiled.
 ADD_DEFINITIONS(-DGLM_ENABLE_EXPERIMENTAL -DGLM_FORCE_SIZE_FUNC=1 -DGLM_FORCE_RADIANS=1)
 EASYLIB(osr)
-TARGET_LINK_LIBRARIES(osr assimp fcl ${Boost_LIBRARIES} ompl tritri)
+TARGET_LINK_LIBRARIES(osr assimp ${Boost_LIBRARIES} ompl tritri)
+use_fcl(osr)
 ## Link osr to ode
 target_link_directories(osr PUBLIC ${CCD_LIBRARY_DIRS})
 target_link_libraries(osr ${ODE_LIBRARIES} ${CCD_LIBRARIES})
@@ -437,11 +454,13 @@ TARGET_LINK_LIBRARIES(objautouv rectpack)
 EASYADD(mtblender)
 target_link_directories(mtblender PRIVATE ${CCD_LIBRARY_DIRS})
 ## Note: do not use ompl_LIBRARIES, which pulls into too many denpendencies.
-TARGET_LINK_LIBRARIES(mtblender ompl fcl)
+TARGET_LINK_LIBRARIES(mtblender ompl)
+use_fcl(mtblender)
 
 EASYADD(mapmerger)
 target_link_directories(mapmerger PRIVATE ${CCD_LIBRARY_DIRS})
-TARGET_LINK_LIBRARIES(mapmerger ompl fcl)
+TARGET_LINK_LIBRARIES(mapmerger ompl)
+use_fcl(mapmerger)
 
 EASYADD(maze2to3)
 
@@ -480,12 +499,9 @@ endif (CGAL_FOUND)
 
 SANCHECK(fclcontacts)
 target_link_directories(sancheck_fclcontacts PRIVATE ${CCD_LIBRARY_DIRS})
-TARGET_LINK_LIBRARIES(sancheck_fclcontacts fcl)
+TARGET_LINK_LIBRARIES(sancheck_fclcontacts)
+use_fcl(sancheck_fclcontacts)
 
-set(EXTERNAL_PROJECTS_PREFIX ${CMAKE_BINARY_DIR}/external)
-set(EXTERNAL_PROJECTS_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/installed)
-
-include(ExternalProject)
 ExternalProject_Add(ext_ompl_app
 	PREFIX ${EXTERNAL_PROJECTS_PREFIX}
 	SOURCE_DIR ${CMAKE_SOURCE_DIR}/third-party/ompl.app/
@@ -511,7 +527,7 @@ FINALIZE(pyse3ompl)
 ExternalProject_Add(ext_libgeokey
 	PREFIX ${EXTERNAL_PROJECTS_PREFIX}
 	SOURCE_DIR ${CMAKE_SOURCE_DIR}/third-party/libgeokey/
-	CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${EXTERNAL_PROJECTS_INSTALL_PREFIX}
+	CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release -DOMPL_BUILD_DEMOS=OFF -DCMAKE_INSTALL_PREFIX=${EXTERNAL_PROJECTS_INSTALL_PREFIX}
 	BUILD_COMMAND make -j ${NCPU}
 	BUILD_ALWAYS 1)
 
