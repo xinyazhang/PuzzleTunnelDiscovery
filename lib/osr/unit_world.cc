@@ -663,16 +663,21 @@ Eigen::MatrixXd
 UnitWorld::translateVanillaPointsToUnitPoints(uint32_t geo,
                                               const Eigen::MatrixXd& pts) const
 {
+	if (pts.rows() <= 0)
+		return Eigen::MatrixXd();
 	Eigen::MatrixXd afpts;
-	afpts.resize(pts.rows(), 4);
+	// std::cerr << "afpts " << afpts.rows() << " * " << afpts.cols() << std::endl;
 	if (geo == GEO_ENV) {
 		afpts = pts.block(0, 0, pts.rows(), 3);
 	} else {
 		auto oc = robot_->getOMPLCenter();
 		afpts = pts.block(0, 0, pts.rows(), 3).rowwise() - glm2Eigen(oc).transpose();
 	}
-	afpts.col(3) = Eigen::VectorXd::Constant(pts.rows(), 1.0);
-	return (calib_mat_ * afpts.transpose()).transpose().block(0, 0, pts.rows(), 3);
+	afpts.conservativeResize(afpts.rows(), 4);
+	afpts.col(3) = Eigen::VectorXd::Constant(afpts.rows(), 1.0);
+	Eigen::MatrixXd upts = (calib_mat_ * afpts.transpose()).transpose();
+	// std::cerr << "upts " << upts.rows() << " * " << upts.cols() << std::endl;
+	return upts.block(0, 0, pts.rows(), 3);
 }
 
 ArrayOfStates
