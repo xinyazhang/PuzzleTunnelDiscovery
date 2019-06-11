@@ -232,6 +232,8 @@ def uvproject(args, ws):
             hdf5_overwrite(f, gpn+'fromi', fromi)
         f.close()
         util.log('[uvproject] projection data written to {}'.format(ofn))
+        util.shell(['xz', '-f', ofn])
+        util.log('[uvproject] data file {} compresses as {}'.format(ofn, ofn+'.xz'))
 
 # DUMMY = True
 DUMMY = False
@@ -302,8 +304,8 @@ def _uvrender_worker(uv_args):
     return ret
 
 def uvrender(args, ws):
-    uvproj_dir = ws.local_ws(_UVPROJ_SCRATCH)
-    uvproj_list = sorted(pathlib.Path(uvproj_dir).glob('uv_batch-*.hdf5'))
+    uvproj_dir = pathlib.Path(ws.local_ws(_UVPROJ_SCRATCH))
+    uvproj_list = sorted(uvproj_dir.glob('uv_batch-*.hdf5') + uvproj_dir.glob('uv_batch-*.hdf5.xz'))
     ncpu = os.cpu_count()
     pgpu = multiprocessing.Pool(processes=4)
 
