@@ -197,6 +197,7 @@ ExternalProject_Add(ext_fcl
 	SOURCE_DIR ${CMAKE_SOURCE_DIR}/third-party/fcl/
 	CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release -DFCL_BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=${EXTERNAL_PROJECTS_INSTALL_PREFIX}
 	BUILD_COMMAND make -j ${NCPU})
+set(ENV{PKG_CONFIG_PATH} "$ENV{PKG_CONFIG_PATH}:${EXTERNAL_PROJECTS_INSTALL_PREFIX}/lib64/pkgconfig:${EXTERNAL_PROJECTS_INSTALL_PREFIX}/lib/pkgconfig")
 
 function(use_fcl TGT)
 	add_dependencies(${TGT} ext_fcl)
@@ -243,6 +244,7 @@ EASYLIB(tritri)
 
 EASYLIB(omplaux)
 target_link_libraries(omplaux tetio)
+use_fcl(omplaux)
 
 TARGET_LINK_LIBRARIES(mazeinfo advplyio)
 
@@ -399,8 +401,10 @@ use_fcl(trmap)
 # However if OpenGL is disabled, then the renderer part is not compiled.
 ADD_DEFINITIONS(-DGLM_ENABLE_EXPERIMENTAL -DGLM_FORCE_SIZE_FUNC=1 -DGLM_FORCE_RADIANS=1)
 EASYLIB(osr)
-TARGET_LINK_LIBRARIES(osr assimp ${Boost_LIBRARIES} ompl tritri)
+TARGET_LINK_LIBRARIES(osr assimp ${Boost_LIBRARIES} tritri)
 use_fcl(osr)
+target_link_libraries(osr ompl)
+
 ## Link osr to ode
 target_link_directories(osr PUBLIC ${CCD_LIBRARY_DIRS})
 target_link_libraries(osr ${ODE_LIBRARIES} ${CCD_LIBRARIES})
@@ -505,10 +509,11 @@ use_fcl(sancheck_fclcontacts)
 ExternalProject_Add(ext_ompl_app
 	PREFIX ${EXTERNAL_PROJECTS_PREFIX}
 	SOURCE_DIR ${CMAKE_SOURCE_DIR}/third-party/ompl.app/
-	CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${EXTERNAL_PROJECTS_INSTALL_PREFIX}
+	CMAKE_ARGS -E env PKG_CONFIG_PATH="$ENV{PKG_CONFIG_PATH}" ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${EXTERNAL_PROJECTS_INSTALL_PREFIX} 
 	BUILD_COMMAND make -j ${NCPU} ompl ompl_app_base
 	BUILD_ALWAYS 1
 	)
+add_dependencies(ext_ompl_app ext_fcl)
 
 SET(EASY_LOCAL_SRC)
 AUX_SOURCE_DIRECTORY(lib/pyse3ompl/ EASY_LOCAL_SRC)
