@@ -203,7 +203,7 @@ function(use_fcl TGT)
 	add_dependencies(${TGT} ext_fcl)
 	target_include_directories("${TGT}" BEFORE PRIVATE ${EXTERNAL_PROJECTS_INSTALL_PREFIX}/include)
 	target_link_directories("${TGT}" BEFORE PRIVATE ${EXTERNAL_PROJECTS_INSTALL_PREFIX}/lib ${EXTERNAL_PROJECTS_INSTALL_PREFIX}/lib64)
-	target_link_libraries("${TGT}" fcl)
+	target_link_libraries("${TGT}" PRIVATE fcl)
 endfunction()
 
 # SET(CMAKE_BUILD_TYPE Debug)
@@ -243,7 +243,7 @@ EASYLIB(goct)
 EASYLIB(tritri)
 
 EASYLIB(omplaux)
-target_link_libraries(omplaux tetio)
+target_link_libraries(omplaux PRIVATE tetio)
 use_fcl(omplaux)
 
 TARGET_LINK_LIBRARIES(mazeinfo advplyio)
@@ -331,17 +331,20 @@ if (USE_GPU)
 SET(viscommon renderer ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY})
 
 EASYADD(freecube)
-TARGET_LINK_LIBRARIES(freecube omplaux ${CMAKE_THREAD_LIBS_INIT} ${viscommon})
+target_link_libraries(freecube PRIVATE omplaux ${CMAKE_THREAD_LIBS_INIT} ${viscommon} ccdxx)
 use_fcl(freecube)
+
+EASYLIB(ccdxx)
+target_link_libraries(omplaux PRIVATE ccdxx)
 
 SET(octbuildercommon goct vecio omplaux ${CMAKE_THREAD_LIBS_INIT})
 
 EASYADD(octbuilder)
-TARGET_LINK_LIBRARIES(octbuilder ${octbuildercommon} ${viscommon})
+target_link_libraries(octbuilder PRIVATE ${octbuildercommon} ${viscommon} ccdxx)
 use_fcl(octbuilder)
 
 EASYADD(naivebuilder)
-TARGET_LINK_LIBRARIES(naivebuilder ${octbuildercommon} ${viscommon})
+target_link_libraries(naivebuilder PRIVATE ${octbuildercommon} ${viscommon})
 use_fcl(naivebuilder)
 
 endif (USE_GPU)
@@ -370,7 +373,7 @@ if (${OpenVDB_FOUND})
 
 	if (USE_GPU)
 		EASYADD(tbuilder)
-		target_link_libraries(tbuilder ${octbuildercommon} ${viscommon} erocol)
+		target_link_libraries(tbuilder PRIVATE ${octbuildercommon} ${viscommon} erocol)
 		use_fcl(tbuilder)
 	endif (USE_GPU)
 
@@ -388,35 +391,32 @@ target_link_directories(sancheck_ccd PRIVATE ${CCD_LIBRARY_DIRS})
 message("CCD_LIBRARIES ${CCD_LIBRARIES}")
 message("CCD_LIBRARY_DIRS ${CCD_LIBRARY_DIRS}")
 
-EASYLIB(ccdxx)
-TARGET_LINK_LIBRARIES(omplaux ccdxx)
-
 # TODO: remove deps on fcl
 EASYADD(trmap)
 target_link_directories(trmap PRIVATE ${CCD_LIBRARY_DIRS})
-TARGET_LINK_LIBRARIES(trmap omplaux)
+target_link_libraries(trmap PRIVATE omplaux)
 use_fcl(trmap)
 
 # Off-Screen Renderer for RL (reinforcement learning)
 # However if OpenGL is disabled, then the renderer part is not compiled.
 ADD_DEFINITIONS(-DGLM_ENABLE_EXPERIMENTAL -DGLM_FORCE_SIZE_FUNC=1 -DGLM_FORCE_RADIANS=1)
 EASYLIB(osr)
-TARGET_LINK_LIBRARIES(osr assimp ${Boost_LIBRARIES} tritri)
+target_link_libraries(osr PRIVATE assimp ${Boost_LIBRARIES} tritri)
 use_fcl(osr)
-target_link_libraries(osr ompl)
+target_link_libraries(osr PRIVATE ompl)
 
 ## Link osr to ode
 target_link_directories(osr PUBLIC ${CCD_LIBRARY_DIRS})
-target_link_libraries(osr ${ODE_LIBRARIES} ${CCD_LIBRARIES})
+target_link_libraries(osr PRIVATE ${ODE_LIBRARIES} ${CCD_LIBRARIES})
 TARGET_INCLUDE_DIRECTORIES(osr BEFORE PRIVATE ${ODE_INCLUDE_DIRS})
 TARGET_COMPILE_DEFINITIONS(osr PRIVATE ${ODE_CFLAGS}) # Required, float or double
 
 ## OPTIONAL FUNCTION 1: rendering
 if (USE_GPU)
 	TARGET_COMPILE_DEFINITIONS(osr PRIVATE GPU_ENABLED=1)
-	TARGET_LINK_LIBRARIES(osr gbm EGL ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${Boost_LIBRARIES})
+	target_link_libraries(osr PRIVATE gbm EGL ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${Boost_LIBRARIES})
 	FIND_PACKAGE(PNG REQUIRED)
-	TARGET_LINK_LIBRARIES(osr ${PNG_LIBRARIES})
+	target_link_libraries(osr PRIVATE ${PNG_LIBRARIES})
 
 
 ### sancheck_osr checks its rendering functions
@@ -447,7 +447,7 @@ else (CGAL_FOUND)
 endif (CGAL_FOUND)
 
 if (TARGET meshbool) # Only link if meshbool exists
-	TARGET_LINK_LIBRARIES(osr meshbool)
+	target_link_libraries(osr PRIVATE meshbool)
 endif (TARGET meshbool)
 
 EASYLIB(rectpack)
@@ -458,12 +458,12 @@ TARGET_LINK_LIBRARIES(objautouv rectpack)
 EASYADD(mtblender)
 target_link_directories(mtblender PRIVATE ${CCD_LIBRARY_DIRS})
 ## Note: do not use ompl_LIBRARIES, which pulls into too many denpendencies.
-TARGET_LINK_LIBRARIES(mtblender ompl)
+target_link_libraries(mtblender PRIVATE ompl)
 use_fcl(mtblender)
 
 EASYADD(mapmerger)
 target_link_directories(mapmerger PRIVATE ${CCD_LIBRARY_DIRS})
-TARGET_LINK_LIBRARIES(mapmerger ompl)
+target_link_libraries(mapmerger PRIVATE ompl)
 use_fcl(mapmerger)
 
 EASYADD(maze2to3)
@@ -487,6 +487,7 @@ pybind11_add_module(pyosr MODULE ${EASY_LOCAL_SRC})
 TARGET_INCLUDE_DIRECTORIES(pyosr BEFORE PRIVATE ${PYTHON_INCLUDE_DIR})
 #message(STATUS "Python library: ${PYTHON_LIBRARY}")
 target_link_libraries(pyosr PRIVATE osr)
+use_fcl(pyosr)
 FINALIZE(pyosr)
 
 if (USE_GPU)
@@ -503,13 +504,13 @@ endif (CGAL_FOUND)
 
 SANCHECK(fclcontacts)
 target_link_directories(sancheck_fclcontacts PRIVATE ${CCD_LIBRARY_DIRS})
-TARGET_LINK_LIBRARIES(sancheck_fclcontacts)
+target_link_libraries(sancheck_fclcontacts PRIVATE ${CCD_LIBRARIES})
 use_fcl(sancheck_fclcontacts)
 
 ExternalProject_Add(ext_ompl_app
 	PREFIX ${EXTERNAL_PROJECTS_PREFIX}
 	SOURCE_DIR ${CMAKE_SOURCE_DIR}/third-party/ompl.app/
-	CMAKE_ARGS -E env PKG_CONFIG_PATH="$ENV{PKG_CONFIG_PATH}" ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${EXTERNAL_PROJECTS_INSTALL_PREFIX} 
+	CMAKE_ARGS -E env PKG_CONFIG_PATH="$ENV{PKG_CONFIG_PATH}" ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${EXTERNAL_PROJECTS_INSTALL_PREFIX}
 	BUILD_COMMAND make -j ${NCPU} ompl ompl_app_base
 	BUILD_ALWAYS 1
 	)
