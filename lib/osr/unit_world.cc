@@ -1508,6 +1508,37 @@ UnitWorld::getCDModel(uint32_t geo) const
 	return const_cast<UnitWorld*>(this)->getCDModel(geo);
 }
 
+
+double
+UnitWorld::kineticEnergyDistance(const StateVector& q0,
+                                 const StateVector& q1) const
+{
+	StateTrans q0t, q1t, dt;
+	StateQuat q0r, q1r, dr;
+	std::tie(q0t, q0r) = decompose(q0);
+	std::tie(q1t, q1r) = decompose(q1);
+	dt = q1t - q0t;
+	dr = q1r * q0r.inverse();
+	const auto& robcd = *getCDModel(GEO_ROB);
+	double rot = dr.vec().transpose() * robcd.inertiaTensorForCenter() * dr.vec();
+	rot *= 4.0 / robcd.volume();
+
+	return dt.squaredNorm() + rot;
+}
+
+Eigen::VectorXd
+UnitWorld::multiKineticEnergyDistance(const StateVector& origin,
+                                      const ArrayOfStates& targets)
+{
+	Eigen::VectorXd ret;
+	const auto N = targets.rows();
+	ret.resize(N);
+	for (int i = 0; i < N; i++) {
+		ret(i) = kineticEnergyDistance(origin, targets.row(i));
+	}
+	return ret;
+}
+
 void
 UnitWorld::extractTriangle(uint32_t geo_id,
                            int prim,

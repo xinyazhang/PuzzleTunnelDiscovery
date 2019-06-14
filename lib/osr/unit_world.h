@@ -319,6 +319,14 @@ public:
 	{
 		return recCres_;
 	}
+
+	double
+	kineticEnergyDistance(const StateVector& q0,
+	                      const StateVector& q1) const;
+
+	Eigen::VectorXd
+	multiKineticEnergyDistance(const StateVector& origin,
+	                           const ArrayOfStates& targets);
 protected:
 	bool shared_ = false;
 

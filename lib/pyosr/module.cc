@@ -225,6 +225,8 @@ PYBIND11_PLUGIN(pyosr) {
 		     py::arg("return_all") = false,
 		     py::arg("enable_mt") = true,
 		     py::call_guard<py::gil_scoped_release>())
+		.def("kinetic_energy_distance", &UnitWorld::kineticEnergyDistance)
+		.def("multi_kinetic_energy_distance", &UnitWorld::multiKineticEnergyDistance)
 		.def_readonly_static("GEO_ENV", &UnitWorld::GEO_ENV)
 		.def_readonly_static("GEO_ROB", &UnitWorld::GEO_ROB)
 		.def_property("recommended_cres", &UnitWorld::getRecommendedCres, &UnitWorld::setRecommendedCres)
