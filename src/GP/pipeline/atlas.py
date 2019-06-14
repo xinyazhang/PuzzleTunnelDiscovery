@@ -71,6 +71,11 @@ class AtlasSampler(object):
             ))
         #self._atlas -= np.min(self._atlas) # All elements must be non-negative
         np.clip(self._atlas, a_min=0.0, a_max=None, out=self._atlas) # All elements must be non-negative
+        # Match the visualization results
+        self._atlas /= np.max(self._atlas)
+        self._atlas *= 255.0
+        self._atlas = self._atlas.astype(np.uint).astype(np.float32)
+        self._atlas[self._atlas < 32.0] = 0.0
         print("Atlas resolution {}".format(self._atlas.shape))
         self._nzpix = np.nonzero(self._atlas)
         self._nzpixweight = self._atlas[self._nzpix]
