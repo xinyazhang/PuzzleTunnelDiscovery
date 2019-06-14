@@ -50,13 +50,15 @@ struct CDModel::CDModelData {
 	}
 
 	Eigen::Matrix<Scalar, 3, 3> MI_world, MI_center;
+	double volume;
 
 	void cache_MI(const Vector3& center)
 	{
 		MI_world = model.computeMomentofInertia();
 		const auto& C = MI_world;
 		auto com = center;
-		auto V = model.computeVolume();
+		volume = model.computeVolume();
+		auto V = volume;
 
 		auto& m = MI_center;
 
@@ -278,6 +280,12 @@ Eigen::Matrix<CDModel::Scalar, 3, 1>
 CDModel::centerOfMass() const
 {
 	return model_->model.computeCOM();
+}
+
+double
+CDModel::volume() const
+{
+	return model_->volume;
 }
 
 }

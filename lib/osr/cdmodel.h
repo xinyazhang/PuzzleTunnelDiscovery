@@ -10,6 +10,9 @@
 namespace osr {
 class Scene;
 
+/*
+ * Shim class between FCL and UnitWorld
+ */
 class CDModel {
 	struct CDModelData;
 	std::unique_ptr<CDModelData> model_;
@@ -64,6 +67,9 @@ public:
 
 	Eigen::Matrix<Scalar, 3, 1>
 	centerOfMass() const;
+
+	double
+	volume() const;
 };
 
 }
