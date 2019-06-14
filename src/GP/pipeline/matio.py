@@ -3,6 +3,7 @@ import h5py
 from scipy.io import loadmat,savemat
 import pathlib
 import lzma
+import io
 
 def _load_csv(fn):
     return np.loadtxt(fn, delimiter=',')
@@ -14,13 +15,21 @@ def _load_hdf5_xz(fn):
     input_file = lzma.open(fn, 'r')
     return h5py.File(input_file, 'r')
 
+def _load_xz(fn):
+    p = pathlib.PosixPath(fn)
+    memfile = io.BytesIO(lzma.open(fn, 'r').read())
+    nest_suffix = p.with_suffix('').suffix
+    if nest_suffix not in _SUFFIX_TO_LOADER:
+        raise NotImplementedError("Parser for {} file is not implemented".format(p.suffix))
+    return _SUFFIX_TO_LOADER[nest_suffix](memfile)
+
 _SUFFIX_TO_LOADER = {
         '.npz': np.load,
         '.txt': np.loadtxt,
         '.csv': _load_csv,
         '.mat': loadmat,
         '.hdf5': _load_hdf5,
-        '.hdf5.xz': _load_hdf5_xz
+        '.xz': _load_xz
         }
 
 def load(fn, key=None):
