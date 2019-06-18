@@ -418,3 +418,6 @@ def rangestring_to_list(x):
             a = int(part)
             result.append(a)
     return result
+
+def xz(fn):
+    shell(['xz', '-f', fn])
