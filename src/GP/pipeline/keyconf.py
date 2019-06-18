@@ -66,6 +66,7 @@ def export_keyconf(ws, uw, puzzle_fn, puzzle_name, key_conf):
     # np.savez(key_fn, KEYQ_OMPL=ompl_q, KEYQ_UNIT=unit_q)
     np.savez(key_fn, KEYQ_OMPL=ompl_q)
     matio.savetxt(key_fn + 'unit.txt', unit_q)
+    return key_fn
 
 def _predict_worker(tup):
     DEBUG = True
@@ -87,7 +88,7 @@ def _predict_worker(tup):
     margin = ws.config.getfloat('Prediction', 'Margin')
     batch_size = ws.config.getint('Prediction', 'SurfacePairsToSample')
     #for i in progressbar(range(batch_size)):
-    if False:
+    if True:
         with ProgressBar(max_value=batch_size) as bar:
             while True:
                 tup1 = rob_sampler.sample(uw)
@@ -123,7 +124,7 @@ def _predict_worker(tup):
                         break
                 if len(key_conf) > batch_size:
                     break
-    export_keyconf(ws, uw, puzzle_fn, puzzle_name, key_conf)
+    key_fn = export_keyconf(ws, uw, puzzle_fn, puzzle_name, key_conf)
     if DEBUG:
         rob_sampler.dump_debugging(prefix=dirname(str(key_fn))+'/')
         env_sampler.dump_debugging(prefix=dirname(str(key_fn))+'/')
