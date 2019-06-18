@@ -13,6 +13,7 @@ from . import matio
 from . import condor
 from . import parse_ompl
 from . import atlas
+from . import partt
 
 def read_roots(args):
     uw = util.create_unit_world(args.puzzle_fn)
@@ -89,28 +90,71 @@ def plotstat(args):
     Load keys
     '''
     ws = util.Workspace(args.dir)
-    ws.fetch_condor(util.TRAINING_DIR, 'KeyCan.npz')
-    keycan_ompl = matio.load(ws.local_ws(util.TRAINING_DIR, 'KeyCan.npz'), key='OMPL_CANDIDATES')
+    if not args.noupdate:
+        ws.fetch_condor(util.TRAINING_DIR, 'KeyCan.npz')
+    kq = matio.load(ws.local_ws(util.KEY_FILE), key='KEYQ')
     uw = util.create_unit_world(ws.training_puzzle)
-    keycan = uw.translate_ompl_to_unit(keycan_ompl)
     '''
     Load stats
     '''
-    st = matio.load(ws.local_ws(util.KEY_FILE), key='_STAT')
-    medians, maxs, mins, means, stddevs = st[:,:]
+    d = matio.load(ws.local_ws(util.KEY_FILE))
+    all_st = d['_STAT_VALUES']
+    st_keymap = d['_STAT_KEYS']
+    top_k_ids = d['_TOP_K_PER_TRAJ']
+    st = all_st[args.offset]
+    util.log('st shape {} from Traj {} top_k_ids {}'.format(st.shape, st_keymap[args.offset], top_k_ids[args.offset]))
+    medians, maxs, mins, means, stddevs = np.transpose(st[:args.trim,:])
     indices=range(medians.shape[0])
-    TOP_K= args.top_k if args.top_k is not None else ws.config.getint('TrainingKeyConf', 'KeyConf')
-    top_k_medians = np.array(medians).argsort()[:TOP_K]
-    top_k_means = np.array(means).argsort()[:TOP_K]
-    matio.savetxt('keyq.unit.txt', keycan[top_k_means])
+
+    top_k = ws.config.getint('TrainingKeyConf', 'KeyConf')
+    util.log("Saving keyq[{} : {}]".format(top_k * args.offset, top_k * (args.offset + 1)))
+    matio.savetxt('keyq.unit.txt', kq[top_k * args.offset : top_k * (args.offset + 1)])
+    # matio.savetxt('keyq.unit.txt', kq[:10])
     '''
     Vis stats
     '''
     plt.plot(indices, means, 'r-')
+    plt.plot(indices, medians, 'b-')
+    plt.plot(indices, maxs, 'g-')
     plt.show()
 
     cfg, config = parse_ompl.parse_simple(ws.training_puzzle)
     util.shell(['./vispath', cfg.env_fn, cfg.rob_fn, 'keyq.unit.txt', '0.5'])
+
+def visclearance(args):
+    ws = util.Workspace(args.dir)
+    '''
+    FIXME: this code is copied from preprocess_key.estimate_clearance_volume.
+    '''
+    candidate_file = ws.local_ws(util.MT_KEY_CANDIDATE_FILE)
+    cf = matio.load(candidate_file)
+    trajs = sorted(list(cf.keys()))
+    ntraj = len(trajs)
+    nq = cf[trajs[0]].shape[0]
+    task_shape = (ntraj, nq)
+    total_chunks = partt.guess_chunk_number(task_shape,
+            ws.config.getint('DEFAULT', 'CondorQuota') * 2,
+            ws.config.getint('TrainingKeyConf', 'ClearanceTaskGranularity'))
+    task_partition = partt.get_task_partition(task_shape, total_chunks)
+    tgt = (args.traj_id, args.point_id)
+    for task_id, task_content in enumerate(task_partition):
+        if tgt not in task_content:
+            continue
+        task_id_str = util.padded(task_id, total_chunks)
+        fn = ws.local_ws(util.PREP_KEY_CAN_SCRATCH,
+                         'unitary_clearance_from_keycan-batch_{}.hdf5.xz'.format(task_id_str))
+        util.log('[visclearance] find {} at {}'.format(tgt, fn))
+        d = matio.load(fn)
+        traj_name = trajs[args.traj_id]
+        qi_str = util.padded(args.point_id, nq)
+        gpn = traj_name + '/' + qi_str + '/'
+        from_v = np.reshape(d[gpn+'FROM_V'], (1,7))
+        free_vertices = d[gpn+'FREE_V']
+        # matio.savetxt('keyq.unit.txt', from_v)
+        matio.savetxt('keyq.unit.txt', free_vertices)
+        cfg, config = parse_ompl.parse_simple(ws.training_puzzle)
+        util.shell(['./vispath', cfg.env_fn, cfg.rob_fn, 'keyq.unit.txt', '0.5'])
+        break
 
 def viskey(args):
     ws = util.Workspace(args.dir)
@@ -263,6 +307,7 @@ function_dict = {
         'visrobgt' : visrobgt,
         'vistraj' : vistraj,
         'plotstat' : plotstat,
+        'visclearance' : visclearance,
         'visnnpred' : visnnpred,
         'visnnsample' : visnnsample,
         'viskey' : viskey,
@@ -289,8 +334,15 @@ def setup_parser(subparsers):
     p.add_argument('--traj_id', help='Trajectory ID', default=0)
     p.add_argument('dir', help='Workspace directory')
     p = toolp.add_parser('plotstat', help='Call matplotlib and vispath to show the statistics of the training trajectory')
+    p.add_argument('--noupdate', help='Do not sync with remote host', action='store_true')
     p.add_argument('--top_k', help='Top K', type=int, default=None)
+    p.add_argument('--offset', help='Specify which serie of stats to plot', type=int, default=0)
+    p.add_argument('--trim', help='Trim the tail', type=int, default=0)
     p.add_argument('dir', help='Workspace directory')
+    p = toolp.add_parser('visclearance', help='Show the colliding configuration used to calculate the clearance')
+    p.add_argument('dir', help='Workspace directory')
+    p.add_argument('--traj_id', help='Specify the trajectory id', type=int, default=0)
+    p.add_argument('--point_id', help='Specify the point in the trajectory', type=int, default=0)
     p = toolp.add_parser('visnnpred', help='Call vistexture to visualize the prediction results')
     p.add_argument('dir', help='Workspace directory')
     p = toolp.add_parser('visnnsample', help='Call vistexture to visualize the prediction results')
