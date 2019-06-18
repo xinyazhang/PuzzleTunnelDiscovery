@@ -21,6 +21,9 @@ def guess_chunk_number(shape, max_chunk_number, minimal_chunk_size):
 
 # A foolproof task partitioner
 # May be slow, but we are not gonna have billions of tasks
-def get_task_chunk(shape, total_chunks, index):
+def get_task_partition(shape, total_chunks):
     grand = [e for e in np.ndindex(shape)]
-    return chunk_it(grand, total_chunks)[index]
+    return chunk_it(grand, total_chunks)
+
+def get_task_chunk(shape, total_chunks, index):
+    return get_task_allocation(shape, total_chunks)[index]
