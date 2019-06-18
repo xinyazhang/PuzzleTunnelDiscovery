@@ -168,7 +168,9 @@ def isect_geometry(args, ws):
             hdf5_overwrite(f, '{}/from'.format(index_id_str), cache_from[si])
             hdf5_overwrite(f, '{}/fromi'.format(index_id_str), cache_fromi[si])
         f.close()
-        util.log('[isect_geometry] geometries written to {}'.format(fn))
+        util.log('[isect_geometry] geometries written to {}.xz'.format(fn))
+        util.xz(fn)
+        util.log('[isect_geometry] geometries compressed as {}.xz'.format(fn))
 
 
 def uvproject(args, ws):
@@ -185,7 +187,7 @@ def uvproject(args, ws):
     total_chunks = partt.guess_chunk_number(task_shape,
             ws.config.getint('DEFAULT', 'CondorQuota') * 6,
             ws.config.getint('TrainingWeightChart', 'MeshBoolGranularity'))
-    fn_list = sorted(pathlib.Path(prev_scratch_dir).glob('isect_batch-*.hdf5'))
+    fn_list = sorted(pathlib.Path(prev_scratch_dir).glob('isect_batch-*.hdf5.xz'))
     if total_chunks > 1 and args.task_id is None:
         # Submit a Condor job
         condor_args = ['facade.py',
@@ -209,7 +211,7 @@ def uvproject(args, ws):
         task_id_str = util.padded(task_id, total_chunks)
         ofn = join(scratch_dir, 'uv_batch-{}.hdf5'.format(task_id_str))
         f = matio.hdf5_safefile(ofn)
-        ifn = join(prev_scratch_dir, 'isect_batch-{}.hdf5'.format(task_id_str))
+        ifn = join(prev_scratch_dir, 'isect_batch-{}.hdf5.xz'.format(task_id_str))
         cache_file = matio.load(ifn)
         for index, (si,) in enumerate(tindices):
             si_str = util.padded(si, touch_n)
@@ -232,8 +234,8 @@ def uvproject(args, ws):
             hdf5_overwrite(f, gpn+'fromi', fromi)
         f.close()
         util.log('[uvproject] projection data written to {}'.format(ofn))
-        util.shell(['xz', '-f', ofn])
-        util.log('[uvproject] data file {} compresses as {}'.format(ofn, ofn+'.xz'))
+        util.xz(ofn)
+        util.log('[uvproject] data file {} compresses as {}.xz'.format(ofn, ofn))
 
 # DUMMY = True
 DUMMY = False

@@ -23,7 +23,7 @@ from . import condor
 hdf5_overwrite = matio.hdf5_overwrite
 
 # Pipeline local file
-# 
+#
 # Here we always use "trajectory" to represent the curve in configuration space
 # and "path" always refers to the path in a file system.
 _TRAJECTORY_SCRATCH = join(util.CONDOR_SCRATCH, 'training_trajectory')
@@ -100,6 +100,7 @@ def interpolate_trajectory(args, ws):
     util.log('[interpolate_trajectory] saving the interpolation results to {}'.format(candidate_file))
     #np.savez(candidate_file, OMPL_CANDIDATES=Qs)
     f.close()
+    util.xz(candidate_file)
 
 
 '''
@@ -155,7 +156,7 @@ def estimate_clearance_volume(args, ws):
         # NOTE: THE COMMA, TODO: check all loops that's using get_task_chunk
         cached_traj = None
         batch_str = util.padded(task_id, total_chunks)
-        out_fn = ws.local_ws(scratch_dir, 'unitary_clearance_from_keycan-batch_{}.hdf5'.format(batch_str))
+        out_fn = ws.local_ws(scratch_dir, 'unitary_clearance_from_keycan-batch_{}.hdf5.xz'.format(batch_str))
         f = matio.hdf5_safefile(out_fn)
         # tindices = tindices[:4]
         for traj_id, qi in progressbar(tindices):
@@ -225,9 +226,12 @@ def pickup_key_configuration_old(args, ws):
     stat_out = np.array([median_list, max_list, min_list, mean_list, stddev_list])
     util.log('[pickup_key_configuration] writting results to {}'.format(key_out))
     np.savez(key_out, KEYQ_OMPL=kq_ompl, KEYQ=kq, _STAT=stat_out, _TOP_K=top_k_indices)
+    util.xz(key_out)
 
 def pickup_key_configuration(args, ws):
     import pyosr
+    uw = util.create_unit_world(ws.local_ws(util.TRAINING_DIR, util.PUZZLE_CFG_FILE))
+
     scratch_dir = ws.local_ws(_KEYCAN_SCRATCH)
     os.makedirs(scratch_dir, exist_ok=True)
     '''
@@ -241,7 +245,7 @@ def pickup_key_configuration(args, ws):
     util.log('[pickup_key_configuration] # of trajs {}'.format(ntraj))
     util.log('[pickup_key_configuration] actual trajs {}'.format(trajs))
     nq = cf[trajs[0]].shape[0]
-    fn_list = sorted(pathlib.Path(scratch_dir).glob('unitary_clearance_from_keycan-batch_*.hdf5'))
+    fn_list = sorted(pathlib.Path(scratch_dir).glob('unitary_clearance_from_keycan-batch_*.hdf5.xz'))
     # fn_list = fn_list[:3] # Debug
     '''
     Load distances to traj_mean_list (dict of dict of index to list)
@@ -258,7 +262,10 @@ def pickup_key_configuration(args, ws):
             traj_grp = d[traj_name]
             for q_name in traj_grp.keys():
                 q = traj_grp[q_name]
-                distances = pyosr.multi_distance(q['FROM_V'], q['FREE_V'])
+                if True:
+                    distances = uw.multi_kinetic_energy_distance(q['FROM_V'], q['FREE_V'])
+                else:
+                    distances = pyosr.multi_distance(q['FROM_V'], q['FREE_V'])
                 idx = int(str(q_name))
                 util.log("checking traj_name {} traj_id {} idx {}".format(traj_name, traj_id, idx)) # Debug
                 m = np.mean(distances)
@@ -277,7 +284,6 @@ def pickup_key_configuration(args, ws):
         for k in current_top_k_indices:
             kq_ompl.append(cf[traj_name][k])
             top_k_indices.append([traj_id, k])
-    uw = util.create_unit_world(ws.local_ws(util.TRAINING_DIR, util.PUZZLE_CFG_FILE))
     kq = uw.translate_ompl_to_unit(kq_ompl)
     key_out = ws.local_ws(util.KEY_FILE)
     # np.savez(key_out, KEYQ_OMPL=kq_ompl, KEYQ=kq, _STAT=stat_out, _TOP_K_PER_TRAJ=top_k_indices)
