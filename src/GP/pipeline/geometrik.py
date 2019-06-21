@@ -44,8 +44,6 @@ def _get_task_args(ws, per_geometry):
             task_args.append(copy.deepcopy(wag))
     return task_args
 
-def deploy_to_condor(args, ws):
-
 def refine_mesh(args, ws):
     target_v = ws.config.getint('GeometriK', 'FineMeshV')
     task_args = _get_task_args(ws, per_geometry=True)
@@ -188,9 +186,9 @@ def collect_stages():
                                              util.CONDOR_TEMPLATE,
                                              util.TRAINING_DIR+'/')
             ),
-            ('refine_mesh', remote_refine_mesh(None, ws)),
-            ('sample_key_point', remote_sample_key_point(None, ws)),
-            ('sample_key_conf', remote_sample_key_conf(None, ws)),
+            ('refine_mesh', remote_refine_mesh),
+            ('sample_key_point', remote_sample_key_point),
+            ('sample_key_conf', remote_sample_key_conf),
             #('deploy_geometrik_to_condor', lambda ws: deploy_geometrik_to_condor(None, ws))
           ]
     return ret

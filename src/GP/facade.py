@@ -2,6 +2,7 @@
 
 import sys, os
 sys.path.append(os.getcwd())
+import resource
 import argparse
 import pipeline
 import colorama
@@ -10,6 +11,26 @@ try:
     USE_ARGCOMPLETE = True
 except ImportError as e:
     USE_ARGCOMPLETE = False
+
+def _memory_limit():
+    soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+    free, total = _get_memory()
+    cap = min(free - 8 * 1024 * 1024 * 1024, total / 2)
+    resource.setrlimit(resource.RLIMIT_AS, (cap, hard))
+
+def _get_memory():
+    with open('/proc/meminfo', 'r') as mem:
+        free_memory = -1
+        total_memory = -1
+        for i in mem:
+            sline = i.split()
+            if str(sline[0]) == 'MemAvailable:':
+                free_memory = int(sline[1])
+            elif str(sline[0]) == 'MemTotal:':
+                total_memory = int(sline[1])
+            if free_memory > 0  and total_memory > 0:
+                break
+    return free_memory * 1024, total_memory * 1024
 
 def main():
     colorama.init()
@@ -42,4 +63,9 @@ def main():
     getattr(pipeline, args.command).run(args)
 
 if __name__ == '__main__':
-    main()
+    _memory_limit() # Limitates maximun memory usage to half
+    try:
+        main()
+    except MemoryError:
+        sys.stderr.write('\n\nERROR: Memory Exception\n')
+        sys.exit(137) # Out of memory
