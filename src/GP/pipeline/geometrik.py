@@ -158,7 +158,7 @@ def _remote_command(ws, cmd, auto_retry=True):
     ws.remote_command(ws.condor_host,
                       ws.condor_exec(),
                       ws.condor_ws(),
-                      'geometrik', cmd, auto_retry=auto_retry)
+                      'geometrik', cmd, with_trial=True, auto_retry=auto_retry)
 
 def remote_refine_mesh(ws):
     _remote_command(ws, 'refine_mesh')
@@ -184,7 +184,7 @@ def collect_stages():
               lambda ws: ws.deploy_to_condor(util.WORKSPACE_SIGNATURE_FILE,
                                              util.WORKSPACE_CONFIG_FILE,
                                              util.CONDOR_TEMPLATE,
-                                             util.TRAINING_DIR+'/')
+                                             util.TESTING_DIR+'/')
             ),
             ('refine_mesh', remote_refine_mesh),
             ('sample_key_point', remote_sample_key_point),
