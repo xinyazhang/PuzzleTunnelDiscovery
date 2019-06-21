@@ -29,7 +29,6 @@ def run_pipeline(ppl_stages, args):
             till = index + 1
     assert cont is not None
     ws = util.Workspace(args.dir)
-    ws.current_trial = args.current_trial
     ws.nn_profile = args.nn_profile
     nstage = []
     if args.till:
@@ -44,14 +43,21 @@ def run_pipeline(ppl_stages, args):
         util.warn("[NOTE] Pipeline is broken")
         raise RuntimeError("Pipeline is broken, cannot autorun with --till")
     util.log("[autorun] running the following stages {}".format([k for k,_ in stage_list]))
-    for k,v in stage_list:
-        ws.timekeeper_start(k)
-        util.ack('[{}] starting...'.format(k))
-        v(ws)
-        util.ack('[{}] finished'.format(k))
-        ws.timekeeper_finish(k)
-    if nstage:
-        util.ack('[autorun] Next stage is {}'.format(nstage[0][0]))
+    util.log("[autorun] running the following stages {}".format([k for k,_ in stage_list]))
+    if args.current_trial is not None:
+        trials = util.rangestring_to_list(args.current_trial)
+    else:
+        trials = [None]
+    for trial in trials:
+        ws.current_trial = trial
+        for k,v in stage_list:
+            ws.timekeeper_start(k)
+            util.ack('<{}> [{}] starting...'.format(ws.current_trial, k))
+            v(ws)
+            util.ack('<{}> [{}] finished'.format(ws.current_trial, k))
+            ws.timekeeper_finish(k)
+        if nstage:
+            util.ack('[autorun] Next stage is {}'.format(nstage[0][0]))
 
 def setup_autorun_parser(subparsers, name, pdesc):
     p = subparsers.add_parser(name, help='Run all pipelines automatically',
@@ -70,7 +76,7 @@ def setup_autorun_parser(subparsers, name, pdesc):
                    choices=stage_names,
                    default=None,
                    metavar='')
-    p.add_argument('--current_trial', help='Trial to solve the puzzle', type=int, default=None)
+    p.add_argument('--current_trial', help='Trial to solve the puzzle', type=str, default=None)
     p.add_argument('--nn_profile', help='NN profile', default='')
     # print('Total Stages: ' + str(len(stage_names)))
 
