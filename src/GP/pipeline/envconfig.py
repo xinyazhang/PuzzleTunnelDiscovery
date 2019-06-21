@@ -117,8 +117,9 @@ Margin                      = 1e-6
 
 [GeometriK]
 
-KeyPointAttempts  = 12
-KeyConfigRotations = 64
+FineMeshV = 500000
+KeyPointAttempts  = 256
+KeyConfigRotations = 128
 
 [RoboGeoK]
 KeyPointAttempts = 32
