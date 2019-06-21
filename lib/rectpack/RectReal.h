@@ -50,8 +50,14 @@ double CompareRectShortSide(const Rect &a, const Rect &b);
 double NodeSortCmp(const Rect &a, const Rect &b);
 
 /// Returns true if a is contained in b.
-bool IsContainedIn(const Rect &a, const Rect &b);
+inline bool IsContainedIn(const Rect &a, const Rect &b)
+{
+	return a.x >= b.x && a.y >= b.y 
+		&& a.x+a.width <= b.x+b.width 
+		&& a.y+a.height <= b.y+b.height;
+}
 
+#if 0 // It seems this class is not used.
 class DisjodoubleRectCollection
 {
 public:
@@ -96,5 +102,6 @@ public:
 		return false;
 	}
 };
+#endif
 
 }

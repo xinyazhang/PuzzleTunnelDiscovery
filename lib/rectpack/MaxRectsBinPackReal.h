@@ -8,10 +8,13 @@
 #pragma once
 
 #include <vector>
+#include <memory>
 
 #include "RectReal.h"
 
 namespace rbp {
+
+class FreeRectangleManager;
 
 /** MaxRectsBinPack implements the MAXRECTS data structure and different bin packing algorithms that 
 	use this structure. */
@@ -58,7 +61,8 @@ private:
 	bool binAllowFlip;
 
 	std::vector<Rect> usedRectangles;
-	std::vector<Rect> freeRectangles;
+
+	std::shared_ptr<FreeRectangleManager> frm_;
 
 	/// Computes the placement score for placing the given rectangle with the given method.
 	/// @param score1 [out] The primary placement score will be outputted here.
@@ -78,11 +82,6 @@ private:
 	Rect FindPositionForNewNodeBestAreaFit(double width, double height, double &bestAreaFit, double &bestShortSideFit) const;
 	Rect FindPositionForNewNodeContactPoint(double width, double height, double &contactScore) const;
 
-	/// @return True if the free node was split.
-	bool SplitFreeNode(Rect freeNode, const Rect &usedNode);
-
-	/// Goes through the free rectangle list and removes any redundant entries.
-	void PruneFreeList();
 };
 
 }

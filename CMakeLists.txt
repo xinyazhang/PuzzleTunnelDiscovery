@@ -451,6 +451,7 @@ if (TARGET meshbool) # Only link if meshbool exists
 endif (TARGET meshbool)
 
 EASYLIB(rectpack)
+use_fcl(rectpack)
 EASYADD(objautouv)
 TARGET_LINK_LIBRARIES(objautouv rectpack)
 
