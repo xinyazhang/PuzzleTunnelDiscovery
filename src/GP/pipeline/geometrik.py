@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
+import os
 import multiprocessing
 import copy
 
@@ -29,31 +30,48 @@ def _get_task_args(ws, per_geometry):
         wag.puzzle_name = puzzle_name
         wag.env_fn = cfg.env_fn
         wag.rob_fn = cfg.rob_fn
+        wag.refined_env_fn = cfg.refined_env_fn
+        wag.refined_rob_fn = cfg.refined_rob_fn
         if per_geometry:
             wag.geo_type = 'env'
             wag.geo_fn = cfg.env_fn
+            wag.refined_geo_fn = cfg.refined_env_fn
             task_args.append(copy.deepcopy(wag))
             wag.geo_type = 'rob'
-            wag.geo_fn = cfg.rob_fn
+            wag.refined_geo_fn = cfg.refined_rob_fn
             task_args.append(copy.deepcopy(wag))
         else:
             task_args.append(copy.deepcopy(wag))
     return task_args
 
+def deploy_to_condor(args, ws):
+
+def refine_mesh(args, ws):
+    target_v = ws.config.getint('GeometriK', 'FineMeshV')
+    task_args = _get_task_args(ws, per_geometry=True)
+    for wag in task_args:
+        if os.path.isfile(wag.refined_geo_fn):
+            continue
+        util.shell(['TetWild', '--level', '6', '--targeted-num-v', str(target_v), '--output-surface', wag.refined_geo_fn, wag.geo_fn])
+
+SAMPLE_NOTCH = True
+
 def _sample_key_point_worker(wag):
     ws = util.Workspace(wag.dir)
     ws.current_trial = wag.current_trial
-    kpp = pygeokey.KeyPointProber(wag.geo_fn)
+    kpp = pygeokey.KeyPointProber(wag.refined_geo_fn)
     natt = ws.config.getint('GeometriK', 'KeyPointAttempts')
-    util.log("[sample_key_point] probing {} for {} attempts".format(wag.geo_fn, natt))
+    util.log("[sample_key_point] probing {} for {} attempts".format(wag.refined_geo_fn, natt))
     pts = kpp.probe_key_points(natt)
     kps_fn = ws.keypoint_prediction_file(wag.puzzle_name, wag.geo_type)
-    util.log("[sample_key_point] Initializing mcs for {}".format(wag.geo_fn))
-    kpp.probe_notch_points(0)
-    util.log("[sample_key_point] Probing notches for {}".format(wag.geo_fn))
-    npts = kpp.probe_notch_points(natt)
-    util.log("[sample_key_point] writing {} points and {} notches to {}".format(pts.shape[0], npts.shape[0], kps_fn))
-    np.savez(kps_fn, KEY_POINT_AMBIENT=pts, NOTCH_POINT_AMBIENT=npts)
+    util.log("[sample_key_point] writing {} points to {}".format(pts.shape[0], kps_fn))
+    if SAMPLE_NOTCH:
+        util.log("[sample_key_point] Probing notches for {}".format(wag.refined_geo_fn))
+        npts = kpp.probe_notch_points()
+        util.log("[sample_key_point] writing {} points and {} notches to {}".format(pts.shape[0], npts.shape[0], kps_fn))
+        np.savez(kps_fn, KEY_POINT_AMBIENT=pts, NOTCH_POINT_AMBIENT=npts)
+    else:
+        np.savez(kps_fn, KEY_POINT_AMBIENT=pts)
 
 def sample_key_point(args, ws):
     task_args = _get_task_args(ws, per_geometry=True)
@@ -71,10 +89,20 @@ def _sample_key_conf_worker(wag):
     kfn = ws.keyconf_prediction_file(wag.puzzle_name, for_read=False)
     util.log('[sample_key_conf] trial {}'.format(ws.current_trial))
     util.log('[sample_key_conf] sampling to {}'.format(kfn))
-    env_kps_fn = ws.keypoint_prediction_file(wag.puzzle_name, 'env')
-    rob_kps_fn = ws.keypoint_prediction_file(wag.puzzle_name, 'rob')
-    env_kps = matio.load(env_kps_fn)['KEY_POINT_AMBIENT']
-    rob_kps = matio.load(rob_kps_fn)['KEY_POINT_AMBIENT']
+    def _load_kps(geo_type):
+        kps_fn = ws.keypoint_prediction_file(wag.puzzle_name, geo_type)
+        d = matio.load(kps_fn)
+        kps = d['KEY_POINT_AMBIENT']
+        if 'NOTCH_POINT_AMBIENT' in d:
+            nps = d['NOTCH_POINT_AMBIENT']
+            if nps.shape[0] != 0:
+                if kps.shape[0] != 0:
+                    kps = np.concatenate((kps, nps), axis=0)
+                else:
+                    kps = nps
+        return kps
+    env_kps = _load_kps('env')
+    rob_kps = _load_kps('rob')
     ks = pygeokey.KeySampler(wag.env_fn, wag.rob_fn)
     kqs, _, _ = ks.get_all_key_configs(env_kps, rob_kps,
                                        ws.config.getint('GeometriK', 'KeyConfigRotations'))
@@ -102,6 +130,7 @@ def deploy_geometrik_to_condor(args, ws):
                         util.TESTING_DIR+'/')
 
 function_dict = {
+        'refine_mesh' : refine_mesh,
         'sample_key_point' : sample_key_point,
         'sample_key_conf' : sample_key_conf,
         'deploy_geometrik_to_condor' : deploy_geometrik_to_condor,
@@ -127,17 +156,41 @@ def run(args):
     else:
         print("Unknown geometrik pipeline stage {}".format(args.stage))
 
+def _remote_command(ws, cmd, auto_retry=True):
+    ws.remote_command(ws.condor_host,
+                      ws.condor_exec(),
+                      ws.condor_ws(),
+                      'geometrik', cmd, auto_retry=auto_retry)
+
+def remote_refine_mesh(ws):
+    _remote_command(ws, 'refine_mesh')
+
+def remote_sample_key_point(ws):
+    _remote_command(ws, 'sample_key_point')
+
+def remote_sample_key_conf(ws):
+    _remote_command(ws, 'sample_key_conf')
+
+'''
+# Deprecated
 def autorun(args):
     ws = util.Workspace(args.dir)
     ws.current_trial = args.current_trial
     pdesc = collect_stages()
     for _,func in pdesc:
         func(ws)
+'''
 
 def collect_stages():
-    ret = [
-            ('sample_key_point', lambda ws: sample_key_point(None, ws)),
-            ('sample_key_conf', lambda ws: sample_key_conf(None, ws)),
-            ('deploy_geometrik_to_condor', lambda ws: deploy_geometrik_to_condor(None, ws))
+    ret = [ ('deploy_to_condor',
+              lambda ws: ws.deploy_to_condor(util.WORKSPACE_SIGNATURE_FILE,
+                                             util.WORKSPACE_CONFIG_FILE,
+                                             util.CONDOR_TEMPLATE,
+                                             util.TRAINING_DIR+'/')
+            ),
+            ('refine_mesh', remote_refine_mesh(None, ws)),
+            ('sample_key_point', remote_sample_key_point(None, ws)),
+            ('sample_key_conf', remote_sample_key_conf(None, ws)),
+            #('deploy_geometrik_to_condor', lambda ws: deploy_geometrik_to_condor(None, ws))
           ]
     return ret

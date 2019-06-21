@@ -41,6 +41,8 @@ def parse_simple(fn):
     puzzle_dir = cfg.puzzle_dir = dirname(fn)
     cfg.env_fn = join(puzzle_dir, config.get("problem", "world"))
     cfg.rob_fn = join(puzzle_dir, config.get("problem", "robot"))
+    cfg.refined_env_fn = join(puzzle_dir, '_refined_'+config.get("problem", "world"))
+    cfg.refined_rob_fn = join(puzzle_dir, '_refined_'+config.get("problem", "robot"))
     cfg.env_fn_base = basename(cfg.env_fn)
     cfg.rob_fn_base = basename(cfg.rob_fn)
     cfg.iq_tup = read_se3state(config, 'problem', 'start')
