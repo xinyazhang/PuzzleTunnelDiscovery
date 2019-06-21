@@ -9,6 +9,7 @@ import sys
 import subprocess
 import colorama
 import numpy as np
+from datetime import datetime;
 
 from . import parse_ompl
 
@@ -29,6 +30,7 @@ CONDOR_SCRATCH = 'condor_scratch'
 NEURAL_SCRATCH = 'nn_scratch'
 SOLVER_SCRATCH = 'solver_scratch'
 BASELINE_SCRATCH = 'baseline_scratch'
+PERFORMANCE_LOG_DIR = 'performance_log'
 # Protocol files/directories
 # Used by multiple pipeline parts
 #
@@ -158,6 +160,7 @@ class Workspace(object):
             self.verify_signature()
         self._current_trial = 0
         self.nn_profile = ''
+        self._timekeeper = {}
 
     def get_path(self, optname):
         return self.config.get('DEFAULT', optname)
@@ -365,6 +368,26 @@ class Workspace(object):
 
     current_trial = property(get_current_trial, set_current_trial)
 
+    def open_performance_log(self):
+        os.makedirs(self.local_ws(PERFORMANCE_LOG_DIR), exist_ok=True)
+        return open(self.local_ws(PERFORMANCE_LOG_DIR, 'log.{}'.format(self.current_trial)), 'a')
+
+    def timekeeper_start(self, stage_name):
+        with self.open_performance_log() as f:
+            t = datetime.utcnow()
+            print('[{}] starting at {}'.format(stage_name, t), file=f)
+        self._timekeeper[stage_name] = t
+
+    def timekeeper_finish(self, stage_name):
+        t = datetime.utcnow()
+        if stage_name in self._timekeeper:
+            delta = t - self._timekeeper[stage_name]
+        else:
+            delta = None
+        with self.open_performance_log() as f:
+            print('[{}] finished at {}'.format(stage_name, t), file=f)
+            print('[{}] cost {}'.format(stage_name, delta), file=f)
+
 def trim_suffix(fn):
     return os.path.splitext(fn)[0]
 
@@ -400,7 +423,8 @@ def fatal(s):
     _colorp(colorama.Style.BRIGHT + colorama.Fore.RED, s)
 
 def ack(s):
-    _colorp(colorama.Style.BRIGHT + colorama.Fore.GREEN, s)
+    ts = '[{}]'.format(datetime.utcnow())
+    _colorp(colorama.Style.BRIGHT + colorama.Fore.GREEN, ts + s)
 
 def pwait(pid):
     if pid < 0:

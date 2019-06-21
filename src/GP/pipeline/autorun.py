@@ -45,9 +45,11 @@ def run_pipeline(ppl_stages, args):
         raise RuntimeError("Pipeline is broken, cannot autorun with --till")
     util.log("[autorun] running the following stages {}".format([k for k,_ in stage_list]))
     for k,v in stage_list:
+        ws.timekeeper_start(k)
         util.ack('[{}] starting...'.format(k))
         v(ws)
         util.ack('[{}] finished'.format(k))
+        ws.timekeeper_finish(k)
     if nstage:
         util.ack('[autorun] Next stage is {}'.format(nstage[0][0]))
 
