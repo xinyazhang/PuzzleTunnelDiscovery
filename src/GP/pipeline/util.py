@@ -263,7 +263,9 @@ class Workspace(object):
     def remote_command(self, host, exec_path, ws_path,
                        pipeline_part, cmd,
                        auto_retry=True, in_tmux=False, with_trial=False):
-        script  = 'cd {}\n'.format(exec_path)
+        script = ''
+        script += 'if [ -f ~/.bashrc ]; then . ~/.bashrc; fi; '
+        script += 'cd {}\n'.format(exec_path)
         if in_tmux:
             script += 'tmux new-session -A -s puzzle_workspace '
         script += './facade.py {ppl} --stage {cmd} '.format(ppl=pipeline_part, cmd=cmd)
