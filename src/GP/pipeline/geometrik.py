@@ -38,6 +38,7 @@ def _get_task_args(ws, per_geometry):
             wag.refined_geo_fn = cfg.refined_env_fn
             task_args.append(copy.deepcopy(wag))
             wag.geo_type = 'rob'
+            wag.geo_fn = cfg.rob_fn
             wag.refined_geo_fn = cfg.refined_rob_fn
             task_args.append(copy.deepcopy(wag))
         else:
