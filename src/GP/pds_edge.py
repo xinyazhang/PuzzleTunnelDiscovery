@@ -61,8 +61,11 @@ def print_edge(args):
     #inter_tree_dtype = np.uint32 if K < np.iinfo(np.uint32).max else np.uint64
     inter_tree_dtype = np.int64
     inter_tree_max = np.iinfo(inter_tree_dtype).max
-    memory_limit = _total_memory() * 0.5
+    memory_limit = _total_memory() * 0.4
+    print("N {}".format(N))
+    print("memory_limit {}".format(memory_limit))
     pds_limit_per_run = min(K, int(memory_limit / N))
+    print("pds_limit_per_run {}".format(pds_limit_per_run))
     ITE = inter_tree_edge = np.zeros((N, N), dtype=inter_tree_dtype)
     per_run_buffer = np.zeros((N, pds_limit_per_run), dtype=np.int8)
     sep = list(range(K, 0, -pds_limit_per_run))
