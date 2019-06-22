@@ -6,6 +6,7 @@ import resource
 import argparse
 import pipeline
 import colorama
+import subprocess
 try:
     import argcomplete
     USE_ARGCOMPLETE = True
@@ -65,6 +66,7 @@ def main():
 if __name__ == '__main__':
     _memory_limit() # Limitates maximun memory usage to half
     try:
+        #subprocess.call(['/usr/bin/env'])
         main()
     except MemoryError:
         sys.stderr.write('\n\nERROR: Memory Exception\n')
