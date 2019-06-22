@@ -51,16 +51,19 @@ def refine_mesh(args, ws):
     for wag in task_args:
         if os.path.isfile(wag.refined_geo_fn):
             continue
-        util.shell(['TetWild', '--level', '6', '--targeted-num-v', str(target_v), '--output-surface', wag.refined_geo_fn, wag.geo_fn])
+        # util.shell(['/usr/bin/env'])
+        util.shell(['./TetWild', '--level', '6', '--targeted-num-v', str(target_v), '--output-surface', wag.refined_geo_fn, wag.geo_fn])
 
 SAMPLE_NOTCH = True
 
 def _sample_key_point_worker(wag):
     ws = util.Workspace(wag.dir)
     ws.current_trial = wag.current_trial
-    kpp = pygeokey.KeyPointProber(wag.refined_geo_fn)
+    geo_fn = wag.refined_geo_fn
+    # geo_fn = wag.geo_fn
+    kpp = pygeokey.KeyPointProber(geo_fn)
     natt = ws.config.getint('GeometriK', 'KeyPointAttempts')
-    util.log("[sample_key_point] probing {} for {} attempts".format(wag.refined_geo_fn, natt))
+    util.log("[sample_key_point] probing {} for {} attempts".format(geo_fn, natt))
     pts = kpp.probe_key_points(natt)
     kps_fn = ws.keypoint_prediction_file(wag.puzzle_name, wag.geo_type)
     util.log("[sample_key_point] writing {} points to {}".format(pts.shape[0], kps_fn))
