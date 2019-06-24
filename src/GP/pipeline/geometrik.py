@@ -90,15 +90,7 @@ def _sample_key_conf_worker(wag):
     def _load_kps(geo_type):
         kps_fn = ws.keypoint_prediction_file(wag.puzzle_name, geo_type)
         d = matio.load(kps_fn)
-        kps = d['KEY_POINT_AMBIENT']
-        if 'NOTCH_POINT_AMBIENT' in d:
-            nps = d['NOTCH_POINT_AMBIENT']
-            if nps.shape[0] != 0:
-                if kps.shape[0] != 0:
-                    kps = np.concatenate((kps, nps), axis=0)
-                else:
-                    kps = nps
-        return kps
+        return util.access_keypoints(d)
     env_kps = _load_kps('env')
     rob_kps = _load_kps('rob')
     ks = pygeokey.KeySampler(wag.env_fn, wag.rob_fn)

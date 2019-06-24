@@ -6,6 +6,7 @@ import os
 from os.path import join, isdir, isfile
 import copy
 import pathlib
+import csv
 import numpy as np
 
 from . import util
@@ -301,6 +302,85 @@ def vistouchdisp(args):
     ax.scatter3D(aas[:,0], aas[:,1], aas[:,2])
     plt.show()
 
+def _dic_add(dic, key, v):
+    if key in dic:
+        dic[key].append(v)
+    else:
+        dic[key] = [v]
+
+def _print_stat(puzzle_name, stat_dic, f):
+    writer = csv.writer(f)
+    for i in range(len(stat_dic['trial_id'])):
+        writer.writerow([puzzle_name,
+                         stat_dic['trial_id'][i],
+                         stat_dic['puzzle_method'][i],
+                         '{}/{}'.format(stat_dic['puzzle_kps_env'][i],
+                                        stat_dic['puzzle_kps_rob'][i]),
+                         stat_dic['puzzle_rot'][i],
+                         stat_dic['puzzle_roots'][i],
+                         stat_dic['puzzle_pds'][i],
+                         stat_dic['puzzle_success'][i]])
+    writer.writerow([puzzle_name, stat_dic['trial_range'],
+                     stat_dic['puzzle_method'][0] if all(elem == stat_dic['puzzle_method'][0] for elem in stat_dic['puzzle_method']) else '*MIXED*',
+                     'mean: {}/{}'.format(np.mean(stat_dic['puzzle_kps_env']),
+                                          np.mean(stat_dic['puzzle_kps_rob'])),
+                     'mean: {}'.format(np.mean(stat_dic['puzzle_rot'])),
+                     'mean: {}'.format(np.mean(stat_dic['puzzle_roots'])),
+                     'mean: {}'.format(np.mean(stat_dic['puzzle_pds'])),
+                     '{}/{}'.format(np.sum([1 if e == 'Y' else 0 for e in stat_dic['puzzle_success']]), len(stat_dic['puzzle_success']))
+                    ])
+
+def conclude(args):
+    f = open(args.out, 'w')
+    for ws_dir in args.dirs:
+        ws = util.Workspace(ws_dir)
+        trial_list = util.rangestring_to_list(args.trial_range)
+        for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+            if args.puzzle_name and puzzle_name != args.puzzle_name:
+                continue
+            cfg, config = parse_ompl.parse_simple(puzzle_fn)
+            stat_dic = {}
+            for trial in trial_list:
+                ws.current_trial = trial
+                pds_fn = ws.local_ws(util.SOLVER_SCRATCH,
+                                     puzzle_name,
+                                     util.PDS_SUBDIR,
+                                     '{}.npz'.format(trial))
+                if not os.path.exists(pds_fn):
+                    break
+                kp_env_fn = ws.keypoint_prediction_file(puzzle_name, 'env')
+                kp_rob_fn = ws.keypoint_prediction_file(puzzle_name, 'rob')
+                if os.path.exists(kp_rob_fn) and os.path.exists(kp_env_fn):
+                    puzzle_method = 'GK'
+                    puzzle_rot = ws.config.getint('GeometriK', 'KeyConfigRotations')
+                    d_env = matio.load(kp_env_fn)
+                    d_rob = matio.load(kp_rob_fn)
+                    puzzle_kps_env = util.access_keypoints(d_env).shape[0]
+                    puzzle_kps_rob = util.access_keypoints(d_rob).shape[0]
+                else:
+                    puzzle_method = 'NN'
+                    puzzle_rot = ws.config.getint('Prediction', 'NumberOfRotations')
+                    puzzle_kps = 'N/A'
+                kq_fn = ws.keyconf_prediction_file(puzzle_name)
+                puzzle_roots = matio.load(kq_fn)['KEYQ_OMPL'].shape[0]
+                puzzle_pds = matio.load(pds_fn)['Q'].shape[0]
+                sol_fn = ws.solution_file(puzzle_name, type_name='unit')
+                if os.path.exists(sol_fn):
+                    puzzle_success = 'Y'
+                else:
+                    puzzle_success = 'N'
+                _dic_add(stat_dic, 'trial_id', trial)
+                _dic_add(stat_dic, 'puzzle_method', puzzle_method)
+                _dic_add(stat_dic, 'puzzle_kps_env', puzzle_kps_env)
+                _dic_add(stat_dic, 'puzzle_kps_rob', puzzle_kps_rob)
+                _dic_add(stat_dic, 'puzzle_rot', puzzle_rot)
+                _dic_add(stat_dic, 'puzzle_roots', puzzle_roots)
+                _dic_add(stat_dic, 'puzzle_pds', puzzle_pds)
+                _dic_add(stat_dic, 'puzzle_success', puzzle_success)
+            stat_dic['trial_range'] = args.trial_range
+            _print_stat(puzzle_name, stat_dic, f=f)
+    f.close()
+
 function_dict = {
         'read_roots' : read_roots,
         'visenvgt' : visenvgt,
@@ -316,6 +396,7 @@ function_dict = {
         'vistouchv' : vistouchv,
         'vistouchdisp' : vistouchdisp,
         'animate' : animate,
+        'conclude' : conclude,
 }
 
 def setup_parser(subparsers):
@@ -370,6 +451,11 @@ def setup_parser(subparsers):
     p.add_argument('--current_trial', help='Trial to predict the keyconf', type=int, default=None)
     p.add_argument('--puzzle_name', help='Only show one specific puzzle', default='')
     p.add_argument('dir', help='Workspace directory')
+    p = toolp.add_parser('conclude', help='Show the execution statistics')
+    p.add_argument('--trial_range', help='range of trials', type=str, required=True)
+    p.add_argument('--puzzle_name', help='Only show one specific testing puzzle', default='')
+    p.add_argument('--out', help='Output CSV file', default='1.csv')
+    p.add_argument('dirs', help='Workspace directory', nargs='+')
 
 def run(args):
     function_dict[args.tool_name](args)

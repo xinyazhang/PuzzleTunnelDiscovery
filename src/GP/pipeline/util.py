@@ -466,3 +466,14 @@ def rangestring_to_list(x):
 
 def xz(fn):
     shell(['xz', '-f', fn])
+
+def access_keypoints(d):
+    kps = d['KEY_POINT_AMBIENT']
+    if 'NOTCH_POINT_AMBIENT' in d:
+        nps = d['NOTCH_POINT_AMBIENT']
+        if nps.shape[0] != 0:
+            if kps.shape[0] != 0:
+                kps = np.concatenate((kps, nps), axis=0)
+            else:
+                kps = nps
+    return kps
