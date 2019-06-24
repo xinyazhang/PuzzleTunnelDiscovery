@@ -88,6 +88,7 @@ def _predict_surface(args, ws, geo_type, generator):
             params = hg_launcher.create_default_config()
         if args.puzzle_name is not None and args.puzzle_name != puzzle_name:
             continue
+        ws.timekeeper_start('predict_{}'.format(geo_type), puzzle_name)
         params['ompl_config'] = puzzle_fn
         params['what_to_render'] = geo_type
         params['checkpoint_dir'] = ws.checkpoint_dir(geo_type) + '/'
@@ -100,9 +101,10 @@ def _predict_surface(args, ws, geo_type, generator):
         proc.start()
         proc.join()
         src = join(ws.checkpoint_dir(geo_type), '{}-atex.npz'.format(puzzle_name))
-        dst = join(pathlib.Path(puzzle_fn).parent, '{}-atex.npz'.format(geo_type))
+        dst = ws.atex_prediction_file(puzzle_fn, geo_type)
         util.log("[prediction] Copy surface prediction file {} => {}".format(src, dst))
         shutil.copy(src, dst)
+        ws.timekeeper_finish('predict_{}'.format(geo_type), puzzle_name)
 
 def predict_rob(args, ws):
     _predict_surface(args, ws, 'rob', ws.test_puzzle_generator)
