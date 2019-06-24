@@ -56,7 +56,7 @@ suppress_cold: 0.1
 
 [Train]
 batch_size: 8
-nEpochs: 150
+nEpochs: 75
 epoch_size: 1000
 learning_rate: 0.00025
 learning_rate_decay: 0.96
@@ -66,7 +66,7 @@ weighted_loss: False
 # valid_iteration: 10
 
 [Prediction]
-prediction_epoch_size = 2048
+prediction_epoch_size = 4096
 
 [Saver]
 # Obsoluted, we now save logs under subdirectories of ckpt_dir
