@@ -161,6 +161,7 @@ class Workspace(object):
         self._current_trial = 0
         self.nn_profile = ''
         self._timekeeper = {}
+        self._extra_condor_hosts = None
 
     def get_path(self, optname):
         return self.config.get('DEFAULT', optname)
@@ -252,6 +253,17 @@ class Workspace(object):
         return self.config.get('DEFAULT', 'CondorHost')
 
     @property
+    def condor_extra_hosts(self):
+        if self._extra_condor_hosts is None:
+            hostlist = self.config.get('DEFAULT', 'ExtraCondorHosts')
+            self._extra_condor_hosts = hostlist.split(',')
+        return self._extra_condor_hosts
+
+    @property
+    def condor_all_hosts(self):
+        return [self.condor_host] + self.condor_extra_hosts
+
+    @property
     def gpu_host(self):
         return self.config.get('DEFAULT', 'GPUHost')
 
@@ -262,7 +274,7 @@ class Workspace(object):
 
     def remote_command(self, host, exec_path, ws_path,
                        pipeline_part, cmd,
-                       auto_retry=True, in_tmux=False, with_trial=False):
+                       auto_retry=True, in_tmux=False, with_trial=False, extra_args=''):
         script = ''
         script += 'if [ -f ~/.bashrc ]; then . ~/.bashrc; fi; '
         script += 'cd {}\n'.format(exec_path)
@@ -273,6 +285,8 @@ class Workspace(object):
             script += ' --current_trial {} '.format(self.current_trial)
         if self.nn_profile:
             script += ' --nn_profile {} '.format(self.nn_profile)
+        if extra_args:
+            script += ' {} '.format(extra_args)
         script += ' {ws}'.format(ws=ws_path)
         if in_tmux:
             # tmux needs a terminal
@@ -331,6 +345,11 @@ class Workspace(object):
                 continue
             yield puzzle_fn, ent
 
+    def condor_host_vs_test_puzzle_generator(self):
+        hosts = self.condor_all_hosts
+        for i,(puzzle_fn,puzzle_name) in enumerate(self.test_puzzle_generator()):
+            yield hosts[i % len(hosts)], puzzle_fn, puzzle_name
+
     def keypoint_prediction_file(self, puzzle_name, geo_type, trial_override=None):
         trial = self.current_trial if trial_override is None else trial_override
         return self.local_ws(TESTING_DIR, puzzle_name,
@@ -374,21 +393,21 @@ class Workspace(object):
         os.makedirs(self.local_ws(PERFORMANCE_LOG_DIR), exist_ok=True)
         return open(self.local_ws(PERFORMANCE_LOG_DIR, 'log.{}'.format(self.current_trial)), 'a')
 
-    def timekeeper_start(self, stage_name):
+    def timekeeper_start(self, stage_name, puzzle_name='*'):
         with self.open_performance_log() as f:
             t = datetime.utcnow()
-            print('[{}] starting at {}'.format(stage_name, t), file=f)
+            print('[{}][{}] starting at {}'.format(stage_name, puzzle_name, t), file=f)
         self._timekeeper[stage_name] = t
 
-    def timekeeper_finish(self, stage_name):
+    def timekeeper_finish(self, stage_name, puzzle_name='*'):
         t = datetime.utcnow()
         if stage_name in self._timekeeper:
             delta = t - self._timekeeper[stage_name]
         else:
             delta = None
         with self.open_performance_log() as f:
-            print('[{}] finished at {}'.format(stage_name, t), file=f)
-            print('[{}] cost {}'.format(stage_name, delta), file=f)
+            print('[{}][{}] finished at {}'.format(stage_name, puzzle_name, t), file=f)
+            print('[{}][{}] cost {}'.format(stage_name, puzzle_name, delta), file=f)
 
 def trim_suffix(fn):
     return os.path.splitext(fn)[0]

@@ -32,9 +32,12 @@ from . import parse_ompl
 #
 
 def _trial_id(ws, trial):
+    return str(trial)
+    '''
     max_trial = ws.config.getint('Solver', 'Trials', fallback=1)
     # util.log('[_trial_id] trial {} max_trial {}'.format(trial, max_trial))
     return util.padded(trial, max(trial, max_trial))
+    '''
 
 def _puzzle_pds(ws, puzzle_name, trial):
     pds_dir = ws.local_ws(util.SOLVER_SCRATCH,
@@ -80,6 +83,9 @@ def _sample_pds_old(args, ws):
 def sample_pds(args, ws):
     if not args.only_wait:
         for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+            # if --puzzle_name presents, skip unmatched puzzles
+            if args.puzzle_name and args.puzzle_name != puzzle_name:
+                continue
             _, config = parse_ompl.parse_simple(puzzle_fn)
             rel_bloom = _rel_bloom_scratch(ws, puzzle_name, ws.current_trial)
             util.log('[sample_pds]  rel_bloom {}'.format(rel_bloom))
@@ -132,6 +138,9 @@ def sample_pds(args, ws):
 def forest_rdt(args, ws):
     trial_str = 'trial-{}'.format(_trial_id(ws, ws.current_trial))
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+        # if --puzzle_name presents, skip unmatched puzzles
+        if args.puzzle_name and args.puzzle_name != puzzle_name:
+            continue
         rel_scratch_dir = os.path.join(util.SOLVER_SCRATCH, puzzle_name, trial_str)
         _, config = parse_ompl.parse_simple(puzzle_fn)
         scratch_dir = ws.local_ws(rel_scratch_dir)
@@ -163,6 +172,8 @@ def forest_rdt(args, ws):
                             arguments=condor_job_args,
                             instances=keys['KEYQ_OMPL'].shape[0],
                             wait=False) # do NOT wait here, we have to submit EVERY puzzle at once
+    if args.no_wait:
+        return
     if not args.only_wait:
         only_wait_args = copy.deepcopy(args)
         only_wait_args.only_wait = True
@@ -234,8 +245,10 @@ def setup_parser(subparsers):
                    default='',
                    metavar='')
     p.add_argument('--only_wait', action='store_true')
+    p.add_argument('--no_wait', action='store_true')
     p.add_argument('--task_id', help='Feed $(Process) from HTCondor', type=int, default=None)
     p.add_argument('--current_trial', help='Trial to solve the puzzle', type=int, default=0)
+    p.add_argument('--puzzle_name', help='Pick a single puzzle to solve (default to all)', default='')
     p.add_argument('dir', help='Workspace directory')
 
 def run(args):
@@ -249,24 +262,51 @@ def run(args):
 #
 # Automatic functions start here
 #
-def _remote_command(ws, cmd, auto_retry=True):
-    ws.remote_command(ws.condor_host,
+def _remote_command(ws, cmd, auto_retry=True, alter_host='', extra_args=''):
+    if not alter_host:
+        alter_host = ws.condor_host
+    ws.remote_command(alter_host,
                       ws.condor_exec(),
                       ws.condor_ws(),
                       'solve', cmd, auto_retry=auto_retry,
-                      with_trial=True)
+                      with_trial=True,
+                      extra_args=extra_args)
+
+def _remote_command_distributed(ws, cmd):
+    for host,_,puzzle_name in ws.condor_host_vs_test_puzzle_generator():
+        _remote_command(ws, cmd,
+                        alter_host=host,
+                        extra_args='--puzzle_name {} --no_wait'.format(puzzle_name))
+    for host,_,puzzle_name in ws.condor_host_vs_test_puzzle_generator():
+        _remote_command(ws, cmd,
+                        alter_host=host,
+                        extra_args='--puzzle_name {} --only_wait'.format(puzzle_name))
 
 def remote_sample_pds(ws):
-    _remote_command(ws, 'sample_pds')
+    if ws.condor_extra_hosts:
+        _remote_command_distributed(ws, 'sample_pds')
+    else:
+        _remote_command(ws, 'sample_pds')
 
 def remote_forest_rdt(ws):
-    _remote_command(ws, 'forest_rdt')
+    if ws.condor_extra_hosts:
+        _remote_command_distributed(ws, 'forest_rdt')
+    else:
+        _remote_command(ws, 'forest_rdt')
 
 def remote_forest_edges(ws):
-    _remote_command(ws, 'forest_edges')
+    for _,_,puzzle_name in ws.condor_host_vs_test_puzzle_generator():
+        ws.timekeeper_start('forest_edges', puzzle_name)
+        _remote_command(ws, 'forest_edges',
+                        extra_args='--puzzle_name {}'.format(puzzle_name))
+        ws.timekeeper_finish('forest_edges', puzzle_name)
 
 def remote_connect_forest(ws):
-    _remote_command(ws, 'connect_forest')
+    for _,_,puzzle_name in ws.condor_host_vs_test_puzzle_generator():
+        ws.timekeeper_start('connect_forest', puzzle_name)
+        _remote_command(ws, 'connect_forest',
+                        extra_args='--puzzle_name {}'.format(puzzle_name))
+        ws.timekeeper_finish('connect_forest', puzzle_name)
 
 def collect_stages():
     ret = [('sample_pds', remote_sample_pds),

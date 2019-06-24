@@ -58,6 +58,8 @@ GPUWorkspacePath = {GPUWorkspacePath}
 
 # Host name of HTCondor submission node, SSH host alias can be used
 CondorHost = {CondorHost}
+# Extra HTCondor submission nodes, comma separated
+ExtraCondorHosts =
 # facade.py path on HTCondor node
 CondorExecPath = {CondorExecPath}
 # Workspace path on NTCondor node
