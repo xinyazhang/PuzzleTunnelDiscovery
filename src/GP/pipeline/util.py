@@ -350,6 +350,10 @@ class Workspace(object):
         for i,(puzzle_fn,puzzle_name) in enumerate(self.test_puzzle_generator()):
             yield hosts[i % len(hosts)], puzzle_fn, puzzle_name
 
+    def atex_prediction_file(self, puzzle_fn, geo_type, trial_override=None):
+        trial = self.current_trial if trial_override is None else trial_override
+        return os.path.join(pathlib.Path(puzzle_fn).parent, '{}-atex_{}.npz'.format(geo_type, trial))
+
     def keypoint_prediction_file(self, puzzle_name, geo_type, trial_override=None):
         trial = self.current_trial if trial_override is None else trial_override
         return self.local_ws(TESTING_DIR, puzzle_name,

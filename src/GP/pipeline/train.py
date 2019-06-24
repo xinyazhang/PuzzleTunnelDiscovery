@@ -141,6 +141,7 @@ def setup_parser(subparsers):
     p.add_argument('--nn_profile', help="NN Profile", default='')
     p.add_argument('--load', help="Load existing checkpoints and continue", action='store_true')
     p.add_argument('--puzzle_name', help="puzzle to predict", default=None)
+    p.add_argument('--current_trial', help='Trial to solve the puzzle', type=int, default=0)
     p.add_argument('dir', help='Workspace directory')
 
 # As always, run() serves as a separator between local function and remote proxy functions
@@ -148,6 +149,7 @@ def run(args):
     if args.stage in function_dict:
         ws = util.Workspace(args.dir)
         ws.nn_profile = args.nn_profile
+        ws.current_trial = args.current_trial
         function_dict[args.stage](args, ws)
     else:
         print("Unknown train pipeline stage {}".format(args.stage))
@@ -159,7 +161,8 @@ def _remote_command(ws, cmd, auto_retry, in_tmux):
                       'train',
                       cmd,
                       auto_retry=auto_retry,
-                      in_tmux=in_tmux)
+                      in_tmux=in_tmux,
+                      with_trial=True)
 
 def remote_train_rob(ws):
     _remote_command(ws, 'train_rob', auto_retry=True, in_tmux=True)
