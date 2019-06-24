@@ -86,6 +86,8 @@ def _predict_surface(args, ws, geo_type, generator):
             params = hg_launcher.create_config_from_profile(ws.nn_profile)
         else:
             params = hg_launcher.create_default_config()
+        if args.puzzle_name is not None and args.puzzle_name != puzzle_name:
+            continue
         params['ompl_config'] = puzzle_fn
         params['what_to_render'] = geo_type
         params['checkpoint_dir'] = ws.checkpoint_dir(geo_type) + '/'
@@ -136,6 +138,7 @@ def setup_parser(subparsers):
     p.add_argument('--only_wait', action='store_true')
     p.add_argument('--nn_profile', help="NN Profile", default='')
     p.add_argument('--load', help="Load existing checkpoints and continue", action='store_true')
+    p.add_argument('--puzzle_name', help="puzzle to predict", default=None)
     p.add_argument('dir', help='Workspace directory')
 
 # As always, run() serves as a separator between local function and remote proxy functions
