@@ -25,7 +25,7 @@ import pyosr
 class OsrDataSet(object):
     dpy = None
 
-    def __init__(self, env, rob, center=None, res=224, flat_surface=False):
+    def __init__(self, env, rob, center=None, res=256, flat_surface=False):
         if self.dpy is None:
             pyosr.init()
             self.dpy = pyosr.create_display()
@@ -121,7 +121,8 @@ class NarrowTunnelRegionDataSet(OsrDataSet):
             if emit_gt:
                 gt_img = np.zeros((batch_size, self.res, self.res, 3), dtype = np.float32)
             if is_training:
-                train_gtmap = np.zeros((batch_size, stacks, self.res//4, self.res//4, self.d_dim), np.float32)
+                # train_gtmap = np.zeros((batch_size, stacks, self.res//4, self.res//4, self.d_dim), np.float32) # Old method
+                train_gtmap = np.zeros((batch_size, stacks, self.res, self.res, self.d_dim), np.float32)
             else:
                 self.r.uv_feedback = True
                 uv_map = np.zeros((batch_size, self.res, self.res, 2), np.float32)
@@ -146,7 +147,7 @@ class NarrowTunnelRegionDataSet(OsrDataSet):
                     if emit_gt:
                         gt_img[i] = rgbd[...,0:3]
                     hm = rgbd[:,:,1:2] # The green region
-                    hm = hm.reshape(self.res//4,4,self.res//4,4,self.d_dim).mean(axis=(1,3)) # Downscale to 64x64
+                    # hm = hm.reshape(self.res//4,4,self.res//4,4,self.d_dim).mean(axis=(1,3)) # Downscale to 64x64
                     hm = np.expand_dims(hm, axis=0) # reshape to [1, 64, 64]
                     train_gtmap[i] = np.repeat(hm, stacks, axis=0) # reshape to [4,64,64] thru duplication
                     '''
@@ -181,6 +182,18 @@ class NarrowTunnelRegionDataSet(OsrDataSet):
                                 aug.dim_rgb(gt_img[i], patch_tl, patch_size)
                 else:
                     uv_map[i] = r.mvuv.reshape((self.res, self.res, 2))
+                    p = np.random.random()
+                    # p = 0.1
+                    # Flipping
+                    if p < 0.25:
+                        uv_map[i] = uv_map[i, :, ::-1, :]
+                        train_img[i] = train_img[i, :, ::-1, :]
+                    elif 0.25 <= p < 0.5:
+                        uv_map[i] = uv_map[i, ::-1, :, :]
+                        train_img[i] = train_img[i, ::-1, :, :]
+                    elif 0.5 <= p < 0.75:
+                        uv_map[i] = uv_map[i, ::-1, ::-1, :]
+                        train_img[i] = train_img[i, ::-1, ::-1, :]
             if is_training:
                 to_yield = [train_img, train_gtmap, train_weights]
             else:
@@ -249,7 +262,8 @@ class MultiPuzzleDataSet(object):
             if emit_gt:
                 gt_img = np.zeros((batch_size, self.res, self.res, 3), dtype = np.float32)
             if is_training:
-                train_gtmap = np.zeros((batch_size, stacks, self.res//4, self.res//4, self.d_dim), np.float32)
+                # train_gtmap = np.zeros((batch_size, stacks, self.res//4, self.res//4, self.d_dim), np.float32)
+                train_gtmap = np.zeros((batch_size, stacks, self.res, self.res, self.d_dim), np.float32)
             else:
                 r.uv_feedback = True
                 uv_map = np.zeros((batch_size, self.res, self.res, 2), np.float32)
@@ -274,7 +288,7 @@ class MultiPuzzleDataSet(object):
                     if emit_gt:
                         gt_img[i] = rgbd[...,0:3]
                     hm = rgbd[:,:,1:2] # The green region
-                    hm = hm.reshape(self.res//4,4,self.res//4,4,self.d_dim).mean(axis=(1,3)) # Downscale to 64x64
+                    # hm = hm.reshape(self.res//4,4,self.res//4,4,self.d_dim).mean(axis=(1,3)) # Downscale to 64x64
                     hm = np.expand_dims(hm, axis=0) # reshape to [1, 64, 64]
                     train_gtmap[i] = np.repeat(hm, stacks, axis=0) # reshape to [4,64,64] thru duplication
                     '''
@@ -309,6 +323,19 @@ class MultiPuzzleDataSet(object):
                                 aug.dim_rgb(gt_img[i], patch_tl, patch_size)
                 else:
                     uv_map[i] = r.mvuv.reshape((self.res, self.res, 2))
+                    # p = np.random.random()
+                    p = 0.1
+                    # Flipping
+                    if p < 0.25:
+                        util.log("flipping")
+                        uv_map[i] = uv_map[i, :, ::-1, :]
+                        train_img[i] = train_img[i, :, ::-1, :]
+                    elif 0.25 <= p < 0.5:
+                        uv_map[i] = uv_map[i, ::-1, :, :]
+                        train_img[i] = train_img[i, ::-1, :, :]
+                    elif 0.5 <= p < 0.75:
+                        uv_map[i] = uv_map[i, ::-1, ::-1, :]
+                        train_img[i] = train_img[i, ::-1, ::-1, :]
             if is_training:
                 to_yield = [train_img, train_gtmap, train_weights]
             else:
