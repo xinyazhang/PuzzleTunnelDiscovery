@@ -103,9 +103,12 @@ def create_config_from_profile(name):
     ret = create_default_config()
     if name == 'hg4':
         ret['nstacks'] = 4
-        util.log("[create_config_from_profile] {}".format(ret))
+    elif name == '256hg':
+        ret['nlow'] = 6
+        ret['batch_size'] = 4
     else:
         raise NotImplemented("Unknown profile {}".format(name))
+    util.log("[create_config_from_profile] {}".format(ret))
     return ret
 
 def _craft_dict(params):

@@ -154,8 +154,13 @@ class HourglassModel():
                 self.img = tf.placeholder(dtype= tf.float32, shape= (None, 256, 256, self.c_dim), name = 'input_img')
                 if self.w_loss:
                     self.weights = tf.placeholder(dtype = tf.float32, shape = (None, self.outDim))
-                # Shape Ground Truth Map: batchSize x nStack x 64 x 64 x outDim
-                self.gtMaps = tf.placeholder(dtype = tf.float32, shape = (None, self.nStack, 64, 64, self.outDim))
+                if self.nLow == 4:
+                    # Shape Ground Truth Map: batchSize x nStack x 64 x 64 x outDim
+                    self.gtMaps = tf.placeholder(dtype = tf.float32, shape = (None, self.nStack, 64, 64, self.outDim))
+                elif self.nLow == 6:
+                    # Ground Truth Map Ver 2: batchSize x nStack x 256 x 256 x outDim
+                    self.gtMaps = tf.placeholder(dtype = tf.float32, shape = (None, self.nStack, 256, 256, self.outDim))
+
                 # TODO : Implement weighted loss function
                 # NOT USABLE AT THE MOMENT
                 #weights = tf.placeholder(dtype = tf.float32, shape = (None, self.nStack, 1, 1, self.outDim))
@@ -365,11 +370,19 @@ class HourglassModel():
                             continue # Profiling, check the % of time used by prediction
                         for uvi,labeli in zip(batch_uv, test_y):
                             # np.clip(labeli, 0.0, 1.0, out=labeli)
-                            labeli = np.reshape(labeli, (64,64))
-                            labeli = np.kron(labeli, np.ones((4,4))) # 64x64 -> 256x256
+                            if self.nLow == 4:
+                                labeli = np.reshape(labeli, (64,64))
+                                labeli = np.kron(labeli, np.ones((4,4))) # 64x64 -> 256x256
+                            elif self.nLow == 6:
+                                labeli = np.reshape(labeli, (256,256))
+                            else:
+                                raise NotImplemented()
+                            # util.log("uvi: {}".format(uvi.shape))
+                            # util.log("labeli: {}".format(labeli.shape))
                             nz = np.nonzero(labeli)
                             scores = labeli[nz]
                             uvs = uvi[nz]
+                            # util.log("uvs: {}".format(uvs.shape))
                             us = 1.0 - uvs[:,1]
                             us = np.array(tres * us, dtype=int)
                             vs = uvs[:,0]
@@ -509,20 +522,43 @@ class HourglassModel():
         """
         with tf.name_scope('model'):
             with tf.name_scope('preprocessing'):
-                # Input Dim : nbImages x 256 x 256 x 3
-                pad1 = tf.pad(inputs, [[0,0],[2,2],[2,2],[0,0]], name='pad_1')
-                # Dim pad1 : nbImages x 260 x 260 x 3
-                conv1 = self._conv_bn_relu(pad1, filters= 64, kernel_size = 6, strides = 2, name = 'conv_256_to_128')
-                # Dim conv1 : nbImages x 128 x 128 x 64
-                r1 = self._residual(conv1, numOut = 128, name = 'r1')
-                # Dim pad1 : nbImages x 128 x 128 x 128
-                pool1 = tf.contrib.layers.max_pool2d(r1, [2,2], [2,2], padding='VALID')
-                # Dim pool1 : nbImages x 64 x 64 x 128
-                if self.tiny:
-                    r3 = self._residual(pool1, numOut=self.nFeat, name='r3')
-                else:
-                    r2 = self._residual(pool1, numOut= int(self.nFeat/2), name = 'r2')
-                    r3 = self._residual(r2, numOut= self.nFeat, name = 'r3')
+                if self.nLow == 4:
+                    # Input Dim : nbImages x 256 x 256 x 3
+                    pad1 = tf.pad(inputs, [[0,0],[2,2],[2,2],[0,0]], name='pad_1')
+                    # Dim pad1 : nbImages x 260 x 260 x 3
+                    conv1 = self._conv_bn_relu(pad1, filters= 64, kernel_size = 6, strides = 2, name = 'conv_256_to_128')
+                    # Dim conv1 : nbImages x 128 x 128 x 64
+                    r1 = self._residual(conv1, numOut = 128, name = 'r1')
+                    # Dim pad1 : nbImages x 128 x 128 x 128
+                    pool1 = tf.contrib.layers.max_pool2d(r1, [2,2], [2,2], padding='VALID')
+                    # Dim pool1 : nbImages x 64 x 64 x 128
+                    if self.tiny:
+                        r3 = self._residual(pool1, numOut=self.nFeat, name='r3')
+                    else:
+                        r2 = self._residual(pool1, numOut= int(self.nFeat/2), name = 'r2')
+                        r3 = self._residual(r2, numOut= self.nFeat, name = 'r3')
+                elif self.nLow == 6:
+                    # Input Dim : nbImages x 256 x 256 x 3
+                    pad1 = tf.pad(inputs, [[0,0],[3,3],[3,3],[0,0]], name='pad_1')
+                    print('pad1 shape {}'.format(pad1.shape))
+                    # Dim pad1 : nbImages x 260 x 260 x 3
+                    conv1 = self._conv_bn_relu(pad1, filters = 16, kernel_size = 7, strides = 1, name = 'conv_256_to_128')
+                    print('conv1 shape {}'.format(conv1.shape))
+                    # Dim conv1 : nbImages x 256 x 256 x 64
+                    r1 = self._residual(conv1, numOut = 32, name = 'r1')
+                    print('r1 shape {}'.format(r1.shape))
+                    # Dim r1 : nbImages x 256 x 256 x 128
+                    # pool1 = tf.contrib.layers.max_pool2d(r1, [2,2], [2,2], padding='VALID')
+                    pool1 = r1
+                    print('pool1 shape {}'.format(pool1.shape))
+                    # Dim pool1 : nbImages x 256 x 256 x 128
+                    if self.tiny:
+                        r3 = self._residual(pool1, numOut=self.nFeat, name='r3')
+                    else:
+                        r2 = self._residual(pool1, numOut=int(self.nFeat/4), name = 'r2')
+                        print('r2 shape {}'.format(r2.shape))
+                        r3 = self._residual(r2, numOut=self.nFeat, name = 'r3')
+                    print('r3 shape {}'.format(r3.shape))
             # Storage Table
             hg = [None] * self.nStack
             ll = [None] * self.nStack
@@ -722,17 +758,23 @@ class HourglassModel():
         with tf.name_scope(name):
             # Upper Branch
             up_1 = self._residual(inputs, numOut, name = 'up_1')
+            print("{}.up_1: {}".format(name, up_1.shape))
             # Lower Branch
             low_ = tf.contrib.layers.max_pool2d(inputs, [2,2], [2,2], padding='VALID')
+            print("{}.low_: {}".format(name, low_.shape))
             low_1= self._residual(low_, numOut, name = 'low_1')
+            print("{}.low_1: {}".format(name, low_1.shape))
 
             if n > 0:
                 low_2 = self._hourglass(low_1, n-1, numOut, name = 'low_2')
             else:
                 low_2 = self._residual(low_1, numOut, name = 'low_2')
+            print("{}.low_2: {}".format(name, low_2.shape))
 
             low_3 = self._residual(low_2, numOut, name = 'low_3')
+            print("{}.low_3: {}".format(name, low_3.shape))
             up_2 = tf.image.resize_nearest_neighbor(low_3, tf.shape(low_3)[1:3]*2, name = 'upsampling')
+            print("{}.up_2: {}".format(name, up_2.shape))
             if self.modif:
                 # Use of RELU
                 return tf.nn.relu(tf.add_n([up_2,up_1]), name='out_hg')
