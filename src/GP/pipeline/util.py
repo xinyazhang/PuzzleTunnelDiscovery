@@ -255,7 +255,7 @@ class Workspace(object):
     @property
     def condor_extra_hosts(self):
         if self._extra_condor_hosts is None:
-            hostlist = self.config.get('DEFAULT', 'ExtraCondorHosts')
+            hostlist = self.config.get('DEFAULT', 'ExtraCondorHosts', fallback='')
             self._extra_condor_hosts = hostlist.split(',')
         return self._extra_condor_hosts
 
