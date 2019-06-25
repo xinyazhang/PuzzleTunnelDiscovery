@@ -8,7 +8,9 @@ import pathlib
 import numpy as np
 from imageio import imwrite as imsave
 import shutil
+import time
 from multiprocessing import Process
+import resource
 
 from . import util
 from . import choice_formatter
@@ -67,16 +69,19 @@ def train_env(args, ws):
 def wait_for_training(args, ws):
     for geo_type in ['rob', 'env']:
         pidfile = ws.local_ws(util.NEURAL_SCRATCH, geo_type + '.pid')
-        pid = -1
-        with open(pidfile, 'r') as f:
-            for line in f:
-                for s in line.split(' '):
-                    pid = int(s)
-                    break
-        ret = 1
-        util.log('[wait_for_training] waiting pid {} for file {}'.format(pid, pidfile))
-        while ret != 0:
-            ret = util.pwait(pid)
+        util.log('[wait_for_training] for file {}'.format(pid, pidfile))
+        last_valid_pid = -1
+        while True:
+            pid = 0
+            with open(pidfile, 'r') as f:
+                for line in f:
+                    for s in line.split(' '):
+                        pid = int(s)
+                        break
+            if pid > 0:
+                last_valid_pid = pid
+            if pid < 0:
+                break
         util.log("[wait_for_training] {} (pid: {}) waited".format(geo_type, pid))
         write_pidfile(pidfile, -1)
 
@@ -147,6 +152,8 @@ def setup_parser(subparsers):
 # As always, run() serves as a separator between local function and remote proxy functions
 def run(args):
     if args.stage in function_dict:
+        # Unset resource limit
+        resource.setrlimit(resource.RLIMIT_AS, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
         ws = util.Workspace(args.dir)
         ws.nn_profile = args.nn_profile
         ws.current_trial = args.current_trial
