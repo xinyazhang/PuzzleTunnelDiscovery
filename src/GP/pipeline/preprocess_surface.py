@@ -411,8 +411,14 @@ def screen_weight(args, ws):
         rgb[np.nonzero(rgb)] = 1.0
         fn = ws.local_ws(util.TRAINING_DIR, '{}_chart_screened_uniform.png'.format(geo_type))
         imsave(fn, rgb)
+        '''
+        # old method, pyosr.Renderer loads the .png file with the same prefix as the texture image
+        # However if cfg.rob_fn == cfg.env_fn, this method would be buggy
+        # Now we uses pyosr.Renderer.loadRobotTextureImage instead
+        # The updated texturing method is implemented in hg_datagen.py
         final_fn = pathlib.Path(fns[geo_type])
         imsave(final_fn.with_suffix('.png'), rgb)
+        '''
 
 function_dict = {
         'sample_touch' : sample_touch,

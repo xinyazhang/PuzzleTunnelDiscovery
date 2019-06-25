@@ -58,6 +58,11 @@ void SceneRenderer::probe_texture(const std::string& fn)
 		}
 		tex_fn = tex2_fn;
 	}
+	load_texture(tex_fn);
+}
+
+void SceneRenderer::load_texture(const std::string& tex_fn)
+{
 	int pc;
 	tex_data_ = readPNG(tex_fn.c_str(), tex_w_, tex_h_, &pc);
 	if (tex_data_.empty())

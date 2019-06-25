@@ -31,6 +31,7 @@ public:
 	~SceneRenderer();
 
 	void probe_texture(const std::string& fn);
+	void load_texture(const std::string& fn);
 	void render(GLuint program, Camera& camera, glm::mat4 globalXform, uint32_t flags);
 private:
 	void render(GLuint program, Camera& camera, glm::mat4 m, Node* node, uint32_t flags);

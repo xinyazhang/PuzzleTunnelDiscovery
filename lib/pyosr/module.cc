@@ -238,6 +238,7 @@ PYBIND11_PLUGIN(pyosr) {
 		.def(py::init<>())
 		.def("setup", &Renderer::setup)
 		.def("setupFrom", &Renderer::setupFrom)
+		.def("loadRobotTextureImage", &Renderer::loadRobotTextureImage)
 		.def("teardown", &Renderer::teardown)
 		// .def("loadModelFromFile", &Renderer::loadModelFromFile)
 		// .def("loadRobotFromFile", &Renderer::loadRobotFromFile)

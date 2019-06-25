@@ -52,6 +52,7 @@ public:
 	void setupFrom(const Renderer*);
 	void loadModelFromFile(const std::string& fn) override;
 	void loadRobotFromFile(const std::string& fn) override;
+	void loadRobotTextureImage(std::string tex_fn);
 	void teardown();
 	void angleCamera(float latitude, float longitude);
 

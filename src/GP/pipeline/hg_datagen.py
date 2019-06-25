@@ -2,6 +2,7 @@
 import numpy as np
 # import cv2 # Legacy, not used
 import os
+import pathlib
 # import matplotlib.pyplot as plt
 import random
 import time
@@ -10,8 +11,8 @@ import scipy.misc as scm
 
 import sys
 sys.path.append(os.getcwd())
-from .import image_augmentation as aug
-from .import parse_ompl
+from . import image_augmentation as aug
+from . import parse_ompl
 import pyosr
 
 # Dataset paths
@@ -25,7 +26,7 @@ import pyosr
 class OsrDataSet(object):
     dpy = None
 
-    def __init__(self, env, rob, center=None, res=256, flat_surface=False):
+    def __init__(self, env, rob, rob_texfn='', center=None, res=256, flat_surface=False):
         if self.dpy is None:
             pyosr.init()
             self.dpy = pyosr.create_display()
@@ -40,6 +41,8 @@ class OsrDataSet(object):
 
         r.loadModelFromFile(env)
         r.loadRobotFromFile(rob)
+        if rob_texfn:
+            r.loadRobotTextureImage(rob_texfn)
         r.scaleToUnit()
         r.angleModel(0.0, 0.0)
         r.default_depth=0.0
@@ -86,9 +89,10 @@ class NarrowTunnelRegionDataSet(OsrDataSet):
     Arguments:
         render_flag: choose which geometry to render
     '''
-    def __init__(self, rob, env, render_flag, center=None, q_range=1.0, res=256, patch_size=32, aug_patch=False, aug_scaling=0.0, aug_dict={}, flat_surface=False):
+    def __init__(self, rob, env, render_flag, rob_texfn='', center=None, q_range=1.0, res=256, patch_size=32, aug_patch=False, aug_scaling=0.0, aug_dict={}, flat_surface=False):
         super(NarrowTunnelRegionDataSet, self).__init__(rob=rob,
                                                         env=env,
+                                                        rob_texfn=rob_texfn,
                                                         center=center,
                                                         res=res,
                                                         flat_surface=flat_surface)
@@ -206,10 +210,13 @@ def create_dataset(ompl_cfg, geo_type, res=256, aug_patch=True, aug_scaling=1.0,
     cfg, _ = parse_ompl.parse_simple(ompl_cfg)
     rob = cfg.rob_fn if geo_type == 'rob' else cfg.env_fn
     env = cfg.env_fn
+    p = pathlib.Path(cfg.rob_fn).parents[0]
+    rob_texfn = str(p.join('{}_chart_screened_uniform.png'.format(geo_type)))
     render_flag = pyosr.Renderer.NO_SCENE_RENDERING
     patch_size=64
     return NarrowTunnelRegionDataSet(rob=rob, env=env,
                                      render_flag=render_flag,
+                                     rob_texfn=rob_texfn,
                                      res=res,
                                      patch_size=patch_size,
                                      center=None,
@@ -237,8 +244,8 @@ class MultiPuzzleDataSet(object):
         self.q_range = q_range
         self.renders = []
 
-    def add_puzzle(self, rob, env, flat_surface=False):
-        ds = OsrDataSet(rob=rob, env=env, center=None, res=self.res, flat_surface=flat_surface)
+    def add_puzzle(self, rob, env, rob_texfn, flat_surface=False):
+        ds = OsrDataSet(rob=rob, env=env, rob_texfn=rob_texfn, center=None, res=self.res, flat_surface=flat_surface)
         self.renders.append(ds)
 
     def _aux_generator(self, batch_size=16, stacks=4, normalize=True, sample_set='train', emit_gt=False):
@@ -327,7 +334,6 @@ class MultiPuzzleDataSet(object):
                     p = 0.1
                     # Flipping
                     if p < 0.25:
-                        util.log("flipping")
                         uv_map[i] = uv_map[i, :, ::-1, :]
                         train_img[i] = train_img[i, :, ::-1, :]
                     elif 0.25 <= p < 0.5:
@@ -357,5 +363,7 @@ def create_multidataset(ompl_cfgs, geo_type, res=256, aug_patch=True, aug_scalin
         cfg, _ = parse_ompl.parse_simple(ompl_cfg)
         rob = cfg.rob_fn if geo_type == 'rob' else cfg.env_fn
         env = cfg.env_fn
-        ds.add_puzzle(rob=rob, env=env)
+        p = pathlib.Path(cfg.rob_fn).parents[0]
+        rob_texfn = str(p.join('{}_chart_screened_uniform.png'.format(geo_type)))
+        ds.add_puzzle(rob=rob, env=env, rob_texfn=rob_texfn)
     return ds

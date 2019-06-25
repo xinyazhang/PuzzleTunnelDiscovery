@@ -265,6 +265,10 @@ void Renderer::loadRobotFromFile(const std::string& fn)
 	robot_renderer_->probe_texture(fn);
 }
 
+void Renderer::loadRobotTextureImage(std::string tex_fn)
+{
+	robot_renderer_->load_texture(tex_fn);
+}
 
 void Renderer::angleCamera(float latitude, float longitude)
 {
