@@ -169,7 +169,8 @@ def _remote_command(ws, cmd, auto_retry, in_tmux):
                       cmd,
                       auto_retry=auto_retry,
                       in_tmux=in_tmux,
-                      with_trial=True)
+                      with_trial=True,
+                      use_nn_profile=True)
 
 def remote_train_rob(ws):
     _remote_command(ws, 'train_rob', auto_retry=True, in_tmux=True)

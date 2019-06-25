@@ -274,7 +274,11 @@ class Workspace(object):
 
     def remote_command(self, host, exec_path, ws_path,
                        pipeline_part, cmd,
-                       auto_retry=True, in_tmux=False, with_trial=False, extra_args=''):
+                       auto_retry=True,
+                       in_tmux=False,
+                       with_trial=False,
+                       extra_args='',
+                       use_nn_profile=False):
         script = ''
         script += 'if [ -f ~/.bashrc ]; then . ~/.bashrc; fi; '
         script += 'cd {}\n'.format(exec_path)
@@ -283,7 +287,7 @@ class Workspace(object):
         script += './facade.py {ppl} --stage {cmd} '.format(ppl=pipeline_part, cmd=cmd)
         if with_trial:
             script += ' --current_trial {} '.format(self.current_trial)
-        if self.nn_profile:
+        if use_nn_profile and self.nn_profile:
             script += ' --nn_profile {} '.format(self.nn_profile)
         if extra_args:
             script += ' {} '.format(extra_args)

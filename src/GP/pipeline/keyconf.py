@@ -75,10 +75,10 @@ def _predict_worker(tup):
     ws.current_trial = trial
     uw = util.create_unit_world(puzzle_fn)
     rob_sampler = atlas.AtlasSampler(ws.local_ws(util.TESTING_DIR, puzzle_name, 'rob-a2p.npz'),
-                                     ws.local_ws(util.TESTING_DIR, puzzle_name, 'rob-atex.npz'),
+                                     ws.atex_prediction_file(puzzle_fn, 'rob'),
                                      'rob', uw.GEO_ROB)
     env_sampler = atlas.AtlasSampler(ws.local_ws(util.TESTING_DIR, puzzle_name, 'env-a2p.npz'),
-                                     ws.local_ws(util.TESTING_DIR, puzzle_name, 'env-atex.npz'),
+                                     ws.atex_prediction_file(puzzle_fn, 'env'),
                                      'env', uw.GEO_ENV)
     if DEBUG:
         rob_sampler.enable_debugging()
