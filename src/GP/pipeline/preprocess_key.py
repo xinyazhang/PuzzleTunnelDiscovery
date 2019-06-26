@@ -30,7 +30,7 @@ _TRAJECTORY_SCRATCH = join(util.CONDOR_SCRATCH, 'training_trajectory')
 _KEYCAN_SCRATCH = util.PREP_KEY_CAN_SCRATCH
 
 def _get_candidate_file(ws):
-    return ws.local_ws(util.MT_KEY_CANDIDATE_FILE)
+    return ws.local_ws(util.MT_KEY_CANDIDATE_FILE) + '.xz'
 
 '''
 System Architecture:
@@ -68,7 +68,7 @@ def find_trajectory(args, ws):
 def interpolate_trajectory(args, ws):
     import pyosr
     scratch_dir = ws.local_ws(_TRAJECTORY_SCRATCH)
-    candidate_file = _get_candidate_file(ws)
+    candidate_file = ws.local_ws(util.MT_KEY_CANDIDATE_FILE)
     # Do not process only_wait, we need to restart if ssh is broken
     Qs = []
     DEBUG = False
