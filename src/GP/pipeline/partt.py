@@ -26,4 +26,4 @@ def get_task_partition(shape, total_chunks):
     return chunk_it(grand, total_chunks)
 
 def get_task_chunk(shape, total_chunks, index):
-    return get_task_allocation(shape, total_chunks)[index]
+    return get_task_partition(shape, total_chunks)[index]
