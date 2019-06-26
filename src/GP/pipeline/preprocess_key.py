@@ -96,7 +96,9 @@ def interpolate_trajectory(args, ws):
             dout = fn.stem+'.unit.txt'
             matio.savetxt(dout, utraj)
             util.log('[DEBUG][interpolate_trajectory] dump unitary path to {}'.format(dout))
-        hdf5_overwrite(f, 'traj_{}'.format(util.padded(i, ntraj)), Qs)
+        traj_name = pathlib.Path(fn).stem
+        traj_id = int(traj_name[len('traj_'):])
+        hdf5_overwrite(f, 'traj_{}'.format(util.padded(traj_id, ntraj)), Qs)
     util.log('[interpolate_trajectory] saving the interpolation results to {}'.format(candidate_file))
     #np.savez(candidate_file, OMPL_CANDIDATES=Qs)
     f.close()
