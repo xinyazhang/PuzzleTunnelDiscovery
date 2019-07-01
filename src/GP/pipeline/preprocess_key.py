@@ -116,6 +116,7 @@ def estimate_clearance_volume(args, ws):
         return
     # Prepare the data and task description
     candidate_file = _get_candidate_file(ws)
+    util.log('[estimate_clearance_volume] loading file {}'.format(candidate_file))
     cf = matio.load(candidate_file)
     trajs = sorted(list(cf.keys()))
     ntraj = len(trajs)
@@ -158,7 +159,7 @@ def estimate_clearance_volume(args, ws):
         # NOTE: THE COMMA, TODO: check all loops that's using get_task_chunk
         cached_traj = None
         batch_str = util.padded(task_id, total_chunks)
-        out_fn = ws.local_ws(scratch_dir, 'unitary_clearance_from_keycan-batch_{}.hdf5.xz'.format(batch_str))
+        out_fn = ws.local_ws(scratch_dir, 'unitary_clearance_from_keycan-batch_{}.hdf5'.format(batch_str))
         f = matio.hdf5_safefile(out_fn)
         # tindices = tindices[:4]
         for traj_id, qi in progressbar(tindices):
@@ -190,6 +191,7 @@ def estimate_clearance_volume(args, ws):
                      TOUCH_TAU=touch_tau)
             '''
         f.close()
+        util.xz(out_fn)
 
 def pickup_key_configuration_old(args, ws):
     import pyosr
@@ -270,7 +272,7 @@ def pickup_key_configuration(args, ws):
                 else:
                     distances = pyosr.multi_distance(q['FROM_V'], q['FREE_V'])
                 idx = int(str(q_name))
-                util.log("checking traj_name {} traj_id {} idx {}".format(traj_name, traj_id, idx)) # Debug
+                # util.log("checking traj_name {} traj_id {} idx {}".format(traj_name, traj_id, idx)) # Debug
                 m = np.mean(distances)
                 if traj_id not in stat_dict:
                     stat_dict[traj_id] = np.full((nq, 5), np.finfo(np.float64).max, dtype=np.float64)
