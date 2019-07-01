@@ -11,13 +11,9 @@ def _load_csv(fn):
 def _load_hdf5(fn):
     return h5py.File(fn, 'r')
 
-def _load_hdf5_xz(fn):
-    input_file = lzma.open(fn, 'r')
-    return h5py.File(input_file, 'r')
-
 def _load_xz(fn):
     p = pathlib.PosixPath(fn)
-    memfile = io.BytesIO(lzma.open(fn, 'r').read())
+    memfile = io.BytesIO(lzma.open(str(fn), 'r').read())
     nest_suffix = p.with_suffix('').suffix
     if nest_suffix not in _SUFFIX_TO_LOADER:
         raise NotImplementedError("Parser for {} file is not implemented".format(p.suffix))
