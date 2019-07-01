@@ -94,8 +94,6 @@ ClearanceTaskGranularity = 4
 # How many configurations we pick from candidates as key configurations.
 # This varies among the training models
 KeyConf = 1
-# How many samples do we create to mark up the key surface
-CollisionSample = 256
 
 [TrainingWeightChart]
 # How many touch configuration we shall generate for each key configuration
