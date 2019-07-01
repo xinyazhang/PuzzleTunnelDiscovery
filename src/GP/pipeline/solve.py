@@ -111,7 +111,11 @@ def sample_pds(args, ws):
                                 arguments=condor_job_args,
                                 instances=keys['KEYQ_OMPL'].shape[0],
                                 wait=False) # do NOT wait here, we have to submit EVERY puzzle at once
+    if args.no_wait:
+        return
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+        if args.puzzle_name and args.puzzle_name != puzzle_name:
+            continue
         rel_bloom = _rel_bloom_scratch(ws, puzzle_name, ws.current_trial)
         scratch_dir = ws.local_ws(rel_bloom)
         condor.local_wait(scratch_dir)
@@ -184,6 +188,8 @@ def forest_edges(args, ws):
 #    ./pds_edge.py --pdsflags dual/pdsrdt-g9ae-1/pds-4m.0.npz --out pdsrdt-g9ae-1-edges.hdf5 `ls -v dual/pdsrdt-g9ae-1/pdsrdt/ssc-*.mat`
     trial_str = 'trial-{}'.format(_trial_id(ws, ws.current_trial))
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+        if args.puzzle_name and args.puzzle_name != puzzle_name:
+            continue
         rel_scratch_dir = os.path.join(util.SOLVER_SCRATCH, puzzle_name, trial_str)
         shell_script = './pds_edge.py --pdsflags '
         shell_script += _puzzle_pds(ws, puzzle_name, ws.current_trial)
@@ -201,6 +207,8 @@ def connect_forest(args, ws):
 #
     trial_str = 'trial-{}'.format(_trial_id(ws, ws.current_trial))
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+        if args.puzzle_name and args.puzzle_name != puzzle_name:
+            continue
         # key_fn = ws.local_ws(util.TESTING_DIR, puzzle_name, util.KEY_PREDICTION)
         key_fn = ws.keyconf_prediction_file(puzzle_name)
         rel_scratch_dir = join(util.SOLVER_SCRATCH, puzzle_name, trial_str)
