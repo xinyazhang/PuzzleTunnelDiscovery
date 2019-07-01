@@ -262,7 +262,8 @@ def pickup_key_configuration(args, ws):
             traj_grp = d[traj_name]
             for q_name in traj_grp.keys():
                 q = traj_grp[q_name]
-                if True:
+                if False:
+                    # FIMXE: this distance is buggy
                     distances = uw.multi_kinetic_energy_distance(q['FROM_V'], q['FREE_V'])
                 else:
                     distances = pyosr.multi_distance(q['FROM_V'], q['FREE_V'])
