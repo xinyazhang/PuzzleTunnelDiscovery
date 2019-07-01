@@ -307,7 +307,7 @@ def _uvrender_worker(uv_args):
 
 def uvrender(args, ws):
     uvproj_dir = pathlib.Path(ws.local_ws(_UVPROJ_SCRATCH))
-    uvproj_list = sorted(uvproj_dir.glob('uv_batch-*.hdf5') + uvproj_dir.glob('uv_batch-*.hdf5.xz'))
+    uvproj_list = sorted(list(uvproj_dir.glob('uv_batch-*.hdf5')) + list(uvproj_dir.glob('uv_batch-*.hdf5.xz')))
     ncpu = os.cpu_count()
     pgpu = multiprocessing.Pool(processes=4)
 
