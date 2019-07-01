@@ -143,7 +143,7 @@ def setup_parser(subparsers):
                    default='',
                    metavar='')
     p.add_argument('--only_wait', action='store_true')
-    p.add_argument('--nn_profile', help="NN Profile", default='')
+    p.add_argument('--nn_profile', help="NN Profile", default='256hg')
     p.add_argument('--load', help="Load existing checkpoints and continue", action='store_true')
     p.add_argument('--puzzle_name', help="puzzle to predict", default=None)
     p.add_argument('--current_trial', help='Trial to solve the puzzle', type=int, default=0)
