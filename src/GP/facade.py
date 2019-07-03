@@ -16,7 +16,8 @@ except ImportError as e:
 def _memory_limit():
     soft, hard = resource.getrlimit(resource.RLIMIT_AS)
     free, total = _get_memory()
-    cap = min(free - 8 * 1024 * 1024 * 1024, total / 2)
+    # cap = min(free - 8 * 1024 * 1024 * 1024, total / 2)
+    cap = total
     resource.setrlimit(resource.RLIMIT_AS, (cap, hard))
 
 def _get_memory():
