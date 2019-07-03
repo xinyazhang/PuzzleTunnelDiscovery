@@ -43,11 +43,17 @@ def visrobgt(args):
 def visnnpred(args):
     ws = util.Workspace(args.dir)
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+        if args.puzzle_name and puzzle_name != args.puzzle_name:
+            continue
         cfg, config = parse_ompl.parse_simple(puzzle_fn)
-        p = pathlib.Path(puzzle_fn)
-        d = p.parents[0]
-        util.shell(['./vistexture', cfg.env_fn, str(d / 'env-atex.png')])
-        util.shell(['./vistexture', cfg.rob_fn, str(d / 'rob-atex.png')])
+        env_npz = ws.atex_prediction_file(puzzle_fn, 'env', trial_override=args.current_trial)
+        util.shell(['./atex2green.py', env_npz])
+        rob_npz = ws.atex_prediction_file(puzzle_fn, 'rob', trial_override=args.current_trial)
+        util.shell(['./atex2green.py', rob_npz])
+        p = pathlib.Path(env_npz)
+        util.shell(['./vistexture', cfg.env_fn, str(p.with_suffix('.png'))])
+        p = pathlib.Path(rob_npz)
+        util.shell(['./vistexture', cfg.rob_fn, str(p.with_suffix('.png'))])
 
 def visnnsample(args):
     import pyosr
@@ -425,6 +431,8 @@ def setup_parser(subparsers):
     p.add_argument('--traj_id', help='Specify the trajectory id', type=int, default=0)
     p.add_argument('--point_id', help='Specify the point in the trajectory', type=int, default=0)
     p = toolp.add_parser('visnnpred', help='Call vistexture to visualize the prediction results')
+    p.add_argument('--current_trial', help='Trial to predict the keyconf', type=int, default=0)
+    p.add_argument('--puzzle_name', help='Only show one specific puzzle', default='')
     p.add_argument('dir', help='Workspace directory')
     p = toolp.add_parser('visnnsample', help='Call vistexture to visualize the prediction results')
     p.add_argument('--puzzle_name', help='Only show one specific puzzle', default='')
