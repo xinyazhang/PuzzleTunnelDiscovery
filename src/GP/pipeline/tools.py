@@ -314,30 +314,64 @@ def _dic_add(dic, key, v):
     else:
         dic[key] = [v]
 
-def _print_stat(puzzle_name, stat_dic, f):
-    writer = csv.writer(f)
+def _print_detail_header(writer):
+    writer.writerow(['Puzzle Name',
+                     'Trial ID',
+                     'Method',
+                     'Key Points (ROB)',
+                     'Key Points (ENV)',
+                     'Number of Roots',
+                     'PDS size',
+                     'Solved (Y/N)',
+                    ])
+
+
+def _print_detail(puzzle_name, stat_dic, writer):
     for i in range(len(stat_dic['trial_id'])):
         writer.writerow([puzzle_name,
                          stat_dic['trial_id'][i],
                          stat_dic['puzzle_method'][i],
-                         '{}/{}'.format(stat_dic['puzzle_kps_env'][i],
-                                        stat_dic['puzzle_kps_rob'][i]),
-                         stat_dic['puzzle_rot'][i],
+                         '{}'.format(stat_dic['puzzle_kps_env'][i]),
+                         '{}'.format(stat_dic['puzzle_kps_rob'][i]),
+                         # stat_dic['puzzle_rot'][i],
                          stat_dic['puzzle_roots'][i],
                          stat_dic['puzzle_pds'][i],
                          stat_dic['puzzle_success'][i]])
+
+def _print_stat_header(writer):
+    writer.writerow(['Puzzle Name',
+                     'Trial IDs',
+                     'Method',
+                     'Mean Key Points (ROB)',
+                     'Stdev of Key Points (ROB)',
+                     'Mean Key Points (ENV)',
+                     'Stdev of Key Points (ENV)',
+                     'Mean Number of Roots',
+                     'Mean PDS size',
+                     'Solved/Total',
+                    ])
+
+def _print_stat(puzzle_name, stat_dic, writer):
     writer.writerow([puzzle_name, stat_dic['trial_range'],
                      stat_dic['puzzle_method'][0] if all(elem == stat_dic['puzzle_method'][0] for elem in stat_dic['puzzle_method']) else '*MIXED*',
-                     'mean: {}/{}'.format(np.mean(stat_dic['puzzle_kps_env']),
-                                          np.mean(stat_dic['puzzle_kps_rob'])),
-                     'mean: {}'.format(np.mean(stat_dic['puzzle_rot'])),
-                     'mean: {}'.format(np.mean(stat_dic['puzzle_roots'])),
-                     'mean: {}'.format(np.mean(stat_dic['puzzle_pds'])),
-                     '{}/{}'.format(np.sum([1 if e == 'Y' else 0 for e in stat_dic['puzzle_success']]), len(stat_dic['puzzle_success']))
+                     '{}'.format(np.mean(stat_dic['puzzle_kps_env'])),
+                     '{}'.format(np.std(stat_dic['puzzle_kps_env'])),
+                     '{}'.format(np.mean(stat_dic['puzzle_kps_rob'])),
+                     '{}'.format(np.std(stat_dic['puzzle_kps_rob'])),
+                     # '{}'.format(np.mean(stat_dic['puzzle_rot'])),
+                     '{}'.format(np.mean(stat_dic['puzzle_roots'])),
+                     '{}'.format(np.mean(stat_dic['puzzle_pds'])),
+                     '{}/{}'.format(np.sum(stat_dic['puzzle_success_int']),
+                                    len(stat_dic['puzzle_success']))
                     ])
 
 def conclude(args):
     f = open(args.out, 'w')
+    writer = csv.writer(f)
+    if args.type == 'detail':
+        _print_detail_header(writer)
+    elif args.type == 'stat':
+        _print_stat_header(writer)
     for ws_dir in args.dirs:
         ws = util.Workspace(ws_dir)
         trial_list = util.rangestring_to_list(args.trial_range)
@@ -353,7 +387,7 @@ def conclude(args):
                                      util.PDS_SUBDIR,
                                      '{}.npz'.format(trial))
                 if not os.path.exists(pds_fn):
-                    break
+                    continue
                 kp_env_fn = ws.keypoint_prediction_file(puzzle_name, 'env')
                 kp_rob_fn = ws.keypoint_prediction_file(puzzle_name, 'rob')
                 if os.path.exists(kp_rob_fn) and os.path.exists(kp_env_fn):
@@ -366,7 +400,8 @@ def conclude(args):
                 else:
                     puzzle_method = 'NN'
                     puzzle_rot = ws.config.getint('Prediction', 'NumberOfRotations')
-                    puzzle_kps = 'N/A'
+                    puzzle_kps_env = -1
+                    puzzle_kps_rob = -1
                 kq_fn = ws.keyconf_prediction_file(puzzle_name)
                 puzzle_roots = matio.load(kq_fn)['KEYQ_OMPL'].shape[0]
                 puzzle_pds = matio.load(pds_fn)['Q'].shape[0]
@@ -383,8 +418,15 @@ def conclude(args):
                 _dic_add(stat_dic, 'puzzle_roots', puzzle_roots)
                 _dic_add(stat_dic, 'puzzle_pds', puzzle_pds)
                 _dic_add(stat_dic, 'puzzle_success', puzzle_success)
+                _dic_add(stat_dic, 'puzzle_success_int', 1 if puzzle_success == 'Y' else 0)
             stat_dic['trial_range'] = args.trial_range
-            _print_stat(puzzle_name, stat_dic, f=f)
+            if 'puzzle_success' not in stat_dic:
+                util.warn('workspace {} has not solution data for puzzle {}. No corresponding information will be printed'.format(ws_dir, puzzle_name))
+                continue
+            if args.type == 'detail':
+                _print_detail(puzzle_name, stat_dic, writer)
+            elif args.type == 'stat':
+                _print_stat(puzzle_name, stat_dic, writer)
     f.close()
 
 function_dict = {
@@ -462,6 +504,7 @@ def setup_parser(subparsers):
     p = toolp.add_parser('conclude', help='Show the execution statistics')
     p.add_argument('--trial_range', help='range of trials', type=str, required=True)
     p.add_argument('--puzzle_name', help='Only show one specific testing puzzle', default='')
+    p.add_argument('--type', help='Choose what kind of info to output', default='detail', choices=['detail', 'stat'])
     p.add_argument('--out', help='Output CSV file', default='1.csv')
     p.add_argument('dirs', help='Workspace directory', nargs='+')
 
