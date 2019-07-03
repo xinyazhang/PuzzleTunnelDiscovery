@@ -211,7 +211,7 @@ def create_dataset(ompl_cfg, geo_type, res=256, aug_patch=True, aug_scaling=1.0,
     rob = cfg.rob_fn if geo_type == 'rob' else cfg.env_fn
     env = cfg.env_fn
     p = pathlib.Path(cfg.rob_fn).parents[0]
-    rob_texfn = str(p.join('{}_chart_screened_uniform.png'.format(geo_type)))
+    rob_texfn = str(p.joinpath('{}_chart_screened_uniform.png'.format(geo_type)))
     render_flag = pyosr.Renderer.NO_SCENE_RENDERING
     patch_size=64
     return NarrowTunnelRegionDataSet(rob=rob, env=env,
@@ -364,6 +364,6 @@ def create_multidataset(ompl_cfgs, geo_type, res=256, aug_patch=True, aug_scalin
         rob = cfg.rob_fn if geo_type == 'rob' else cfg.env_fn
         env = cfg.env_fn
         p = pathlib.Path(cfg.rob_fn).parents[0]
-        rob_texfn = str(p.join('{}_chart_screened_uniform.png'.format(geo_type)))
+        rob_texfn = str(p.joinpath('{}_chart_screened_uniform.png'.format(geo_type)))
         ds.add_puzzle(rob=rob, env=env, rob_texfn=rob_texfn)
     return ds
