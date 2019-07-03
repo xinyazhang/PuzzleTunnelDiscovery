@@ -125,7 +125,7 @@ def solve(args):
                     print("skipping exising file {} and {}".format(ssc_fn, tree_fn))
                     continue
             return_ve = args.bloom_out is not None
-            V,_ = driver.solve(args.days, return_ve=return_ve, sbudget=args.sbudget, record_compact_tree=record_compact_tree, continuous_motion_validator=ccd)
+            V,E = driver.solve(args.days, return_ve=return_ve, sbudget=args.sbudget, record_compact_tree=record_compact_tree, continuous_motion_validator=ccd)
             '''
             if isdir(out_path):
                 savemat('{}/tree-{}.mat'.format(out_path, index), dict(V=V, E=E), do_compression=True)
@@ -140,7 +140,7 @@ def solve(args):
                 savemat(tree_fn, dict(CNVI=CNVI, CNV=CNV, CE=CE), do_compression=True)
                 util.log("saving compact tree {}".format(tree_fn))
             if args.bloom_out:
-                np.savez(args.bloom_out, BLOOM=V)
+                np.savez(args.bloom_out, BLOOM=V, BLOOM_EDGE=E)
                 util.log("saving bloom results to {}".format(args.bloom_out))
     else:
         return_ve = args.bloom_out is not None
