@@ -20,6 +20,28 @@ except ImportError as e:
     util.warn("[WARNING] CANNOT IMPORT hg_launcher. This node is incapable of training/prediction")
     # Note: do NOT raise exceptions in modules loaded by __init__.py
 
+try:
+    import fcntl
+    def global_gpu_lock(ws):
+        util.log('waiting for GPU resource')
+        ws.timekeeper_start('wait for GPU resource')
+        ws.gpu_lock_fd = open('/tmp/mkobs3d.gpulock', 'w')
+        fcntl.lockf(ws.gpu_lock_fd, fcntl.LOCK_EX)
+        pid = os.getpid()
+        print(pid, file=ws.gpu_lock_fd)
+        util.log('waited for GPU resource')
+    def global_gpu_unlock(ws):
+        ws.timekeeper_finish('wait for GPU resource')
+        fcntl.lockf(ws.gpu_lock_fd, fcntl.LOCK_UN)
+        ws.gpu_lock_fd.close()
+        ws.gpu_lock_fd = None
+except ImportError as e:
+    util.warn("[WARNING] CANNOT IMPORT fcntl, global GPU lock is disabled")
+    def global_gpu_lock(ws):
+        pass
+    def global_gpu_unlock(ws):
+        pass
+
 def _deploy(ws):
     ws.deploy_to_gpu(util.WORKSPACE_SIGNATURE_FILE,
                      util.WORKSPACE_CONFIG_FILE,
@@ -50,11 +72,17 @@ def _train(args, ws, geo_type):
     params['checkpoint_dir'] = ws.checkpoint_dir(geo_type) + '/'
     params['suppress_hot'] = 0.0
     params['suppress_cold'] = 0.7
+    global_gpu_lock(ws)
+    ws.timekeeper_start('train_{}'.format(geo_type))
+
     os.makedirs(ws.local_ws(util.NEURAL_SCRATCH), exist_ok=True)
     pidfile = ws.local_ws(util.NEURAL_SCRATCH, geo_type + '.pid')
     write_pidfile(pidfile, os.getpid())
     hg_launcher.launch_with_params(params, do_training=True, load=args.load)
     write_pidfile(pidfile, -1)
+
+    ws.timekeeper_finish('train_{}'.format(geo_type))
+    global_gpu_unlock(ws)
 
 def train_rob(args, ws):
     if args.only_wait:
@@ -69,7 +97,7 @@ def train_env(args, ws):
 def wait_for_training(args, ws):
     for geo_type in ['rob', 'env']:
         pidfile = ws.local_ws(util.NEURAL_SCRATCH, geo_type + '.pid')
-        util.log('[wait_for_training] for file {}'.format(pid, pidfile))
+        util.log('[wait_for_training] wait for file {}'.format(pidfile))
         last_valid_pid = -1
         while True:
             pid = 0
@@ -93,6 +121,7 @@ def _predict_surface(args, ws, geo_type, generator):
             params = hg_launcher.create_default_config()
         if args.puzzle_name is not None and args.puzzle_name != puzzle_name:
             continue
+        global_gpu_lock(ws)
         ws.timekeeper_start('predict_{}'.format(geo_type), puzzle_name)
         params['ompl_config'] = puzzle_fn
         params['what_to_render'] = geo_type
@@ -110,6 +139,7 @@ def _predict_surface(args, ws, geo_type, generator):
         util.log("[prediction] Copy surface prediction file {} => {}".format(src, dst))
         shutil.copy(src, dst)
         ws.timekeeper_finish('predict_{}'.format(geo_type), puzzle_name)
+        global_gpu_unlock(ws)
 
 def predict_rob(args, ws):
     _predict_surface(args, ws, 'rob', ws.test_puzzle_generator)
