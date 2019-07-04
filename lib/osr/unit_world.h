@@ -327,6 +327,11 @@ public:
 	Eigen::VectorXd
 	multiKineticEnergyDistance(const StateVector& origin,
 	                           const ArrayOfStates& targets);
+
+	double getSceneScale() const
+	{
+		return scene_scale_;
+	}
 protected:
 	bool shared_ = false;
 
