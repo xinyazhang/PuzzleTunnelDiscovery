@@ -102,7 +102,7 @@ def _load_unit_world(uw, puzzle_file):
     uw.loadRobotFromFile(puzzle.rob_fn)
     uw.scaleToUnit()
     uw.angleModel(0.0, 0.0)
-    uw.recommended_cres = config.getfloat('problem', 'collision_resolution', fallback=0.001)
+    uw.recommended_cres = uw.scene_scale * config.getfloat('problem', 'collision_resolution', fallback=0.001)
 
 def create_unit_world(puzzle_file):
     # Well this is against PEP 08 but we do not always need pyosr
