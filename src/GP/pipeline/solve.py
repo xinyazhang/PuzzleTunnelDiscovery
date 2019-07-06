@@ -15,12 +15,14 @@ from progressbar import progressbar, ProgressBar
 import shutil
 
 from . import util
+from . import disjoint_set
 from . import choice_formatter
 try:
     from . import se3solver
 except ImportError as e:
     util.warn(str(e))
     util.warn("[WARNING] CANNOT IMPORT se3solver. Some function will be disabled and the pipeline is broken")
+from . import partt
 from . import condor
 from . import matio
 from . import atlas
@@ -49,6 +51,107 @@ def _puzzle_pds(ws, puzzle_name, trial):
 
 def _rel_bloom_scratch(ws, puzzle_fn, trial):
     return join(util.SOLVER_SCRATCH, puzzle_fn, util.PDS_SUBDIR, 'bloom-'+_trial_id(ws, trial))
+
+def _partition_screening(ws, puzzle_name, index=None):
+    keyfn = ws.keyconf_prediction_file(puzzle_name)
+    keys = matio.load(keyfn, key='KEYQ_OMPL')
+    nkey = keys.shape[0] - util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS
+    task_indices = np.tril_indices(nkey)
+    task_shape = task_indices[0].shape
+    total_chunks = partt.guess_chunk_number(task_shape,
+            ws.config.getint('DEFAULT', 'CondorQuota') * 4,
+            ws.config.getint('TrainingKeyConf', 'ClearanceTaskGranularity'))
+    if index is None:
+        return keys, total_chunks
+    chunk = partt.get_task_chunk(task_shape, total_chunks, index)
+    chunk = np.array(chunk).reshape(-1)
+    # util.log('chunk shape {}'.format(chunk.shape))
+    return (keys,
+            task_indices[0][chunk] + util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS,
+            task_indices[1][chunk] + util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS)
+
+def screen_keyconf(args, ws):
+    screen_str = 'screen-{}'.format(ws.current_trial)
+    if args.task_id is not None:
+        # actual worker
+        for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+            rel_scratch_dir = os.path.join(util.SOLVER_SCRATCH, puzzle_name, screen_str)
+            scratch_dir = ws.local_ws(rel_scratch_dir)
+
+            keys, from_indices, to_indices = _partition_screening(ws,
+                                                                  puzzle_name,
+                                                                  index=args.task_id)
+            # util.log('keys shape {}'.format(keys.shape))
+            # util.log('from_indices shape {}'.format(from_indices.shape))
+            uw = util.create_unit_world(puzzle_fn)
+            # util.log('from {}'.format(keys[from_indices].shape))
+            # util.log('from_indices[:16] {}'.format(from_indices[:16]))
+            # util.log('to_indices[:16] {}'.format(to_indices[:16]))
+            visb_pairs = uw.calculate_visibility_pair(keys[from_indices], False,
+                                                      keys[to_indices], False,
+                                                      uw.recommended_cres,
+                                                      enable_mt=False)
+            visb_vec = visb_pairs.reshape((-1))
+            visibile_indices = visb_vec.nonzero()[0]
+            outfn = join(scratch_dir, 'edge_batch-{}.npz'.format(args.task_id))
+            np.savez(outfn, EDGE_FROM=from_indices[visibile_indices], EDGE_TO=to_indices[visibile_indices])
+        return # worker never wait
+    if not args.only_wait:
+        # submit condor job
+        for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+            rel_scratch_dir = os.path.join(util.SOLVER_SCRATCH, puzzle_name, screen_str)
+            scratch_dir = ws.local_ws(rel_scratch_dir)
+            _, total_chunks = _partition_screening(ws, puzzle_name, index=None)
+            condor_job_args = [ws.condor_local_exec('facade.py'),
+                               'solve',
+                               '--stage', 'screen_keyconf',
+                               '--current_trial', ws.current_trial,
+                               '--puzzle_name', puzzle_name,
+                               '--task_id', '$(Process)',
+                               ws.local_ws()]
+            condor.local_submit(ws,
+                                util.PYTHON,
+                                iodir_rel=rel_scratch_dir,
+                                arguments=condor_job_args,
+                                instances=total_chunks,
+                                wait=False)
+    if not args.no_wait:
+        # wait the condor_job
+        for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+            rel_scratch_dir = os.path.join(util.SOLVER_SCRATCH, puzzle_name, screen_str)
+            scratch_dir = ws.local_ws(rel_scratch_dir)
+            condor.local_wait(scratch_dir)
+
+            keyfn = ws.keyconf_prediction_file(puzzle_name)
+            keys = matio.load(keyfn, key='KEYQ_OMPL')
+            vert_ids = [i for i in range(keys.shape[0])]
+            djs = disjoint_set.DisjointSet(vert_ids)
+            fn_list = pathlib.Path(scratch_dir).glob("edge_batch-*.npz")
+            util.log("[screen_keyconf][{}] Creating disjoint set".format(puzzle_name))
+            for fn in progressbar(fn_list):
+                d = matio.load(fn)
+                for r,c in zip(d['EDGE_FROM'], d['EDGE_TO']):
+                    djs.union(r,c)
+
+            cluster = djs.get_cluster()
+            screened_index = []
+            uw = util.create_unit_world(puzzle_fn)
+            unit_keys = uw.translate_ompl_to_unit(keys)
+            util.log("[screen_keyconf][{}] Screening roots".format(puzzle_name))
+            for k in progressbar(cluster):
+                nondis = []
+                for member in cluster[k]:
+                    if not uw.is_disentangled(unit_keys[member]):
+                        nondis.append(member)
+                        break
+                # TODO: clustering?
+                screened_index += nondis # No effect if nondis == []
+            screened = keys[screened_index]
+            util.log("[screen_keyconf][{}] Screened {} roots into {}".format(puzzle_name,
+                      keys.shape, screened.shape))
+            outfn = ws.screened_keyconf_prediction_file(puzzle_name)
+            util.log("[screen_keyconf] Save screened roots {} to {}".format(screened.shape, outfn))
+            np.savez(outfn, KEYQ_OMPL=screened)
 
 class TmpDriverArgs(object):
     pass
@@ -90,7 +193,7 @@ def sample_pds(args, ws):
             rel_bloom = _rel_bloom_scratch(ws, puzzle_name, ws.current_trial)
             util.log('[sample_pds]  rel_bloom {}'.format(rel_bloom))
             scratch_dir = ws.local_ws(rel_bloom)
-            key_fn = ws.keyconf_prediction_file(puzzle_name)
+            key_fn = ws.screened_keyconf_prediction_file(puzzle_name)
             condor_job_args = ['se3solver.py',
                     'solve',
                     '--cdres', config.getfloat('problem', 'collision_resolution', fallback=0.0001),
@@ -121,14 +224,19 @@ def sample_pds(args, ws):
         condor.local_wait(scratch_dir)
         pds_fn = _puzzle_pds(ws, puzzle_name, ws.current_trial)
         Q_list = []
+        tree_base_list = []
         fn_list = sorted(pathlib.Path(scratch_dir).glob("bloom-from_*.npz"))
+        tree_base = 0
         for fn in progressbar(fn_list):
             d = matio.load(fn)
             s = d['BLOOM'].shape
             if s[0] == 0:
                 continue
             assert s[1] == 7, "{}'s shape is {}".format(fn, s)
-            Q_list.append(d['BLOOM'])
+            bloom =d['BLOOM']
+            Q_list.append(bloom)
+            tree_base_list.append(tree_base)
+            tree_base += int(bloom.shape[0])
         Q = np.concatenate(Q_list, axis=0)
         uw = util.create_unit_world(puzzle_fn)
         uQ = uw.translate_ompl_to_unit(Q)
@@ -136,7 +244,7 @@ def sample_pds(args, ws):
         for j, uq in enumerate(uQ):
             if uw.is_disentangled(uq):
                 QF[j] = se3solver.PDS_FLAG_TERMINATE
-        np.savez(pds_fn, Q=Q, QF=QF)
+        np.savez(pds_fn, Q=Q, QF=QF, QB=tree_base_list)
         util.log('[sample_pds] samples stored at {}'.format(pds_fn))
 
 def forest_rdt(args, ws):
@@ -158,8 +266,8 @@ def forest_rdt(args, ws):
         #key_fn = ws.local_ws(util.TESTING_DIR, puzzle_name, util.KEY_PREDICTION)
 
         # Note: no need to probe the key configuration, which has been done in sample_pds and
-        #       ws.keyconf_prediction_file should always point to a valid keyconf
-        key_fn = ws.keyconf_prediction_file(puzzle_name)
+        #       ws.screened_keyconf_prediction_file should always point to a valid keyconf
+        key_fn = ws.screened_keyconf_prediction_file(puzzle_name)
         condor_job_args = ['se3solver.py',
                 'solve',
                 '--cdres', config.getfloat('problem', 'collision_resolution', fallback=0.0001),
@@ -210,7 +318,7 @@ def connect_forest(args, ws):
         if args.puzzle_name and args.puzzle_name != puzzle_name:
             continue
         # key_fn = ws.local_ws(util.TESTING_DIR, puzzle_name, util.KEY_PREDICTION)
-        key_fn = ws.keyconf_prediction_file(puzzle_name)
+        key_fn = ws.screened_keyconf_prediction_file(puzzle_name)
         rel_scratch_dir = join(util.SOLVER_SCRATCH, puzzle_name, trial_str)
         rel_edges = join(rel_scratch_dir, 'edges.hdf5')
         path_out = ws.local_ws(rel_scratch_dir, 'path.txt')
@@ -238,6 +346,7 @@ def connect_forest(args, ws):
         util.ack("Saving UNIT solution of {} to {}".format(puzzle_name, sol_out))
 
 function_dict = {
+        'screen_keyconf' : screen_keyconf,
         'sample_pds' : sample_pds,
         'forest_rdt' : forest_rdt,
         'forest_edges' : forest_edges,
@@ -290,6 +399,12 @@ def _remote_command_distributed(ws, cmd):
                         alter_host=host,
                         extra_args='--puzzle_name {} --only_wait'.format(puzzle_name))
 
+def remote_screen_keyconf(ws):
+    if ws.condor_extra_hosts:
+        _remote_command_distributed(ws, 'screen_keyconf')
+    else:
+        _remote_command(ws, 'screen_keyconf')
+
 def remote_sample_pds(ws):
     if ws.condor_extra_hosts:
         _remote_command_distributed(ws, 'sample_pds')
@@ -317,7 +432,9 @@ def remote_connect_forest(ws):
         ws.timekeeper_finish('connect_forest', puzzle_name)
 
 def collect_stages():
-    ret = [('sample_pds', remote_sample_pds),
+    ret = [
+            ('screen_keyconf', remote_screen_keyconf),
+            ('sample_pds', remote_sample_pds),
             ('forest_rdt', remote_forest_rdt),
             ('forest_edges', remote_forest_edges),
             ('connect_forest', remote_connect_forest),

@@ -46,11 +46,14 @@ UV_DIR = os.path.join(CONDOR_SCRATCH, 'training_key_uvproj')
 PIXMARGIN = 2
 
 KEY_POINT_FMT = 'geometrik_key_point_of_{}-{}.npz'
-KEY_PREDICTION_FMT = 'forest_roots-{}.npz'
+UNSCREENED_KEY_PREDICTION_FMT = 'unscreened_forest_roots-{}.npz'
+SCREENED_KEY_PREDICTION_FMT = 'forest_roots-{}.npz'
 SOLUTION_FMT = 'path-{trial}.{type_name}.txt'
 PDS_SUBDIR = 'pds'
 
 RDT_FOREST_ALGORITHM_ID = 15
+RDT_FOREST_INIT_AND_GOAL_RESERVATIONS = 2
+
 
 '''
 WORKSPACE HIERARCHY
@@ -341,8 +344,10 @@ class Workspace(object):
                 continue
             yield puzzle_fn, ent
 
-    def test_puzzle_generator(self):
+    def test_puzzle_generator(self, target_puzzle_name=''):
         for ent in os.listdir(self.local_ws(TESTING_DIR)):
+            if target_puzzle_name and target_puzzle_name != ent:
+                continue
             puzzle_fn = self.local_ws(TESTING_DIR, ent, 'puzzle.cfg')
             if not os.path.isfile(puzzle_fn):
                 log("Cannot find puzzle file {}. continue to next dir".format(puzzle_fn))
@@ -363,24 +368,30 @@ class Workspace(object):
         return self.local_ws(TESTING_DIR, puzzle_name,
                              KEY_POINT_FMT.format(geo_type, trial))
 
-    def keyconf_prediction_file(self, puzzle_name, for_read=True, trial_override=None):
+    def screened_keyconf_prediction_file(self, puzzle_name, for_read=True, trial_override=None):
         trial = self.current_trial if trial_override is None else trial_override
         ret = self.local_ws(TESTING_DIR, puzzle_name,
-                            KEY_PREDICTION_FMT.format(trial))
+                            SCREENED_KEY_PREDICTION_FMT.format(trial))
         if for_read and not os.path.exists(ret):
             warn("[sample_pds] forest root file {} does not exist")
             probe_trial = self.current_trial - 1
             while probe_trial >= 0:
                 key_fn_0 = self.local_ws(TESTING_DIR, puzzle_name,
-                                         KEY_PREDICTION_FMT.format(probe_trial))
+                                         SCREENED_KEY_PREDICTION_FMT.format(probe_trial))
                 if os.path.exists(key_fn_0):
                     break
                 probe_trial -= 1
             if probe_trial < 0:
                 fatal("[util.keyconf_prediction_file] Cannot {}, nor any old old prediction files".format(ret))
-            link_target = KEY_PREDICTION_FMT.format(probe_trial)
+            link_target = SCREENED_KEY_PREDICTION_FMT.format(probe_trial)
             os.symlink(link_target, ret)
             warn("[util.keyconf_prediction_file] sylink {} to {} as forest root file".format(link_target, ret))
+        return ret
+
+    def keyconf_prediction_file(self, puzzle_name, for_read=True, trial_override=None):
+        trial = self.current_trial if trial_override is None else trial_override
+        ret = self.local_ws(TESTING_DIR, puzzle_name,
+                            UNSCREENED_KEY_PREDICTION_FMT.format(trial))
         return ret
 
     def solution_file(self, puzzle_name, type_name, trial_override=None):
