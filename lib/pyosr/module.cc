@@ -169,6 +169,14 @@ PYBIND11_PLUGIN(pyosr) {
 				py::arg("verify_magnitude"),
 				py::arg("enable_mt") = true,
 				py::call_guard<py::gil_scoped_release>())
+		.def("calculate_visibility_pair", &UnitWorld::calculateVisibilityPair,
+				py::arg("qs0"),
+				py::arg("qs0_are_unit_states"),
+				py::arg("qs1"),
+				py::arg("qs1_are_unit_states"),
+				py::arg("verify_magnitude"),
+				py::arg("enable_mt") = true,
+				py::call_guard<py::gil_scoped_release>())
 #if PYOSR_HAS_CGAL
 		.def("intersection_region_surface_areas", &UnitWorld::intersectionRegionSurfaceAreas, py::call_guard<py::gil_scoped_release>())
 		.def("intersecting_geometry", &UnitWorld::intersectingGeometry, py::call_guard<py::gil_scoped_release>())

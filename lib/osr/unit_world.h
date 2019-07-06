@@ -163,6 +163,13 @@ public:
 	                           bool qs1_is_unit_states,
 	                           double verify_magnitude,
 				   bool enable_mt = true);
+	Eigen::Matrix<int8_t, -1, 1>
+	calculateVisibilityPair(ArrayOfStates qs0,
+			        bool qs0_is_unit_states,
+	                        ArrayOfStates qs1,
+	                        bool qs1_is_unit_states,
+	                        double verify_magnitude,
+				bool enable_mt = true);
 
 	using VMatrix = Eigen::Matrix<StateScalar, -1, 3>;
 	using FMatrix = Eigen::Matrix<int, -1, 3>;
