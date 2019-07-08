@@ -91,15 +91,36 @@ def _sample_key_conf_worker(wag):
     kfn = ws.keyconf_prediction_file(wag.puzzle_name, for_read=False)
     util.log('[sample_key_conf] trial {}'.format(ws.current_trial))
     util.log('[sample_key_conf] sampling to {}'.format(kfn))
-    def _load_kps(geo_type):
-        kps_fn = ws.keypoint_prediction_file(wag.puzzle_name, geo_type)
-        d = matio.load(kps_fn)
-        return util.access_keypoints(d)
-    env_kps = _load_kps('env')
-    rob_kps = _load_kps('rob')
     ks = pygeokey.KeySampler(wag.env_fn, wag.rob_fn)
-    kqs, _, _ = ks.get_all_key_configs(env_kps, rob_kps,
-                                       ws.config.getint('GeometriK', 'KeyConfigRotations'))
+    INTER_CLASS_PREDICTION = False
+    if INTER_CLASS_PREDICTION:
+        def _load_kps(geo_type):
+            kps_fn = ws.keypoint_prediction_file(wag.puzzle_name, geo_type)
+            d = matio.load(kps_fn)
+            return util.access_keypoints(d)
+        env_kps = _load_kps('env')
+        rob_kps = _load_kps('rob')
+        kqs, _, _ = ks.get_all_key_configs(env_kps, rob_kps,
+                                           ws.config.getint('GeometriK', 'KeyConfigRotations'))
+    else:
+        def _load_kps(geo_type):
+            kps_fn = ws.keypoint_prediction_file(wag.puzzle_name, geo_type)
+            return matio.load(kps_fn)
+        env_d = _load_kps('env')
+        rob_d = _load_kps('rob')
+        def _gen_kqs(key):
+            if not key in env_d or env_d[key].shape[0] == 0:
+                return None
+            if not key in rob_d or rob_d[key].shape[0] == 0:
+                return None
+            ip1 = env_d[key]
+            ip2 = rob_d[key]
+            kqs, _, _ = ks.get_all_key_configs(ip1, ip2,
+                                               ws.config.getint('GeometriK', 'KeyConfigRotations'))
+            return kqs
+        kqs1 = _gen_kqs('KEY_POINT_AMBIENT')
+        kqs2 = _gen_kqs('NOTCH_POINT_AMBIENT')
+        kqs = util.safe_concatente([kqs1, kqs2])
     uw = util.create_unit_world(wag.puzzle_fn)
     cfg, config = parse_ompl.parse_simple(wag.puzzle_fn)
     iq = parse_ompl.tup_to_ompl(cfg.iq_tup)

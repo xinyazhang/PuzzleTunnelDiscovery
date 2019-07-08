@@ -496,3 +496,10 @@ def access_keypoints(d):
             else:
                 kps = nps
     return kps
+
+def safe_concatente(nparray_list, axis=0):
+    true_list = []
+    for arr in nparray_list:
+        if arr.shape[axis] != 0:
+            true_list.append(arr)
+    return np.concatenate(true_list, axis=axis)
