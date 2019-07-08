@@ -372,6 +372,7 @@ class Workspace(object):
         trial = self.current_trial if trial_override is None else trial_override
         ret = self.local_ws(TESTING_DIR, puzzle_name,
                             SCREENED_KEY_PREDICTION_FMT.format(trial))
+        '''
         if for_read and not os.path.exists(ret):
             warn("[sample_pds] forest root file {} does not exist")
             probe_trial = self.current_trial - 1
@@ -386,6 +387,7 @@ class Workspace(object):
             link_target = SCREENED_KEY_PREDICTION_FMT.format(probe_trial)
             os.symlink(link_target, ret)
             warn("[util.keyconf_prediction_file] sylink {} to {} as forest root file".format(link_target, ret))
+        '''
         return ret
 
     def keyconf_prediction_file(self, puzzle_name, for_read=True, trial_override=None):
