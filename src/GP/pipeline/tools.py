@@ -450,57 +450,72 @@ function_dict = {
 def setup_parser(subparsers):
     sp = subparsers.add_parser('tools', help='Various Tools.')
     toolp = sp.add_subparsers(dest='tool_name', help='Name of Tool')
+
     p = toolp.add_parser('read_roots', help='Dump roots of the forest to text file')
     p.add_argument('--roots_key', help='NPZ file of roots', default='KEYQ_OMPL')
     p.add_argument('puzzle_fn', help='OMPL config')
     p.add_argument('roots', help='NPZ file of roots')
     p.add_argument('out', help='output txt file')
+
     p = toolp.add_parser('visenvgt', help='Call vistexture to visualize the training texture')
     p.add_argument('dir', help='Workspace directory')
+
     p = toolp.add_parser('visrobgt', help='Call vistexture to visualize the training texture')
     p.add_argument('dir', help='Workspace directory')
+
     p = toolp.add_parser('vistraj', help='Call vispath to visualize the training trajectory')
     p.add_argument('--traj_id', help='Trajectory ID', default=0)
     p.add_argument('dir', help='Workspace directory')
+
     p = toolp.add_parser('plotstat', help='Call matplotlib and vispath to show the statistics of the training trajectory')
     p.add_argument('--noupdate', help='Do not sync with remote host', action='store_true')
     p.add_argument('--top_k', help='Top K', type=int, default=None)
     p.add_argument('--offset', help='Specify which serie of stats to plot', type=int, default=0)
     p.add_argument('--trim', help='Trim the tail', type=int, default=0)
     p.add_argument('dir', help='Workspace directory')
+
     p = toolp.add_parser('visclearance', help='Show the colliding configuration used to calculate the clearance')
     p.add_argument('dir', help='Workspace directory')
     p.add_argument('--traj_id', help='Specify the trajectory id', type=int, default=0)
     p.add_argument('--point_id', help='Specify the point in the trajectory', type=int, default=0)
+
     p = toolp.add_parser('visnnpred', help='Call vistexture to visualize the prediction results')
     p.add_argument('--current_trial', help='Trial to predict the keyconf', type=int, default=0)
     p.add_argument('--puzzle_name', help='Only show one specific puzzle', default='')
     p.add_argument('dir', help='Workspace directory')
+
     p = toolp.add_parser('visnnsample', help='Call vistexture to visualize the prediction results')
     p.add_argument('--puzzle_name', help='Only show one specific puzzle', default='')
     p.add_argument('--update', help='Only show one specific puzzle', action='store_true')
     p.add_argument('dir', help='Workspace directory')
+
     p = toolp.add_parser('viskey', help='Use vispath to visualize the key configuration')
     p.add_argument('--current_trial', help='Trial to predict the keyconf', type=int, default=None)
     p.add_argument('--range', help='Range of key confs, e.g. 1,2,3,4-7,11', default='')
     p.add_argument('--puzzle_name', help='Only show one specific puzzle', default='')
     p.add_argument('dir', help='Workspace directory')
+
     p = toolp.add_parser('visimp', help='Visualize "Important Points" from geometric hueristics')
     p.add_argument('--pairs', help='How many pairs of points to generate', type=int, default=12)
     p.add_argument('dir', help='Workspace directory')
+
     p = toolp.add_parser('visnotch', help='Visualize Notch from geometric hueristics')
     p.add_argument('--pairs', help='How many pairs of points to generate', type=int, default=12)
     p.add_argument('dir', help='Workspace directory')
+
     p = toolp.add_parser('vistouchv', help='Visualize the touch configurations in clearance estimation')
     p.add_argument('--key_id', help='Key ID in KeyCan.npz. Top K can be found at KEY.npz:_TOP_K', type=int, required=True)
     p.add_argument('dir', help='Workspace directory')
+
     p = toolp.add_parser('vistouchdisp', help='Visualize the displacement of touch configurations from clearance estimation')
     p.add_argument('--key_id', help='Key ID in KeyCan.npz. Top K can be found at KEY.npz:_TOP_K', type=int, required=True)
     p.add_argument('dir', help='Workspace directory')
+
     p = toolp.add_parser('animate', help='Show the animation of solution with vispath')
     p.add_argument('--current_trial', help='Trial to predict the keyconf', type=int, default=None)
     p.add_argument('--puzzle_name', help='Only show one specific puzzle', default='')
     p.add_argument('dir', help='Workspace directory')
+
     p = toolp.add_parser('conclude', help='Show the execution statistics')
     p.add_argument('--trial_range', help='range of trials', type=str, required=True)
     p.add_argument('--puzzle_name', help='Only show one specific testing puzzle', default='')
