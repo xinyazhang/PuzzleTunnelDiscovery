@@ -31,23 +31,7 @@ def _lsv(indir, prefix, suffix):
 
 def _load(fefn, ds_name='E'):
     d = matio.load(fefn)
-    if ds_name is None:
-        ds_name = list(d.keys())[0]
     return d[ds_name] if ds_name in d else None
-'''
-    if fefn.endswith('.npz'):
-        d = np.load(fefn)
-        if ds_name is None:
-            ds_name = list(d.keys())[0]
-        return d[ds_name] if ds_name in d else None
-    elif fefn.endswith('.mat'):
-        d = loadmat(fefn)
-        return d[ds_name] if ds_name in d else None
-    elif fefn.endswith('.hdf5'):
-        d = h5py.File(fefn, 'r')
-        return d[ds_name][:] if ds_name in d else None
-    raise NotImplementedError("Parser for file {} is not implemented".format(fefn))
-'''
 
 class TreePathFinder(object):
     def __init__(self, root, ssc_fn, ct_fn, pds, pds_ids, pds_flags):
@@ -131,34 +115,12 @@ class ForestPathFinder(object):
         assert nssc == nct, 'number of compact tree files ({}) should match number of sample set connectivity files ({})'.format(nct, nssc)
         self._nroots = nssc
 
-    def __solve_old(self):
-        G = self._G = nx.Graph()
-        G.add_nodes_from([-1 - i for i in range(self._nroots)]) # Root nodes
-        G.add_nodes_from(self._pds_ids) # PDS nodes
-        for i in progressbar(range(self._nroots)):
-            root_index = -1 - i
-            rows, cols = np.nonzero(loadmat(self._ssc_files[i])['C'])
-            # print(rows)
-            # print(cols)
-            rows = np.array(rows)
-            rows = np.full(rows.shape, root_index)
-            # print(edges)
-            edges = np.transpose([rows, cols])
-            G.add_edges_from(edges)
-
     def _solve_root_and_pds(self):
-        #self._sssp = [-1, 48, -608, 357, -607, 1j]
-        # self._sssp = [357, -607, 1j]
-        # return
-        # self._sssp = [-1, 4162147, -612, 726372, -725, 3776176, -367, 4131349, -941, 1420526, -41, 3918338, -743, 3488854, -773, 1442466, -525, 3888572, -767, 214122, -764, 3361120, -840, 1449284, -815, 4154340, -2]
-        # self._sssp = self._sssp[:2] # First few segment
-        # print(self._sssp)
-        # return
         G = self._G = nx.Graph()
         G.add_nodes_from([-1 - i for i in range(self._nroots)]) # Root nodes
         G.add_nodes_from(self._pds_ids)
         print("Loading edges from {}".format(self._args.forest_edge))
-        tups = _load(self._args.forest_edge)[:].astype(np.int64)
+        tups = _load(self._args.forest_edge, 'E')[:].astype(np.int64)
         if False:
             print("OpenSet algorithm is disabled")
             self.openset = None
@@ -258,28 +220,13 @@ class ForestPathFinder(object):
         # return
         path = None
         # path = self._solve_in_single_tree(-1, 12342)
-        if True:
-            pairs = [e for e in zip(self._sssp[:-1], self._sssp[1:])]
-            print(pairs)
-            for n_from,n_to in progressbar(pairs):
-                traj = self._solve_in_single_tree(n_from, n_to)
-                if traj is not None:
-                    path = traj if path is None else np.concatenate((path, traj), axis=0)
-        else:
-            roots = [-(root + 1) for root in self._sssp if root < 0]
-            pairs = [e for e in zip(self._sssp[:-1], self._sssp[1:])]
-            for tree_from, tree_to in pairs:
-                traj = self._connect_two_roots(root_from, root_to)
+        pairs = [e for e in zip(self._sssp[:-1], self._sssp[1:])]
+        print(pairs)
+        for n_from,n_to in progressbar(pairs):
+            traj = self._solve_in_single_tree(n_from, n_to)
+            if traj is not None:
                 path = traj if path is None else np.concatenate((path, traj), axis=0)
         self._sssp_full = path
-
-    def solve_root_only(self):
-        G = self._G = nx.Graph()
-        G.add_nodes_from([i for i in range(self._nroots)]) # Root nodes
-        tups = _load(self._args.forest_edge)
-        edges_1 = tups[:,[0,1]]
-        G.add_edges_from(edges_1)
-        self._sssp = nx.shortest_path(G, 0, 1)
 
     def output(self):
         print(self._pds_size)
@@ -290,9 +237,6 @@ class ForestPathFinder(object):
         else:
             np.savetxt(self._args.out, self._sssp_full, fmt='%.17g')
 
-    def _connect_two_roots(self, root_from, root_to):
-        raise NotImplementedError
-
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--indir', help='input directory for ssc-*.mat and file', required=True)
@@ -301,6 +245,7 @@ def main():
     parser.add_argument('--forest_edge', help='Pre-processed edge file from pds_edge.py', required=True)
     parser.add_argument('--prefix_ct', help='File name prefix of compact tree file ', default='compact_tree-')
     parser.add_argument('--prefix_ssc', help='File name prefix of sample set connectivity (ssc) file', default='ssc-')
+    parser.add_argument('--bloom_base', help='File that store the bases of blooming trees in PDS', default=None)
     parser.add_argument('--out', help='Output path file. default to stdout', default=None)
     args = parser.parse_args()
     fpf = ForestPathFinder(args)
