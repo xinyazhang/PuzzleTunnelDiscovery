@@ -301,12 +301,16 @@ class Workspace(object):
         else:
             remoter = ['ssh', host]
         ret = shell(remoter + [script])
-        while ret != 0:
+        while ret == 255:
             if not auto_retry:
                 return ret
             print("SSH Connection to {} is probably broken, retry after 5 secs".format(host))
             time.sleep(5)
             ret = shell(['ssh', host, script + ' --only_wait'])
+        if ret != 0:
+            print("Remote error, exiting")
+            exit()
+        return ret
 
     '''
     Note: directory must end with /
