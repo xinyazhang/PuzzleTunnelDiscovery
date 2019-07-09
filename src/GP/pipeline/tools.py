@@ -429,6 +429,94 @@ def conclude(args):
                 _print_stat(puzzle_name, stat_dic, writer)
     f.close()
 
+def _get_detailed_rows(grand_dict):
+    yield_header = True
+    for trial in grand_dict:
+        for puzzle_name in grand_dict[trial]:
+            data = [cost for _,cost in grand_dict[trial][puzzle_name]]
+            if yield_header:
+                yield ['Puzzle Name', 'Trial ID'] + [stage_name for stage_name,_ in grand_dict[trial][puzzle_name]]
+                yield_header = False
+            yield [puzzle_name, trial] + data
+
+def _get_stat_rows(grand_dict):
+    pass
+
+def _get_rows(grand_dict, args):
+    if args.type == 'detail':
+        yield from _get_detailed_rows(grand_dict)
+    elif args.type == 'stat':
+        yield from _get_stat_rows(grand_dict)
+
+def _detect_single_puzzle(ws):
+    # Deal with single puzzle workspace
+    npuzzle = 0
+    last_puzzle_name = None
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+        npuzzle += 1
+        last_puzzle_name = puzzle_name
+        if npuzzle > 1:
+            break
+    if npuzzle == 1:
+        return last_puzzle_name
+    return None
+
+def _parse_log(logfn, single_puzzle):
+    ret_dic = {}
+    breaker = ' cost '
+
+    def _update_ret_dic(list_of_tuples, stage_name, cost_str):
+        for i in range(len(list_of_tuples)):
+            k,v = list_of_tuples[i]
+            if k == stage_name:
+                list_of_tuples[i] = (stage_name, cost_str)
+                return
+        list_of_tuples.append((stage_name, cost_str))
+
+    with open(logfn, 'r') as f:
+        for line in f:
+            loc = line.find(breaker)
+            if loc < 0:
+                continue
+            cost_str = line[loc+len(breaker):].strip()
+            line = line.replace('[', ' ')
+            line = line.replace(']', ' ')
+            split = line.split()
+            stage_name = split[0]
+            if split[1] == 'cost': # old format, '[puzzle name]' not exist
+                puzzle_name = '*'
+            else:
+                puzzle_name = split[1]
+            if single_puzzle is not None:
+                puzzle_name = single_puzzle if puzzle_name == '*' else puzzle_name
+            if puzzle_name not in ret_dic:
+                ret_dic[puzzle_name] = []
+            # print("{} {}".format(stage_name, cost_str))
+            _update_ret_dic(ret_dic[puzzle_name], stage_name, cost_str)
+    return ret_dic
+
+def breakdown(args):
+    grand_dict = {}
+    trial_list = util.rangestring_to_list(args.trial_range)
+
+    for ws_dir in args.dirs:
+        ws = util.Workspace(ws_dir)
+        single_puzzle = _detect_single_puzzle(ws)
+        for trial in trial_list:
+            if trial not in grand_dict:
+                grand_dict[trial] = {}
+            logfn = ws.local_ws(util.PERFORMANCE_LOG_DIR, 'log.{}'.format(trial))
+            if not os.path.exists(logfn):
+                util.log("{} does not exist, skipping".format(logfn))
+                continue
+            grand_dict[trial].update(_parse_log(logfn, single_puzzle))
+
+    f = open(args.out, 'w')
+    writer = csv.writer(f)
+    for row in _get_rows(grand_dict, args):
+        writer.writerow(row)
+    f.close()
+
 function_dict = {
         'read_roots' : read_roots,
         'visenvgt' : visenvgt,
@@ -445,6 +533,7 @@ function_dict = {
         'vistouchdisp' : vistouchdisp,
         'animate' : animate,
         'conclude' : conclude,
+        'breakdown' : breakdown,
 }
 
 def setup_parser(subparsers):
@@ -521,6 +610,13 @@ def setup_parser(subparsers):
     p.add_argument('--puzzle_name', help='Only show one specific testing puzzle', default='')
     p.add_argument('--type', help='Choose what kind of info to output', default='detail', choices=['detail', 'stat'])
     p.add_argument('--out', help='Output CSV file', default='1.csv')
+    p.add_argument('dirs', help='Workspace directory', nargs='+')
+
+    p = toolp.add_parser('breakdown', help='Show the per-stage runtime')
+    p.add_argument('--trial_range', help='range of trials', type=str, required=True)
+    p.add_argument('--puzzle_name', help='Only show one specific testing puzzle', default='')
+    p.add_argument('--type', help='Choose what kind of info to output', default='detail', choices=['detail', 'stat'])
+    p.add_argument('--out', help='Output CSV file', default='b.csv')
     p.add_argument('dirs', help='Workspace directory', nargs='+')
 
 def run(args):
