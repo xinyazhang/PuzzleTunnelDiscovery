@@ -173,7 +173,7 @@ def viskey(args):
             for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
                 if args.puzzle_name and args.puzzle_name != puzzle_name:
                     continue
-                key_fn = ws.keyconf_prediction_file(puzzle_name, for_read=False)
+                key_fn = ws.screened_keyconf_prediction_file(puzzle_name, for_read=False)
                 if not isfile(key_fn):
                     util.log("[viskey] Could not find {}".format(key_fn))
                     continue
