@@ -94,7 +94,7 @@ def screen_keyconf(args, ws):
             visb_vec = visb_pairs.reshape((-1))
             visibile_indices = visb_vec.nonzero()[0]
             outfn = join(scratch_dir, 'edge_batch-{}.npz'.format(args.task_id))
-            np.savez(outfn, EDGE_FROM=from_indices[visibile_indices], EDGE_TO=to_indices[visibile_indices])
+            np.savez_compressed(outfn, EDGE_FROM=from_indices[visibile_indices], EDGE_TO=to_indices[visibile_indices])
         return # worker never wait
     if not args.only_wait:
         # submit condor job
@@ -151,7 +151,7 @@ def screen_keyconf(args, ws):
                       keys.shape, screened.shape))
             outfn = ws.screened_keyconf_prediction_file(puzzle_name)
             util.log("[screen_keyconf] Save screened roots {} to {}".format(screened.shape, outfn))
-            np.savez(outfn, KEYQ_OMPL=screened)
+            np.savez_compressed(outfn, KEYQ_OMPL=screened)
 
 class TmpDriverArgs(object):
     pass
@@ -244,7 +244,7 @@ def sample_pds(args, ws):
         for j, uq in enumerate(uQ):
             if uw.is_disentangled(uq):
                 QF[j] = se3solver.PDS_FLAG_TERMINATE
-        np.savez(pds_fn, Q=Q, QF=QF, QB=tree_base_list)
+        np.savez_compressed(pds_fn, Q=Q, QF=QF, QB=tree_base_list)
         util.log('[sample_pds] samples stored at {}'.format(pds_fn))
 
 def forest_rdt(args, ws):

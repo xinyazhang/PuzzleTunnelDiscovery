@@ -54,8 +54,6 @@ def refine_mesh(args, ws):
         # util.shell(['/usr/bin/env'])
         util.shell(['./TetWild', '--level', '6', '--targeted-num-v', str(target_v), '--output-surface', wag.refined_geo_fn, wag.geo_fn])
 
-SAMPLE_NOTCH = True
-
 def _sample_key_point_worker(wag):
     ws = util.Workspace(wag.dir)
     ws.current_trial = wag.current_trial
@@ -65,6 +63,7 @@ def _sample_key_point_worker(wag):
     pts = kpp.probe_key_points(natt)
     kps_fn = ws.keypoint_prediction_file(wag.puzzle_name, wag.geo_type)
     util.log("[sample_key_point] writing {} points to {}".format(pts.shape[0], kps_fn))
+    SAMPLE_NOTCH = ws.config.getboolean('GeometriK', 'EnableNotchDetection', fallback=False)
     if SAMPLE_NOTCH:
         util.log("[sample_key_point] Probing notches for {}".format(wag.refined_geo_fn))
         kpp2 = pygeokey.KeyPointProber(wag.refined_geo_fn)
@@ -91,7 +90,7 @@ def _sample_key_conf_worker(wag):
     util.log('[sample_key_conf] trial {}'.format(ws.current_trial))
     util.log('[sample_key_conf] sampling to {}'.format(kfn))
     ks = pygeokey.KeySampler(wag.env_fn, wag.rob_fn)
-    INTER_CLASS_PREDICTION = False
+    INTER_CLASS_PREDICTION = True # For debugging. This must be enabled in order to predict notch-tooth key confs
     if INTER_CLASS_PREDICTION:
         def _load_kps(geo_type):
             kps_fn = ws.keypoint_prediction_file(wag.puzzle_name, geo_type)
@@ -128,7 +127,7 @@ def _sample_key_conf_worker(wag):
     ompl_q = np.concatenate((iq, gq, ompl_q), axis=0)
     #np.savez(kfn, KEYQ_AMBIENT_NOIG=kqs, KEYQ_OMPL=ompl_q)
     np.savez(kfn, KEYQ_OMPL=ompl_q)
-    util.log('[sample_key_conf] save key confs to {}'.format(kfn))
+    util.log('[sample_key_conf] save {} key confs to {}'.format(ompl_q.shape, kfn))
 
 def sample_key_conf(args, ws):
     task_args = _get_task_args(ws, per_geometry=False)

@@ -121,6 +121,9 @@ FineMeshV = 500000
 KeyPointAttempts  = 256
 KeyConfigRotations = 128
 
+# We do not enable notch detector by default, otherwise too many key points will be generated
+EnableNotchDetection = no
+
 [RoboGeoK]
 KeyPointAttempts = 32
 EnvKeyPoints = 1024
