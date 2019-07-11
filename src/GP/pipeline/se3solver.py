@@ -140,7 +140,7 @@ def solve(args):
                 savemat(tree_fn, dict(CNVI=CNVI, CNV=CNV, CE=CE), do_compression=True)
                 util.log("saving compact tree {}".format(tree_fn))
             if args.bloom_out:
-                np.savez(args.bloom_out, BLOOM=V, BLOOM_EDGE=E)
+                np.savez(args.bloom_out, BLOOM=V, BLOOM_EDGE=np.array(E.nonzero()))
                 util.log("saving bloom results to {}".format(args.bloom_out))
     else:
         return_ve = args.bloom_out is not None
