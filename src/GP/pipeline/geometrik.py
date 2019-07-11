@@ -63,7 +63,7 @@ def _sample_key_point_worker(wag):
     pts = kpp.probe_key_points(natt)
     kps_fn = ws.keypoint_prediction_file(wag.puzzle_name, wag.geo_type)
     util.log("[sample_key_point] writing {} points to {}".format(pts.shape[0], kps_fn))
-    SAMPLE_NOTCH = ws.config.getboolean('GeometriK', 'EnableNotchDetection', fallback=False)
+    SAMPLE_NOTCH = ws.config.getboolean('GeometriK', 'EnableNotchDetection', fallback=True)
     if SAMPLE_NOTCH:
         util.log("[sample_key_point] Probing notches for {}".format(wag.refined_geo_fn))
         kpp2 = pygeokey.KeyPointProber(wag.refined_geo_fn)
