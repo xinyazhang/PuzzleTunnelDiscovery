@@ -32,7 +32,12 @@ def load(fn, key=None):
     p = pathlib.PosixPath(fn)
     if p.suffix not in _SUFFIX_TO_LOADER:
         raise NotImplementedError("Parser for {} file is not implemented".format(p.suffix))
-    d = _SUFFIX_TO_LOADER[p.suffix](fn)
+    try:
+        d = _SUFFIX_TO_LOADER[p.suffix](fn)
+    except Exception as e:
+        print("error in loading {}".format(fn))
+        print(e)
+        exit()
     if p.suffix == '.txt':
         return d
     if key is not None:
