@@ -124,13 +124,17 @@ def screen_keyconf(args, ws):
 
             keyfn = ws.keyconf_prediction_file(puzzle_name)
             keys = matio.load(keyfn, key='KEYQ_OMPL')
-            vert_ids = [i for i in range(keys.shape[0])]
+            nkey = keys.shape[0]
+            util.log('[screen_keyconf][{}] nkey (unscreened) {}'.format(puzzle_name, nkey))
+            vert_ids = [i for i in range(nkey)]
             djs = disjoint_set.DisjointSet(vert_ids)
             fn_list = pathlib.Path(scratch_dir).glob("edge_batch-*.npz")
             util.log("[screen_keyconf][{}] Creating disjoint set".format(puzzle_name))
             for fn in progressbar(fn_list):
                 d = matio.load(fn)
                 for r,c in zip(d['EDGE_FROM'], d['EDGE_TO']):
+                    #if str(fn) == '/u/zxy/scratch/auto-mkobs3d/bin/gkws/duet-g1/solver_scratch/duet-g1/screen-80/edge_batch-120.npz':
+                    # util.log("{} {} {} {}".format(r, c, djs.find(r), djs.find(c)))
                     djs.union(r,c)
 
             cluster = djs.get_cluster()
