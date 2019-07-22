@@ -8,6 +8,7 @@ import copy
 import pathlib
 import csv
 import numpy as np
+import argparse
 
 from . import util
 from . import matio
@@ -20,8 +21,11 @@ def read_roots(args):
     uw = util.create_unit_world(args.puzzle_fn)
     ompl_q = matio.load(args.roots, key=args.roots_key)
     print("OMPL_Q {}".format(ompl_q.shape))
-    unit_q = uw.translate_ompl_to_unit(ompl_q)
-    matio.savetxt(args.out, unit_q)
+    if args.to_vanilla:
+        store_q = uw.translate_ompl_to_vanilla(ompl_q)
+    else:
+        store_q = uw.translate_ompl_to_unit(ompl_q)
+    matio.savetxt(args.out, store_q)
 
 def _visgt(args):
     ws = util.Workspace(args.dir)
@@ -542,6 +546,7 @@ def setup_parser(subparsers):
 
     p = toolp.add_parser('read_roots', help='Dump roots of the forest to text file')
     p.add_argument('--roots_key', help='NPZ file of roots', default='KEYQ_OMPL')
+    p.add_argument('--to_vanilla', help='Store vanilla instead of unit configurations', action='store_true')
     p.add_argument('puzzle_fn', help='OMPL config')
     p.add_argument('roots', help='NPZ file of roots')
     p.add_argument('out', help='output txt file')
