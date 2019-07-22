@@ -164,6 +164,7 @@ class Workspace(object):
         self._current_trial = 0
         self.nn_profile = ''
         self._timekeeper = {}
+        self._override_condor_host = None
         self._extra_condor_hosts = None
 
     def get_path(self, optname):
@@ -251,8 +252,13 @@ class Workspace(object):
     def condor_template(self):
         return self.local_ws(CONDOR_TEMPLATE)
 
+    def override_condor_host(self, new_host):
+        self._override_condor_host = str(new_host)
+
     @property
     def condor_host(self):
+        if self._override_condor_host:
+            return self._override_condor_host
         return self.config.get('DEFAULT', 'CondorHost')
 
     @property

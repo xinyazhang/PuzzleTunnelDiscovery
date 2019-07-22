@@ -30,6 +30,8 @@ def run_pipeline(ppl_stages, args):
     assert cont is not None
     ws = util.Workspace(args.dir)
     ws.nn_profile = args.nn_profile
+    if args.condor_host:
+        ws.override_condor_host(args.condor_host)
     nstage = []
     if args.till:
         stage_list = pdesc[cont:till]
@@ -78,6 +80,7 @@ def setup_autorun_parser(subparsers, name, pdesc):
                    metavar='')
     p.add_argument('--current_trial', help='Trial to solve the puzzle', type=str, default=None)
     p.add_argument('--nn_profile', help='NN profile', default='')
+    p.add_argument('--condor_host', help='Override the CondorHost option provided by config File in workspace', type=str, default=None)
     # print('Total Stages: ' + str(len(stage_names)))
 
 
