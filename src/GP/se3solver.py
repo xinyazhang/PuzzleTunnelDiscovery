@@ -8,7 +8,7 @@ import subprocess
 from pipeline.se3solver import solve, merge_forest, presample, merge_pdsc
 
 def main():
-    subprocess.call(['/usr/bin/env'])
+    # subprocess.call(['/usr/bin/env'])
     main_parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     subparsers = main_parser.add_subparsers(dest='command')
     # Subcommand 'solve'
