@@ -27,6 +27,19 @@ def read_roots(args):
         store_q = uw.translate_ompl_to_unit(ompl_q)
     matio.savetxt(args.out, store_q)
 
+def write_roots(args):
+    ws = util.Workspace(args.dir)
+    ws.current_trial = args.current_trial
+    unit_q = matio.load(args.roots, key=args.input_key)
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+        uw = util.create_unit_world(puzzle_fn)
+        d = {}
+        ompl_q = uw.translate_unit_to_ompl(unit_q)
+        d[args.roots_key] = ompl_q
+        key_fn = ws.screened_keyconf_prediction_file(puzzle_name, for_read=False)
+        np.savez(key_fn, **d)
+        util.log('[tools][write_roots] write {} roots to {}'.format(ompl_q.shape, key_fn))
+
 def _visgt(args):
     ws = util.Workspace(args.dir)
     cfg, config = parse_ompl.parse_simple(ws.training_puzzle)
@@ -523,6 +536,7 @@ def breakdown(args):
 
 function_dict = {
         'read_roots' : read_roots,
+        'write_roots' : write_roots,
         'visenvgt' : visenvgt,
         'visrobgt' : visrobgt,
         'vistraj' : vistraj,
@@ -550,6 +564,14 @@ def setup_parser(subparsers):
     p.add_argument('puzzle_fn', help='OMPL config')
     p.add_argument('roots', help='NPZ file of roots')
     p.add_argument('out', help='output txt file')
+
+    p = toolp.add_parser('write_roots', help='Write unitary configurations as roots of the forest to text file', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    p.add_argument('--input_key', help='key of array that stores roots. Useful for non-text format', default=None)
+    p.add_argument('--roots_key', help='NPZ key of roots', default='KEYQ_OMPL')
+    p.add_argument('--current_trial', help='Trial of workspace', type=int, default=0)
+    p.add_argument('--puzzle_name', help='Puzzle name in workspace', required=True)
+    p.add_argument('roots', help='file of unitary configurations supported by matio')
+    p.add_argument('dir', help='workspace')
 
     p = toolp.add_parser('visenvgt', help='Call vistexture to visualize the training texture')
     p.add_argument('dir', help='Workspace directory')
