@@ -221,7 +221,7 @@ def visimp(args):
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
         cfg, _ = parse_ompl.parse_simple(puzzle_fn)
         uw = util.create_unit_world(puzzle_fn)
-        for geo_type in ['rob', 'env']:
+        for geo_type, geo_flag in zip(['rob', 'env'], [uw.GEO_ROB, uw.GEO_ENV]):
             kps_fn = ws.keypoint_prediction_file(puzzle_name, geo_type)
             d = matio.load(kps_fn)
             for key_name in ['KEY_POINT_AMBIENT', 'NOTCH_POINT_AMBIENT']:
@@ -230,8 +230,8 @@ def visimp(args):
                 pts = d[key_name]
                 if pts.shape[0] == 0:
                     continue
-                unit_imp_1 = uw.translate_vanilla_pts_to_unit(uw.GEO_ROB, pts[:, 0:3])
-                unit_imp_2 = uw.translate_vanilla_pts_to_unit(uw.GEO_ROB, pts[:, 3:6])
+                unit_imp_1 = uw.translate_vanilla_pts_to_unit(geo_flag, pts[:, 0:3])
+                unit_imp_2 = uw.translate_vanilla_pts_to_unit(geo_flag, pts[:, 3:6])
                 matio.savetxt('visimp.tmp.txt', np.concatenate((unit_imp_1, unit_imp_2), axis=0))
                 util.shell(['./vispath', cfg.env_fn, cfg.rob_fn, 'visimp.tmp.txt', '0.5'])
 
