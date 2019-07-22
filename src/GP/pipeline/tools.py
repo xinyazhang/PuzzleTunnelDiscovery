@@ -211,6 +211,26 @@ def viskey(args):
         util.shell(['./vispath', cfg.env_fn, cfg.rob_fn, 'viskey.tmp.txt', '0.5'])
 
 def visimp(args):
+    ws = util.Workspace(args.dir)
+    ws.current_trial = args.current_trial
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+        cfg, _ = parse_ompl.parse_simple(puzzle_fn)
+        uw = util.create_unit_world(puzzle_fn)
+        for geo_type in ['rob', 'env']:
+            kps_fn = ws.keypoint_prediction_file(puzzle_name, geo_type)
+            d = matio.load(kps_fn)
+            for key_name in ['KEY_POINT_AMBIENT', 'NOTCH_POINT_AMBIENT']:
+                if key_name not in d:
+                    continue
+                pts = d[key_name]
+                if pts.shape[0] == 0:
+                    continue
+                unit_imp_1 = uw.translate_vanilla_pts_to_unit(uw.GEO_ROB, pts[:, 0:3])
+                unit_imp_2 = uw.translate_vanilla_pts_to_unit(uw.GEO_ROB, pts[:, 3:6])
+                matio.savetxt('visimp.tmp.txt', np.concatenate((unit_imp_1, unit_imp_2), axis=0))
+                util.shell(['./vispath', cfg.env_fn, cfg.rob_fn, 'visimp.tmp.txt', '0.5'])
+
+def _old_visimp(args):
     import pygeokey
     class WorkerArgs(object):
         pass
@@ -261,7 +281,7 @@ def visnotch(args):
         wag.geo_fn = cfg.env_fn
         kpp = pygeokey.KeyPointProber(wag.geo_fn)
         while True:
-            pts = kpp.probe_notch_points(args.pairs)
+            pts = kpp.probe_notch_points()
             if pts.shape[0] > 0:
                 break
             util.log("Found 0 key points, try again")
@@ -615,12 +635,13 @@ def setup_parser(subparsers):
     p.add_argument('--unscreened', help='Show the unscreened key configurations', action='store_true')
     p.add_argument('dir', help='Workspace directory')
 
-    p = toolp.add_parser('visimp', help='Visualize "Important Points" from geometric hueristics')
-    p.add_argument('--pairs', help='How many pairs of points to generate', type=int, default=12)
+    p = toolp.add_parser('visimp', help='Use vispath to visualize the key configuration')
+    p.add_argument('--current_trial', help='Trial to predict the keyconf', type=int, default=None)
+    p.add_argument('--range', help='Range of key confs, e.g. 1,2,3,4-7,11', default='')
+    p.add_argument('--puzzle_name', help='Only show one specific puzzle', default='')
     p.add_argument('dir', help='Workspace directory')
 
     p = toolp.add_parser('visnotch', help='Visualize Notch from geometric hueristics')
-    p.add_argument('--pairs', help='How many pairs of points to generate', type=int, default=12)
     p.add_argument('dir', help='Workspace directory')
 
     p = toolp.add_parser('vistouchv', help='Visualize the touch configurations in clearance estimation')
