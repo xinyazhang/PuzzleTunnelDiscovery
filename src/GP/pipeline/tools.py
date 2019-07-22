@@ -190,7 +190,10 @@ def viskey(args):
             for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
                 if args.puzzle_name and args.puzzle_name != puzzle_name:
                     continue
-                key_fn = ws.screened_keyconf_prediction_file(puzzle_name, for_read=False)
+                if args.unscreened:
+                    key_fn = ws.keyconf_prediction_file(puzzle_name, for_read=False)
+                else:
+                    key_fn = ws.screened_keyconf_prediction_file(puzzle_name, for_read=False)
                 if not isfile(key_fn):
                     util.log("[viskey] Could not find {}".format(key_fn))
                     continue
@@ -419,7 +422,7 @@ def conclude(args):
                     puzzle_rot = ws.config.getint('Prediction', 'NumberOfRotations')
                     puzzle_kps_env = -1
                     puzzle_kps_rob = -1
-                kq_fn = ws.keyconf_prediction_file(puzzle_name)
+                kq_fn = ws.screened_keyconf_prediction_file(puzzle_name)
                 puzzle_roots = matio.load(kq_fn)['KEYQ_OMPL'].shape[0]
                 puzzle_pds = matio.load(pds_fn)['Q'].shape[0]
                 sol_fn = ws.solution_file(puzzle_name, type_name='unit')
@@ -609,6 +612,7 @@ def setup_parser(subparsers):
     p.add_argument('--current_trial', help='Trial to predict the keyconf', type=int, default=None)
     p.add_argument('--range', help='Range of key confs, e.g. 1,2,3,4-7,11', default='')
     p.add_argument('--puzzle_name', help='Only show one specific puzzle', default='')
+    p.add_argument('--unscreened', help='Show the unscreened key configurations', action='store_true')
     p.add_argument('dir', help='Workspace directory')
 
     p = toolp.add_parser('visimp', help='Visualize "Important Points" from geometric hueristics')
