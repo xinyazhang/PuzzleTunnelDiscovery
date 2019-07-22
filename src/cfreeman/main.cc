@@ -62,7 +62,7 @@ bool is_latest_state_free = false;
 
 void usage()
 {
-	std::cerr << R"xxx(Usage: c-freeman <env .obj file> <robot .obj file>
+	std::cerr << R"xxx(Usage: c-freeman <env .obj file> <robot .obj file> [7 numbers for unitary state]
  K: Switch between 'anchor selection' and 'anchor align' mode.
  M: Switch to 'Manual' mode
  Ctrl+S: Save current c-free state to cfreeman.out
@@ -491,6 +491,11 @@ int main(int argc, const char* argv[])
 	osr::state_vector_set_identity(latest_state);
 	osr::state_vector_set_identity(identity);
 	std::tie(identity_trans, identity_rot) = osr::decompose(identity);
+	if (argc == 1 /* cmd */ + 2 /* models */ + 7 /* states */) {
+		for (int i = 3; i < 3 + 7; i++) {
+			latest_state(i - 3) = std::atof(argv[i]);
+		}
+	}
 
 	Viewer viewer;
 	env_data_index = load_geometry_to_viewer(viewer, UnitWorld::GEO_ENV, true);
