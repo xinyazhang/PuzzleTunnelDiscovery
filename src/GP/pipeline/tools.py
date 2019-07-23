@@ -35,6 +35,11 @@ def write_roots(args):
         uw = util.create_unit_world(puzzle_fn)
         d = {}
         ompl_q = uw.translate_unit_to_ompl(unit_q)
+        if not args.noig:
+            cfg, config = parse_ompl.parse_simple(puzzle_fn)
+            iq = parse_ompl.tup_to_ompl(cfg.iq_tup)
+            gq = parse_ompl.tup_to_ompl(cfg.gq_tup)
+            ompl_q = np.concatenate((iq, gq, ompl_q), axis=0)
         d[args.roots_key] = ompl_q
         key_fn = ws.screened_keyconf_prediction_file(puzzle_name, for_read=False)
         np.savez(key_fn, **d)
@@ -593,6 +598,7 @@ def setup_parser(subparsers):
     p.add_argument('--roots_key', help='NPZ key of roots', default='KEYQ_OMPL')
     p.add_argument('--current_trial', help='Trial of workspace', type=int, default=0)
     p.add_argument('--puzzle_name', help='Puzzle name in workspace', required=True)
+    p.add_argument('--noig', help='Do not add initial state and goal state as Key 0 and Key 1', action='store_true')
     p.add_argument('roots', help='file of unitary configurations supported by matio')
     p.add_argument('dir', help='workspace')
 
