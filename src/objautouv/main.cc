@@ -23,6 +23,8 @@ Options:
 	-h <box height> Default: -1 (probing)
 	-m <margin>     Unit: pixel. Requires -r -w and -h. Default: 0
 	-f              Overwrite the output obj.
+	-n              Do not pick optimal box to place in each iteration.
+                        This makes large mesh packed faster.
 )xxx";
 	std::cerr << "\tDefault Resolution: " << res << "\n";
 }
@@ -32,7 +34,8 @@ int main(int argc, char* argv[])
 	int opt;
 	bool overwrite = false;
 	bool pair = true;
-	while ((opt = getopt(argc, argv, "r:w:h:m:fs")) != -1) {
+	bool optimized = true;
+	while ((opt = getopt(argc, argv, "r:w:h:m:fsn")) != -1) {
 		switch (opt) {
 			case 'r':
 				res = std::atoi(optarg);
@@ -51,6 +54,9 @@ int main(int argc, char* argv[])
 				break;
 			case 's': // -s == single
 				pair = false;
+				break;
+			case 'n':
+				optimized = false;
 				break;
 			default:
 				std::cerr << "Unrecognized argument -" << char(opt) << std::endl;
@@ -96,7 +102,7 @@ int main(int argc, char* argv[])
 	// std::cerr << "m.F\n" << m.F << std::endl;
 	igl::per_face_normals(m.V, m.F, m.face_normals);
 	m.PairWithLongEdge(pair);
-	m.Program(res, boxw, boxh, margin);
+	m.Program(res, boxw, boxh, margin, optimized);
 	igl::writeOBJ(ofn, m.V, m.F, m.N, m.FN, m.UV, m.FUV);
 	std::ofstream fout("out.svg");
 	fout << "<svg height=\"" << res << "\" width=\"" << res << "\">\n";

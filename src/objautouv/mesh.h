@@ -41,7 +41,8 @@ struct Mesh {
 	// Final routine
 	//   After calling PairWithLongEdge to set boxes,
 	//   call lib/rectpack to pack these boxes.
-	void Program(int res = -1, double boxw = -1, double boxh = -1, int margin_pix = 0);
+	void Program(int res = -1, double boxw = -1, double boxh = -1, int margin_pix = 0,
+	             bool optimized = true);
 
 	double rec_u_size, rec_v_size;
 };

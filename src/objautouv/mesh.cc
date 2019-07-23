@@ -292,7 +292,7 @@ bool in(const Eigen::Vector2d& uv, const rbp::Rect& rect)
 	       uv(1) >= rect.y && uv(1) <= rect.y + rect.height;
 }
 
-void Mesh::Program(int res, double boxw, double boxh, int margin_pix)
+void Mesh::Program(int res, double boxw, double boxh, int margin_pix, bool optimized)
 {
 	assert(boxw * boxh > 0); // boxw and boxh must have the same sign
 	double total_area = 0;
@@ -360,11 +360,29 @@ void Mesh::Program(int res, double boxw, double boxh, int margin_pix)
 		}
 #else
 		bin.Init(edges[0], edges[1]);
-		// bin.Insert(rects_in, rects_out, rbp::MaxRectsBinPack::RectBestShortSideFit);
-		bin.Insert(rects_in, rects_out, rbp::MaxRectsBinPack::RectBestLongSideFit);
-		// bin.Insert(rects_in, rects_out, rbp::MaxRectsBinPack::RectBestAreaFit);
-		// bin.Insert(rects_in, rects_out, rbp::MaxRectsBinPack::RectBottomLeftRule);
-		// bin.Insert(rects_in, rects_out, rbp::MaxRectsBinPack::RectContactPointRule);
+		// auto current_method = rbp::MaxRectsBinPack::RectBestShortSideFit;
+		auto current_method = rbp::MaxRectsBinPack::RectBestLongSideFit;
+		// auto current_method = rbp::MaxRectsBinPack::RectBestAreaFit;
+		// auto current_method = rbp::MaxRectsBinPack::RectBottomLeftRule;
+		// auto current_method = rbp::MaxRectsBinPack::RectContactPointRule;
+		if (optimized) {
+			bin.Insert(rects_in, rects_out, current_method);
+		} else {
+			rects_out.clear();
+			rects_out.reserve(rects_in.size());
+			size_t last_pc = 0;
+			for (const auto& rect: rects_in) {
+				auto node = bin.Insert(rect.width, rect.height, current_method, rect.cookie);
+				if (node.height == 0)
+					break;
+				rects_out.emplace_back(node);
+				size_t pc = rects_out.size() * 100 / rects_in.size();
+				if (pc != last_pc) {
+					std::cout << "Progress: " << pc << "%" << std::endl;
+					last_pc = pc;
+				}
+			}
+		}
 		if (rects_out.size() == rects_in.size()) {
 			break;
 		}
