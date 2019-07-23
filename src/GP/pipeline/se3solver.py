@@ -56,13 +56,15 @@ def _load_states_from_dic(dic):
     if 'file' not in dic:
         return None, 0, 0, None
     is_fn = dic['file']
-    is_key = dic['key'] if 'key' in dic else None
+    is_key = dic['key'] if 'key' in dic else 'KEYQ_OMPL'
     is_offset = int(dic['offset'])
     is_size = int(dic['size']) if 'size' in dic else 1
     is_out = dic['out']
     d = np.load(is_fn)
+    '''
     if is_key is None:
-        is_key = list(d.keys())[0]
+        is_key = list(d.keys())[0] # <- DON'T IT'S RISKY
+    '''
     A = d[is_key]
     total_size = A.shape[0]
     if is_size == -1:
