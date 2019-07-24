@@ -339,11 +339,12 @@ bool mouse_scroll(Viewer& viewer, float delta_y)
 		// rob_data.set_transform(osr::translate_state_to_transform(latest_state).matrix());
 	} else {
 		if (!ctrl_pressed)
-			return true;
+			return false;
 		anchors[rob_data_index].angle += delta_y / 180.0 * M_PI;
+		std::cerr << "scroll to " << anchors[rob_data_index].angle << std::endl;
 
 		update_cfree_visualization(viewer, magnitude);
-		return false;
+		return true;
 	}
 }
 
@@ -374,6 +375,10 @@ bool key_up(Viewer& viewer, unsigned int key, int modifier)
 	if (key == GLFW_KEY_LEFT_CONTROL || key == GLFW_KEY_RIGHT_CONTROL)
 		ctrl_pressed = false;
 	// std::cerr << "ctrl_pressed " << ctrl_pressed << std::endl;
+	if (key < 128)
+		std::cerr << (char)key << " pressed " << std::endl;
+	else
+		std::cerr << key << " pressed " << std::endl;
 	if (key == 'k' or key == 'K') {
 		// "K": Switch between 'anchor selection' and 'anchor align' mode.
 		anchor_mode = !anchor_mode;
@@ -404,7 +409,7 @@ bool key_up(Viewer& viewer, unsigned int key, int modifier)
 		else
 			viewer.data().show_lines = not viewer.data().show_lines;
 	} else if (key == 't' or key == 'T') {
-		viewer.data().show_lines = not viewer.data().show_texture;
+		viewer.data().show_texture = not viewer.data().show_texture;
 	} else if (key == '-') {
 		magnitude *= 0.5;
 		if (!manual_mode)
@@ -432,9 +437,11 @@ bool key_up(Viewer& viewer, unsigned int key, int modifier)
 		manual_axis -= 1;
 		manual_axis += 3;
 		manual_axis %= 3;
+	} else {
+		return false;
 	}
 #endif
-	return false;
+	return true;
 }
 
 bool predraw(Viewer& viewer)
@@ -462,12 +469,12 @@ bool predraw(Viewer& viewer)
 	// Non-anchor mode: all models are shown
 	for (auto& data : viewer.data_list) {
 		data.show_faces = !anchor_mode;
-		data.show_lines = !anchor_mode;
+		// data.show_lines = !anchor_mode;
 		data.show_overlay = !anchor_mode;
 	}
 	auto& rob_data = viewer.data_list[rob_data_index];
 	rob_data.show_faces = true;
-	rob_data.show_lines = true;
+	// rob_data.show_lines = true;
 	rob_data.show_overlay = true;
 
 	if (anchor_mode)
