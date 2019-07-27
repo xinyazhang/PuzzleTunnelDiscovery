@@ -343,7 +343,9 @@ class Workspace(object):
         return self.local_ws(NEURAL_SCRATCH, name)
 
     def training_puzzle_generator(self):
-        yield self.training_puzzle, 'train'
+        # More flexible, allows ws with only 'extrain'
+        if os.path.isfile(self.training_puzzle):
+            yield self.training_puzzle, 'train'
         exdir = self.local_ws(EXTRA_TRAINING_DIR)
         if not os.path.isdir(exdir):
             return
