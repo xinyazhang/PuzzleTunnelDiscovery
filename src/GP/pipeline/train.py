@@ -239,6 +239,7 @@ def collect_stages():
              ('train_rob', remote_train_rob),
              ('train_env', remote_train_env),
              ('wait_for_training', remote_wait_for_training),
+             ('Break', lambda _: util.ack('[Break] Dummy stage between training phase and testing phase')),
              ('predict_rob', remote_predict_rob),
              ('predict_env', remote_predict_env),
              ('fetch_from_gpu', _fetch),
