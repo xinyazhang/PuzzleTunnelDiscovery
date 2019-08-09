@@ -286,7 +286,7 @@ void extractPlanVE(const ompl::base::PlannerData& pdata,
 		std::vector<unsigned int> edges;
 		pdata.getEdges(i, edges);
 		for (auto j : edges)
-			tris.emplace_back(i, j);
+			tris.emplace_back(i, j, 1);
 	}
 	E.setFromTriplets(tris.begin(), tris.end());
 }
