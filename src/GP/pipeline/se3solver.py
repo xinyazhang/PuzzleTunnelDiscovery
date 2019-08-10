@@ -18,6 +18,8 @@ try:
     PLANNER_RDT = plan.PLANNER_RDT
 except ImportError as e:
     util.warn(str(e))
+    util.warn(str(sys.version))
+    util.warn(str(sys.version_info))
     util.warn("[WARNING] CANNOT IMPORT pyse3ompl. This node is incapable of RDT forest planning")
 from . import parse_ompl
 PDS_FLAG_TERMINATE = 1
@@ -142,7 +144,16 @@ def solve(args):
                 savemat(tree_fn, dict(CNVI=CNVI, CNV=CNV, CE=CE), do_compression=True)
                 util.log("saving compact tree {}".format(tree_fn))
             if args.bloom_out:
-                np.savez(args.bloom_out, BLOOM=V, BLOOM_EDGE=np.array(E.nonzero()))
+                '''
+                _, _, CE = driver.get_compact_graph()
+                np.savez(args.bloom_out, BLOOM=V, BLOOM_EDGE=CE)
+                '''
+                np.savez(args.bloom_out,
+                         BLOOM=V,
+                         BLOOM_EDGE=np.array(E.nonzero()),
+                         IS_INDICES=driver.get_graph_istate_indices(),
+                         GS_INDICES=driver.get_graph_gstate_indices()
+                         )
                 util.log("saving bloom results to {}".format(args.bloom_out))
     else:
         return_ve = args.bloom_out is not None

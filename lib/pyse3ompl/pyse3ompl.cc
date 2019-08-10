@@ -150,6 +150,14 @@ public:
 			}
 			if (return_ve) {
 				extractPlanVE(pdata, V, E);
+				graph_istate_indices_.resize(pdata.numStartVertices());
+				graph_gstate_indices_.resize(pdata.numGoalVertices());
+				for (int i = 0; i < graph_istate_indices_.rows(); i++) {
+					graph_istate_indices_(i) = pdata.getStartIndex(i);
+				}
+				for (int i = 0; i < graph_gstate_indices_.rows(); i++) {
+					graph_gstate_indices_(i) = pdata.getGoalIndex(i);
+				}
 			}
 		}
 		std::cout << "-----FINAL-----" << std::endl;
@@ -248,6 +256,18 @@ public:
 	{
 		return static_cast<int>(latest_solution_status_);
 	}
+
+	Eigen::VectorXi
+	getGraphIStateIndices() const
+	{
+		return graph_istate_indices_;
+	}
+
+	Eigen::VectorXi
+	getGraphGStateIndices() const
+	{
+		return graph_gstate_indices_;
+	}
 private:
 	int planner_id_;
 	int vs_sampler_id_;
@@ -338,6 +358,9 @@ private:
 
 	Eigen::MatrixXd latest_solution_;
 	ompl::base::PlannerStatus::StatusType latest_solution_status_;
+
+	Eigen::VectorXi graph_istate_indices_;
+	Eigen::VectorXi graph_gstate_indices_;
 };
 
 PYBIND11_MODULE(pyse3ompl, m) {
@@ -391,6 +414,8 @@ PYBIND11_MODULE(pyse3ompl, m) {
 		.def("get_sample_set_connectivity", &OmplDriver::getSampleSetConnectivity)
 		.def("presample", &OmplDriver::presample)
 		.def("get_compact_graph", &OmplDriver::getCompactGraph)
+		.def("get_graph_istate_indices", &OmplDriver::getGraphIStateIndices)
+		.def("get_graph_gstate_indices", &OmplDriver::getGraphGStateIndices)
 		.def_property_readonly("latest_solution", &OmplDriver::getLatestSolution)
 		.def_property_readonly("latest_solution_status", &OmplDriver::getLatestSolutionStatus)
 		;
