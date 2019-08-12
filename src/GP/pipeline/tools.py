@@ -205,7 +205,8 @@ def viskey(args):
                 yield puzzle_fn, puzzle_name, key_fn
         return
     for puzzle_fn, puzzle_name, key_fn in puzgen(args):
-        keys = matio.load(key_fn)['KEYQ_OMPL']
+        d = matio.load(key_fn)
+        keys = d['KEYQ_OMPL']
         uw = util.create_unit_world(puzzle_fn)
         if args.range:
             keys = keys[util.rangestring_to_list(args.range)]
@@ -213,7 +214,39 @@ def viskey(args):
         matio.savetxt('viskey.tmp.txt', ukeys)
 
         cfg, _ = parse_ompl.parse_simple(puzzle_fn)
-        util.shell(['./vispath', cfg.env_fn, cfg.rob_fn, 'viskey.tmp.txt', '0.5'])
+        cmd = ['./vispath', cfg.env_fn, cfg.rob_fn, 'viskey.tmp.txt', '0.5']
+        type2flag = {'rob':uw.GEO_ROB, 'env':uw.GEO_ENV}
+        if 'ENV_KEYID' in d:
+            env_keyid = d['ENV_KEYID'].reshape(-1)
+            rob_keyid = d['ROB_KEYID'].reshape(-1)
+            def _load_kps(geo_type):
+                geo_flag = type2flag[geo_type]
+                kps_fn = ws.keypoint_prediction_file(puzzle_name, geo_type)
+                d = matio.load(kps_fn)
+                pts = util.access_keypoints(d)
+                unit_imp_1 = uw.translate_vanilla_pts_to_unit(geo_flag, pts[:, 0:3])
+                unit_imp_2 = uw.translate_vanilla_pts_to_unit(geo_flag, pts[:, 3:6])
+                return np.concatenate((unit_imp_1, unit_imp_2), axis=1)
+            if True:
+                env_kps = _load_kps('env')[env_keyid, :]
+                rob_kps = _load_kps('rob')[rob_keyid, :]
+                karma = np.concatenate((env_kps, rob_kps), axis=1)
+            else:
+                env_kps = _load_kps('env')
+                rob_kps = _load_kps('rob')
+                if True:
+                    cap = min(env_kps.shape[0], rob_kps.shape[0])
+                    env_kps = env_kps[:cap]
+                    rob_kps = rob_kps[:cap]
+                    karma = np.concatenate((env_kps, rob_kps), axis=1)
+                else:
+                    # karma = np.concatenate((env_kps, env_kps), axis=1)
+                    karma = np.concatenate((rob_kps, rob_kps), axis=1)
+            matio.savetxt('viskey.karma.txt', karma)
+            matio.savetxt('viskey.env_kps.txt', env_kps[:,:])
+            matio.savetxt('viskey.rob_kps.txt', rob_kps[:,:])
+            cmd.append('viskey.karma.txt')
+        util.shell(cmd)
 
 def visimp(args):
     ws = util.Workspace(args.dir)
@@ -562,6 +595,28 @@ def breakdown(args):
         writer.writerow(row)
     f.close()
 
+def blender_animate(args):
+    ws = util.Workspace(args.dir)
+    ws.current_trial = args.current_trial
+    if not args.puzzle_name:
+        util.fatal("[blender_animate] --puzzle_name is required to render")
+        util.ack("[blender_animate] Avaliable puzzles:")
+        for _, name in ws.test_puzzle_generator():
+            util.ack(f"[blender_animate] {name}")
+        return
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+        cfg, config = parse_ompl.parse_simple(puzzle_fn)
+        unit_path = ws.solution_file(puzzle_name, type_name='unit')
+        vanilla_path = ws.solution_file(puzzle_name, type_name='vanilla')
+        if not os.path.isfile(unit_path):
+            util.warn(f'[blender_animate] The solution file {unit_path} does not exist')
+            continue
+        uw = util.create_unit_world(puzzle_fn)
+        unit_q = matio.load(unit_path)
+        van_q = uw.translate_ompl_to_vanilla(uw.translate_unit_to_ompl(unit_q))
+        matio.savetxt(vanilla_path, van_q)
+        util.shell(['blender', '-P', 'SolVis.py', '--', cfg.env_fn, cfg.rob_fn, vanilla_path, args.outdir])
+
 function_dict = {
         'read_roots' : read_roots,
         'write_roots' : write_roots,
@@ -580,6 +635,7 @@ function_dict = {
         'animate' : animate,
         'conclude' : conclude,
         'breakdown' : breakdown,
+        'blender' : blender_animate,
 }
 
 def setup_parser(subparsers):
@@ -676,6 +732,12 @@ def setup_parser(subparsers):
     p.add_argument('--type', help='Choose what kind of info to output', default='detail', choices=['detail', 'stat'])
     p.add_argument('--out', help='Output CSV file', default='b.csv')
     p.add_argument('dirs', help='Workspace directory', nargs='+')
+
+    p = toolp.add_parser('blender', help='Invoke blender to render the trajectory')
+    p.add_argument('--current_trial', help='Trial that has the solution trajectory', type=int, default=None)
+    p.add_argument('--puzzle_name', help='Puzzle selection. Will exit after displaying all puzzle names if not present', default='')
+    p.add_argument('dir', help='Workspace directory')
+    p.add_argument('outdir', help='Output directory')
 
 def run(args):
     function_dict[args.tool_name](args)
