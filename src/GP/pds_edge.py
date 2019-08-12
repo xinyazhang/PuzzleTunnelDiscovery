@@ -24,6 +24,7 @@ def _total_memory():
     return virtual_memory().total
 
 def collect_ITE(files, buf, ITE, low, high, pbar=None, QF=None, roots_to_open=None):
+    # print("low {}".format(low))
     batch = high - low
     '''
     Load data into buffer
@@ -47,6 +48,7 @@ def collect_ITE(files, buf, ITE, low, high, pbar=None, QF=None, roots_to_open=No
             pbar += N
         if QF is not None and (QF[global_col] & _OPENSPACE_FLAG != 0):
             rows = col_data.nonzero()[0].tolist()
+            # print("update roots_to_open {}".format(rows))
             roots_to_open.update(rows)
 
 def print_edge(args):
@@ -56,7 +58,12 @@ def print_edge(args):
         QF = None
     f = h5py.File(args.out, mode='a')
     N = len(args.files)                     # N: number of roots
-    K = matio.load(args.files[0])['C'].shape[1]  # K: PDS size
+    # Guessing K: PDS size
+    # QF is the most reliable source
+    if QF is not None:
+        K = QF.shape[0]
+    else:
+        K = matio.load(args.files[0])['C'].shape[1]
 
     #inter_tree_dtype = np.uint32 if K < np.iinfo(np.uint32).max else np.uint64
     inter_tree_dtype = np.int64
@@ -70,6 +77,7 @@ def print_edge(args):
     per_run_buffer = np.zeros((N, pds_limit_per_run), dtype=np.int8)
     sep = list(range(K, 0, -pds_limit_per_run))
     sep.append(0)
+    print("sep {}".format(sep))
     pbar = ProgressBar(max_value=K*N*2)
     roots_to_open = set()
     print("Chunk the forest from {} to {}".format((N,K), per_run_buffer.shape))
