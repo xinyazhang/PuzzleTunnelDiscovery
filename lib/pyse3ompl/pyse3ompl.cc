@@ -131,6 +131,8 @@ public:
 		}
 		if (sbudget > 0)
 			throw std::runtime_error("sbudget is not implemented");
+		latest_solution_.resize(0, 0);
+		latest_solution_status_ = ompl::base::PlannerStatus::UNKNOWN;
 		auto status = setup.solve(3600 * 24 * days);
 		if (status) {
 			std::cout.precision(17);
