@@ -40,6 +40,8 @@ bool Qs_has_rotation = true;
 osr::ArrayOfStates Qs;
 Eigen::VectorXd miles;
 double total_miles;
+Eigen::MatrixXd Qs_karma;
+int karma_base = 0;
 
 bool play = false;
 bool first_draw = false;
@@ -211,6 +213,9 @@ bool predraw(Viewer& viewer)
 
 bool key_up(Viewer& viewer, unsigned int key, int modifier)
 {
+	bool do_update_keyconf = false;
+	auto& rob_data = viewer.data_list[rob_data_index];
+	auto& env_data = viewer.data_list[env_data_index];
 	// std::cerr << key << std::endl;
 	if (key == 'p' or key == 'P') {
 		if (modifier & GLFW_MOD_CONTROL) {
@@ -232,28 +237,89 @@ bool key_up(Viewer& viewer, unsigned int key, int modifier)
 		show_all = !show_all;
 		load_all = show_all;
 	} else if (Qs_has_rotation && key == GLFW_KEY_PAGE_UP) {
-		auto& rob_data = viewer.data_list[rob_data_index];
 		current_node += 1;
 		current_node %= Qs.rows();
-		osr::StateVector q = Qs.row(current_node).transpose();
-		rob_data.set_transform(osr::translate_state_to_transform(q).matrix(), 0);
+		do_update_keyconf = true;
 	} else if (Qs_has_rotation && key == GLFW_KEY_PAGE_DOWN) {
-		auto& rob_data = viewer.data_list[rob_data_index];
 		current_node -= 1;
 		current_node += Qs.rows();
 		current_node %= Qs.rows();
-		osr::StateVector q = Qs.row(current_node).transpose();
-		rob_data.set_transform(osr::translate_state_to_transform(q).matrix(), 0);
+		do_update_keyconf = true;
 	} else if (key == 'k' or key == 'K') {
 		// "K": Switch between 'anchor selection' and 'anchor align' mode.
 		anchor_mode = !anchor_mode;
 		if (anchor_mode) {
-			auto& rob_data = viewer.data_list[rob_data_index];
 			osr::StateVector q;
 			osr::state_vector_set_identity(q);
 			rob_data.set_transform(osr::translate_state_to_transform(q).matrix());
 		}
 	}
+#if 1
+	if (do_update_keyconf) {
+		osr::StateVector q = Qs.row(current_node).transpose();
+		auto tf = osr::translate_state_to_transform(q);
+		rob_data.set_transform(tf.matrix(), 0);
+		int nk = Qs_karma.rows();
+		if (nk > 0 && current_node >= karma_base) {
+#if 0
+			int off = (current_node - karma_base) % nk;
+			Eigen::MatrixXd pc_color(1, 3);
+			pc_color << 0.0, 1.0, 0.0;
+			std::cerr << "current_node: " << current_node << std::endl;
+			std::cerr << "Qs: " << Qs.rows() << std::endl;
+			std::cerr << "Qs_karma: " << Qs_karma.rows() << std::endl;
+			std::cerr << "off: " << off << std::endl;
+			Eigen::MatrixXd tmp = Qs_karma.block(off, 0, 1, 3);
+			env_data.set_points(tmp, pc_color);
+			for (int off = 1; off < nk; off++)
+				env_data.add_points(Qs_karma.block(off, 0, 1, 3), pc_color);
+			pc_color << 0.0, 0.5, 0.0;
+			for (int off = 0; off < nk; off++)
+				env_data.add_points(Qs_karma.block(off, 3, 1, 3), pc_color);
+			// pc_color << 1.0, 0.0, 0.0;
+			// rob_data.set_points(Qs_karma.block(off, 6, 1, 3), pc_color);
+			// pc_color << 0.5, 0.0, 0.0;
+			// rob_data.add_points(Qs_karma.block(off, 9, 1, 3), pc_color);
+#else
+			int off = (current_node - karma_base) % nk;
+			Eigen::MatrixXd pc_color(1, 3);
+			pc_color << 0.0, 1.0, 0.0;
+			env_data.set_points(Qs_karma.block(off, 0, 1, 3), pc_color);
+			pc_color << 0.0, 0.5, 0.0;
+			env_data.add_points(Qs_karma.block(off, 3, 1, 3), pc_color);
+			pc_color << 1.0, 0.0, 0.0;
+			Eigen::Vector3d pt;
+			pt = Qs_karma.block(off, 6, 1, 3).transpose();
+			pt = tf * pt;
+			rob_data.set_points(pt.transpose(), pc_color);
+			pc_color << 0.5, 0.0, 0.0;
+			pt = Qs_karma.block(off, 9, 1, 3).transpose();
+			pt = tf * pt;
+			rob_data.add_points(pt.transpose(), pc_color);
+#endif
+		}
+		std::string window_title = "current key index: " + std::to_string(current_node);
+		glfwSetWindowTitle(viewer.window, window_title.c_str());
+	}
+#else
+	if (Qs_karma.rows() > 0) {
+		Eigen::MatrixXd pc_color(1, 3);
+		pc_color << 0.0, 1.0, 0.0;
+		env_data.set_points(Qs_karma.block(0, 0, Qs_karma.rows(), 3), pc_color);
+		pc_color << 0.0, 0.5, 0.0;
+		env_data.add_points(Qs_karma.block(0, 3, Qs_karma.rows(), 3), pc_color);
+
+#if 1
+		osr::StateVector q;
+		osr::state_vector_set_identity(q);
+		rob_data.set_transform(osr::translate_state_to_transform(q).matrix());
+		pc_color << 1.0, 0.0, 0.0;
+		rob_data.set_points(Qs_karma.block(0, 6, Qs_karma.rows(), 3), pc_color);
+		pc_color << 0.5, 0.0, 0.0;
+		rob_data.add_points(Qs_karma.block(0, 9, Qs_karma.rows(), 3), pc_color);
+#endif
+	}
+#endif
 	return false;
 }
 
@@ -300,6 +366,30 @@ void load_path(const std::string& fn)
 		miles(i) = dist;
 	}
 	total_miles = dist;
+}
+
+void load_qs_karma(const std::string& fn, int nelem)
+{
+	std::ifstream fin(fn);
+	std::vector<Eigen::VectorXd> qs_karma;
+	Eigen::VectorXd q;
+	q.resize(nelem);
+	std::string line;
+	while (!fin.eof()) {
+		std::getline(fin, line);
+		std::stringstream linein(line);
+		int i = 0;
+		while (i < nelem && linein >> q(i))
+			i++;
+		if (i == 0)
+			break;
+		qs_karma.emplace_back(q);
+	}
+	Qs_karma.resize(qs_karma.size(), q.rows());
+	for (size_t i = 0; i < qs_karma.size(); i++) {
+		Qs_karma.row(i) = qs_karma[i];
+	}
+	karma_base = Qs.rows() - Qs_karma.rows();
 }
 
 bool mouse_up(Viewer& viewer, int button, int modifier)
@@ -361,6 +451,9 @@ int main(int argc, const char* argv[])
 	}
 	std::string env_fn(argv[1]), rob_fn(argv[2]), txt_fn(argv[3]);
 	speed = std::atof(argv[4]);
+	if (argc >= 6) {
+		load_qs_karma(argv[5], 12); // four 3D points = 12 reals per row
+	}
 
 	load_path(txt_fn);
 
