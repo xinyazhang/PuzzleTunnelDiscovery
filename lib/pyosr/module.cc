@@ -233,6 +233,8 @@ PYBIND11_PLUGIN(pyosr) {
 		     py::arg("return_all") = false,
 		     py::arg("enable_mt") = true,
 		     py::call_guard<py::gil_scoped_release>())
+		.def("get_ompl_center", &UnitWorld::getOMPLCenter,
+		     py::arg("geo") = UnitWorld::GEO_ROB)
 		.def("kinetic_energy_distance", &UnitWorld::kineticEnergyDistance)
 		.def("multi_kinetic_energy_distance", &UnitWorld::multiKineticEnergyDistance)
 		.def_readonly_static("GEO_ENV", &UnitWorld::GEO_ENV)

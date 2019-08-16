@@ -1552,6 +1552,11 @@ UnitWorld::getCDModel(uint32_t geo) const
 	return const_cast<UnitWorld*>(this)->getCDModel(geo);
 }
 
+Eigen::Vector3d
+UnitWorld::getOMPLCenter(uint32_t geo) const
+{
+	return glm2Eigen(getScene(geo)->getOMPLCenter());
+}
 
 double
 UnitWorld::kineticEnergyDistance(const StateVector& q0,

@@ -7,7 +7,7 @@ import bpy
 import argparse
 import math
 import numpy as np
-from scipy.spatial.transform import Rotation
+from scipy.spatial.transform import Rotation, Slerp
 
 
 #ui stuff... can ignore this
@@ -84,6 +84,27 @@ def select(li, i, objkey = "Rob"):
     obj.rotation_quaternion.z = li[i][6]
     print(f'{objkey} quat {obj.rotation_quaternion}')
 
+def _mix(tau, key_0, key_1):
+    t = (1.0 - tau) * key_0[0] + tau * key_1[0]
+    rots = Rotation.from_quat([key_0[1].as_quat(), key_1[1].as_quat()])
+    slerp = Slerp([0.0, 1.0], rots)
+    r, = slerp([tau])
+    return (t, r)
+
+def _add_key(rob, t, quat, frame):
+    rob.rotation_mode = 'QUATERNION'
+    rob.location.x = t[0]
+    rob.location.y = t[1]
+    rob.location.z = t[2]
+    rob.rotation_quaternion.x = quat[0]
+    rob.rotation_quaternion.y = quat[1]
+    rob.rotation_quaternion.z = quat[2]
+    rob.rotation_quaternion.w = quat[3]
+    rob.select = True
+    rob.keyframe_insert(data_path="location", frame=frame)
+    rob.keyframe_insert(data_path="rotation_quaternion", frame=frame)
+    rob.select = False
+
 def displace(initCoords, transCoords, obj):
     """applies rigid body transform to obj, with initial position (x,y,z) initCoords"""
     r = Rotation.from_quat(transCoords[3:7])
@@ -109,6 +130,7 @@ def parse_args():
     p.add_argument('qpath', help='Vanilla configuration path')
     p.add_argument('out', help='Output dir')
     p.add_argument('--total_frames', help='Total number of frames to render', default=1440)
+    p.add_argument('--O', help='OMPL center of gemoetry', type=float, nargs=3, required=True)
     argv = sys.argv
     return p.parse_args(argv[argv.index("--") + 1:])
 
@@ -130,6 +152,7 @@ def main():
 
     # matrix detailing path of the object. framesamples[i] is coordinates of the robot at step i
     frameSamples = []
+    key_confs = []
     # distance travelled per step, using weighted distance. Determines keyrame placement
     distances = [0]
     rotationWeight = 50     #weight to rotational component of distance
@@ -140,6 +163,7 @@ def main():
     vanilla_path = np.loadtxt(args.qpath)
 
     prevQ = []
+    O = np.array(args.O)
     for el in vanilla_path:
             el = [float(el) for el in el]
             T = el[:3]
@@ -160,6 +184,9 @@ def main():
                 distances.append(distances[-1] + d)
                 totalDist += d
             frameSamples.append(res) # w-first
+            R = Rotation.from_quat(el[3:7]) # w-last
+            # Translate to OMPL configuration
+            key_confs.append((np.array(el[:3]) + R.apply(O), R))
     listSize = len(frameSamples)
 
     def i_changed(self, context):
@@ -194,7 +221,9 @@ def main():
 #initial coordinates of point on robot when robot's position is identity
     witnessCoords = np.array([40,41,-2])
 
-#keyframe insertion
+    '''
+    # keyframe insertion
+    # Note this is buggy due to C-space translation
     for ind in range(listSize):
         bpy.ops.object.select_all(action='DESELECT')
         bpy.context.scene.i = ind
@@ -209,6 +238,45 @@ def main():
         bpy.data.objects["Witness"].keyframe_insert(data_path="location",frame = desiredFrames/totalDist*distances[ind]+1)
         bpy.data.objects["Witness"].keyframe_insert(data_path="rotation_quaternion",
                                                     frame=desiredFrames/totalDist*distances[ind]+1)
+    '''
+    # All-frame insertion
+    distance_per_frame = 1.0 / float(desiredFrames) * totalDist
+    print(args.O)
+    DEBUG = False
+    rob = bpy.data.objects["Rob"]
+    if DEBUG:
+        key_0 = key_confs[44]
+        key_1 = key_confs[45]
+        t,r = _mix(0.0, key_0, key_1)
+        t = t - r.apply(O) # Translate back to vanilla
+        quat = r.as_quat() # Note scipy.spatial.transform.Rotation uses w-last
+        _add_key(rob, t, quat, 1)
+        t,r = _mix(0.7507349475305162, key_0, key_1)
+        t = t - r.apply(O) # Translate back to vanilla
+        quat = r.as_quat()
+        print(f"intermediate key {t} {quat}")
+        _add_key(rob, t, quat, 2)
+        t,r = _mix(1.0, key_0, key_1)
+        t = t - r.apply(O) # Translate back to vanilla
+        quat = r.as_quat()
+        _add_key(rob, t, quat, 3)
+    else:
+        for frame in range(desiredFrames):
+            d = frame * distance_per_frame
+            index_1 = np.argmax(distances > d)
+            # print(f'index_1 {index_1}')
+            index_0 = index_1 - 1
+            d_0 = distances[index_0]
+            d_1 = distances[index_1]
+            key_0 = key_confs[index_0]
+            key_1 = key_confs[index_1]
+            tau = (d - d_0) / (d_1 - d_0)
+            if frame == 107:
+                print(f"Frame 107 is interpolated from {index_0} and {index_1}, with tau {tau}")
+            t,r = _mix(tau, key_0, key_1)
+            t = t - r.apply(O) # Translate back to vanilla
+            quat = r.as_quat()
+            _add_key(rob, t, quat, frame+1)
 
     ob = bpy.data.objects["Witness"]
     mp = ob.motion_path

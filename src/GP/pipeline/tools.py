@@ -615,7 +615,22 @@ def blender_animate(args):
         unit_q = matio.load(unit_path)
         van_q = uw.translate_ompl_to_vanilla(uw.translate_unit_to_ompl(unit_q))
         matio.savetxt(vanilla_path, van_q)
-        util.shell(['blender', '-P', 'SolVis.py', '--', cfg.env_fn, cfg.rob_fn, vanilla_path, args.outdir])
+        oc = uw.get_ompl_center()
+        ocstr = ["{:.17f}".format(oc[i]) for i in range(3)]
+        DEBUG = False
+        if DEBUG:
+            import pyosr
+            tau = 0.7507349475305162
+            unit = pyosr.interpolate(unit_q[44], unit_q[45], tau).reshape((1,7))
+            van = uw.translate_ompl_to_vanilla(uw.translate_unit_to_ompl(unit))
+            print(f'Interpolate then translate: {van}')
+            van2 = pyosr.interpolate(van_q[44], van_q[45], tau).reshape((1,7))
+            print(f'Translate then interpolate: {van2}')
+            ompl_q = uw.translate_unit_to_ompl(unit_q)
+            van3 = pyosr.interpolate(ompl_q[44], ompl_q[45], tau).reshape((1,7))
+            van3 = uw.translate_ompl_to_vanilla(van3)
+            print(f'OMPL interpolate: {van3}')
+        util.shell(['blender', '-P', 'SolVis.py', '--', cfg.env_fn, cfg.rob_fn, vanilla_path, args.outdir, '--O'] + ocstr)
 
 function_dict = {
         'read_roots' : read_roots,

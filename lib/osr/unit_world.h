@@ -339,6 +339,8 @@ public:
 	{
 		return scene_scale_;
 	}
+
+	Eigen::Vector3d getOMPLCenter(uint32_t geo = GEO_ROB) const;
 protected:
 	bool shared_ = false;
 
