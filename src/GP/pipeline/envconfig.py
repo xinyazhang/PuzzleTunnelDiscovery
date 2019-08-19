@@ -111,9 +111,12 @@ MeshBoolGranularity = 1024
 # Set the number of processes that predict the key configuration from
 # the surface distribution, auto means number of (logic) processors
 NumberOfPredictionProcesses = auto
-NumberOfRotations           = 64
+NumberOfRotations           = 256
 SurfacePairsToSample        = 1024
 Margin                      = 1e-6
+# Reuse trained workspace so we can separate the training workspace from testing workspace
+# May use relative path
+ReuseWorkspace              =
 
 [GeometriK]
 

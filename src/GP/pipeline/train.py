@@ -3,6 +3,7 @@
 
 import os
 from os.path import join, isdir
+import copy
 import subprocess
 import pathlib
 import numpy as np
@@ -114,6 +115,13 @@ def wait_for_training(args, ws):
         write_pidfile(pidfile, -1)
 
 def _predict_surface(args, ws, geo_type, generator):
+    rews_dir = ws.config.get('Prediction', 'ReuseWorkspace')
+    if rews_dir:
+        rews_dir = join(ws.dir, rews_dir) # Relative path
+        rews = copy.deepcopy(ws)
+        rews.workspace_dir = rews_dir
+    else:
+        rews = ws
     for puzzle_fn, puzzle_name in generator():
         if ws.nn_profile:
             params = hg_launcher.create_config_from_profile(ws.nn_profile)
@@ -125,7 +133,7 @@ def _predict_surface(args, ws, geo_type, generator):
         ws.timekeeper_start('predict_{}'.format(geo_type), puzzle_name)
         params['ompl_config'] = puzzle_fn
         params['what_to_render'] = geo_type
-        params['checkpoint_dir'] = ws.checkpoint_dir(geo_type) + '/'
+        params['checkpoint_dir'] = rews.checkpoint_dir(geo_type) + '/'
         params['dataset_name'] = puzzle_name # Enforce the generated filename
         util.log("[prediction] Predicting {}:{}".format(puzzle_fn, geo_type))
         # NEVER call launch_with_params in the same process for multiple times
