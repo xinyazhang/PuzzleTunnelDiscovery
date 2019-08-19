@@ -353,7 +353,14 @@ def animate(args):
             continue
         sol_out = ws.solution_file(puzzle_name, type_name='unit')
         if os.path.exists(sol_out):
-            util.shell(['./vispath', cfg.env_fn, cfg.rob_fn, sol_out, '0.5'])
+            if args.range:
+                li = util.rangestring_to_list(args.range)
+                rangedfn = 'animate.tmp.txt'
+                traj = matio.load(sol_out)[li, :]
+                matio.savetxt(rangedfn, traj)
+                util.shell(['./vispath', cfg.env_fn, cfg.rob_fn, rangedfn, '0.5'])
+            else:
+                util.shell(['./vispath', cfg.env_fn, cfg.rob_fn, sol_out, '0.5'])
         else:
             util.warn("[tools.animate] Could not locate solution file {}".format(sol_out))
 
@@ -731,6 +738,7 @@ def setup_parser(subparsers):
 
     p = toolp.add_parser('animate', help='Show the animation of solution with vispath')
     p.add_argument('--current_trial', help='Trial to predict the keyconf', type=int, default=None)
+    p.add_argument('--range', help='Only use a subset of the path, format example: 1,2,3,4-7,11', default='')
     p.add_argument('--puzzle_name', help='Only show one specific puzzle', default='')
     p.add_argument('dir', help='Workspace directory')
 
