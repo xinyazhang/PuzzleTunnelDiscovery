@@ -88,9 +88,11 @@ if __name__ == '__main__':
     for e in progressbar(pairs):
         [r,c] = e[0], e[1]
         djs.union(r, c)
+        '''
         if djs.find(0) == djs.find(1):
             print("Early terminate: 0 and 1 connected")
             break
+        '''
     print(djs.get_roots())
     cluster = djs.get_cluster()
     print(cluster)
