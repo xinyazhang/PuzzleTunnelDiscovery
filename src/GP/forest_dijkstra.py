@@ -105,11 +105,12 @@ class TreePathFinder(object):
         return f <= pds_id < t
 
     def bloom_nodes_from_root(self, pds_id):
+        d = matio.load(self._bloom_fn)
         if self._bloom_G is None:
             G = self._bloom_G = nx.Graph()
-            self._bloom_nodes = _load(self._bloom_fn, 'BLOOM')
+            self._bloom_nodes = d['BLOOM']
             n = self._bloom_nodes.shape[0]
-            bloom_edges = np.transpose(_load(self._bloom_fn, 'BLOOM_EDGE'))
+            bloom_edges = np.transpose(d['BLOOM_EDGE'])
             G.add_nodes_from([i for i in range(n)])
             G.add_edges_from(bloom_edges)
         G = self._bloom_G
@@ -117,7 +118,9 @@ class TreePathFinder(object):
         leaf = pds_id - f
         print("Finding path from root to {} (pds_id {}) within {}".format(leaf, pds_id, self._bloom_fn))
         # bloom tree uses 0 as the root
-        ids = nx.shortest_path(self._G, 0, leaf)
+        bloom_roots = d['IS_INDICES']
+        assert bloom_roots.size == 1
+        ids = nx.shortest_path(self._G, int(bloom_roots[0]), leaf)
         print("BLOOM IDs on the path {}".format(ids))
         path = [self._bloom_nodes[node] for node in ids]
         return path[::-1]
