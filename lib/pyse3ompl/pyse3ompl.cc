@@ -1,4 +1,5 @@
 #include <limits>
+#include <memory>
 #include <stdint.h>
 #include <tuple>
 #include <Eigen/Core>
@@ -8,6 +9,8 @@
 #include <pybind11/eigen.h>
 #include <string>
 #include <omplapp/apps/SE3RigidBodyPlanning.h>
+#include <ompl/geometric/planners/rrt/ReRRT.h>
+#include <ompl/tools/config/SelfConfig.h>
 //#include <omplapp/geometry/detail/FCLStateValidityChecker.h>
 #include <omplapp/geometry/detail/FCLContinuousMotionValidator.h>
 #include <omplapp/config.h>
@@ -38,6 +41,9 @@ public:
 	using GraphV = Eigen::MatrixXd;
 	using GraphVFlags = Eigen::Matrix<uint32_t, -1, 1>;
 	using GraphE = Eigen::SparseMatrix<uint8_t>;
+	using Motion = ompl::geometric::ReRRT::Motion;
+	using NearestNeighbors = ompl::NearestNeighbors<Motion*>;
+	using KNNPtr = std::shared_ptr<NearestNeighbors>;
 
 	OmplDriver()
 	{
@@ -76,10 +82,11 @@ public:
 			throw std::runtime_error("OmplDriver::setState: invalid state_type "
 			                         + std::to_string(state_type));
 		}
-		auto& m = problem_states_[state_type];
+		auto& m = real_problem_states_[state_type];
 		m.tr = tr;
 		m.rot_axis = rot_axis;
 		m.rot_angle = rot_angle;
+		problem_states_[state_type] = m;
 	}
 
 	void setBB(const Eigen::Vector3d& mins, 
@@ -203,17 +210,175 @@ public:
 	// NOTE: TRANSLATION + W-LAST QUATERNION
 	void substituteState(int state_type, const Eigen::VectorXd& state)
 	{
+		if (state_type < 0 || state_type >= TOTAL_STATES) {
+			throw std::runtime_error("OmplDriver::substituteState: invalid state_type "
+			                         + std::to_string(state_type));
+		}
+		if (state.size() == 0) {
+			// reset the state
+			problem_states_[state_type] = real_problem_states_[state_type];
+			return ;
+		}
 		Eigen::Vector3d tr;
 		tr << state(0), state(1), state(2);
 		Eigen::Quaternion<double> quat(state(6), state(3), state(4), state(5));
 		Eigen::AngleAxis<double> aa(quat);
-		setState(state_type, tr, aa.axis(), aa.angle());
+
+		auto& m = problem_states_[state_type];
+		m.tr = tr;
+		m.rot_axis = aa.axis();
+		m.rot_angle = aa.angle();
 	}
 
 	void addExistingGraph(GraphV V, GraphE E)
 	{
 		ex_graph_v_.emplace_back(std::move(V));
 		ex_graph_e_.emplace_back(std::move(E));
+	}
+
+	//
+	// Merge graphs added by addExistingGraph
+	//
+	// Param
+	//   KNN: K-Nearest Neighbors
+	//
+	// Returns
+	//   a Nx4 integer matrix, each row is composed by
+	//   (from graph id, from vertex id in graph, to graph id, to vertex id in graph)
+	//   all IDs are 0-indexed
+	// 
+	// Note: ex_graph_e_ will not be used, assuming each graph is connected.
+	Eigen::MatrixXd
+	mergeExistingGraph(int KNN, bool verbose = false, int version = 0)
+	{
+		// We do not really need an SE3RigidBodyPlanning object,
+		// but this make things much easier
+		ompl::app::SE3RigidBodyPlanning setup;
+		{
+			auto bak = planner_id_;
+			planner_id_ = PLANNER_ReRRT;
+			configSE3RigidBodyPlanning(setup, false);
+			planner_id_ = bak;
+		}
+		auto generic_planner = setup.getPlanner();
+		auto real_planner = std::dynamic_pointer_cast<ompl::geometric::ReRRT>(generic_planner);
+		if (!real_planner) {
+			// This should not happen.
+			throw std::runtime_error("FATAL: SE3RigidBodyPlanning does not contain a ReRRT planner\n");
+		}
+		auto nn = real_planner->_accessNearestNeighbors();
+		auto si = real_planner->getSpaceInformation();
+		auto ss = si->getStateSpace();
+		int last_pc = 0;
+		std::vector<Motion*> all_motions; // DS to track all motions
+		std::vector<Eigen::Vector4i> edges;
+		{
+			size_t ttl = 0;
+			for (const auto& V: ex_graph_v_)
+				ttl += V.rows();
+			all_motions.reserve(ttl);
+		}
+		if (version == 0) {
+			for (size_t i = 0; i < ex_graph_v_.size(); i++) {
+				const auto& V = ex_graph_v_[i];
+				for (int j = 0; j < V.rows(); j++) {
+					auto m = new Motion(si);
+					ss->copyFromEigen3(m->state, V.row(j));
+					m->motion_index = j;
+					m->forest_index = i;
+					nn->add(m);
+					all_motions.emplace_back(m);
+				}
+				if (verbose) {
+					std::cerr << i + 1 << " / " << ex_graph_v_.size() << std::endl;
+				}
+			}
+			// Try to connect forests
+			std::vector<Motion*> nmotions;
+			for (size_t i = 0; i < all_motions.size(); i++) {
+				auto m = all_motions[i];
+				nn->nearestK(m, KNN, nmotions);
+				for (auto nn: nmotions) {
+					if (!si->checkMotion(m->state, nn->state))
+						continue;
+					Eigen::Vector4i e;
+					e << m->forest_index, m->motion_index,
+					     nn->forest_index, nn->motion_index;
+					edges.emplace_back(e);
+				}
+				// pc: percent
+				int pc = i / (all_motions.size() / 100);
+				if (verbose && last_pc < pc) {
+					std::cerr << pc << "%" << std::endl;
+					last_pc = pc;
+				}
+			}
+		} else if (version == 1) {
+			ex_knn_.clear();
+			for (size_t i = 0; i < ex_graph_v_.size(); i++) {
+				const auto& V = ex_graph_v_[i];
+				auto nn = createKNNForRDT(real_planner.get());
+				for (int j = 0; j < V.rows(); j++) {
+					auto m = new Motion(si);
+					ss->copyFromEigen3(m->state, V.row(j));
+					m->motion_index = j;
+					m->forest_index = i;
+					nn->add(m);
+					all_motions.emplace_back(m);
+				}
+				ex_knn_.emplace_back(std::move(nn));
+				if (verbose) {
+					std::cerr << i + 1 << " / " << ex_graph_v_.size() << std::endl;
+				}
+			}
+			// KNN for each tree
+			std::vector<Motion*> nmotions;
+			struct MotionWithDistance {
+				Motion* motion;
+				double distance;
+			};
+			std::vector<MotionWithDistance> nmotions_all;
+			for (size_t i = 0; i < all_motions.size(); i++) {
+				auto m = all_motions[i];
+				for (int j = 0; j < ex_graph_v_.size(); j++) {
+					nmotions.clear();
+					if (i == j)
+						continue;
+					ex_knn_[j]->nearestK(m, KNN, nmotions);
+					for (auto nm : nmotions) {
+						double d = real_planner->distanceFunction(m, nm);
+						nmotions_all.emplace_back(MotionWithDistance{.motion = nm, .distance = d});
+					}
+				}
+				nmotions.clear();
+				std::nth_element(nmotions_all.begin(),
+						 nmotions_all.begin() + KNN,
+						 nmotions_all.end(),
+						 [](const MotionWithDistance& lhs, const MotionWithDistance& rhs) {
+							return lhs.distance < rhs.distance;
+						 });
+				for (size_t j = 0; j < KNN; j++) {
+					auto nm = nmotions_all[j].motion;
+					if (!si->checkMotion(m->state, nm->state))
+						continue;
+					Eigen::Vector4i e;
+					e << m->forest_index, m->motion_index,
+					     nm->forest_index, nm->motion_index;
+					edges.emplace_back(e);
+				}
+				// pc: percent
+				int pc = i / (all_motions.size() / 100);
+				if (verbose && last_pc < pc) {
+					std::cerr << pc << "%" << std::endl;
+					last_pc = pc;
+				}
+			}
+		}
+		Eigen::MatrixXd ret;
+		ret.resize(edges.size(), 4);
+		for (size_t i = 0; i < edges.size(); i++)
+			ret.row(i) << edges[i](0), edges[i](1), edges[i](2), edges[i](3);
+		return ret;
 	}
 
 	// Only one set is supported. If multiple ones present, users are
@@ -276,7 +441,8 @@ private:
 	int rdt_k_nearest_;
 	std::string sample_inj_fn_;
 	std::string model_files_[TOTAL_MODEL_PARTS];
-	SE3State problem_states_[TOTAL_STATES];
+	SE3State real_problem_states_[TOTAL_STATES];
+	SE3State problem_states_[TOTAL_STATES]; // Effective states
 	Eigen::Vector3d mins_, maxs_;
 	double cdres_ = std::numeric_limits<double>::quiet_NaN();
 
@@ -363,6 +529,23 @@ private:
 
 	Eigen::VectorXi graph_istate_indices_;
 	Eigen::VectorXi graph_gstate_indices_;
+
+	// Create a KNN in the same manner as of RDT (ompl::geometric::ReRRT)
+	// Note: different planner may have different metrics
+	std::shared_ptr<NearestNeighbors>
+	createKNNForRDT(const ompl::geometric::ReRRT* planner)
+	{
+		using ompl::geometric::ReRRT;
+		std::shared_ptr<NearestNeighbors> ret;
+		ret.reset(ompl::tools::SelfConfig::getDefaultNearestNeighbors<Motion*>(planner));
+		ret->setDistanceFunction(std::bind(&ReRRT::distanceFunction,
+					           planner,
+						   std::placeholders::_1,
+						   std::placeholders::_2));
+		return ret;
+	}
+
+	std::vector<KNNPtr> ex_knn_;
 };
 
 PYBIND11_MODULE(pyse3ompl, m) {
@@ -411,6 +594,11 @@ PYBIND11_MODULE(pyse3ompl, m) {
 		    )
 		.def("substitute_state", &OmplDriver::substituteState)
 		.def("add_existing_graph", &OmplDriver::addExistingGraph)
+		.def("merge_existing_graph", &OmplDriver::mergeExistingGraph,
+		     py::arg("knn"),
+		     py::arg("verbose") = false,
+		     py::arg("version") = 0 
+		    )
 		.def("set_sample_set", &OmplDriver::setSampleSet)
 		.def("set_sample_set_flags", &OmplDriver::setSampleSetFlags)
 		.def("get_sample_set_connectivity", &OmplDriver::getSampleSetConnectivity)
