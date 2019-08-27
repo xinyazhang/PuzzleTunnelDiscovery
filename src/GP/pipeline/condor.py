@@ -42,7 +42,8 @@ def local_submit(ws,
                  iodir_rel,
                  arguments,
                  instances,
-                 wait=True):
+                 wait=True,
+                 dryrun=False):
     if xfile is None or xfile == '':
         msg = "[condor.local_submit] xfile is None or empty, current value {}".format(xfile)
         util.fatal(msg)
@@ -65,6 +66,10 @@ def local_submit(ws,
             assert ' ' not in str(a), 'We cannot deal with paths/arguments with spaces'
             print(' {}'.format(a), file=f, end='')
         print('\nQueue {}'.format(instances), file=f)
+    if dryrun:
+        util.log("[local_submit] dryrun, existing without submitting")
+        util.log("[local_submit] HTCondor file has been written to {}".format(local_sub))
+        return
     util.log("[local_submit] submitting {}".format(local_sub))
     util.shell(['condor_submit', local_sub])
     if wait:
