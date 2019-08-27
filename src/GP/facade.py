@@ -57,6 +57,7 @@ def main():
     pipeline.solve.setup_parser(subparsers)
     # Modules not a part of the auto pipeline
     pipeline.baseline.setup_parser(subparsers)
+    pipeline.baseline_pwrdtc.setup_parser(subparsers)
     pipeline.tools.setup_parser(subparsers)
 
     if USE_ARGCOMPLETE:

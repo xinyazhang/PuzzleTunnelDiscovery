@@ -16,6 +16,7 @@ from . import train
 from . import solve
 from . import se3solver
 from . import baseline
+from . import baseline_pwrdtc
 from . import tools
 from . import keyconf
 from . import autorun2
