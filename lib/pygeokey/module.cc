@@ -12,8 +12,13 @@ PYBIND11_MODULE(pygeokey, m) {
 	using namespace geokeyconf;
 	py::class_<KeyPointProber>(m, "KeyPointProber")
 		.def(py::init<const std::string&>())
-		.def("probe_key_points", &KeyPointProber::probeKeyPoints)
-		.def("probe_notch_points", &KeyPointProber::probeNotchPoints)
+		.def("probe_key_points", &KeyPointProber::probeKeyPoints,
+		     py::arg("attempts"),
+		     py::arg("seed") = 0
+		    )
+		.def("probe_notch_points", &KeyPointProber::probeNotchPoints,
+		     py::arg("seed") = 0
+		    )
 		.def_property("alpha", &KeyPointProber::getAlpha, &KeyPointProber::setAlpha)
 		.def_property("local_min_thresh", &KeyPointProber::getLocalMinThresh, &KeyPointProber::setLocalMinThresh)
 		;
@@ -26,5 +31,6 @@ PYBIND11_MODULE(pygeokey, m) {
 		     py::arg("number_of_rotations_env"),
 		     py::arg("number_of_rotations_rob") = 1
 		    )
+		.def_property("thresh_narrow_tunnel_ratio", &KeySampler::getThreshNarrowTunnelRatio, &KeySampler::setThreshNarrowTunnelRatio)
 		;
 }
