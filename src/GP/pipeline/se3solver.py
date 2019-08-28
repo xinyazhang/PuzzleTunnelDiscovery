@@ -203,6 +203,38 @@ def merge_forest(args):
     if args.out is not None:
         savemat(args.out, dict(V=V, E=E), do_compression=True)
 
+'''
+merge_blooming_forest:
+    Merge the forest from blooming algorithm
+'''
+def merge_blooming_forest(args):
+    print('running merge_blooming_forest with {}'.format(args))
+    puzzle = args.puzzle
+    args.planner_id = plan.PLANNER_RDT
+    args.sampler_id = 0 # Uniform sampler
+    args.saminj = ''
+    args.rdt_k = 0
+    driver = create_driver(args)
+    bloom_files = _lsv(indir=args.bloom_dir, prefix='bloom-from_', suffix='.npz')
+    for bf in progressbar(bloom_files):
+        d = matio.load(bf)
+        V = d['BLOOM']
+        nv = V.shape[0]
+        E = sparse.csr_matrix((nv, nv), dtype=np.uint8)
+        driver.add_existing_graph(V, E)
+    inter_tree_edges = driver.merge_existing_graph(args.knn, verbose=True, version=args.algo_version)
+    if args.out is not None:
+        np.savez_compressed(args.out, INTER_BLOOMING_TREE_EDGES=inter_tree_edges)
+    import networkx as nx
+    G = nx.Graph()
+    G.add_nodes_from([i for i in range(len(bloom_files))])
+    G.add_edges_from(inter_tree_edges[:,[0,2]])
+    try:
+        ids = nx.shortest_path(G, 0, 1)
+        print('Solved with KNN, tree level path: {}'.format(ids))
+    except nx.exception.NetworkXNoPath:
+        print('Failed to solve with KNN')
+
 def presample(args):
     args.planner = plan.PLANNER_PRM
     args.saminj = ''

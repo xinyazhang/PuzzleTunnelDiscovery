@@ -197,6 +197,7 @@ def sample_pds(args, ws):
             rel_bloom = _rel_bloom_scratch(ws, puzzle_name, ws.current_trial)
             util.log('[sample_pds]  rel_bloom {}'.format(rel_bloom))
             scratch_dir = ws.local_ws(rel_bloom)
+            os.makedirs(scratch_dir, exist_ok=True)
             key_fn = ws.screened_keyconf_prediction_file(puzzle_name)
             condor_job_args = ['se3solver.py',
                     'solve',
@@ -207,7 +208,7 @@ def sample_pds(args, ws):
                     join(scratch_dir, 'bloom-from_$(Process).npz'),
                     puzzle_fn,
                     util.RDT_FOREST_ALGORITHM_ID,
-                    1.0,
+                    0.25,
                     '--bloom_limit',
                     ws.config.getint('Solver', 'PDSBloom')
                               ]
@@ -349,12 +350,62 @@ def connect_forest(args, ws):
         matio.savetxt(sol_out, unit_q)
         util.ack("Saving UNIT solution of {} to {}".format(puzzle_name, sol_out))
 
+'''
+knn_forest:
+    Connect forest with prm like algorithm
+'''
+def knn_forest(args, ws):
+    ALGO_VERSION = 0 if args.algorithm_version is None else args.algorithm_version
+    trial_list = util.rangestring_to_list(args.current_trial)
+    trial_str = 'knn_forest-{}-algver_{}'.format(args.current_trial, ALGO_VERSION)
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+        rel_scratch_dir = os.path.join(util.BASELINE_SCRATCH, puzzle_name, trial_str)
+        _, config = parse_ompl.parse_simple(puzzle_fn)
+        scratch_dir = ws.local_ws(rel_scratch_dir)
+        if args.only_wait:
+            condor.local_wait(scratch_dir)
+            continue
+        if args.task_id is None:
+            condor_job_args = ['./facade.py',
+                    'solve',
+                    '--stage', 'knn_forest',
+                    '--current_trial', args.current_trial,
+                    '--puzzle_name', puzzle_name,
+                    '--algorithm_version', ALGO_VERSION,
+                    '--task_id', '$(Process)',
+                    ws.local_ws()]
+            condor.local_submit(ws,
+                                util.PYTHON,
+                                iodir_rel=rel_scratch_dir,
+                                arguments=condor_job_args,
+                                instances=len(trial_list),
+                                wait=False) # do NOT wait here, we have to submit EVERY puzzle at once
+        else:
+            solver_args = TmpDriverArgs()
+            solver_args.puzzle = puzzle_fn
+            ws.current_trial = trial_list[args.task_id]
+            rel_bloom = _rel_bloom_scratch(ws, puzzle_name, ws.current_trial)
+            solver_args.bloom_dir = ws.local_ws(rel_bloom)
+            solver_args.out = os.path.join(scratch_dir, 'edges-{}.npz'.format(ws.current_trial))
+            solver_args.knn = 8 # default
+            solver_args.algo_version = ALGO_VERSION # algorithm version
+            se3solver.merge_blooming_forest(solver_args)
+    if args.task_id is not None:
+        return
+    if args.no_wait:
+        return
+    if not args.only_wait:
+        only_wait_args = copy.deepcopy(args)
+        only_wait_args.only_wait = True
+        forest_rdt(only_wait_args, ws)
+
 function_dict = {
         'screen_keyconf' : screen_keyconf,
         'sample_pds' : sample_pds,
         'forest_rdt' : forest_rdt,
         'forest_edges' : forest_edges,
         'connect_forest' : connect_forest,
+        'knn_forest' : knn_forest,
 }
 
 def setup_parser(subparsers):
@@ -368,15 +419,20 @@ def setup_parser(subparsers):
     p.add_argument('--only_wait', action='store_true')
     p.add_argument('--no_wait', action='store_true')
     p.add_argument('--task_id', help='Feed $(Process) from HTCondor', type=int, default=None)
-    p.add_argument('--current_trial', help='Trial to solve the puzzle', type=int, default=0)
+    p.add_argument('--current_trial', help='Trial to solve the puzzle', type=str, default='0')
     p.add_argument('--puzzle_name', help='Pick a single puzzle to solve (default to all)', default='')
+    p.add_argument('--algorithm_version', help='Algorithm version (varying among stages', type=int, default=None)
     p.add_argument('dir', help='Workspace directory')
 
 def run(args):
     if args.stage in function_dict:
         ws = util.Workspace(args.dir)
-        ws.current_trial = args.current_trial
-        function_dict[args.stage](args, ws)
+        if args.stage == 'knn_forest': # knn_forest takes current_trial list instead of single trial
+            function_dict[args.stage](args, ws)
+        else:
+            for current_trial in util.rangestring_to_list(args.current_trial):
+                ws.current_trial = current_trial
+                function_dict[args.stage](args, ws)
     else:
         print("Unknown solve pipeline stage {}".format(args.stage))
 
@@ -435,7 +491,8 @@ def remote_connect_forest(ws):
                         extra_args='--puzzle_name {}'.format(puzzle_name))
         ws.timekeeper_finish('connect_forest', puzzle_name)
 
-def collect_stages():
+def collect_stages(variant=0):
+    assert variant in [0], f'Solve Pipeline Variant {variant} has not been implemented'
     ret = [
             ('screen_keyconf', remote_screen_keyconf),
             ('sample_pds', remote_sample_pds),
