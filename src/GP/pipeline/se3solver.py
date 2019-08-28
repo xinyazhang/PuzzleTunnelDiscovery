@@ -9,8 +9,10 @@ import sys
 import os
 from os.path import abspath, dirname, join, isdir
 import itertools
+from progressbar import progressbar
 
 from . import util
+from . import matio
 sys.path.insert(0, os.getcwd())
 try:
     import pyse3ompl as plan
@@ -23,6 +25,16 @@ except ImportError as e:
     util.warn("[WARNING] CANNOT IMPORT pyse3ompl. This node is incapable of RDT forest planning")
 from . import parse_ompl
 PDS_FLAG_TERMINATE = 1
+
+def _lsv(indir, prefix, suffix):
+    ret = []
+    for i in itertools.count(0):
+        fn = "{}/{}{}{}".format(indir, prefix, i, suffix)
+        if not os.path.exists(fn):
+            if not ret:
+                raise FileNotFoundError("Cannot even locate the a single file under {}. Complete path: {}".format(indir, fn))
+            return ret
+        ret.append(fn)
 
 def create_driver(args):
     puzzle = args.puzzle
@@ -56,7 +68,7 @@ def create_driver(args):
 
 def _load_states_from_dic(dic):
     if 'file' not in dic:
-        return None, 0, 0, None
+        return None, 1, 0, None
     is_fn = dic['file']
     is_key = dic['key'] if 'key' in dic else 'KEYQ_OMPL'
     is_offset = int(dic['offset'])
@@ -72,6 +84,18 @@ def _load_states_from_dic(dic):
     if is_size == -1:
         is_size = total_size
     return A, is_size, is_offset, is_out
+
+def _pair_generator(istate_dic, gstate_dic):
+    A, is_size, is_offset, is_out = _load_states_from_dic(istate_dic)
+    B, gs_size, gs_offset, gs_out = _load_states_from_dic(gstate_dic)
+    out_path = is_out if is_out else gs_out
+    out_dir = out_path if isdir(out_path) else dirname(out_path)
+    for is_index in range(is_offset, is_offset+is_size):
+        istate = np.zeros(shape=(0)) if A is None else A[is_index]
+        pds_tree_index = is_index
+        for gs_index in range(gs_offset, gs_offset+gs_size):
+            gstate = np.zeros(shape=(0)) if B is None else B[gs_index]
+            yield istate, gstate, is_index, gs_index, pds_tree_index, out_dir
 
 def solve(args):
     driver = create_driver(args)
@@ -92,76 +116,70 @@ def solve(args):
     else:
         record_compact_tree = False
     print("solve args {}".format(args))
-    if args.replace_istate is not None or args.replace_gstate is not None:
-        A, is_size, is_offset, is_out = _load_states_from_dic(args.istate_dic)
-        B, gs_size, gs_offset, gs_out = _load_states_from_dic(args.gstate_dic)
-        # FIXME: better error handling for input
-        assert is_size == gs_size or is_size == 0 or gs_size == 0
-        if is_size == 0:
-            out_path = gs_out
-        else:
-            out_path = is_out
-        if isdir(out_path):
-            out_dir = out_path
-        else:
-            out_dir = dirname(out_path)
-        print("is_size, gs_size {} {}".format(is_size,gs_size))
-        print("A, B {} {}".format(A.shape if A is not None else None, B.shape if B is not None else None))
-        for i in range(max(is_size,gs_size)):
-            index = is_offset + i
-            gindex = gs_offset + i
-            if is_size > 0:
-                if index > A.shape[0]:
-                    print("istate offset {} out of range {}".format(index, A.shape[0]))
-                    break
-                driver.substitute_state(plan.INIT_STATE, A[index])
-            if gs_size > 0:
-                if gindex > B.shape[0]:
-                    print("gstate offset {} out of range {}".format(index, B.shape[0]))
-                    break
-                driver.substitute_state(plan.GOAL_STATE, B[gindex])
-            if args.samset2:
-                index = current
-            ssc_fn = '{}/ssc-{}.mat'.format(out_dir, index)
-            tree_fn = '{}/compact_tree-{}.mat'.format(out_path, index)
-            if args.samset and args.skip_existing:
-                if os.path.exists(ssc_fn) and os.path.exists(tree_fn):
-                    print("skipping exising file {} and {}".format(ssc_fn, tree_fn))
-                    continue
-            return_ve = args.bloom_out is not None
-            V,E = driver.solve(args.days, return_ve=return_ve, sbudget=args.sbudget, record_compact_tree=record_compact_tree, continuous_motion_validator=ccd)
-            '''
-            if isdir(out_path):
-                savemat('{}/tree-{}.mat'.format(out_path, index), dict(V=V, E=E), do_compression=True)
-            else:
-                savemat(out_path, dict(V=V, E=E), do_compression=True)
-            '''
-            if args.samset:
-                savemat(ssc_fn, dict(C=driver.get_sample_set_connectivity()), do_compression=True)
-                util.log("saving ssc matrix {}".format(ssc_fn))
-            if record_compact_tree:
-                CNVI, CNV, CE = driver.get_compact_graph()
-                savemat(tree_fn, dict(CNVI=CNVI, CNV=CNV, CE=CE), do_compression=True)
-                util.log("saving compact tree {}".format(tree_fn))
-            if args.bloom_out:
-                '''
-                _, _, CE = driver.get_compact_graph()
-                np.savez(args.bloom_out, BLOOM=V, BLOOM_EDGE=CE)
-                '''
-                np.savez(args.bloom_out,
-                         BLOOM=V,
-                         BLOOM_EDGE=np.array(E.nonzero()),
-                         IS_INDICES=driver.get_graph_istate_indices(),
-                         GS_INDICES=driver.get_graph_gstate_indices()
-                         )
-                util.log("saving bloom results to {}".format(args.bloom_out))
-    else:
+
+    if args.replace_istate is None and args.replace_gstate is None:
         return_ve = args.bloom_out is not None
         V, _ = driver.solve(args.days, args.out, sbudget=args.sbudget, return_ve=return_ve)
         if args.trajectory_out:
             is_complete = (driver.latest_solution_status == plan.EXACT_SOLUTION)
             np.savez(args.trajectory_out, OMPL_TRAJECTORY=driver.latest_solution, FLAG_IS_COMPLETE=is_complete)
+        return
 
+    h5traj = None
+    complete_tuple = []
+    complete_list = []
+    for istate, gstate, is_index, gs_index, pds_tree_index, pds_out_dir in _pair_generator(args.istate_dic, args.gstate_dic):
+        driver.substitute_state(plan.INIT_STATE, istate)
+        driver.substitute_state(plan.GOAL_STATE, gstate)
+        index = pds_tree_index
+        if args.samset2:
+            index = current
+        ssc_fn = '{}/ssc-{}.mat'.format(pds_out_dir, index)
+        tree_fn = '{}/compact_tree-{}.mat'.format(pds_out_dir, index)
+        if args.samset and args.skip_existing:
+            if os.path.exists(ssc_fn) and os.path.exists(tree_fn):
+                print("skipping exising file {} and {}".format(ssc_fn, tree_fn))
+                continue
+        return_ve = bool(args.bloom_out is not None or args.trajectory_out)
+        V,E = driver.solve(args.days, return_ve=return_ve, sbudget=args.sbudget, record_compact_tree=record_compact_tree, continuous_motion_validator=ccd)
+        '''
+        if isdir(out_path):
+            savemat('{}/tree-{}.mat'.format(out_path, index), dict(V=V, E=E), do_compression=True)
+        else:
+            savemat(out_path, dict(V=V, E=E), do_compression=True)
+        '''
+        if args.trajectory_out:
+            if h5traj is None:
+                h5traj = matio.hdf5_safefile(args.trajectory_out)
+            is_complete = (driver.latest_solution_status == plan.EXACT_SOLUTION)
+            matio.hdf5_overwrite(h5traj, f'{gs_index}/OMPL_TRAJECTORY', driver.latest_solution)
+            matio.hdf5_overwrite(h5traj, f'{gs_index}/FLAG_IS_COMPLETE', is_complete)
+            complete_tuple.append([is_index, gs_index, int(is_complete)])
+            if is_complete:
+                complete_list.append(gs_index)
+        if args.samset:
+            savemat(ssc_fn, dict(C=driver.get_sample_set_connectivity()), do_compression=True)
+            util.log("saving ssc matrix {}".format(ssc_fn))
+        if record_compact_tree:
+            CNVI, CNV, CE = driver.get_compact_graph()
+            savemat(tree_fn, dict(CNVI=CNVI, CNV=CNV, CE=CE), do_compression=True)
+            util.log("saving compact tree {}".format(tree_fn))
+        if args.bloom_out:
+            '''
+            _, _, CE = driver.get_compact_graph()
+            np.savez(args.bloom_out, BLOOM=V, BLOOM_EDGE=CE)
+            '''
+            np.savez(args.bloom_out,
+                     BLOOM=V,
+                     BLOOM_EDGE=np.array(E.nonzero()),
+                     IS_INDICES=driver.get_graph_istate_indices(),
+                     GS_INDICES=driver.get_graph_gstate_indices()
+                     )
+            util.log("saving bloom results to {}".format(args.bloom_out))
+    if h5traj is not None:
+        matio.hdf5_overwrite(h5traj, 'COMPLETE_TUPLE', complete_tuple)
+        matio.hdf5_overwrite(h5traj, 'COMPLETE_LIST', complete_list)
+        h5traj.close()
 
 def merge_forest(args):
     # Create PRM planner
