@@ -53,6 +53,7 @@ PDS_SUBDIR = 'pds'
 
 RDT_FOREST_ALGORITHM_ID = 15
 RDT_FOREST_INIT_AND_GOAL_RESERVATIONS = 2
+RDT_CONNECT_ALGORITHM_ID = 17
 
 
 '''
@@ -500,7 +501,30 @@ def rangestring_to_list(x):
 def xz(fn):
     shell(['xz', '-f', fn])
 
-def access_keypoints(d):
+def safe_concatente(nparray_list, axis=0):
+    true_list = []
+    for arr in nparray_list:
+        if arr.shape[axis] != 0:
+            true_list.append(arr)
+    return np.concatenate(true_list, axis=axis)
+
+def access_keys(d, keys):
+    ret = []
+    for k in keys:
+        if k in d:
+            ret.append(d[k])
+        else:
+            ret.append(None)
+    return ret
+
+def access_keypoints(d, geo_type):
+    return safe_concatente(access_keys(d, ['KEY_POINT_AMBIENT', 'NOTCH_POINT_AMBIENT']), axis=0)
+    # debug code
+    if geo_type == 'rob':
+        return safe_concatente(access_keys(d, ['KEY_POINT_AMBIENT']), axis=0)
+    else:
+        return safe_concatente(access_keys(d, ['NOTCH_POINT_AMBIENT']), axis=0)
+    # Old implementation
     kps = d['KEY_POINT_AMBIENT']
     if 'NOTCH_POINT_AMBIENT' in d:
         nps = d['NOTCH_POINT_AMBIENT']
@@ -510,10 +534,3 @@ def access_keypoints(d):
             else:
                 kps = nps
     return kps
-
-def safe_concatente(nparray_list, axis=0):
-    true_list = []
-    for arr in nparray_list:
-        if arr.shape[axis] != 0:
-            true_list.append(arr)
-    return np.concatenate(true_list, axis=axis)
