@@ -19,7 +19,7 @@ except ImportError as e:
 class WorkerArgs(object):
     pass
 
-def _get_task_args(ws, per_geometry):
+def _get_task_args(ws, args, per_geometry):
     task_args = []
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
         cfg, config = parse_ompl.parse_simple(puzzle_fn)
@@ -30,24 +30,31 @@ def _get_task_args(ws, per_geometry):
         wag.puzzle_name = puzzle_name
         wag.env_fn = cfg.env_fn
         wag.rob_fn = cfg.rob_fn
-        wag.refined_env_fn = cfg.refined_env_fn
-        wag.refined_rob_fn = cfg.refined_rob_fn
+        if args.no_refine:
+            wag.refined_env_fn = cfg.env_fn
+            wag.refined_rob_fn = cfg.rob_fn
+        else:
+            wag.refined_env_fn = cfg.refined_env_fn
+            wag.refined_rob_fn = cfg.refined_rob_fn
         if per_geometry:
             wag.geo_type = 'env'
             wag.geo_fn = cfg.env_fn
-            wag.refined_geo_fn = cfg.refined_env_fn
+            wag.refined_geo_fn = wag.refined_env_fn
             task_args.append(copy.deepcopy(wag))
             wag.geo_type = 'rob'
             wag.geo_fn = cfg.rob_fn
-            wag.refined_geo_fn = cfg.refined_rob_fn
+            wag.refined_geo_fn = wag.refined_rob_fn
             task_args.append(copy.deepcopy(wag))
         else:
             task_args.append(copy.deepcopy(wag))
     return task_args
 
 def refine_mesh(args, ws):
+    if args.no_refine:
+        util.ack('[refine_mesh] --no_refine is specified so the mesh will not be refined')
+        return
     target_v = ws.config.getint('GeometriK', 'FineMeshV')
-    task_args = _get_task_args(ws, per_geometry=True)
+    task_args = _get_task_args(ws, args=args, per_geometry=True)
     for wag in task_args:
         if os.path.isfile(wag.refined_geo_fn):
             continue
@@ -74,7 +81,7 @@ def _sample_key_point_worker(wag):
         np.savez(kps_fn, KEY_POINT_AMBIENT=pts)
 
 def sample_key_point(args, ws):
-    task_args = _get_task_args(ws, per_geometry=True)
+    task_args = _get_task_args(ws, args=args, per_geometry=True)
     USE_MP = False
     if USE_MP:
         pcpu = multiprocessing.Pool()
@@ -95,12 +102,16 @@ def _sample_key_conf_worker(wag):
         def _load_kps(geo_type):
             kps_fn = ws.keypoint_prediction_file(wag.puzzle_name, geo_type)
             d = matio.load(kps_fn)
-            return util.access_keypoints(d)
+            return util.access_keypoints(d, geo_type)
         env_kps = _load_kps('env')
         rob_kps = _load_kps('rob')
-        kqs, _, _ = ks.get_all_key_configs(env_kps, rob_kps,
+        util.log("env_kps {}".format(env_kps.shape))
+        util.log("rob_kps {}".format(rob_kps.shape))
+        kqs, env_keyid, rob_keyid = ks.get_all_key_configs(env_kps, rob_kps,
                                            ws.config.getint('GeometriK', 'KeyConfigRotations'))
-    else:
+        util.log("kqs {}".format(kqs.shape))
+    else: # FIXME: remove this branch later
+        assert False, 'NEVER USE THIS CODEPATH'
         def _load_kps(geo_type):
             kps_fn = ws.keypoint_prediction_file(wag.puzzle_name, geo_type)
             return matio.load(kps_fn)
@@ -123,14 +134,21 @@ def _sample_key_conf_worker(wag):
     cfg, config = parse_ompl.parse_simple(wag.puzzle_fn)
     iq = parse_ompl.tup_to_ompl(cfg.iq_tup)
     gq = parse_ompl.tup_to_ompl(cfg.gq_tup)
-    ompl_q = uw.translate_vanilla_to_ompl(kqs)
+    # ompl_q = uw.translate_vanilla_to_ompl(kqs) <- this is buggy?
+    unit_q = uw.translate_vanilla_to_unit(kqs)
+    ompl_q = uw.translate_unit_to_ompl(unit_q)
     ompl_q = np.concatenate((iq, gq, ompl_q), axis=0)
     #np.savez(kfn, KEYQ_AMBIENT_NOIG=kqs, KEYQ_OMPL=ompl_q)
-    np.savez(kfn, KEYQ_OMPL=ompl_q)
+    np.savez(kfn, KEYQ_OMPL=ompl_q, ENV_KEYID=env_keyid, ROB_KEYID=rob_keyid)
     util.log('[sample_key_conf] save {} key confs to {}'.format(ompl_q.shape, kfn))
 
+    unit_q = uw.translate_vanilla_to_unit(kqs)
+    out = kfn+'.unit.txt'
+    util.log('[debug][sample_key_conf] save unitary {} key confs to {}'.format(ompl_q.shape, out))
+    np.savetxt(out, unit_q)
+
 def sample_key_conf(args, ws):
-    task_args = _get_task_args(ws, per_geometry=False)
+    task_args = _get_task_args(ws, args=args, per_geometry=False)
     for wag in task_args:
          _sample_key_conf_worker(wag)
     # pcpu = multiprocessing.Pool()
@@ -159,6 +177,7 @@ def setup_parser(subparsers):
                    metavar='')
     p.add_argument('--only_wait', action='store_true')
     p.add_argument('--current_trial', help='Trial to solve the puzzle', type=int, default=0)
+    p.add_argument('--no_refine', help='Do not refine the mesh with TetWild, nor use the refined version in later stages', action='store_true')
     p.add_argument('dir', help='Workspace directory')
 
 def run(args):
