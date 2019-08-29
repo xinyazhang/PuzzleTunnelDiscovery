@@ -8,6 +8,7 @@ import time
 import sys
 import subprocess
 import colorama
+import itertools
 import numpy as np
 from datetime import datetime;
 
@@ -45,7 +46,10 @@ UV_DIR = os.path.join(CONDOR_SCRATCH, 'training_key_uvproj')
 
 PIXMARGIN = 2
 
+KEYCONF_CLEARANCE_DIR = 'keyconf_clearance'
 KEY_POINT_FMT = 'geometrik_key_point_of_{}-{}.npz'
+GEOMETRIK_KEY_PREDICTION_FMT = 'geometrik_forest_roots-{}.npz'
+OVERSAMPLED_KEY_PREDICTION_FMT = 'oversampled_forest_roots-{}.npz'
 UNSCREENED_KEY_PREDICTION_FMT = 'unscreened_forest_roots-{}.npz'
 SCREENED_KEY_PREDICTION_FMT = 'forest_roots-{}.npz'
 SOLUTION_FMT = 'path-{trial}.{type_name}.txt'
@@ -97,6 +101,7 @@ workspace/
 |   +-- env/            # checkpoints for env
 +-- solver_scratch/     # Scratch directory for OMPL solvers
 |   +-- <Puzzle 1>/     # Each puzzle has its own directory
+|   |   +-- keyconf_clearance   #
 |   |   +-- pds/        # Predefined sample set
 '''
 
@@ -381,10 +386,11 @@ class Workspace(object):
         return self.local_ws(TESTING_DIR, puzzle_name,
                              KEY_POINT_FMT.format(geo_type, trial))
 
-    def screened_keyconf_prediction_file(self, puzzle_name, for_read=True, trial_override=None):
-        trial = self.current_trial if trial_override is None else trial_override
-        ret = self.local_ws(TESTING_DIR, puzzle_name,
-                            SCREENED_KEY_PREDICTION_FMT.format(trial))
+    def screened_keyconf_prediction_file(self, puzzle_name, trial_override=None):
+        return self.keyconf_file_from_fmt(puzzle_name, SCREENED_KEY_PREDICTION_FMT, trial_override)
+        # trial = self.current_trial if trial_override is None else trial_override
+        # ret = self.local_ws(TESTING_DIR, puzzle_name,
+        #                     SCREENED_KEY_PREDICTION_FMT.format(trial))
         '''
         if for_read and not os.path.exists(ret):
             warn("[sample_pds] forest root file {} does not exist")
@@ -403,10 +409,16 @@ class Workspace(object):
         '''
         return ret
 
-    def keyconf_prediction_file(self, puzzle_name, for_read=True, trial_override=None):
+    def keyconf_prediction_file(self, puzzle_name, trial_override=None):
+        return self.keyconf_file_from_fmt(puzzle_name, UNSCREENED_KEY_PREDICTION_FMT, trial_override)
+
+    def oversampled_keyconf_prediction_file(self, puzzle_name, trial_override=None):
+        return self.keyconf_file_from_fmt(puzzle_name, OVERSAMPLED_KEY_PREDICTION_FMT, trial_override)
+
+    def keyconf_file_from_fmt(self, puzzle_name, FMT, trial_override=None):
         trial = self.current_trial if trial_override is None else trial_override
         ret = self.local_ws(TESTING_DIR, puzzle_name,
-                            UNSCREENED_KEY_PREDICTION_FMT.format(trial))
+                            FMT.format(trial))
         return ret
 
     def solution_file(self, puzzle_name, type_name, trial_override=None):
@@ -534,3 +546,13 @@ def access_keypoints(d, geo_type):
             else:
                 kps = nps
     return kps
+
+def lsv(indir, prefix, suffix):
+    ret = []
+    for i in itertools.count(0):
+        fn = "{}/{}{}{}".format(indir, prefix, i, suffix)
+        if not os.path.exists(fn):
+            if not ret:
+                raise FileNotFoundError("Cannot even locate the a single file under {}. Complete path: {}".format(indir, fn))
+            return ret
+        ret.append(fn)

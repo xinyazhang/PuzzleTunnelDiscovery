@@ -116,7 +116,10 @@ SurfacePairsToSample        = 1024
 Margin                      = 1e-6
 # Reuse trained workspace so we can separate the training workspace from testing workspace
 # May use relative path
-ReuseWorkspace              =
+ReuseWorkspace              = {ReuseWorkspace}
+OversamplingRatio           = 10
+OversamplingClearanceSample = 128
+
 
 [GeometriK]
 
@@ -124,8 +127,7 @@ FineMeshV = 500000
 KeyPointAttempts  = 256
 KeyConfigRotations = 128
 
-# We do not enable notch detector by default, otherwise too many key points will be generated
-EnableNotchDetection = no
+EnableNotchDetection = yes
 
 [RoboGeoK]
 KeyPointAttempts = 32
@@ -157,7 +159,8 @@ def init_config_file(args, ws, oldws=None):
                         'GPUWorkspacePath': normpath(join(oldws.config.get('DEFAULT', 'GPUWorkspacePath'), rel_old_to_new)),
                         'CondorHost': oldws.config.get('DEFAULT', 'CondorHost'),
                         'CondorExecPath': oldws.config.get('DEFAULT', 'CondorExecPath'),
-                        'CondorWorkspacePath': normpath(join(oldws.config.get('DEFAULT', 'CondorWorkspacePath'), rel_old_to_new))
+                        'CondorWorkspacePath': normpath(join(oldws.config.get('DEFAULT', 'CondorWorkspacePath'), rel_old_to_new)),
+                        'ReuseWorkspace': normpath(join(oldws.config.get('DEFAULT', 'ReuseWorkspace'), rel_old_to_new))
                       }
             else:
                 dic = {

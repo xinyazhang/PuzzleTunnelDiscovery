@@ -26,15 +26,7 @@ except ImportError as e:
 from . import parse_ompl
 PDS_FLAG_TERMINATE = 1
 
-def _lsv(indir, prefix, suffix):
-    ret = []
-    for i in itertools.count(0):
-        fn = "{}/{}{}{}".format(indir, prefix, i, suffix)
-        if not os.path.exists(fn):
-            if not ret:
-                raise FileNotFoundError("Cannot even locate the a single file under {}. Complete path: {}".format(indir, fn))
-            return ret
-        ret.append(fn)
+_lsv = util.lsv
 
 def create_driver(args):
     puzzle = args.puzzle
@@ -158,8 +150,10 @@ def solve(args):
             if is_complete:
                 complete_list.append(gs_index)
         if args.samset:
-            savemat(ssc_fn, dict(C=driver.get_sample_set_connectivity()), do_compression=True)
-            util.log("saving ssc matrix {}".format(ssc_fn))
+            ssc_data = driver.get_sample_set_connectivity()
+            savemat(ssc_fn, dict(C=ssc_data), do_compression=True)
+            # np.savez_compressed(ssc_fn+'.npz', C=ssc_data)
+            util.log("saving ssc matrix {}, shape {}".format(ssc_fn, ssc_data.shape))
         if record_compact_tree:
             CNVI, CNV, CE = driver.get_compact_graph()
             savemat(tree_fn, dict(CNVI=CNVI, CNV=CNV, CE=CE), do_compression=True)

@@ -41,7 +41,7 @@ def write_roots(args):
             gq = parse_ompl.tup_to_ompl(cfg.gq_tup)
             ompl_q = np.concatenate((iq, gq, ompl_q), axis=0)
         d[args.roots_key] = ompl_q
-        key_fn = ws.screened_keyconf_prediction_file(puzzle_name, for_read=False)
+        key_fn = ws.screened_keyconf_prediction_file(puzzle_name)
         np.savez(key_fn, **d)
         util.log('[tools][write_roots] write {} roots to {}'.format(ompl_q.shape, key_fn))
 
@@ -196,9 +196,9 @@ def viskey(args):
                 if args.puzzle_name and args.puzzle_name != puzzle_name:
                     continue
                 if args.unscreened:
-                    key_fn = ws.keyconf_prediction_file(puzzle_name, for_read=False)
+                    key_fn = ws.keyconf_prediction_file(puzzle_name)
                 else:
-                    key_fn = ws.screened_keyconf_prediction_file(puzzle_name, for_read=False)
+                    key_fn = ws.screened_keyconf_prediction_file(puzzle_name)
                 if not isfile(key_fn):
                     util.log("[viskey] Could not find {}".format(key_fn))
                     continue

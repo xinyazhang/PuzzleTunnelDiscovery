@@ -48,6 +48,7 @@ def main():
     pipeline.autorun.setup_parser(subparsers)
     pipeline.autorun2.setup_parser(subparsers)
     pipeline.autorun3.setup_parser(subparsers)
+    pipeline.autorun4.setup_parser(subparsers)
     pipeline.copy_training_data.setup_parser(subparsers)
     # Occationally users want to run pipeline stages individually
     pipeline.preprocess_key.setup_parser(subparsers)

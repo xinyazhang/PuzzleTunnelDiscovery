@@ -23,3 +23,4 @@ from . import autorun2
 from . import autorun3
 from . import robogeok
 from . import copy_training_data
+from . import autorun4

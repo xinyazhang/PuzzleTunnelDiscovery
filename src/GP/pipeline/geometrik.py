@@ -19,7 +19,7 @@ except ImportError as e:
 class WorkerArgs(object):
     pass
 
-def _get_task_args(ws, args, per_geometry):
+def _get_task_args(ws, args, per_geometry, FMT=util.UNSCREENED_KEY_PREDICTION_FMT):
     task_args = []
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
         cfg, config = parse_ompl.parse_simple(puzzle_fn)
@@ -30,6 +30,7 @@ def _get_task_args(ws, args, per_geometry):
         wag.puzzle_name = puzzle_name
         wag.env_fn = cfg.env_fn
         wag.rob_fn = cfg.rob_fn
+        wag.FMT = FMT
         if args.no_refine:
             wag.refined_env_fn = cfg.env_fn
             wag.refined_rob_fn = cfg.rob_fn
@@ -93,7 +94,8 @@ def sample_key_point(args, ws):
 def _sample_key_conf_worker(wag):
     ws = util.Workspace(wag.dir)
     ws.current_trial = wag.current_trial
-    kfn = ws.keyconf_prediction_file(wag.puzzle_name, for_read=False)
+    FMT = wag.FMT
+    kfn = ws.keyconf_file_from_fmt(wag.puzzle_name, FMT)
     util.log('[sample_key_conf] trial {}'.format(ws.current_trial))
     util.log('[sample_key_conf] sampling to {}'.format(kfn))
     ks = pygeokey.KeySampler(wag.env_fn, wag.rob_fn)
@@ -154,6 +156,11 @@ def sample_key_conf(args, ws):
     # pcpu = multiprocessing.Pool()
     # pcpu.map(_sample_key_conf_worker, task_args)
 
+def sample_key_conf_with_geometrik_prefix(args, ws):
+    task_args = _get_task_args(ws, args=args, per_geometry=False, FMT=util.GEOMETRIK_KEY_PREDICTION_FMT)
+    for wag in task_args:
+         _sample_key_conf_worker(wag)
+
 def deploy_geometrik_to_condor(args, ws):
     ws.deploy_to_condor(util.WORKSPACE_SIGNATURE_FILE,
                         util.WORKSPACE_CONFIG_FILE,
@@ -164,6 +171,7 @@ function_dict = {
         'refine_mesh' : refine_mesh,
         'sample_key_point' : sample_key_point,
         'sample_key_conf' : sample_key_conf,
+        'sample_key_conf_with_geometrik_prefix' : sample_key_conf_with_geometrik_prefix,
         'deploy_geometrik_to_condor' : deploy_geometrik_to_condor,
 }
 
@@ -203,6 +211,9 @@ def remote_sample_key_point(ws):
 def remote_sample_key_conf(ws):
     _remote_command(ws, 'sample_key_conf')
 
+def remote_sample_key_conf_with_geometrik_prefix(ws):
+    _remote_command(ws, 'sample_key_conf_with_geometrik_prefix')
+
 '''
 # Deprecated
 def autorun(args):
@@ -213,16 +224,24 @@ def autorun(args):
         func(ws)
 '''
 
-def collect_stages():
-    ret = [ ('deploy_to_condor',
-              lambda ws: ws.deploy_to_condor(util.WORKSPACE_SIGNATURE_FILE,
-                                             util.WORKSPACE_CONFIG_FILE,
-                                             util.CONDOR_TEMPLATE,
-                                             util.TESTING_DIR+'/')
-            ),
-            ('refine_mesh', remote_refine_mesh),
-            ('sample_key_point', remote_sample_key_point),
-            ('sample_key_conf', remote_sample_key_conf),
-            #('deploy_geometrik_to_condor', lambda ws: deploy_geometrik_to_condor(None, ws))
-          ]
+def collect_stages(variant=0):
+    if variant in [0]:
+        ret = [ ('deploy_to_condor',
+                  lambda ws: ws.deploy_to_condor(util.WORKSPACE_SIGNATURE_FILE,
+                                                 util.WORKSPACE_CONFIG_FILE,
+                                                 util.CONDOR_TEMPLATE,
+                                                 util.TESTING_DIR+'/')
+                ),
+                ('refine_mesh', remote_refine_mesh),
+                ('sample_key_point', remote_sample_key_point),
+                ('sample_key_conf', remote_sample_key_conf),
+                #('deploy_geometrik_to_condor', lambda ws: deploy_geometrik_to_condor(None, ws))
+              ]
+    elif variant in [4]:
+        ret = [
+                ('refine_mesh', remote_refine_mesh),
+                ('sample_key_point', remote_sample_key_point),
+                ('sample_key_conf_with_geometrik_prefix', remote_sample_key_conf_with_geometrik_prefix),
+                #('deploy_geometrik_to_condor', lambda ws: deploy_geometrik_to_condor(None, ws))
+              ]
     return ret

@@ -105,7 +105,7 @@ def screen_keyconf(args, ws):
             condor_job_args = [ws.condor_local_exec('facade.py'),
                                'solve',
                                '--stage', 'screen_keyconf',
-                               '--current_trial', ws.current_trial,
+                               '--current_trial', str(ws.current_trial),
                                '--puzzle_name', puzzle_name,
                                '--task_id', '$(Process)',
                                ws.local_ws()]
@@ -156,6 +156,38 @@ def screen_keyconf(args, ws):
             outfn = ws.screened_keyconf_prediction_file(puzzle_name)
             util.log("[screen_keyconf] Save screened roots {} to {}".format(screened.shape, outfn))
             np.savez_compressed(outfn, KEYQ_OMPL=screened)
+
+'''
+least_visible_keyconf:
+    this stage would wait for the finish of keyconf.calculate_keyconf_clearance,
+    and pick up K key confs with lowest clearance.
+'''
+def least_visible_keyconf(args, ws):
+    # wait for all key confs
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+        rel_scratch_dir = join(util.SOLVER_SCRATCH, puzzle_name, util.KEYCONF_CLEARANCE_DIR, str(ws.current_trial))
+        condor.local_wait(ws.local_ws(rel_scratch_dir))
+
+    K = ws.config.getint('Prediction', 'SurfacePairsToSample')
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+        rel_scratch_dir = join(util.SOLVER_SCRATCH, puzzle_name, util.KEYCONF_CLEARANCE_DIR, str(ws.current_trial))
+        oskey_fn = ws.oversampled_keyconf_prediction_file(puzzle_name)
+        oskey = matio.load(oskey_fn)['KEYQ_OMPL']
+        # TODO: Pickup top key confs
+        '''
+        '''
+        osc_files = util.lsv(ws.local_ws(rel_scratch_dir), 'clearance_batch-', '.npz')
+        osc_arrays = [matio.load(fn)['DISTANCE_BATCH'] for fn in osc_files]
+        osc = util.safe_concatente(osc_arrays)
+        assert osc.shape[0] == oskey.shape[0]
+        mean = np.mean(osc, axis=1)
+        top_k = mean.argsort()[:K]
+        top_oskey = oskey[top_k,:]
+        gk_key = np.load(ws.keyconf_file_from_fmt(puzzle_name, util.GEOMETRIK_KEY_PREDICTION_FMT))['KEYQ_OMPL']
+        uskey_fn = ws.keyconf_prediction_file(puzzle_name)
+        comb_key = util.safe_concatente([top_oskey, gk_key])
+        np.savez(uskey_fn, KEYQ_OMPL=comb_key)
+        util.ack('[least_visible_keyconf] save combined key to {}, shape {}'.format(uskey_fn, comb_key.shape))
 
 class TmpDriverArgs(object):
     pass
@@ -400,6 +432,7 @@ def knn_forest(args, ws):
         forest_rdt(only_wait_args, ws)
 
 function_dict = {
+        'least_visible_keyconf' : least_visible_keyconf,
         'screen_keyconf' : screen_keyconf,
         'sample_pds' : sample_pds,
         'forest_rdt' : forest_rdt,
@@ -465,6 +498,12 @@ def remote_screen_keyconf(ws):
     else:
         _remote_command(ws, 'screen_keyconf')
 
+def remote_least_visible_keyconf(ws):
+    if ws.condor_extra_hosts:
+        _remote_command_distributed(ws, 'least_visible_keyconf')
+    else:
+        _remote_command(ws, 'least_visible_keyconf')
+
 def remote_sample_pds(ws):
     if ws.condor_extra_hosts:
         _remote_command_distributed(ws, 'sample_pds')
@@ -492,14 +531,24 @@ def remote_connect_forest(ws):
         ws.timekeeper_finish('connect_forest', puzzle_name)
 
 def collect_stages(variant=0):
-    assert variant in [0], f'Solve Pipeline Variant {variant} has not been implemented'
-    ret = [
-            ('screen_keyconf', remote_screen_keyconf),
-            ('sample_pds', remote_sample_pds),
-            ('forest_rdt', remote_forest_rdt),
-            ('forest_edges', remote_forest_edges),
-            ('connect_forest', remote_connect_forest),
-          ]
+    assert variant in [0,4], f'Solve Pipeline Variant {variant} has not been implemented'
+    if variant in [0]:
+        ret = [
+                ('screen_keyconf', remote_screen_keyconf),
+                ('sample_pds', remote_sample_pds),
+                ('forest_rdt', remote_forest_rdt),
+                ('forest_edges', remote_forest_edges),
+                ('connect_forest', remote_connect_forest),
+              ]
+    elif variant in [4]:
+        ret = [
+                ('least_visible_keyconf', remote_least_visible_keyconf),
+                ('screen_keyconf', remote_screen_keyconf),
+                ('sample_pds', remote_sample_pds),
+                ('forest_rdt', remote_forest_rdt),
+                ('forest_edges', remote_forest_edges),
+                ('connect_forest', remote_connect_forest),
+              ]
     return ret
 
 def autorun(args):
