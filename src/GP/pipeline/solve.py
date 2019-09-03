@@ -126,7 +126,7 @@ def screen_keyconf(args, ws):
             keys = matio.load(keyfn, key='KEYQ_OMPL')
             nkey = keys.shape[0]
             util.log('[screen_keyconf][{}] nkey (unscreened) {}'.format(puzzle_name, nkey))
-            vert_ids = [i for i in range(nkey)]
+            vert_ids = [i for i in range(util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS, nkey)]
             djs = disjoint_set.DisjointSet(vert_ids)
             fn_list = pathlib.Path(scratch_dir).glob("edge_batch-*.npz")
             util.log("[screen_keyconf][{}] Creating disjoint set".format(puzzle_name))
@@ -150,6 +150,7 @@ def screen_keyconf(args, ws):
                         break
                 # TODO: clustering?
                 screened_index += nondis # No effect if nondis == []
+            screened_index = list(range(util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS)) + screened_index
             screened = keys[screened_index]
             util.log("[screen_keyconf][{}] Screened {} roots into {}".format(puzzle_name,
                       keys.shape, screened.shape))
@@ -181,11 +182,18 @@ def least_visible_keyconf(args, ws):
         osc = util.safe_concatente(osc_arrays)
         assert osc.shape[0] == oskey.shape[0]
         mean = np.mean(osc, axis=1)
+        # remove the initial root and goal root
+        mean = mean[util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS:]
         top_k = mean.argsort()[:K]
+        # Get the original indices
+        top_k += util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS
         top_oskey = oskey[top_k,:]
         gk_key = np.load(ws.keyconf_file_from_fmt(puzzle_name, util.GEOMETRIK_KEY_PREDICTION_FMT))['KEYQ_OMPL']
+        # also remove the initial and goal roots
+        gk_key = gk_key[util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS:]
         uskey_fn = ws.keyconf_prediction_file(puzzle_name)
-        comb_key = util.safe_concatente([top_oskey, gk_key])
+        ig_key = oskey[:util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS]
+        comb_key = util.safe_concatente([ig_key, top_oskey, gk_key])
         np.savez(uskey_fn, KEYQ_OMPL=comb_key)
         util.ack('[least_visible_keyconf] save combined key to {}, shape {}'.format(uskey_fn, comb_key.shape))
 
