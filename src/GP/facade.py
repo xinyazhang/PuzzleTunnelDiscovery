@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import sys, os
+print('[python version] {}'.format(sys.version))
 sys.path.append(os.getcwd())
 import resource
 import argparse
