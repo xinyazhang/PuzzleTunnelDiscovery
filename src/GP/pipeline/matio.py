@@ -19,11 +19,14 @@ def _load_xz(fn):
         raise NotImplementedError("Parser for {} file is not implemented".format(p.suffix))
     return _SUFFIX_TO_LOADER[nest_suffix](memfile)
 
+def _loadmat(fn):
+    return loadmat(fn, verify_compressed_data_integrity=False)
+
 _SUFFIX_TO_LOADER = {
         '.npz': np.load,
         '.txt': np.loadtxt,
         '.csv': _load_csv,
-        '.mat': loadmat,
+        '.mat': _loadmat,
         '.hdf5': _load_hdf5,
         '.xz': _load_xz
         }
