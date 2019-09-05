@@ -30,22 +30,41 @@ from . import parse_ompl
 
 def _predict_atlas2prim(tup):
     import pyosr
+    import hashlib
     ws_dir, puzzle_fn, puzzle_name, trial = tup
     ws = util.Workspace(ws_dir)
     ws.current_trial = trial
     r = util.create_offscreen_renderer(puzzle_fn, ws.chart_resolution)
     r.uv_feedback = True
     r.avi = False
-    for geo_type,flags in zip(['rob', 'env'], [pyosr.Renderer.NO_SCENE_RENDERING, pyosr.Renderer.NO_ROBOT_RENDERING]):
+    puzzle, config = parse_ompl.parse_simple(puzzle_fn)
+    for geo_type,flags,model_fn in zip(['rob', 'env'], [pyosr.Renderer.NO_SCENE_RENDERING, pyosr.Renderer.NO_ROBOT_RENDERING], [puzzle.rob_fn, puzzle.env_fn]):
+        tgt_file = ws.local_ws(util.TESTING_DIR, puzzle_name, geo_type+'-a2p.npz')
+        new_sha = None
+        try:
+            p = pathlib.Path(model_fn)
+            new_sha = hashlib.blake2b(p.read_bytes()).digest()
+            old_sha = bytes(matio.load(tgt_file)['MODEL_BLAKE2B'])
+            if new_sha == old_sha:
+                util.ack('[generate_atlas2prim] {} is updated (model: {})'.format(tgt_file, model_fn))
+                continue
+        except:
+            pass
         r.render_mvrgbd(pyosr.Renderer.UV_MAPPINNG_RENDERING|flags)
         atlas2prim = np.copy(r.mvpid.reshape((r.pbufferWidth, r.pbufferHeight)))
         #imsave(geo_type+'-a2p-nt.png', atlas2prim) # This is for debugging
         atlas2prim = texture_format.framebuffer_to_file(atlas2prim)
         atlas2uv = np.copy(r.mvuv.reshape((r.pbufferWidth, r.pbufferHeight, 2)))
         atlas2uv = texture_format.framebuffer_to_file(atlas2uv)
-        np.savez(ws.local_ws(util.TESTING_DIR, puzzle_name, geo_type+'-a2p.npz'),
-                 PRIM=atlas2prim,
-                 UV=atlas2uv)
+        if new_sha is None:
+            np.savez(tgt_file,
+                     PRIM=atlas2prim,
+                     UV=atlas2uv)
+        else:
+            np.savez(tgt_file,
+                     PRIM=atlas2prim,
+                     UV=atlas2uv,
+                     MODEL_BLAKE2B=new_sha)
         imsave(ws.local_ws(util.TESTING_DIR, puzzle_name, geo_type+'-a2p.png'), atlas2prim) # This is for debugging
 
 def generate_atlas2prim(args, ws):
