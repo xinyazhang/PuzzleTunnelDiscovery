@@ -413,7 +413,7 @@ def connect_forest(args, ws):
         ompl_q = matio.load(path_out)
         uw = util.create_unit_world(puzzle_fn)
         unit_q = uw.translate_ompl_to_unit(ompl_q)
-        sol_out = ws.solution_file(puzzle_name, type_name='unit')
+        sol_out = ws.solution_file(puzzle_name, type_name=algoprefix+'unit')
         matio.savetxt(sol_out, unit_q)
         util.ack("Saving UNIT solution of {} to {}".format(puzzle_name, sol_out))
 
