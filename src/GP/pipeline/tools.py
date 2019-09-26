@@ -394,6 +394,8 @@ def vistouchdisp(args):
     plt.show()
 
 def _dic_add(dic, key, v):
+    if v is None:
+        return
     if key in dic:
         dic[key].append(v)
     else:
@@ -475,13 +477,26 @@ def conclude(args):
                     continue
                 kp_env_fn = ws.keypoint_prediction_file(puzzle_name, 'env')
                 kp_rob_fn = ws.keypoint_prediction_file(puzzle_name, 'rob')
+                overkp_fn = ws.oversampled_keyconf_prediction_file(puzzle_name)
+                puzzle_roots_from_gk = None
+                puzzle_roots_from_nn_oversampled = None
+                puzzle_roots_from_nn = None
                 if os.path.exists(kp_rob_fn) and os.path.exists(kp_env_fn):
                     puzzle_method = 'GK'
                     puzzle_rot = ws.config.getint('GeometriK', 'KeyConfigRotations')
                     d_env = matio.load(kp_env_fn)
                     d_rob = matio.load(kp_rob_fn)
-                    puzzle_kps_env = util.access_keypoints(d_env).shape[0]
-                    puzzle_kps_rob = util.access_keypoints(d_rob).shape[0]
+                    puzzle_kps_env = util.access_keypoints(d_env, 'env').shape[0]
+                    puzzle_kps_rob = util.access_keypoints(d_rob, 'rob').shape[0]
+                    if os.path.exists(overkp_fn):
+                        puzzle_method = 'GK+NN'
+                        puzzle_roots_from_nn = matio.load(overkp_fn)['KEYQ_OMPL'].shape[0]
+                        puzzle_roots_from_gk = None
+                        FMT = util.GEOMETRIK_KEY_PREDICTION_FMT
+                        kfn = ws.keyconf_file_from_fmt(puzzle_name, FMT)
+                        puzzle_roots_from_gk = matio.load(kfn)['KEYQ_OMPL'].shape[0]
+                        kfn = ws.keyconf_prediction_file(puzzle_name)
+                        puzzle_roots_from_nn = matio.load(kfn)['KEYQ_OMPL'].shape[0]
                 else:
                     puzzle_method = 'NN'
                     puzzle_rot = ws.config.getint('Prediction', 'NumberOfRotations')
@@ -501,6 +516,9 @@ def conclude(args):
                 _dic_add(stat_dic, 'puzzle_kps_rob', puzzle_kps_rob)
                 _dic_add(stat_dic, 'puzzle_rot', puzzle_rot)
                 _dic_add(stat_dic, 'puzzle_roots', puzzle_roots)
+                _dic_add(stat_dic, 'puzzle_gk_roots', puzzle_roots_from_gk)
+                _dic_add(stat_dic, 'puzzle_nn_roots_oversampled', puzzle_roots_from_nn_oversampled)
+                _dic_add(stat_dic, 'puzzle_nn_roots', puzzle_roots_from_nn)
                 _dic_add(stat_dic, 'puzzle_pds', puzzle_pds)
                 _dic_add(stat_dic, 'puzzle_success', puzzle_success)
                 _dic_add(stat_dic, 'puzzle_success_int', 1 if puzzle_success == 'Y' else 0)
