@@ -131,6 +131,11 @@ public:
 			if (pds_flags_.rows() > 0) {
 				planner->setSampleSetFlags(pds_flags_);
 			}
+			if (pds_tree_bases_.rows() > 0) {
+				planner->setSampleSetEdges(pds_tree_bases_,
+				                           pds_edges_,
+				                           pds_edge_bases_);
+			}
 		} else {
 			if (record_compact_tree) {
 				throw std::runtime_error("record_compact_tree requires set_sample_set");
@@ -389,6 +394,13 @@ public:
 		predefined_sample_set_ = std::move(Q);
 	}
 
+	void setSampleSetEdges(Eigen::MatrixXi QB, Eigen::MatrixXi QE, Eigen::MatrixXi QEB)
+	{
+		pds_tree_bases_ = std::move(QB);
+		pds_edges_ = std::move(QE);
+		pds_edge_bases_ = std::move(QEB);
+	}
+
 	void setSampleSetFlags(GraphVFlags QF)
 	{
 		pds_flags_ = std::move(QF);
@@ -450,6 +462,9 @@ private:
 	std::vector<GraphE> ex_graph_e_;
 
 	GraphV predefined_sample_set_;
+	Eigen::MatrixXi pds_tree_bases_;
+	Eigen::MatrixXi pds_edges_;
+	Eigen::MatrixXi pds_edge_bases_;
 	GraphVFlags pds_flags_;
 	Eigen::SparseMatrix<int> predefined_set_connectivity_;
 	std::vector<std::string> option_vector_;
@@ -600,6 +615,11 @@ PYBIND11_MODULE(pyse3ompl, m) {
 		     py::arg("version") = 0 
 		    )
 		.def("set_sample_set", &OmplDriver::setSampleSet)
+		.def("set_sample_set_edges", &OmplDriver::setSampleSetEdges,
+		     py::arg("QB"),
+		     py::arg("QE"),
+		     py::arg("QEB")
+		    )
 		.def("set_sample_set_flags", &OmplDriver::setSampleSetFlags)
 		.def("get_sample_set_connectivity", &OmplDriver::getSampleSetConnectivity)
 		.def("presample", &OmplDriver::presample)
