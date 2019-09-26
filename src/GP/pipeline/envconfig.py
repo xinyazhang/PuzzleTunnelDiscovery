@@ -124,8 +124,8 @@ OversamplingClearanceSample = 128
 [GeometriK]
 
 FineMeshV = 500000
-KeyPointAttempts  = 256
-KeyConfigRotations = 128
+KeyPointAttempts  = 32
+KeyConfigRotations = 512
 
 EnableNotchDetection = yes
 
@@ -136,10 +136,12 @@ KeyConfigRotations = 64
 
 [Solver]
 # Number of samples in the PreDefined Sample set
-PDSSize = 4194304
+# Not used
+# PDSSize = 4194304
 PDSBloom = 3072
 # Maximum trials before cancel
-Trials = 1
+# Not used
+# Trials = 1
 
 
 # In day(s), 0.01 ~= 14 minutes, 0.02 ~= 0.5 hour
