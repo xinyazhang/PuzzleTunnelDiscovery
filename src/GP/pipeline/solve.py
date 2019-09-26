@@ -381,6 +381,8 @@ def connect_forest(args, ws):
 #               --pdsf dual/pdsrdt-g9ae-1/pds-4m.0.npz \
 #               --out pdsrdt-g9ae-1-path-1.txt
 #
+    if args.no_wait: # No wait, no answer
+        return
     if args.algorithm_version == ALGORITHM_VERSION_PHASE2_WITH_BLOOMING_TREE:
         algoprefix = 'withbt-'
     else:
@@ -518,21 +520,21 @@ def _remote_command(ws, cmd, auto_retry=True, alter_host='', extra_args=''):
                       with_trial=True,
                       extra_args=extra_args)
 
-def _remote_command_distributed(ws, cmd):
+def _remote_command_distributed(ws, cmd, extra_args=''):
     for host,_,puzzle_name in ws.condor_host_vs_test_puzzle_generator():
         _remote_command(ws, cmd,
                         alter_host=host,
-                        extra_args='--puzzle_name {} --no_wait'.format(puzzle_name))
+                        extra_args=extra_args+' --puzzle_name {} --no_wait'.format(puzzle_name))
     for host,_,puzzle_name in ws.condor_host_vs_test_puzzle_generator():
         _remote_command(ws, cmd,
                         alter_host=host,
-                        extra_args='--puzzle_name {} --only_wait'.format(puzzle_name))
+                        extra_args=extra_args+' --puzzle_name {} --only_wait'.format(puzzle_name))
 
-def _remote_command_auto(ws, cmd):
+def _remote_command_auto(ws, cmd, extra_args=''):
     if ws.condor_extra_hosts:
-        _remote_command_distributed(ws, cmd)
+        _remote_command_distributed(ws, cmd, extra_args=extra_args)
     else:
-        _remote_command(ws, cmd)
+        _remote_command(ws, cmd, extra_args=extra_args)
 
 def remote_screen_keyconf(ws):
     _remote_command_auto(ws, 'screen_keyconf')
@@ -544,7 +546,7 @@ def remote_sample_pds(ws):
     _remote_command_auto(ws, 'sample_pds')
 
 def remote_assemble_pds(ws):
-    _remote_command_auto(ws, 'assemble_pds')
+    _remote_command(ws, 'assemble_pds')
 
 def remote_forest_rdt(ws):
     _remote_command_auto(ws, 'forest_rdt')
