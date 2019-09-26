@@ -34,9 +34,7 @@ def _predict_atlas2prim(tup):
     ws_dir, puzzle_fn, puzzle_name, trial = tup
     ws = util.Workspace(ws_dir)
     ws.current_trial = trial
-    r = util.create_offscreen_renderer(puzzle_fn, ws.chart_resolution)
-    r.uv_feedback = True
-    r.avi = False
+    r = None
     puzzle, config = parse_ompl.parse_simple(puzzle_fn)
     for geo_type,flags,model_fn in zip(['rob', 'env'], [pyosr.Renderer.NO_SCENE_RENDERING, pyosr.Renderer.NO_ROBOT_RENDERING], [puzzle.rob_fn, puzzle.env_fn]):
         tgt_file = ws.local_ws(util.TESTING_DIR, puzzle_name, geo_type+'-a2p.npz')
@@ -50,6 +48,10 @@ def _predict_atlas2prim(tup):
                 continue
         except:
             pass
+        if r is None:
+            r = util.create_offscreen_renderer(puzzle_fn, ws.chart_resolution)
+            r.uv_feedback = True
+            r.avi = False
         r.render_mvrgbd(pyosr.Renderer.UV_MAPPINNG_RENDERING|flags)
         atlas2prim = np.copy(r.mvpid.reshape((r.pbufferWidth, r.pbufferHeight)))
         #imsave(geo_type+'-a2p-nt.png', atlas2prim) # This is for debugging
