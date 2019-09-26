@@ -11,6 +11,8 @@ def setup_parser(subparsers):
     p.add_argument('old', help='Template workspace directory')
     p.add_argument('dir', help='New workspace directory')
     p.add_argument('--training_puzzle', help='Puzzle as training data', default='')
+    p.add_argument('--quiet', help='do not call editor after creating the config', action='store_true')
+    p.add_argument('--override', help='Override the variable from the old workspace', default=None)
 
 def run(args):
     oldws = util.Workspace(args.old)

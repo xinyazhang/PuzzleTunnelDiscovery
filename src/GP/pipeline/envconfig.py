@@ -155,15 +155,24 @@ def init_config_file(args, ws, oldws=None):
         if not os.path.isfile(cfg):
             if oldws is not None:
                 rel_old_to_new = os.path.relpath(ws.dir, start=oldws.dir)
+                old_reuse = oldws.config.get('Prediction', 'ReuseWorkspace')
+                gpu_ws = normpath(join(oldws.config.get('DEFAULT', 'GPUWorkspacePath'), rel_old_to_new))
+                if old_reuse:
+                    new_reuse = os.path.relpath(join(oldws.dir, old_reuse), start=gpu_ws)
+                else:
+                    new_reuse = ''
                 dic = {
                         'GPUHost': oldws.config.get('DEFAULT', 'GPUHost'),
                         'GPUExecPath': oldws.config.get('DEFAULT', 'GPUExecPath'),
-                        'GPUWorkspacePath': normpath(join(oldws.config.get('DEFAULT', 'GPUWorkspacePath'), rel_old_to_new)),
+                        'GPUWorkspacePath': gpu_ws,
                         'CondorHost': oldws.config.get('DEFAULT', 'CondorHost'),
                         'CondorExecPath': oldws.config.get('DEFAULT', 'CondorExecPath'),
                         'CondorWorkspacePath': normpath(join(oldws.config.get('DEFAULT', 'CondorWorkspacePath'), rel_old_to_new)),
-                        'ReuseWorkspace': normpath(join(oldws.config.get('DEFAULT', 'ReuseWorkspace'), rel_old_to_new))
+                        'ReuseWorkspace': new_reuse
                       }
+                if hasattr(args, 'override') and args.override is not None:
+                    patch = dict(item.split("=") for item in args.override.split(","))
+                    dic.update(patch)
             else:
                 dic = {
                         'GPUHost': '',
@@ -172,10 +181,12 @@ def init_config_file(args, ws, oldws=None):
                         'CondorHost': '',
                         'CondorExecPath': '',
                         'CondorWorkspacePath': '',
+                        'ReuseWorkspace': '',
                       }
             print(_CONFIG_TEMPLATE.format(**dic), file=open(cfg, 'w'))
-        EDITOR = os.environ.get('EDITOR', 'vim')
-        subprocess.run([EDITOR, cfg])
+        if not hasattr(args, 'quiet') or not args.quiet:
+            EDITOR = os.environ.get('EDITOR', 'vim')
+            subprocess.run([EDITOR, cfg])
     except FileNotFoundError as e:
         print(e)
         return
