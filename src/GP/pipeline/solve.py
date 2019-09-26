@@ -29,6 +29,8 @@ from . import atlas
 from . import texture_format
 from . import parse_ompl
 
+ALGORITHM_VERSION_PHASE2_WITH_BLOOMING_TREE = 5
+
 #
 # Functions to process workspaces locally
 #
@@ -115,48 +117,47 @@ def screen_keyconf(args, ws):
                                 arguments=condor_job_args,
                                 instances=total_chunks,
                                 wait=False)
-    if not args.no_wait:
-        # wait the condor_job
-        for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
-            rel_scratch_dir = os.path.join(util.SOLVER_SCRATCH, puzzle_name, screen_str)
-            scratch_dir = ws.local_ws(rel_scratch_dir)
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+        rel_scratch_dir = os.path.join(util.SOLVER_SCRATCH, puzzle_name, screen_str)
+        scratch_dir = ws.local_ws(rel_scratch_dir)
+        if not args.no_wait: # wait the condor_job
             condor.local_wait(scratch_dir)
 
-            keyfn = ws.keyconf_prediction_file(puzzle_name)
-            keys = matio.load(keyfn, key='KEYQ_OMPL')
-            nkey = keys.shape[0]
-            util.log('[screen_keyconf][{}] nkey (unscreened) {}'.format(puzzle_name, nkey))
-            vert_ids = [i for i in range(util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS, nkey)]
-            djs = disjoint_set.DisjointSet(vert_ids)
-            fn_list = pathlib.Path(scratch_dir).glob("edge_batch-*.npz")
-            util.log("[screen_keyconf][{}] Creating disjoint set".format(puzzle_name))
-            for fn in progressbar(fn_list):
-                d = matio.load(fn)
-                for r,c in zip(d['EDGE_FROM'], d['EDGE_TO']):
-                    #if str(fn) == '/u/zxy/scratch/auto-mkobs3d/bin/gkws/duet-g1/solver_scratch/duet-g1/screen-80/edge_batch-120.npz':
-                    # util.log("{} {} {} {}".format(r, c, djs.find(r), djs.find(c)))
-                    djs.union(r,c)
+        keyfn = ws.keyconf_prediction_file(puzzle_name)
+        keys = matio.load(keyfn, key='KEYQ_OMPL')
+        nkey = keys.shape[0]
+        util.log('[screen_keyconf][{}] nkey (unscreened) {}'.format(puzzle_name, nkey))
+        vert_ids = [i for i in range(util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS, nkey)]
+        djs = disjoint_set.DisjointSet(vert_ids)
+        fn_list = pathlib.Path(scratch_dir).glob("edge_batch-*.npz")
+        util.log("[screen_keyconf][{}] Creating disjoint set".format(puzzle_name))
+        for fn in progressbar(fn_list):
+            d = matio.load(fn)
+            for r,c in zip(d['EDGE_FROM'], d['EDGE_TO']):
+                #if str(fn) == '/u/zxy/scratch/auto-mkobs3d/bin/gkws/duet-g1/solver_scratch/duet-g1/screen-80/edge_batch-120.npz':
+                # util.log("{} {} {} {}".format(r, c, djs.find(r), djs.find(c)))
+                djs.union(r,c)
 
-            cluster = djs.get_cluster()
-            screened_index = []
-            uw = util.create_unit_world(puzzle_fn)
-            unit_keys = uw.translate_ompl_to_unit(keys)
-            util.log("[screen_keyconf][{}] Screening roots".format(puzzle_name))
-            for k in progressbar(cluster):
-                nondis = []
-                for member in cluster[k]:
-                    if not uw.is_disentangled(unit_keys[member]):
-                        nondis.append(member)
-                        break
-                # TODO: clustering?
-                screened_index += nondis # No effect if nondis == []
-            screened_index = list(range(util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS)) + screened_index
-            screened = keys[screened_index]
-            util.log("[screen_keyconf][{}] Screened {} roots into {}".format(puzzle_name,
-                      keys.shape, screened.shape))
-            outfn = ws.screened_keyconf_prediction_file(puzzle_name)
-            util.log("[screen_keyconf] Save screened roots {} to {}".format(screened.shape, outfn))
-            np.savez_compressed(outfn, KEYQ_OMPL=screened)
+        cluster = djs.get_cluster()
+        screened_index = []
+        uw = util.create_unit_world(puzzle_fn)
+        unit_keys = uw.translate_ompl_to_unit(keys)
+        util.log("[screen_keyconf][{}] Screening roots".format(puzzle_name))
+        for k in progressbar(cluster):
+            nondis = []
+            for member in cluster[k]:
+                if not uw.is_disentangled(unit_keys[member]):
+                    nondis.append(member)
+                    break
+            # TODO: clustering?
+            screened_index += nondis # No effect if nondis == []
+        screened_index = list(range(util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS)) + screened_index
+        screened = keys[screened_index]
+        util.log("[screen_keyconf][{}] Screened {} roots into {}".format(puzzle_name,
+                  keys.shape, screened.shape))
+        outfn = ws.screened_keyconf_prediction_file(puzzle_name)
+        util.log("[screen_keyconf] Save screened roots {} to {}".format(screened.shape, outfn))
+        np.savez_compressed(outfn, KEYQ_OMPL=screened)
 
 '''
 least_visible_keyconf:
@@ -180,7 +181,7 @@ def least_visible_keyconf(args, ws):
         osc_files = util.lsv(ws.local_ws(rel_scratch_dir), 'clearance_batch-', '.npz')
         osc_arrays = [matio.load(fn)['DISTANCE_BATCH'] for fn in osc_files]
         osc = util.safe_concatente(osc_arrays)
-        assert osc.shape[0] == oskey.shape[0]
+        assert osc.shape[0] == oskey.shape[0], 'osc shape {} != oskey shape {}'.format(osc.shape, oskey.shape)
         mean = np.mean(osc, axis=1)
         # remove the initial root and goal root
         mean = mean[util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS:]
@@ -229,10 +230,7 @@ def _sample_pds_old(args, ws):
 # Bloom from roots
 def sample_pds(args, ws):
     if not args.only_wait:
-        for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
-            # if --puzzle_name presents, skip unmatched puzzles
-            if args.puzzle_name and args.puzzle_name != puzzle_name:
-                continue
+        for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
             _, config = parse_ompl.parse_simple(puzzle_fn)
             rel_bloom = _rel_bloom_scratch(ws, puzzle_name, ws.current_trial)
             util.log('[sample_pds]  rel_bloom {}'.format(rel_bloom))
@@ -261,25 +259,35 @@ def sample_pds(args, ws):
                                 wait=False) # do NOT wait here, we have to submit EVERY puzzle at once
     if args.no_wait:
         return
-    for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
-        if args.puzzle_name and args.puzzle_name != puzzle_name:
-            continue
+
+def assemble_pds(args, ws):
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
         rel_bloom = _rel_bloom_scratch(ws, puzzle_name, ws.current_trial)
         scratch_dir = ws.local_ws(rel_bloom)
         condor.local_wait(scratch_dir)
         pds_fn = _puzzle_pds(ws, puzzle_name, ws.current_trial)
         Q_list = []
+        QE_list = []
         tree_base_list = []
+        edge_base_list = []
         fn_list = sorted(pathlib.Path(scratch_dir).glob("bloom-from_*.npz"))
         tree_base = 0
+        edge_base = 0
         for fn in progressbar(fn_list):
             d = matio.load(fn)
             s = d['BLOOM'].shape
             if s[0] == 0:
                 continue
             assert s[1] == 7, "{}'s shape is {}".format(fn, s)
-            bloom =d['BLOOM']
+            bloom = d['BLOOM']
             Q_list.append(bloom)
+            if 'BLOOM_EDGE' in d and QE_list is not None:
+                edges = np.transpose(d['BLOOM_EDGE']) + tree_base
+                QE_list.append(edges)
+                edge_base_list.append(edge_base)
+                edge_base += int(edges.shape[0])
+            else:
+                QE_list = None # Disable QE
             tree_base_list.append(tree_base)
             tree_base += int(bloom.shape[0])
         Q = np.concatenate(Q_list, axis=0)
@@ -289,11 +297,20 @@ def sample_pds(args, ws):
         for j, uq in enumerate(uQ):
             if uw.is_disentangled(uq):
                 QF[j] = se3solver.PDS_FLAG_TERMINATE
-        np.savez_compressed(pds_fn, Q=Q, QF=QF, QB=tree_base_list)
+        if QE_list:
+            QE = np.concatenate(QE_list, axis=0)
+            assert QE.shape[0] == Q.shape[0] - len(tree_base_list), 'San check failed. Broken tree edges'
+            np.savez_compressed(pds_fn, Q=Q, QF=QF, QB=tree_base_list, QE=QE, QEB=edge_base_list)
+        else:
+            np.savez_compressed(pds_fn, Q=Q, QF=QF, QB=tree_base_list)
         util.log('[sample_pds] samples stored at {}'.format(pds_fn))
 
 def forest_rdt(args, ws):
-    trial_str = 'trial-{}'.format(_trial_id(ws, ws.current_trial))
+    if args.algorithm_version == ALGORITHM_VERSION_PHASE2_WITH_BLOOMING_TREE:
+        algoprefix = 'withbt-'
+    else:
+        algoprefix = ''
+    trial_str = algoprefix + 'trial-{}'.format(_trial_id(ws, ws.current_trial))
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
         # if --puzzle_name presents, skip unmatched puzzles
         if args.puzzle_name and args.puzzle_name != puzzle_name:
@@ -318,8 +335,10 @@ def forest_rdt(args, ws):
                 '--cdres', config.getfloat('problem', 'collision_resolution', fallback=0.0001),
                 '--samset', _puzzle_pds(ws, puzzle_name, ws.current_trial),
                 '--replace_istate',
-                'file={},key=KEYQ_OMPL,offset=$$([$(Process)]),size=1,out={}'.format(key_fn, scratch_dir),
-                puzzle_fn,
+                'file={},key=KEYQ_OMPL,offset=$$([$(Process)]),size=1,out={}'.format(key_fn, scratch_dir)]
+        if args.algorithm_version == ALGORITHM_VERSION_PHASE2_WITH_BLOOMING_TREE:
+            condor_job_args += ['--use_blooming_tree']
+        condor_job_args += [puzzle_fn,
                 util.RDT_FOREST_ALGORITHM_ID,
                 1.0]
         keys = matio.load(key_fn)
@@ -339,14 +358,18 @@ def forest_rdt(args, ws):
 def forest_edges(args, ws):
 #pdsrdt-g9ae-1-edges.hdf5:
 #    ./pds_edge.py --pdsflags dual/pdsrdt-g9ae-1/pds-4m.0.npz --out pdsrdt-g9ae-1-edges.hdf5 `ls -v dual/pdsrdt-g9ae-1/pdsrdt/ssc-*.mat`
-    trial_str = 'trial-{}'.format(_trial_id(ws, ws.current_trial))
+    if args.algorithm_version == ALGORITHM_VERSION_PHASE2_WITH_BLOOMING_TREE:
+        algoprefix = 'withbt-'
+    else:
+        algoprefix = ''
+    trial_str = algoprefix + 'trial-{}'.format(_trial_id(ws, ws.current_trial))
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
         if args.puzzle_name and args.puzzle_name != puzzle_name:
             continue
         rel_scratch_dir = os.path.join(util.SOLVER_SCRATCH, puzzle_name, trial_str)
         shell_script = './pds_edge.py --pdsflags '
         shell_script += _puzzle_pds(ws, puzzle_name, ws.current_trial)
-        shell_script += ' --out {}'.format(ws.local_ws(rel_scratch_dir, 'edges.hdf5'))
+        shell_script += ' --out {}'.format(ws.local_ws(rel_scratch_dir, algoprefix + 'edges.hdf5'))
         shell_script += ' `ls -v {}/ssc-*.mat`'.format(ws.local_ws(rel_scratch_dir))
         util.shell(['bash', '-c', shell_script])
 
@@ -358,15 +381,19 @@ def connect_forest(args, ws):
 #               --pdsf dual/pdsrdt-g9ae-1/pds-4m.0.npz \
 #               --out pdsrdt-g9ae-1-path-1.txt
 #
-    trial_str = 'trial-{}'.format(_trial_id(ws, ws.current_trial))
+    if args.algorithm_version == ALGORITHM_VERSION_PHASE2_WITH_BLOOMING_TREE:
+        algoprefix = 'withbt-'
+    else:
+        algoprefix = ''
+    trial_str = algoprefix + 'trial-{}'.format(_trial_id(ws, ws.current_trial))
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
         if args.puzzle_name and args.puzzle_name != puzzle_name:
             continue
         # key_fn = ws.local_ws(util.TESTING_DIR, puzzle_name, util.KEY_PREDICTION)
         key_fn = ws.screened_keyconf_prediction_file(puzzle_name)
         rel_scratch_dir = join(util.SOLVER_SCRATCH, puzzle_name, trial_str)
-        rel_edges = join(rel_scratch_dir, 'edges.hdf5')
-        path_out = ws.local_ws(rel_scratch_dir, 'path.txt')
+        rel_edges = join(rel_scratch_dir, algoprefix + 'edges.hdf5')
+        path_out = ws.local_ws(rel_scratch_dir, algoprefix + 'path.txt')
         shell_script = './forest_dijkstra.py'
         shell_script += ' --indir '
         shell_script += ws.local_ws(rel_scratch_dir)
@@ -443,6 +470,7 @@ function_dict = {
         'least_visible_keyconf' : least_visible_keyconf,
         'screen_keyconf' : screen_keyconf,
         'sample_pds' : sample_pds,
+        'assemble_pds' : assemble_pds,
         'forest_rdt' : forest_rdt,
         'forest_edges' : forest_edges,
         'connect_forest' : connect_forest,
@@ -500,29 +528,26 @@ def _remote_command_distributed(ws, cmd):
                         alter_host=host,
                         extra_args='--puzzle_name {} --only_wait'.format(puzzle_name))
 
-def remote_screen_keyconf(ws):
+def _remote_command_auto(ws, cmd):
     if ws.condor_extra_hosts:
-        _remote_command_distributed(ws, 'screen_keyconf')
+        _remote_command_distributed(ws, cmd)
     else:
-        _remote_command(ws, 'screen_keyconf')
+        _remote_command(ws, cmd)
+
+def remote_screen_keyconf(ws):
+    _remote_command_auto(ws, 'screen_keyconf')
 
 def remote_least_visible_keyconf(ws):
-    if ws.condor_extra_hosts:
-        _remote_command_distributed(ws, 'least_visible_keyconf')
-    else:
-        _remote_command(ws, 'least_visible_keyconf')
+    _remote_command_auto(ws, 'least_visible_keyconf')
 
 def remote_sample_pds(ws):
-    if ws.condor_extra_hosts:
-        _remote_command_distributed(ws, 'sample_pds')
-    else:
-        _remote_command(ws, 'sample_pds')
+    _remote_command_auto(ws, 'sample_pds')
+
+def remote_assemble_pds(ws):
+    _remote_command_auto(ws, 'assemble_pds')
 
 def remote_forest_rdt(ws):
-    if ws.condor_extra_hosts:
-        _remote_command_distributed(ws, 'forest_rdt')
-    else:
-        _remote_command(ws, 'forest_rdt')
+    _remote_command_auto(ws, 'forest_rdt')
 
 def remote_forest_edges(ws):
     for _,_,puzzle_name in ws.condor_host_vs_test_puzzle_generator():
@@ -538,12 +563,31 @@ def remote_connect_forest(ws):
                         extra_args='--puzzle_name {}'.format(puzzle_name))
         ws.timekeeper_finish('connect_forest', puzzle_name)
 
+def remote_forest_rdt_withbt(ws):
+    _remote_command_auto(ws, 'forest_rdt', extra_args='--algorithm_version {}'.format(ALGORITHM_VERSION_PHASE2_WITH_BLOOMING_TREE))
+
+def remote_forest_edges_withbt(ws):
+    for _,_,puzzle_name in ws.condor_host_vs_test_puzzle_generator():
+        ws.timekeeper_start('forest_edges', puzzle_name)
+        _remote_command(ws, 'forest_edges',
+                        extra_args='--puzzle_name {} --algorithm_version {}'.format(puzzle_name, ALGORITHM_VERSION_PHASE2_WITH_BLOOMING_TREE))
+        ws.timekeeper_finish('forest_edges', puzzle_name)
+
+def remote_connect_forest_withbt(ws):
+    for _,_,puzzle_name in ws.condor_host_vs_test_puzzle_generator():
+        ws.timekeeper_start('connect_forest', puzzle_name)
+        _remote_command(ws, 'connect_forest',
+                        extra_args='--puzzle_name {} --algorithm_version {}'.format(puzzle_name, ALGORITHM_VERSION_PHASE2_WITH_BLOOMING_TREE))
+        ws.timekeeper_finish('connect_forest', puzzle_name)
+
+
 def collect_stages(variant=0):
-    assert variant in [0,4], f'Solve Pipeline Variant {variant} has not been implemented'
+    assert variant in [0,4,5], f'Solve Pipeline Variant {variant} has not been implemented'
     if variant in [0]:
         ret = [
                 ('screen_keyconf', remote_screen_keyconf),
                 ('sample_pds', remote_sample_pds),
+                ('assemble_pds', remote_assemble_pds),
                 ('forest_rdt', remote_forest_rdt),
                 ('forest_edges', remote_forest_edges),
                 ('connect_forest', remote_connect_forest),
@@ -553,9 +597,17 @@ def collect_stages(variant=0):
                 ('least_visible_keyconf', remote_least_visible_keyconf),
                 ('screen_keyconf', remote_screen_keyconf),
                 ('sample_pds', remote_sample_pds),
+                ('assemble_pds', remote_assemble_pds),
                 ('forest_rdt', remote_forest_rdt),
                 ('forest_edges', remote_forest_edges),
                 ('connect_forest', remote_connect_forest),
+              ]
+    elif variant in [5]:
+        ret = [
+                ('assemble_pds', remote_assemble_pds),
+                ('forest_rdt_withbt', remote_forest_rdt_withbt),
+                ('forest_edges_withbt', remote_forest_edges_withbt),
+                ('connect_forest_withbt', remote_connect_forest_withbt),
               ]
     return ret
 

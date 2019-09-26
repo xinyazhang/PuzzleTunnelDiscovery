@@ -105,6 +105,11 @@ def solve(args):
             QF = d['QF']
             driver.set_sample_set_flags(QF)
         record_compact_tree = True
+        if args.use_blooming_tree:
+            assert 'QB' in d
+            assert 'QE' in d
+            assert 'QEB' in d
+            driver.set_sample_set_edges(QB=d['QB'], QE=d['QE'], QEB=d['QEB'])
     else:
         record_compact_tree = False
     print("solve args {}".format(args))

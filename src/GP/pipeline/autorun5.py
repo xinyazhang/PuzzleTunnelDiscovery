@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from . import train
+from . import keyconf
 from . import geometrik
 from . import solve
 from . import choice_formatter
@@ -10,14 +12,13 @@ from . import autorun
 def _get_pipeline_stages():
     stages = []
     stages += [('Begin', lambda x: util.ack('Starting the pipeline'))]
-    for m in [geometrik, solve]:
-        stages += m.collect_stages()
+    stages += solve.collect_stages(variant=5)
     stages += [('End', lambda x: util.ack('All pipeline finished'))]
     return stages
 
 def setup_parser(subparsers):
-    autorun.setup_autorun_parser(subparsers, 'autorun2', _get_pipeline_stages(),
-            helptext='GK pipeline')
+    autorun.setup_autorun_parser(subparsers, 'autorun5', _get_pipeline_stages(),
+                                 helptext='autorun4 with another planner design, which uses blooming tree in Phase 2. Note this should be run AFTER autorun4.')
 
 def run(args):
     if args.stage is None:

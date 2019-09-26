@@ -18,7 +18,8 @@ def _get_pipeline_stages():
     return stages
 
 def setup_parser(subparsers):
-    autorun.setup_autorun_parser(subparsers, 'autorun4', _get_pipeline_stages())
+    autorun.setup_autorun_parser(subparsers, 'autorun4', _get_pipeline_stages(),
+            helptext='GK+NN combined pipeline')
 
 def run(args):
     if args.stage is None:

@@ -61,8 +61,8 @@ def run_pipeline(ppl_stages, args):
         if nstage:
             util.ack('[autorun] Next stage is {}'.format(nstage[0][0]))
 
-def setup_autorun_parser(subparsers, name, pdesc):
-    p = subparsers.add_parser(name, help='Run all pipelines automatically',
+def setup_autorun_parser(subparsers, name, pdesc, helptext='Run all pipelines automatically'):
+    p = subparsers.add_parser(name, help=helptext,
                               formatter_class=choice_formatter.Formatter)
     p.add_argument('dir', help='Workspace directory')
     stage_names = [ str(k) for k,v in pdesc ]
@@ -97,7 +97,8 @@ def _get_pipeline_stages():
     return stages
 
 def setup_parser(subparsers):
-    setup_autorun_parser(subparsers, 'autorun', _get_pipeline_stages())
+    setup_autorun_parser(subparsers, 'autorun', _get_pipeline_stages(),
+            helptext='NN pipeline')
 
 def run(args):
     if args.stage is None:

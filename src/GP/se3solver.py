@@ -22,7 +22,12 @@ def main():
     parser.add_argument('--bloom_out', help='Output bloom results', default=None)
     parser.add_argument('--sampler_id', help='Valid state sampler', type=int, default=0)
     parser.add_argument('--saminj', help='Sample injection file', type=str, default='')
-    parser.add_argument('--samset', help='Predefined sample set', type=str, default='')
+    parser.add_argument('--samset', help='Predefined sample set (PDS) file', type=str, default='')
+    parser.add_argument('--use_blooming_tree',
+                        help='Use blooming tree in Phase 2. '
+                        'If current RDT tree directly connected to a PDS sample, '
+                        'the whole tree from blooming would be added to the current RDT tree.',
+                        action='store_true')
     parser.add_argument('--samset2', help='Predefined sample set, format: current total prefix', type=str, nargs=3, default=[])
     parser.add_argument('--skip_existing', help='Quit if the output file already exists', action='store_true')
     parser.add_argument('--rdt_k', help='K Nearest in RDT algorithm', type=int, default=1)
