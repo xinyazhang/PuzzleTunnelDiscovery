@@ -566,21 +566,21 @@ def remote_connect_forest(ws):
         ws.timekeeper_finish('connect_forest', puzzle_name)
 
 def remote_forest_rdt_withbt(ws):
-    _remote_command_auto(ws, 'forest_rdt', extra_args='--algorithm_version {}'.format(ALGORITHM_VERSION_PHASE2_WITH_BLOOMING_TREE))
+    _remote_command_auto(ws, 'forest_rdt_withbt', extra_args='--algorithm_version {}'.format(ALGORITHM_VERSION_PHASE2_WITH_BLOOMING_TREE))
 
 def remote_forest_edges_withbt(ws):
     for _,_,puzzle_name in ws.condor_host_vs_test_puzzle_generator():
-        ws.timekeeper_start('forest_edges', puzzle_name)
+        ws.timekeeper_start('forest_edges_withbt', puzzle_name)
         _remote_command(ws, 'forest_edges',
                         extra_args='--puzzle_name {} --algorithm_version {}'.format(puzzle_name, ALGORITHM_VERSION_PHASE2_WITH_BLOOMING_TREE))
-        ws.timekeeper_finish('forest_edges', puzzle_name)
+        ws.timekeeper_finish('forest_edges_withbt', puzzle_name)
 
 def remote_connect_forest_withbt(ws):
     for _,_,puzzle_name in ws.condor_host_vs_test_puzzle_generator():
-        ws.timekeeper_start('connect_forest', puzzle_name)
+        ws.timekeeper_start('connect_forest_withbt', puzzle_name)
         _remote_command(ws, 'connect_forest',
                         extra_args='--puzzle_name {} --algorithm_version {}'.format(puzzle_name, ALGORITHM_VERSION_PHASE2_WITH_BLOOMING_TREE))
-        ws.timekeeper_finish('connect_forest', puzzle_name)
+        ws.timekeeper_finish('connect_forest_withbt', puzzle_name)
 
 
 def collect_stages(variant=0):
