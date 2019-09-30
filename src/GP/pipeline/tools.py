@@ -436,6 +436,7 @@ def _print_stat_header(writer):
                      'Mean Number of Roots',
                      'Mean PDS size',
                      'Solved/Total',
+                     'Solved/Total (WithBT)',
                     ])
 
 def _print_stat(puzzle_name, stat_dic, writer):
@@ -449,7 +450,9 @@ def _print_stat(puzzle_name, stat_dic, writer):
                      '{}'.format(np.mean(stat_dic['puzzle_roots'])),
                      '{}'.format(np.mean(stat_dic['puzzle_pds'])),
                      '{}/{}'.format(np.sum(stat_dic['puzzle_success_int']),
-                                    len(stat_dic['puzzle_success']))
+                                    len(stat_dic['puzzle_success'])),
+                     '{}/{}'.format(np.sum(stat_dic['puzzle_withbt_success_int']),
+                                    len(stat_dic['puzzle_withbt_success']))
                     ])
 
 def conclude(args):
@@ -510,6 +513,11 @@ def conclude(args):
                     puzzle_success = 'Y'
                 else:
                     puzzle_success = 'N'
+                sol_fn = ws.solution_file(puzzle_name, type_name='withbt-unit')
+                if os.path.exists(sol_fn):
+                    puzzle_withbt_success = 'Y'
+                else:
+                    puzzle_withbt_success = 'N'
                 _dic_add(stat_dic, 'trial_id', trial)
                 _dic_add(stat_dic, 'puzzle_method', puzzle_method)
                 _dic_add(stat_dic, 'puzzle_kps_env', puzzle_kps_env)
@@ -522,6 +530,8 @@ def conclude(args):
                 _dic_add(stat_dic, 'puzzle_pds', puzzle_pds)
                 _dic_add(stat_dic, 'puzzle_success', puzzle_success)
                 _dic_add(stat_dic, 'puzzle_success_int', 1 if puzzle_success == 'Y' else 0)
+                _dic_add(stat_dic, 'puzzle_withbt_success', puzzle_withbt_success)
+                _dic_add(stat_dic, 'puzzle_withbt_success_int', 1 if puzzle_withbt_success == 'Y' else 0)
             stat_dic['trial_range'] = args.trial_range
             if 'puzzle_success' not in stat_dic:
                 util.warn('workspace {} has not solution data for puzzle {}. No corresponding information will be printed'.format(ws_dir, puzzle_name))
@@ -567,6 +577,17 @@ def _detect_single_puzzle(ws):
 def _parse_log(logfn, single_puzzle):
     ret_dic = {}
     breaker = ' cost '
+    _RIGHT_TO_WRONG = {
+            'forest_rdt_withbt'     : 'forest_rdt',
+            'forest_edges_withbt'   : 'forest_edges',
+            'connect_forest_withbt' : 'connect_forest'
+    }
+
+    _WRONG_TO_RIGHT = {
+        'forest_rdt'     : 'forest_rdt_withbt',
+        'forest_edges'   : 'forest_edges_withbt',
+        'connect_forest' : 'connect_forest_withbt'
+    }
 
     def _update_ret_dic(list_of_tuples, stage_name, cost_str):
         for i in range(len(list_of_tuples)):
@@ -577,6 +598,12 @@ def _parse_log(logfn, single_puzzle):
         list_of_tuples.append((stage_name, cost_str))
 
     with open(logfn, 'r') as f:
+        '''
+        We had a bug in recording forest_rdt_withbt, forest_edges_withbt, connect_forest_withbt
+        Hence we are going to introduce a context-dependent parser to fix this
+        '''
+        fixing = ''
+        fixed_as = ''
         for line in f:
             loc = line.find(breaker)
             if loc < 0:
@@ -594,6 +621,16 @@ def _parse_log(logfn, single_puzzle):
                 puzzle_name = single_puzzle if puzzle_name == '*' else puzzle_name
             if puzzle_name not in ret_dic:
                 ret_dic[puzzle_name] = []
+            if 'puzzle_name' == '*' and stage_name in _RIGHT_TO_WRONG:
+                if split[2] == 'starting':
+                    fixing = _RIGHT_TO_WRONG[stage_name]
+                    fixed_as = stage_name
+                elif split[2] == 'finished':
+                    fixing = ''
+                    fixed_as = ''
+            else:
+                if fixing == stage_name:
+                    stage_name = fixed_as
             # print("{} {}".format(stage_name, cost_str))
             _update_ret_dic(ret_dic[puzzle_name], stage_name, cost_str)
     return ret_dic
