@@ -80,6 +80,57 @@ def _sample_key_point_worker(wag):
         np.savez(kps_fn, KEY_POINT_AMBIENT=pts, NOTCH_POINT_AMBIENT=npts)
     else:
         np.savez(kps_fn, KEY_POINT_AMBIENT=pts)
+    kps_fn = ws.keypoint_prediction_file(wag.puzzle_name, wag.geo_type)
+    util.log("[sample_key_point] writing {} points to {}".format(pts.shape[0], kps_fn))
+
+def _debug_notch_worker(wag):
+    ws = util.Workspace(wag.dir)
+    ws.current_trial = wag.current_trial
+    kpp = pygeokey.KeyPointProber(wag.refined_env_fn)
+    os.makedirs(ws.local_ws('debug'), exist_ok=True)
+    kps_fn = ws.local_ws('debug', f'notch-{ws.current_trial}.npz')
+    dic = dict()
+    SKV = kpp.get_all_skeleton_points()
+    SKE = kpp.get_skeleton_edges()
+    SKVd = np.concatenate([SKV,SKV], axis=0)
+    SKF = np.zeros((SKE.shape[0], 3), dtype=SKE.dtype)
+    SKF[:, 0] = SKE[:, 0]
+    SKF[:, 1] = SKE[:, 1]
+    SKF[:, 2] = SKE[:, 0] + SKV.shape[0]
+    import pyosr
+    pyosr.save_obj_1(SKVd, SKF, ws.local_ws('debug', f'ske-{ws.current_trial}.obj'))
+    # pyosr.save_obj_1(SKV, SKE, ws.local_ws('debug', f'ske-{ws.current_trial}.obj'))
+    # pyosr.save_ply_2(SKV, SKE, np.zeros([]), np.array([]), ws.local_ws('debug', f'ske-{ws.current_trial}.ply'))
+    kpp.local_min_thresh = 0.10
+    kpp.group_tolerance_epsilon = 0.05
+    for i in range(1):
+        npts = kpp.probe_notch_points(seed=0, keep_intermediate_data=True)
+        ZF = np.zeros(shape=(0,0))
+        for it in range(3):
+            P1 = kpp.get_intermediate_data(it, 0)
+            P2 = kpp.get_intermediate_data(it, 1)
+            P3 = kpp.get_intermediate_data(it, 2)
+            pyosr.save_obj_1(P1, ZF, ws.local_ws('debug', f'P1-I{it}-{ws.current_trial}.obj'))
+            pyosr.save_obj_1(P2, ZF, ws.local_ws('debug', f'P2-I{it}-{ws.current_trial}.obj'))
+            pyosr.save_obj_1(P3, ZF, ws.local_ws('debug', f'P3-I{it}-{ws.current_trial}.obj'))
+            PE = np.concatenate((P2, P3, P3),axis=0)
+            D = P2.shape[0]
+            edges = [(i, i + D, i + D*2) for i in range(D)]
+            pyosr.save_obj_1(PE, edges, ws.local_ws('debug', f'PE-I{it}-{ws.current_trial}.obj'))
+        npt1 = npts[:,:3]
+        npt2 = npts[:,3:6]
+        D = npt1.shape[0]
+        nptb = np.concatenate((npt1, npt2, npt2),axis=0)
+        edges = [(i, i + D, i + D*2) for i in range(D)]
+        pyosr.save_obj_1(nptb, edges, ws.local_ws('debug', f'NPTE-{ws.current_trial}.obj'))
+        matio.savetxt(ws.local_ws('debug', f'EL-{ws.current_trial}.txt'), np.linalg.norm(npt1 - npt2, axis=1))
+        dic[str(i)] = npts
+    np.savez(kps_fn, **dic)
+
+def _debug_notch(args, ws):
+    task_args = _get_task_args(ws, args=args, per_geometry=False)
+    for wag in task_args:
+        _debug_notch_worker(wag)
 
 def sample_key_point(args, ws):
     task_args = _get_task_args(ws, args=args, per_geometry=True)
@@ -173,6 +224,7 @@ function_dict = {
         'sample_key_conf' : sample_key_conf,
         'sample_key_conf_with_geometrik_prefix' : sample_key_conf_with_geometrik_prefix,
         'deploy_geometrik_to_condor' : deploy_geometrik_to_condor,
+        '_debug_notch' : _debug_notch,
 }
 
 def setup_parser(subparsers):

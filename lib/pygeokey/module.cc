@@ -17,10 +17,15 @@ PYBIND11_MODULE(pygeokey, m) {
 		     py::arg("seed") = 0
 		    )
 		.def("probe_notch_points", &KeyPointProber::probeNotchPoints,
-		     py::arg("seed") = 0
+		     py::arg("seed") = 0,
+		     py::arg("keep_intermediate_data") = false
 		    )
+		.def("get_intermediate_data", &KeyPointProber::getIntermediateData)
+		.def("get_all_skeleton_points", &KeyPointProber::getAllSkeletonPoints)
+		.def("get_skeleton_edges", &KeyPointProber::getSkeletonEdges)
 		.def_property("alpha", &KeyPointProber::getAlpha, &KeyPointProber::setAlpha)
 		.def_property("local_min_thresh", &KeyPointProber::getLocalMinThresh, &KeyPointProber::setLocalMinThresh)
+		.def_property("group_tolerance_epsilon", &KeyPointProber::getToleranceEpsilon, &KeyPointProber::setToleranceEpsilon)
 		;
 	py::class_<KeySampler>(m, "KeySampler")
 		.def(py::init<const std::string&, const std::string&>())
