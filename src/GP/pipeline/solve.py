@@ -51,8 +51,8 @@ def _puzzle_pds(ws, puzzle_name, trial):
     fn ='{}.npz'.format(_trial_id(ws, trial))
     return join(pds_dir, fn)
 
-def _rel_bloom_scratch(ws, puzzle_fn, trial):
-    return join(util.SOLVER_SCRATCH, puzzle_fn, util.PDS_SUBDIR, 'bloom-'+_trial_id(ws, trial))
+def _rel_bloom_scratch(ws, puzzle_name, trial):
+    return join(util.SOLVER_SCRATCH, puzzle_name, util.PDS_SUBDIR, 'bloom-'+_trial_id(ws, trial))
 
 def _partition_screening(ws, puzzle_name, index=None):
     keyfn = ws.keyconf_prediction_file(puzzle_name)

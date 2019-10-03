@@ -657,6 +657,113 @@ def breakdown(args):
         writer.writerow(row)
     f.close()
 
+_CONDOR_PPSTAGE_TO_DIR = {
+        'find_trajectory': util.PREP_TRAJECTORY_SCRATCH,
+        'estimate_clearance_volume': util.PREP_KEY_CAN_SCRATCH,
+        'sample_touch' : util.PREP_TOUCH_SCRATCH,
+        'isect_geometry' : util.PREP_ISECT_SCRATCH,
+        'uvproject' : util.UV_DIR,
+}
+
+def estimate_keyconf_clearance_dir(puzzle_name, current_trial):
+    return join(util.SOLVER_SCRATCH, puzzle_name, util.KEYCONF_CLEARANCE_DIR, str(current_trial))
+
+def screen_keyconf_dir(puzzle_name, current_trial):
+    return join(util.SOLVER_SCRATCH, puzzle_name, 'screen-{}'.format(current_trial))
+
+def sample_pds_dir(puzzle_name, current_trial):
+    return join(util.SOLVER_SCRATCH, puzzle_name, util.PDS_SUBDIR, 'bloom-{}'.format(current_trial))
+
+def forest_rdt_dir(puzzle_name, current_trial):
+    return join(util.SOLVER_SCRATCH, puzzle_name, 'trial-{}'.format(current_trial))
+
+def forest_rdt_withbt_dir(puzzle_name, current_trial):
+    return join(util.SOLVER_SCRATCH, puzzle_name, 'withbt-trial-{}'.format(current_trial))
+
+_CONDOR_SOLSTAGE_TO_DIR = {
+        'estimate_keyconf_clearance' : estimate_keyconf_clearance_dir,
+        'screen_keyconf' : screen_keyconf_dir,
+        'sample_pds' : sample_pds_dir,
+        'forest_rdt' : forest_rdt_dir,
+        'forest_rdt_withbt' : forest_rdt_withbt_dir,
+}
+def condor_ppbreakdown(args):
+    grand_dict = {}
+    trial_list = util.rangestring_to_list(args.trial_range)
+    for ws_dir in args.dirs:
+        ws = util.Workspace(ws_dir)
+        pp_dict = {}
+        for k,v in _CONDOR_PPSTAGE_TO_DIR.items():
+            lt = condor.query_last_cputime(ws, v)
+            if lt is not None:
+                pp_dict[k] = lt
+        ws_basename = os.path.basename(ws_dir)
+        grand_dict[ws_basename] = pp_dict
+    def _get_rows():
+        first = True
+        keys = []
+        for ent, dic in grand_dict.items():
+            if first:
+                ty = ['Workspace']
+                for k,v in dic.items():
+                    keys += [k]
+                yield ty + keys
+                first = False
+            ty = [ent]
+            for k in keys:
+                ty.append(dic[k])
+            yield ty
+    with open(args.out, 'w') as f:
+        writer = csv.writer(f)
+        for row in _get_rows():
+            writer.writerow(row)
+
+def condor_breakdown(args):
+    grand_dict = {}
+    trial_list = util.rangestring_to_list(args.trial_range)
+
+    for ws_dir in args.dirs:
+        ws = util.Workspace(ws_dir)
+        for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+            if puzzle_name not in grand_dict:
+                grand_dict[puzzle_name] = {}
+            pp_dict = grand_dict[puzzle_name]
+            for trial in trial_list:
+                if trial not in grand_dict:
+                    pp_dict[trial] = {}
+                for k,v in _CONDOR_SOLSTAGE_TO_DIR.items():
+                    rel = v(puzzle_name, trial)
+                    lt = condor.query_last_cputime(ws, rel)
+                    if lt is not None:
+                        pp_dict[trial][k] = lt
+    print(grand_dict)
+    def _get_rows():
+        first = True
+        keys = []
+        for puzzle_name, dic in grand_dict.items():
+            print(puzzle_name)
+            print(dic)
+            if first:
+                ty = ['Puzzle', 'Trial']
+                for trial, trialdata in dic.items():
+                    for k,v in trialdata.items():
+                        keys += [k]
+                    yield ty + keys
+                    first = False
+                    break
+            for trial, trialdata in dic.items():
+                ty = [puzzle_name, trial]
+                for k in keys:
+                    if k in trialdata:
+                        ty.append(trialdata[k])
+                    else:
+                        ty.append('N/A')
+                yield ty
+    with open(args.out, 'w') as f:
+        writer = csv.writer(f)
+        for row in _get_rows():
+            writer.writerow(row)
+
 def blender_animate(args):
     ws = util.Workspace(args.dir)
     ws.current_trial = args.current_trial
@@ -712,6 +819,8 @@ function_dict = {
         'animate' : animate,
         'conclude' : conclude,
         'breakdown' : breakdown,
+        'condor_breakdown' : condor_ppbreakdown,
+        'condor_breakdown' : condor_breakdown,
         'blender' : blender_animate,
 }
 
@@ -810,6 +919,20 @@ def setup_parser(subparsers):
     p.add_argument('--type', help='Choose what kind of info to output', default='detail', choices=['detail', 'stat'])
     p.add_argument('--out', help='Output CSV file', default='b.csv')
     p.add_argument('dirs', help='Workspace directory', nargs='+')
+
+    p = toolp.add_parser('condor_breakdown', help='Show the solving per-stage runtime on HTCondor cluster')
+    p.add_argument('--trial_range', help='range of trials', type=str, required=True)
+    p.add_argument('--puzzle_name', help='Only show one specific testing puzzle', default='')
+    p.add_argument('--out', help='Output CSV file', default='c.csv')
+    p.add_argument('dirs', help='Archived workspace directory, must include condor log files',
+                   nargs='+')
+
+    p = toolp.add_parser('condor_ppbreakdown', help='Show the preprocessing per-stage runtime on HTCondor cluster')
+    p.add_argument('--trial_range', help='range of trials', type=str, required=True)
+    p.add_argument('--puzzle_name', help='Only show one specific testing puzzle', default='')
+    p.add_argument('--out', help='Output CSV file', default='p.csv')
+    p.add_argument('dirs', help='Archived workspace directory, must include condor log files',
+                   nargs='+')
 
     p = toolp.add_parser('blender', help='Invoke blender to render the trajectory')
     p.add_argument('--current_trial', help='Trial that has the solution trajectory', type=int, default=None)

@@ -26,8 +26,10 @@ from . import texture_format
 
 hdf5_overwrite = matio.hdf5_overwrite
 
-_TOUCH_SCRATCH = join(util.CONDOR_SCRATCH, 'training_key_touch')
-_ISECT_SCRATCH = join(util.CONDOR_SCRATCH, 'training_key_isect')
+# _TOUCH_SCRATCH = join(util.CONDOR_SCRATCH, 'training_key_touch')
+# _ISECT_SCRATCH = join(util.CONDOR_SCRATCH, 'training_key_isect')
+_TOUCH_SCRATCH = util.PREP_TOUCH_SCRATCH
+_ISECT_SCRATCH = util.PREP_ISECT_SCRATCH
 _UVPROJ_SCRATCH = util.UV_DIR
 
 def _get_keys(ws):

@@ -36,7 +36,10 @@ PERFORMANCE_LOG_DIR = 'performance_log'
 # Used by multiple pipeline parts
 #
 # Note: we use UPPERCASE KEY to indicate this is training data/ground truth.
+PREP_TRAJECTORY_SCRATCH = os.path.join(CONDOR_SCRATCH, 'training_trajectory')
 PREP_KEY_CAN_SCRATCH = os.path.join(CONDOR_SCRATCH, 'training_key_can')
+PREP_TOUCH_SCRATCH = os.path.join(CONDOR_SCRATCH, 'training_key_touch')
+PREP_ISECT_SCRATCH = os.path.join(CONDOR_SCRATCH, 'training_key_isect')
 KEY_CANDIDATE_FILE = os.path.join(TRAINING_DIR, 'KeyCan.npz')
 # Multi trajectory key candidate file
 MT_KEY_CANDIDATE_FILE = os.path.join(TRAINING_DIR, 'KeyCan.hdf5')

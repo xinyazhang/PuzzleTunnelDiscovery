@@ -26,7 +26,7 @@ hdf5_overwrite = matio.hdf5_overwrite
 #
 # Here we always use "trajectory" to represent the curve in configuration space
 # and "path" always refers to the path in a file system.
-_TRAJECTORY_SCRATCH = join(util.CONDOR_SCRATCH, 'training_trajectory')
+_TRAJECTORY_SCRATCH = util.PREP_TRAJECTORY_SCRATCH
 _KEYCAN_SCRATCH = util.PREP_KEY_CAN_SCRATCH
 
 def _get_candidate_file(ws):
