@@ -421,13 +421,30 @@ public:
 					subset(i) = i;
 			}
 			for (int i = 0; i < subset.size(); i++) {
-				for (int mi = tree_offset[i]; mi < tree_offset[i+1]; mi++) {
+				auto qfrom = tree_offset[i];
+				auto qto = tree_offset[i+1];
+				if (verbose) {
+					std::cerr << "Subset: " << i + 1 << " / " << subset.size()
+					          << "From " << qfrom << " To " << qto
+					          << std::endl;
+				}
+				int last_pc = -1;
+				ssize_t total = (qto - qfrom) * NTree;
+				for (int mi = qfrom; mi < qto; mi++) {
 					auto m = all_motions[mi];
 					for (int k = 0; k < NTree; k++) {
 						if (m->forest_index == k)
 							continue;
 						std::vector<Motion*> nmotions;
 						ex_knn_[k]->nearestK(m, KNN, nmotions);
+						if (verbose) {
+							int pc = (mi - qfrom) * NTree + k;
+							pc = pc * 100 / total;
+							if (pc != last_pc) {
+								std::cerr << "[Subset " << i + 1 << "/" << subset.size() << "] " << pc << "%" << std::endl;
+								last_pc = pc;
+							}
+						}
 						for (auto nn: nmotions) {
 							if (!si->checkMotion(m->state, nn->state))
 								continue;
