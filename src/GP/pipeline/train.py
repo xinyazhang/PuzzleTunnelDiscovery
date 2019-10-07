@@ -239,7 +239,6 @@ def autorun(args):
     _fetch(ws)
 
 def collect_stages(variant=0):
-    assert variant in [0,4], f'Train Pipeline Variant {variant} has not been implemented'
     if variant in [0]:
         return [ ('deploy_to_gpu', _deploy),
                  ('train_rob', remote_train_rob),
@@ -250,10 +249,11 @@ def collect_stages(variant=0):
                  ('predict_env', remote_predict_env),
                  ('fetch_from_gpu', _fetch),
                ]
-    if variant in [4]:
+    elif variant in [4,6]:
         return [
                  ('deploy_to_gpu', _deploy),
                  ('predict_rob', remote_predict_rob),
                  ('predict_env', remote_predict_env),
                  ('fetch_from_gpu', _fetch),
                ]
+    assert False, f'Train Pipeline Variant {variant} has not been implemented'

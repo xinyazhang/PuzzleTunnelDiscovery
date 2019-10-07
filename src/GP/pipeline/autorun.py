@@ -18,7 +18,7 @@ def run_pipeline(ppl_stages, args):
     cont = None
     till = None
     for index,(k,v) in enumerate(pdesc):
-        util.log('[autorun] checking {}'.format(k))
+        util.log(f'[{args.command}] checking {k}')
         if k == args.stage:
             if cont is not None:
                 raise RuntimeError("Duplicated key name {} in the pipeline".format(k))
@@ -44,14 +44,14 @@ def run_pipeline(ppl_stages, args):
     if None in keys:
         util.warn("[NOTE] Pipeline is broken")
         raise RuntimeError("Pipeline is broken, cannot autorun with --till")
-    util.log("[autorun] running the following stages {}".format([k for k,_ in stage_list]))
-    util.log("[autorun] running the following stages {}".format([k for k,_ in stage_list]))
+    util.log("[{}] running the following stages {}".format(args.command, [k for k,_ in stage_list]))
     if args.current_trial is not None:
         trials = util.rangestring_to_list(args.current_trial)
     else:
         trials = [None]
     for trial in trials:
         ws.current_trial = trial
+        ws.timekeeper_start(args.command)
         for k,v in stage_list:
             ws.timekeeper_start(k)
             util.ack('<{}> [{}] starting...'.format(ws.current_trial, k))
@@ -59,7 +59,8 @@ def run_pipeline(ppl_stages, args):
             util.ack('<{}> [{}] finished'.format(ws.current_trial, k))
             ws.timekeeper_finish(k)
         if nstage:
-            util.ack('[autorun] Next stage is {}'.format(nstage[0][0]))
+            util.ack('[{}] Next stage is {}'.format(args.command, nstage[0][0]))
+        ws.timekeeper_finish(args.command)
 
 def setup_autorun_parser(subparsers, name, pdesc, helptext='Run all pipelines automatically'):
     p = subparsers.add_parser(name, help=helptext,

@@ -51,8 +51,14 @@ PIXMARGIN = 2
 
 KEYCONF_CLEARANCE_DIR = 'keyconf_clearance'
 KEY_POINT_FMT = 'geometrik_key_point_of_{}-{}.npz'
+GERATIO_POINT_FMT = 'geometrik_geratio_point_of_{geo_type}-{trial}.npz'
+NOTCH_POINT_FMT = 'geometrik_notch_point_of_{geo_type}-{trial}.npz'
+GERATIO_KEY_FMT = 'geometrik_geratio_keyconf-{trial}.npz'
+NOTCH_KEY_FMT = 'geometrik_notch_keyconf-{trial}.npz'
+NEURAL_KEY_FMT = 'neural_keyconf-{trial}.npz'
 GEOMETRIK_KEY_PREDICTION_FMT = 'geometrik_forest_roots-{}.npz'
 OVERSAMPLED_KEY_PREDICTION_FMT = 'oversampled_forest_roots-{}.npz'
+COMBINED_KEY_FMT = 'combined_keyconf-{trial}.npz'
 UNSCREENED_KEY_PREDICTION_FMT = 'unscreened_forest_roots-{}.npz'
 SCREENED_KEY_PREDICTION_FMT = 'forest_roots-{}.npz'
 SOLUTION_FMT = 'path-{trial}.{type_name}.txt'
@@ -445,7 +451,7 @@ class Workspace(object):
     def timekeeper_start(self, stage_name, puzzle_name='*'):
         with self.open_performance_log() as f:
             t = datetime.utcnow()
-            print('[{}][{}] starting at {}'.format(stage_name, puzzle_name, t), file=f)
+            print('[{}][{}] starting at {}'.format(stage_name, puzzle_name, t.isoformat()), file=f)
         self._timekeeper[stage_name] = t
 
     def timekeeper_finish(self, stage_name, puzzle_name='*'):
@@ -455,8 +461,8 @@ class Workspace(object):
         else:
             delta = None
         with self.open_performance_log() as f:
-            print('[{}][{}] finished at {}'.format(stage_name, puzzle_name, t), file=f)
-            print('[{}][{}] cost {}'.format(stage_name, puzzle_name, delta), file=f)
+            print('[{}][{}] finished at {}'.format(stage_name, puzzle_name, t.isoformat()), file=f)
+            print(f'[{stage_name}][{puzzle_name}] cost {delta.days}+{delta.seconds//3600}:{delta.seconds % 3600 // 60}:{delta.seconds % 60}.{delta.microseconds:06d}', file=f)
 
 def trim_suffix(fn):
     return os.path.splitext(fn)[0]

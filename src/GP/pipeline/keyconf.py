@@ -335,14 +335,13 @@ def remote_estimate_keyconf_clearance(ws):
 # Automatic functions start here
 #
 def collect_stages(variant=0):
-    assert variant in [0,4], f'Keyconf Pipeline Variant {variant} has not been implemented'
     if variant in [0]:
         ret = [
                 ('generate_atlas2prim', lambda ws: generate_atlas2prim(None, ws)),
                 ('predict_keyconf', lambda ws: predict_keyconf(None, ws)),
                 ('upload_keyconf_to_condor', lambda ws: ws.deploy_to_condor(util.TESTING_DIR + '/'))
               ]
-    elif variant in [4]:
+    elif variant in [4,6]:
         ret = [
                 ('generate_atlas2prim', lambda ws: generate_atlas2prim(None, ws)),
                 ('oversample_keyconf', lambda ws: oversample_keyconf(None, ws)),
@@ -354,6 +353,8 @@ def collect_stages(variant=0):
                 ),
                 ('estimate_keyconf_clearance', remote_estimate_keyconf_clearance)
               ]
+    else:
+        assert False, f'Keyconf Pipeline Variant {variant} has not been implemented'
     return ret
 
 def autorun(args):

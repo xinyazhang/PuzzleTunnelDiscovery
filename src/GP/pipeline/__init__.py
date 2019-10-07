@@ -25,3 +25,5 @@ from . import robogeok
 from . import copy_training_data
 from . import autorun4
 from . import autorun5
+from . import autorun5_1
+from . import autorun6

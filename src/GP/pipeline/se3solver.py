@@ -221,9 +221,14 @@ def merge_blooming_forest(args):
         nv = V.shape[0]
         E = sparse.csr_matrix((nv, nv), dtype=np.uint8)
         driver.add_existing_graph(V, E)
-    inter_tree_edges = driver.merge_existing_graph(args.knn, verbose=True, version=args.algo_version)
+    inter_tree_edges = driver.merge_existing_graph(args.knn,
+                                                   verbose=True,
+                                                   version=args.algo_version,
+                                                   subset=args.subset)
     if args.out is not None:
         np.savez_compressed(args.out, INTER_BLOOMING_TREE_EDGES=inter_tree_edges)
+    if args.algo_version == 2:
+        return
     import networkx as nx
     G = nx.Graph()
     G.add_nodes_from([i for i in range(len(bloom_files))])

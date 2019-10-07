@@ -19,7 +19,7 @@ except ImportError as e:
 class WorkerArgs(object):
     pass
 
-def _get_task_args(ws, args, per_geometry, FMT=util.UNSCREENED_KEY_PREDICTION_FMT):
+def get_task_args(ws, args, per_geometry, FMT=util.UNSCREENED_KEY_PREDICTION_FMT, pairing=False):
     task_args = []
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
         cfg, config = parse_ompl.parse_simple(puzzle_fn)
@@ -37,15 +37,20 @@ def _get_task_args(ws, args, per_geometry, FMT=util.UNSCREENED_KEY_PREDICTION_FM
         else:
             wag.refined_env_fn = cfg.refined_env_fn
             wag.refined_rob_fn = cfg.refined_rob_fn
-        if per_geometry:
+        if per_geometry or pairing:
             wag.geo_type = 'env'
             wag.geo_fn = cfg.env_fn
             wag.refined_geo_fn = wag.refined_env_fn
-            task_args.append(copy.deepcopy(wag))
+            wag1 = copy.deepcopy(wag)
             wag.geo_type = 'rob'
             wag.geo_fn = cfg.rob_fn
             wag.refined_geo_fn = wag.refined_rob_fn
-            task_args.append(copy.deepcopy(wag))
+            wag2 = copy.deepcopy(wag)
+            if pairing:
+                task_args.append((wag1, wag2))
+            else:
+                task_args.append(wag1)
+                task_args.append(wag2)
         else:
             task_args.append(copy.deepcopy(wag))
     return task_args
@@ -55,33 +60,40 @@ def refine_mesh(args, ws):
         util.ack('[refine_mesh] --no_refine is specified so the mesh will not be refined')
         return
     target_v = ws.config.getint('GeometriK', 'FineMeshV')
-    task_args = _get_task_args(ws, args=args, per_geometry=True)
+    task_args = get_task_args(ws, args=args, per_geometry=True)
     for wag in task_args:
         if os.path.isfile(wag.refined_geo_fn):
             continue
         # util.shell(['/usr/bin/env'])
         util.shell(['./TetWild', '--level', '6', '--targeted-num-v', str(target_v), '--output-surface', wag.refined_geo_fn, wag.geo_fn])
 
-def _sample_key_point_worker(wag):
-    ws = util.Workspace(wag.dir)
-    ws.current_trial = wag.current_trial
+def detect_geratio_feature_worker(ws, wag):
     kpp = pygeokey.KeyPointProber(wag.geo_fn)
     natt = ws.config.getint('GeometriK', 'KeyPointAttempts')
     util.log("[sample_key_point] probing {} for {} attempts".format(wag.geo_fn, natt))
     pts = kpp.probe_key_points(natt)
-    kps_fn = ws.keypoint_prediction_file(wag.puzzle_name, wag.geo_type)
-    util.log("[sample_key_point] writing {} points to {}".format(pts.shape[0], kps_fn))
+    return pts
+
+def detect_notch_feature_worker(ws, wag):
+    util.log("[sample_key_point] Probing notches for {}".format(wag.refined_geo_fn))
+    kpp2 = pygeokey.KeyPointProber(wag.refined_geo_fn)
+    npts = kpp2.probe_notch_points()
+    return npts
+
+def _sample_key_point_worker(wag):
+    ws = util.Workspace(wag.dir)
+    ws.current_trial = wag.current_trial
+    pts = detect_geratio_feature_worker(ws, wag)
     SAMPLE_NOTCH = ws.config.getboolean('GeometriK', 'EnableNotchDetection', fallback=True)
     if SAMPLE_NOTCH:
-        util.log("[sample_key_point] Probing notches for {}".format(wag.refined_geo_fn))
-        kpp2 = pygeokey.KeyPointProber(wag.refined_geo_fn)
-        npts = kpp2.probe_notch_points()
-        util.log("[sample_key_point] writing {} points and {} notches to {}".format(pts.shape[0], npts.shape[0], kps_fn))
+        npts = detect_notch_feature_worker(ws, wag)
+        util.log("[sample_key_point] writing {} points and {} notches to {}".format(
+                  pts.shape[0], npts.shape[0], kps_fn))
         np.savez(kps_fn, KEY_POINT_AMBIENT=pts, NOTCH_POINT_AMBIENT=npts)
     else:
+        kps_fn = ws.keypoint_prediction_file(wag.puzzle_name, wag.geo_type)
+        util.log("[sample_key_point] writing {} points to {}".format(pts.shape[0], kps_fn))
         np.savez(kps_fn, KEY_POINT_AMBIENT=pts)
-    kps_fn = ws.keypoint_prediction_file(wag.puzzle_name, wag.geo_type)
-    util.log("[sample_key_point] writing {} points to {}".format(pts.shape[0], kps_fn))
 
 def _debug_notch_worker(wag):
     ws = util.Workspace(wag.dir)
@@ -128,12 +140,12 @@ def _debug_notch_worker(wag):
     np.savez(kps_fn, **dic)
 
 def _debug_notch(args, ws):
-    task_args = _get_task_args(ws, args=args, per_geometry=False)
+    task_args = get_task_args(ws, args=args, per_geometry=False)
     for wag in task_args:
         _debug_notch_worker(wag)
 
 def sample_key_point(args, ws):
-    task_args = _get_task_args(ws, args=args, per_geometry=True)
+    task_args = get_task_args(ws, args=args, per_geometry=True)
     USE_MP = False
     if USE_MP:
         pcpu = multiprocessing.Pool()
@@ -163,26 +175,6 @@ def _sample_key_conf_worker(wag):
         kqs, env_keyid, rob_keyid = ks.get_all_key_configs(env_kps, rob_kps,
                                            ws.config.getint('GeometriK', 'KeyConfigRotations'))
         util.log("kqs {}".format(kqs.shape))
-    else: # FIXME: remove this branch later
-        assert False, 'NEVER USE THIS CODEPATH'
-        def _load_kps(geo_type):
-            kps_fn = ws.keypoint_prediction_file(wag.puzzle_name, geo_type)
-            return matio.load(kps_fn)
-        env_d = _load_kps('env')
-        rob_d = _load_kps('rob')
-        def _gen_kqs(key):
-            if not key in env_d or env_d[key].shape[0] == 0:
-                return None
-            if not key in rob_d or rob_d[key].shape[0] == 0:
-                return None
-            ip1 = env_d[key]
-            ip2 = rob_d[key]
-            kqs, _, _ = ks.get_all_key_configs(ip1, ip2,
-                                               ws.config.getint('GeometriK', 'KeyConfigRotations'))
-            return kqs
-        kqs1 = _gen_kqs('KEY_POINT_AMBIENT')
-        kqs2 = _gen_kqs('NOTCH_POINT_AMBIENT')
-        kqs = util.safe_concatente([kqs1, kqs2])
     uw = util.create_unit_world(wag.puzzle_fn)
     cfg, config = parse_ompl.parse_simple(wag.puzzle_fn)
     iq = parse_ompl.tup_to_ompl(cfg.iq_tup)
@@ -201,14 +193,14 @@ def _sample_key_conf_worker(wag):
     np.savetxt(out, unit_q)
 
 def sample_key_conf(args, ws):
-    task_args = _get_task_args(ws, args=args, per_geometry=False)
+    task_args = get_task_args(ws, args=args, per_geometry=False)
     for wag in task_args:
          _sample_key_conf_worker(wag)
     # pcpu = multiprocessing.Pool()
     # pcpu.map(_sample_key_conf_worker, task_args)
 
 def sample_key_conf_with_geometrik_prefix(args, ws):
-    task_args = _get_task_args(ws, args=args, per_geometry=False, FMT=util.GEOMETRIK_KEY_PREDICTION_FMT)
+    task_args = get_task_args(ws, args=args, per_geometry=False, FMT=util.GEOMETRIK_KEY_PREDICTION_FMT)
     for wag in task_args:
          _sample_key_conf_worker(wag)
 
@@ -227,8 +219,8 @@ function_dict = {
         '_debug_notch' : _debug_notch,
 }
 
-def setup_parser(subparsers):
-    p = subparsers.add_parser('geometrik', help='Sample Key configuration from Geometric features',
+def setup_parser(subparsers, module_name='geometrik'):
+    p = subparsers.add_parser(module_name, help='Sample Key configuration from Geometric features',
                               formatter_class=choice_formatter.Formatter)
     p.add_argument('--stage',
                    choices=list(function_dict.keys()),
@@ -266,16 +258,6 @@ def remote_sample_key_conf(ws):
 def remote_sample_key_conf_with_geometrik_prefix(ws):
     _remote_command(ws, 'sample_key_conf_with_geometrik_prefix')
 
-'''
-# Deprecated
-def autorun(args):
-    ws = util.Workspace(args.dir)
-    ws.current_trial = args.current_trial
-    pdesc = collect_stages()
-    for _,func in pdesc:
-        func(ws)
-'''
-
 def collect_stages(variant=0):
     if variant in [0]:
         ret = [ ('deploy_to_condor',
@@ -296,4 +278,6 @@ def collect_stages(variant=0):
                 ('sample_key_conf_with_geometrik_prefix', remote_sample_key_conf_with_geometrik_prefix),
                 #('deploy_geometrik_to_condor', lambda ws: deploy_geometrik_to_condor(None, ws))
               ]
+    else:
+        assert False, f'[geometrik] Unknown variant {variant}'
     return ret
