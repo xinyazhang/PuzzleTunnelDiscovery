@@ -408,7 +408,7 @@ public:
 				}
 				ex_knn_.emplace_back(std::move(nn));
 				if (verbose) {
-					std::cerr << i + 1 << " / " << ex_graph_v_.size() << std::endl;
+					std::cerr << i + 1 << " / " << ex_graph_v_.size() << "\tall_motions size: " << all_motions.size() << std::endl;
 				}
 			}
 			// Ensure tree_offset[tree_id+1] always points to the
@@ -421,11 +421,12 @@ public:
 					subset(i) = i;
 			}
 			for (int i = 0; i < subset.size(); i++) {
-				auto qfrom = tree_offset[i];
-				auto qto = tree_offset[i+1];
+				auto subset_id = subset(i);
+				auto qfrom = tree_offset[subset_id];
+				auto qto = tree_offset[subset_id+1];
 				if (verbose) {
 					std::cerr << "Subset: " << i + 1 << " / " << subset.size()
-					          << "From " << qfrom << " To " << qto
+					          << " From " << qfrom << " To " << qto
 					          << std::endl;
 				}
 				int last_pc = -1;
@@ -457,7 +458,7 @@ public:
 				}
 			}
 		}
-		Eigen::MatrixXd ret;
+		Eigen::MatrixXi ret;
 		ret.resize(edges.size(), 4);
 		for (size_t i = 0; i < edges.size(); i++)
 			ret.row(i) << edges[i](0), edges[i](1), edges[i](2), edges[i](3);
