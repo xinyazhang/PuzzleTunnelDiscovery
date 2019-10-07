@@ -207,7 +207,7 @@ merge_blooming_forest:
     Merge the forest from blooming algorithm
 '''
 def merge_blooming_forest(args):
-    print('running merge_blooming_forest with {}'.format(args))
+    print('running merge_blooming_forest with {}'.format(vars(args)))
     puzzle = args.puzzle
     args.planner_id = plan.PLANNER_RDT
     args.sampler_id = 0 # Uniform sampler
