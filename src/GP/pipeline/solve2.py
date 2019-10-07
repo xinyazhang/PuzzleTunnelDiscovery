@@ -530,6 +530,7 @@ function_dict = {
 }
 
 def setup_parser(subparsers):
+    return
     p = subparsers.add_parser('solve', help='Final step to solve the puzzle',
                               formatter_class=choice_formatter.Formatter)
     p.add_argument('--stage',
