@@ -253,7 +253,7 @@ public:
 	//   all IDs are 0-indexed
 	//
 	// Note: ex_graph_e_ will not be used, assuming each graph is connected.
-	Eigen::MatrixXd
+	Eigen::MatrixXi
 	mergeExistingGraph(int KNN,
 	                   bool verbose = false,
 	                   int version = 0,
