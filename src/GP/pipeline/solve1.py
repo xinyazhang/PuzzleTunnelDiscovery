@@ -58,7 +58,7 @@ def pairwise_knn(args, ws):
     ALGO_VERSION = 2
     trial_str = _trial_str(args.current_trial)
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
-        rel_scratch_dir = os.path.join(util.BASELINE_SCRATCH, puzzle_name, trial_str)
+        rel_scratch_dir = os.path.join(util.SOLVER_SCRATCH, puzzle_name, trial_str)
         _, config = parse_ompl.parse_simple(puzzle_fn)
         scratch_dir = ws.local_ws(rel_scratch_dir)
         if args.only_wait:
@@ -68,7 +68,7 @@ def pairwise_knn(args, ws):
         if args.task_id is None:
             keys = matio.load(key_fn)
             condor_job_args = ['./facade.py',
-                    'solve',
+                    'solve1',
                     '--stage', 'pairwise_knn',
                     '--current_trial', str(args.current_trial),
                     '--puzzle_name', puzzle_name,
@@ -100,13 +100,13 @@ def pairwise_knn(args, ws):
         pairwise_knn(only_wait_args, ws)
 
 def _ibte_fn(ws, puzzle_name, trial):
-    return ws.local_ws(util.BASELINE_SCRATCH, puzzle_name, _trial_str(ws.current_trial),
+    return ws.local_ws(util.SOLVER_SCRATCH, puzzle_name, _trial_str(ws.current_trial),
                        'inter_blooming_tree_edges.npz')
 
 def assemble_knn(args, ws):
     trial_str = _trial_str(args.current_trial)
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
-        rel_scratch_dir = os.path.join(util.BASELINE_SCRATCH, puzzle_name, trial_str)
+        rel_scratch_dir = os.path.join(util.SOLVER_SCRATCH, puzzle_name, trial_str)
         scratch_dir = ws.local_ws(rel_scratch_dir)
         key_fn = ws.screened_keyconf_prediction_file(puzzle_name)
         keys = matio.load(key_fn)
@@ -237,7 +237,7 @@ def _remote_command(ws, cmd, auto_retry=True, alter_host='', extra_args=''):
     ws.remote_command(alter_host,
                       ws.condor_exec(),
                       ws.condor_ws(),
-                      'solve', cmd, auto_retry=auto_retry,
+                      'solve1', cmd, auto_retry=auto_retry,
                       with_trial=True,
                       extra_args=extra_args)
 
