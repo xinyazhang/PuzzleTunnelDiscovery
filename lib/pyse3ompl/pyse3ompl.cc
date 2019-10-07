@@ -89,7 +89,7 @@ public:
 		problem_states_[state_type] = m;
 	}
 
-	void setBB(const Eigen::Vector3d& mins, 
+	void setBB(const Eigen::Vector3d& mins,
 	           const Eigen::Vector3d& maxs)
 	{
 		mins_ = mins;
@@ -251,10 +251,13 @@ public:
 	//   a Nx4 integer matrix, each row is composed by
 	//   (from graph id, from vertex id in graph, to graph id, to vertex id in graph)
 	//   all IDs are 0-indexed
-	// 
+	//
 	// Note: ex_graph_e_ will not be used, assuming each graph is connected.
 	Eigen::MatrixXd
-	mergeExistingGraph(int KNN, bool verbose = false, int version = 0)
+	mergeExistingGraph(int KNN,
+	                   bool verbose = false,
+	                   int version = 0,
+			   Eigen::VectorXi subset = Eigen::VectorXi())
 	{
 		// We do not really need an SE3RigidBodyPlanning object,
 		// but this make things much easier
@@ -284,6 +287,9 @@ public:
 			all_motions.reserve(ttl);
 		}
 		if (version == 0) {
+			/*
+ 			 * Put all blooming trees into single KNN DS
+ 			 */
 			for (size_t i = 0; i < ex_graph_v_.size(); i++) {
 				const auto& V = ex_graph_v_[i];
 				for (int j = 0; j < V.rows(); j++) {
@@ -304,6 +310,8 @@ public:
 				auto m = all_motions[i];
 				nn->nearestK(m, KNN, nmotions);
 				for (auto nn: nmotions) {
+					if (m->forest_index == nn->forest_index)
+						continue;
 					if (!si->checkMotion(m->state, nn->state))
 						continue;
 					Eigen::Vector4i e;
@@ -319,6 +327,10 @@ public:
 				}
 			}
 		} else if (version == 1) {
+			/*
+ 			 * For all N blooming trees, we one KNN DS each of
+			 * them.
+ 			 */
 			ex_knn_.clear();
 			for (size_t i = 0; i < ex_graph_v_.size(); i++) {
 				const auto& V = ex_graph_v_[i];
@@ -376,6 +388,55 @@ public:
 				if (verbose && last_pc < pc) {
 					std::cerr << pc << "%" << std::endl;
 					last_pc = pc;
+				}
+			}
+		} else if (version == 2) {
+			auto NTree = ex_graph_v_.size();
+			ex_knn_.clear();
+			std::vector<int> tree_offset(NTree);
+			for (size_t i = 0; i < NTree; i++) {
+				const auto& V = ex_graph_v_[i];
+				auto nn = createKNNForRDT(real_planner.get());
+				tree_offset[i] = all_motions.size();
+				for (int j = 0; j < V.rows(); j++) {
+					auto m = new Motion(si);
+					ss->copyFromEigen3(m->state, V.row(j));
+					m->motion_index = j;
+					m->forest_index = i;
+					nn->add(m);
+					all_motions.emplace_back(m);
+				}
+				ex_knn_.emplace_back(std::move(nn));
+				if (verbose) {
+					std::cerr << i + 1 << " / " << ex_graph_v_.size() << std::endl;
+				}
+			}
+			// Ensure tree_offset[tree_id+1] always points to the
+			// upper bound.
+			tree_offset[NTree] = all_motions.size();
+			// Empty subset means select all
+			if (subset.size() == 0) {
+				subset.resize(NTree);
+				for (size_t i = 0; i < NTree; i++)
+					subset(i) = i;
+			}
+			for (int i = 0; i < subset.size(); i++) {
+				for (int mi = tree_offset[i]; mi < tree_offset[i+1]; mi++) {
+					auto m = all_motions[mi];
+					for (int k = 0; k < NTree; k++) {
+						if (m->forest_index == k)
+							continue;
+						std::vector<Motion*> nmotions;
+						ex_knn_[k]->nearestK(m, KNN, nmotions);
+						for (auto nn: nmotions) {
+							if (!si->checkMotion(m->state, nn->state))
+								continue;
+							Eigen::Vector4i e;
+							e << m->forest_index, m->motion_index,
+							     nn->forest_index, nn->motion_index;
+							edges.emplace_back(e);
+						}
+					}
 				}
 			}
 		}
@@ -612,7 +673,8 @@ PYBIND11_MODULE(pyse3ompl, m) {
 		.def("merge_existing_graph", &OmplDriver::mergeExistingGraph,
 		     py::arg("knn"),
 		     py::arg("verbose") = false,
-		     py::arg("version") = 0 
+		     py::arg("version") = 0,
+		     py::arg("subset") = Eigen::VectorXi()
 		    )
 		.def("set_sample_set", &OmplDriver::setSampleSet)
 		.def("set_sample_set_edges", &OmplDriver::setSampleSetEdges,
