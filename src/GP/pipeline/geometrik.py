@@ -85,13 +85,13 @@ def _sample_key_point_worker(wag):
     ws.current_trial = wag.current_trial
     pts = detect_geratio_feature_worker(ws, wag)
     SAMPLE_NOTCH = ws.config.getboolean('GeometriK', 'EnableNotchDetection', fallback=True)
+    kps_fn = ws.keypoint_prediction_file(wag.puzzle_name, wag.geo_type)
     if SAMPLE_NOTCH:
         npts = detect_notch_feature_worker(ws, wag)
         util.log("[sample_key_point] writing {} points and {} notches to {}".format(
                   pts.shape[0], npts.shape[0], kps_fn))
         np.savez(kps_fn, KEY_POINT_AMBIENT=pts, NOTCH_POINT_AMBIENT=npts)
     else:
-        kps_fn = ws.keypoint_prediction_file(wag.puzzle_name, wag.geo_type)
         util.log("[sample_key_point] writing {} points to {}".format(pts.shape[0], kps_fn))
         np.savez(kps_fn, KEY_POINT_AMBIENT=pts)
 
