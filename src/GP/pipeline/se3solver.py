@@ -226,8 +226,8 @@ def merge_blooming_forest(args):
                                                    version=args.algo_version,
                                                    subset=args.subset)
     if args.out is not None:
-        np.savez_compressed(args.out, INTER_BLOOMING_TREE_EDGES=inter_tree_edges)
-    if args.algo_version == 2:
+        np.savez(args.out, INTER_BLOOMING_TREE_EDGES=inter_tree_edges)
+    if args.algo_version >= 2:
         return
     import networkx as nx
     G = nx.Graph()
