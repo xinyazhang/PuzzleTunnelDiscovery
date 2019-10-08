@@ -393,7 +393,7 @@ public:
 		} else if (version == 2) {
 			auto NTree = ex_graph_v_.size();
 			ex_knn_.clear();
-			std::vector<int> tree_offset(NTree);
+			std::vector<int> tree_offset(NTree + 1);
 			for (size_t i = 0; i < NTree; i++) {
 				const auto& V = ex_graph_v_[i];
 				auto nn = createKNNForRDT(real_planner.get());
@@ -457,7 +457,61 @@ public:
 					}
 				}
 			}
+		} else if (version == 3) {
+			if (subset.size() != 1)
+				throw std::runtime_error("mergeExistingGraph algorithm ver. 3 requies one and only one element in argument subset");
+			auto NTree = ex_graph_v_.size();
+			std::vector<int> tree_offset(NTree + 1);
+			ex_knn_.clear();
+			auto nn = createKNNForRDT(real_planner.get());
+			ex_knn_.emplace_back(nn);
+			int source = subset[0];
+			for (size_t i = 0; i < NTree; i++) {
+				const auto& V = ex_graph_v_[i];
+				tree_offset[i] = all_motions.size();
+				for (int j = 0; j < V.rows(); j++) {
+					auto m = new Motion(si);
+					ss->copyFromEigen3(m->state, V.row(j));
+					m->motion_index = j;
+					m->forest_index = i;
+					if (i != source)
+						nn->add(m);
+					all_motions.emplace_back(m);
+				}
+			}
+			// upper bound.
+			tree_offset[NTree] = all_motions.size();
+			auto qfrom = tree_offset[source];
+			auto qto = tree_offset[source+1];
+			if (verbose) {
+				std::cerr << "Subset: From " << qfrom << " To " << qto
+					  << std::endl;
+			}
+			int last_pc = -1;
+			ssize_t total = qto - qfrom;
+			for (int mi = qfrom; mi < qto; mi++) {
+				auto m = all_motions[mi];
+				std::vector<Motion*> nmotions;
+				nn->nearestK(m, KNN, nmotions);
+				if (verbose) {
+					int pc = mi - qfrom;
+					pc = pc * 100 / total;
+					if (pc != last_pc) {
+						std::cerr << pc << "%" << std::endl;
+						last_pc = pc;
+					}
+				}
+				for (auto nn: nmotions) {
+					if (!si->checkMotion(m->state, nn->state))
+						continue;
+					Eigen::Vector4i e;
+					e << m->forest_index, m->motion_index,
+					     nn->forest_index, nn->motion_index;
+					edges.emplace_back(e);
+				}
+			}
 		}
+		// FIXME: all_motions is leaked
 		Eigen::MatrixXi ret;
 		ret.resize(edges.size(), 4);
 		for (size_t i = 0; i < edges.size(); i++)
