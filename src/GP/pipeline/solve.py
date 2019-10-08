@@ -274,7 +274,7 @@ def _sample_pds_old(args, ws):
             util.log('[sample_pds] samples stored at {}'.format(fn))
 
 # Bloom from roots
-# 
+#
 def sample_pds(args, ws):
     # Note: sample_pds does not wait anymore, assemble_pds would do the waiting instead
     if args.only_wait:
@@ -317,15 +317,28 @@ def assemble_pds(args, ws):
         QE_list = []
         tree_base_list = []
         edge_base_list = []
+        INDEX_TO_BLOOM_NO = []
         fn_list = sorted(pathlib.Path(scratch_dir).glob("bloom-from_*.npz"))
+        BLOOM_NO_TO_INDEX = np.full((len(fn_list)), -1, dtype=np.int32)
+        # fn_list = util.lsv(scratch_dir, prefix="bloom-from_", suffix=".npz")
         tree_base = 0
         edge_base = 0
-        for fn in progressbar(fn_list):
+        for fni, fn in enumerate(progressbar(fn_list)):
             d = matio.load(fn)
             s = d['BLOOM'].shape
             if s[0] == 0:
                 continue
             assert s[1] == 7, "{}'s shape is {}".format(fn, s)
+            fnstr = str(fn.name)
+            assert fnstr.startswith('bloom-from_')
+            bloom_idstr = fnstr[len('bloom-from_'):]
+            assert bloom_idstr.endswith('.npz')
+            bloom_idstr = bloom_idstr[:-len('.npz')]
+            assert f"bloom-from_{bloom_idstr}.npz" == fnstr
+            bloom_id = int(bloom_idstr)
+            BLOOM_NO_TO_INDEX[bloom_id] = len(INDEX_TO_BLOOM_NO)
+            INDEX_TO_BLOOM_NO.append(bloom_id)
+
             bloom = d['BLOOM']
             Q_list.append(bloom)
             if 'BLOOM_EDGE' in d and QE_list is not None:
@@ -347,9 +360,14 @@ def assemble_pds(args, ws):
         if QE_list:
             QE = np.concatenate(QE_list, axis=0)
             assert QE.shape[0] == Q.shape[0] - len(tree_base_list), 'San check failed. Broken tree edges'
-            np.savez_compressed(pds_fn, Q=Q, QF=QF, QB=tree_base_list, QE=QE, QEB=edge_base_list)
+            np.savez_compressed(pds_fn, Q=Q, QF=QF, QB=tree_base_list,
+                                QE=QE, QEB=edge_base_list,
+                                BLOOM_NO_TO_INDEX=BLOOM_NO_TO_INDEX,
+                                INDEX_TO_BLOOM_NO=INDEX_TO_BLOOM_NO)
         else:
-            np.savez_compressed(pds_fn, Q=Q, QF=QF, QB=tree_base_list)
+            np.savez_compressed(pds_fn, Q=Q, QF=QF, QB=tree_base_list,
+                                BLOOM_NO_TO_INDEX=BLOOM_NO_TO_INDEX,
+                                INDEX_TO_BLOOM_NO=INDEX_TO_BLOOM_NO)
         util.log('[sample_pds] samples stored at {}'.format(pds_fn))
 
 def forest_rdt(args, ws):
