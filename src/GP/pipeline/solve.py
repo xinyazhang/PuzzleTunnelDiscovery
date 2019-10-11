@@ -204,35 +204,6 @@ class TmpDriverArgs(object):
 def FMT_to_keyfile(ws, FMT):
     return ws.local_ws(util.TESTING_DIR, wag.puzzle_name, FMT.format(trial=ws.current_trial))
 
-def least_visible_keyconf2(args, ws):
-    # wait for all key confs
-    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
-        rel_scratch_dir = join(util.SOLVER_SCRATCH, puzzle_name, util.KEYCONF_CLEARANCE_DIR, str(ws.current_trial))
-        condor.local_wait(ws.local_ws(rel_scratch_dir))
-
-    K = ws.config.getint('Prediction', 'SurfacePairsToSample')
-    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
-        rel_scratch_dir = join(util.SOLVER_SCRATCH, puzzle_name, util.KEYCONF_CLEARANCE_DIR, str(ws.current_trial))
-        oskey_fn = ws.oversampled_keyconf_prediction_file(puzzle_name)
-        oskey = matio.load(oskey_fn)['KEYQ_OMPL']
-        # TODO: Pickup top key confs
-        '''
-        '''
-        osc_files = util.lsv(ws.local_ws(rel_scratch_dir), 'clearance_batch-', '.npz')
-        osc_arrays = [matio.load(fn)['DISTANCE_BATCH'] for fn in osc_files]
-        osc = util.safe_concatente(osc_arrays)
-        assert osc.shape[0] == oskey.shape[0], 'osc shape {} != oskey shape {}'.format(osc.shape, oskey.shape)
-        mean = np.mean(osc, axis=1)
-        # remove the initial root and goal root
-        mean = mean[util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS:]
-        top_k = mean.argsort()[:K]
-        # Get the original indices
-        top_k += util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS
-        top_oskey = oskey[top_k,:]
-        downsampled_key_fn = ws.keyconf_file_from_fmt(puzzle_name, util.NEURAL_KEY_FMT)
-        np.savez(downsampled_key_fn, KEYQ_OMPL=top_oskey)
-        util.ack(f'[least_visible_keyconf2] save top {K} key to {downsampled_key_fn}, shape {top_oskey.shape}')
-
 def assemble_roots(args, ws):
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
         ge_kfn = FMT_to_file(ws, util.GERATIO_KEY_FMT)
@@ -535,7 +506,6 @@ def knn_forest(args, ws):
 
 function_dict = {
         'least_visible_keyconf' : least_visible_keyconf,
-        'least_visible_keyconf2' : least_visible_keyconf2,
         'screen_keyconf' : screen_keyconf,
         'sample_pds' : sample_pds,
         'assemble_pds' : assemble_pds,
@@ -609,9 +579,6 @@ def remote_screen_keyconf(ws):
 
 def remote_least_visible_keyconf(ws):
     _remote_command_auto(ws, 'least_visible_keyconf')
-
-def remote_least_visible_keyconf2(ws):
-    _remote_command_auto(ws, 'least_visible_keyconf2')
 
 def remote_sample_pds(ws):
     _remote_command_auto(ws, 'sample_pds')

@@ -28,38 +28,17 @@ from . import matio
 from . import atlas
 from . import texture_format
 from . import parse_ompl
-from .solve import (setup_parser
+from .solve import (
+        setup_parser as original_setup_parser
 )
+from .file_locations import RAW_KEY_PRED_SCHEMES, KEY_PRED_SCHEMES, SCHEME_TO_FMT, FileLocations
 
-ALGORITHM_VERSION_PHASE2_WITH_BLOOMING_TREE = 5
+class TmpDriverArgs(object):
+    pass
 
-KEY_PRED_MODULE_NAME = ['ge', 'nt', 'nn', 'cmb']
-#
-# Functions to process workspaces locally
-#
-
-def _trial_id(ws, trial):
-    return str(trial)
-    '''
-    max_trial = ws.config.getint('Solver', 'Trials', fallback=1)
-    # util.log('[_trial_id] trial {} max_trial {}'.format(trial, max_trial))
-    return util.padded(trial, max(trial, max_trial))
-    '''
-
-def _puzzle_pds(ws, puzzle_name, trial):
-    pds_dir = ws.local_ws(util.SOLVER_SCRATCH,
-                          puzzle_name,
-                          util.PDS_SUBDIR)
-    os.makedirs(pds_dir, exist_ok=True)
-    fn ='{}.npz'.format(_trial_id(ws, trial))
-    return join(pds_dir, fn)
-
-def _rel_bloom_scratch(ws, puzzle_name, trial):
-    return join(util.SOLVER_SCRATCH, puzzle_name, util.PDS_SUBDIR, 'bloom-'+_trial_id(ws, trial))
-
-def _partition_screening(ws, puzzle_name, index=None):
-    keyfn = ws.keyconf_prediction_file(puzzle_name)
-    keys = matio.load(keyfn, key='KEYQ_OMPL')
+def _partition_screening(ws, keyfn, index=None):
+    util.log(f'loading {keyfn}')
+    keys = matio.load(keyfn)['KEYQ_OMPL']
     nkey = keys.shape[0] - util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS
     task_indices = np.tril_indices(nkey)
     task_shape = task_indices[0].shape
@@ -75,259 +54,243 @@ def _partition_screening(ws, puzzle_name, index=None):
             task_indices[0][chunk] + util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS,
             task_indices[1][chunk] + util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS)
 
+def least_visible_keyconf_fixed(args, ws):
+    # wait for all key confs
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+        fl = FileLocations(args, ws, puzzle_name)
+        condor.local_wait(fl.clearance)
+
+    K = ws.config.getint('Prediction', 'SurfacePairsToSample')
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+        fl = FileLocations(args, ws, puzzle_name)
+
+        oskey_fn = ws.oversampled_keyconf_prediction_file(puzzle_name)
+        oskey = matio.load(oskey_fn)['KEYQ_OMPL']
+        # TODO: Pickup top key confs
+        '''
+        '''
+        osc_files = util.lsv(fl.clearance, 'clearance_batch-', '.npz')
+        osc_arrays = [matio.load(fn)['DISTANCE_BATCH'] for fn in osc_files]
+        osc = util.safe_concatente(osc_arrays)
+        assert osc.shape[0] == oskey.shape[0], 'osc shape {} != oskey shape {}'.format(osc.shape, oskey.shape)
+        mean = np.mean(osc ** 2, axis=1)
+        # remove the initial root and goal root
+        mean = mean[util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS:]
+        top_k = mean.argsort()[:K]
+        # Get the original indices
+        top_k += util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS
+        top_oskey = oskey[top_k,:]
+        np.savez(fl.downsampled_key_fn, KEYQ_OMPL=top_oskey)
+        util.ack(f'[least_visible_keyconf_fixed] save top {K} key to {fl.downsampled_key_fn}, shape {top_oskey.shape}')
+
+def assemble_raw_keyconf(args, ws):
+    if args.no_wait:
+        return
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+        fl = FileLocations(args, ws, puzzle_name)
+        keyq_dic = {}
+        for scheme, fn in fl.raw_key_fn_gen:
+            kq = matio.load(fn)['KEYQ_OMPL']
+            keyq_dic[scheme] = kq
+            util.log(f'[assemble_raw_keyconf] loaded {kq.shape} from {fn} (scheme {scheme})')
+        save_dic = {}
+        keyq_list = []
+        base = 0
+        base_list = []
+        for scheme in RAW_KEY_PRED_SCHEMES:
+            keyq = keyq_dic[scheme]
+            if base != 0: # strip off the IG states
+                keyq = keyq[util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS:]
+            keyq_list.append(keyq)
+            if base == 0:
+                base_list.append(util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS)
+            else:
+                base_list.append(base)
+            base += keyq.shape[0]
+        base_list.append(base)
+        save_dic['KEYQ_OMPL'] = util.safe_concatente(keyq_list)
+        save_dic['BASES_WITH_END'] = base_list
+        np.savez(fl.assembled_raw_key_fn, **save_dic)
+        util.ack(f'[assemble_raw_keyconf] save {save_dic["KEYQ_OMPL"].shape} to {fl.assembled_raw_key_fn}')
+
 def screen_keyconf(args, ws):
-    screen_str = 'screen-{}'.format(ws.current_trial)
+    if args.task_id is None and not args.only_wait:
+        # submit condor job
+        for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+            fl = FileLocations(args, ws, puzzle_name)
+            _, total_chunks = _partition_screening(ws,
+                                                   fl.assembled_raw_key_fn,
+                                                   index=None)
+            condor_job_args = [ws.condor_local_exec('facade.py'),
+                               'solve2',
+                               '--stage', 'screen_keyconf',
+                               '--current_trial', str(ws.current_trial),
+                               '--puzzle_name', puzzle_name,
+                               '--scheme', 'cmb',
+                               '--task_id', '$(Process)',
+                               ws.local_ws()]
+            condor.local_submit(ws,
+                                util.PYTHON,
+                                iodir_rel=fl.rel_screen,
+                                arguments=condor_job_args,
+                                instances=total_chunks,
+                                wait=False)
+
     if args.task_id is not None:
         # actual worker
         for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
-            rel_scratch_dir = os.path.join(util.SOLVER_SCRATCH, puzzle_name, screen_str)
-            scratch_dir = ws.local_ws(rel_scratch_dir)
-
+            fl = FileLocations(args, ws, puzzle_name)
             keys, from_indices, to_indices = _partition_screening(ws,
-                                                                  puzzle_name,
+                                                                  fl.assembled_raw_key_fn,
                                                                   index=args.task_id)
-            # util.log('keys shape {}'.format(keys.shape))
-            # util.log('from_indices shape {}'.format(from_indices.shape))
             uw = util.create_unit_world(puzzle_fn)
-            # util.log('from {}'.format(keys[from_indices].shape))
-            # util.log('from_indices[:16] {}'.format(from_indices[:16]))
-            # util.log('to_indices[:16] {}'.format(to_indices[:16]))
             visb_pairs = uw.calculate_visibility_pair(keys[from_indices], False,
                                                       keys[to_indices], False,
                                                       uw.recommended_cres,
                                                       enable_mt=False)
             visb_vec = visb_pairs.reshape((-1))
             visibile_indices = visb_vec.nonzero()[0]
-            outfn = join(scratch_dir, 'edge_batch-{}.npz'.format(args.task_id))
+            outfn = join(fl.screen, 'edge_batch-{}.npz'.format(args.task_id))
             np.savez_compressed(outfn, EDGE_FROM=from_indices[visibile_indices], EDGE_TO=to_indices[visibile_indices])
         return # worker never wait
-    if not args.only_wait:
-        # submit condor job
-        for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
-            rel_scratch_dir = os.path.join(util.SOLVER_SCRATCH, puzzle_name, screen_str)
-            scratch_dir = ws.local_ws(rel_scratch_dir)
-            _, total_chunks = _partition_screening(ws, puzzle_name, index=None)
-            condor_job_args = [ws.condor_local_exec('facade.py'),
-                               'solve',
-                               '--stage', 'screen_keyconf',
-                               '--current_trial', str(ws.current_trial),
-                               '--puzzle_name', puzzle_name,
-                               '--task_id', '$(Process)',
-                               ws.local_ws()]
-            condor.local_submit(ws,
-                                util.PYTHON,
-                                iodir_rel=rel_scratch_dir,
-                                arguments=condor_job_args,
-                                instances=total_chunks,
-                                wait=False)
+
+    if args.no_wait: # wait the condor_job
+        return
+
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
-        rel_scratch_dir = os.path.join(util.SOLVER_SCRATCH, puzzle_name, screen_str)
-        scratch_dir = ws.local_ws(rel_scratch_dir)
-        if not args.no_wait: # wait the condor_job
-            condor.local_wait(scratch_dir)
-
-        keyfn = ws.keyconf_prediction_file(puzzle_name)
-        keys = matio.load(keyfn, key='KEYQ_OMPL')
-        nkey = keys.shape[0]
-        util.log('[screen_keyconf][{}] nkey (unscreened) {}'.format(puzzle_name, nkey))
-        vert_ids = [i for i in range(util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS, nkey)]
-        djs = disjoint_set.DisjointSet(vert_ids)
-        fn_list = pathlib.Path(scratch_dir).glob("edge_batch-*.npz")
-        util.log("[screen_keyconf][{}] Creating disjoint set".format(puzzle_name))
-        for fn in progressbar(fn_list):
-            d = matio.load(fn)
-            for r,c in zip(d['EDGE_FROM'], d['EDGE_TO']):
-                #if str(fn) == '/u/zxy/scratch/auto-mkobs3d/bin/gkws/duet-g1/solver_scratch/duet-g1/screen-80/edge_batch-120.npz':
-                # util.log("{} {} {} {}".format(r, c, djs.find(r), djs.find(c)))
-                djs.union(r,c)
-
-        cluster = djs.get_cluster()
-        screened_index = []
-        uw = util.create_unit_world(puzzle_fn)
-        unit_keys = uw.translate_ompl_to_unit(keys)
-        util.log("[screen_keyconf][{}] Screening roots".format(puzzle_name))
-        for k in progressbar(cluster):
-            nondis = []
-            for member in cluster[k]:
-                if not uw.is_disentangled(unit_keys[member]):
-                    nondis.append(member)
-                    break
-            # TODO: clustering?
-            screened_index += nondis # No effect if nondis == []
-        screened_index = list(range(util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS)) + screened_index
-        screened = keys[screened_index]
-        util.log("[screen_keyconf][{}] Screened {} roots into {}".format(puzzle_name,
-                  keys.shape, screened.shape))
-        outfn = ws.screened_keyconf_prediction_file(puzzle_name)
-        util.log("[screen_keyconf] Save screened roots {} to {}".format(screened.shape, outfn))
-        np.savez_compressed(outfn, KEYQ_OMPL=screened)
-
-'''
-least_visible_keyconf:
-    this stage would wait for the finish of keyconf.calculate_keyconf_clearance,
-    and pick up K key confs with lowest clearance.
-'''
-def least_visible_keyconf(args, ws):
-    # wait for all key confs
-    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
-        rel_scratch_dir = join(util.SOLVER_SCRATCH, puzzle_name, util.KEYCONF_CLEARANCE_DIR, str(ws.current_trial))
-        condor.local_wait(ws.local_ws(rel_scratch_dir))
-
-    K = ws.config.getint('Prediction', 'SurfacePairsToSample')
-    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
-        rel_scratch_dir = join(util.SOLVER_SCRATCH, puzzle_name, util.KEYCONF_CLEARANCE_DIR, str(ws.current_trial))
-        oskey_fn = ws.oversampled_keyconf_prediction_file(puzzle_name)
-        oskey = matio.load(oskey_fn)['KEYQ_OMPL']
-        # TODO: Pickup top key confs
-        '''
-        '''
-        osc_files = util.lsv(ws.local_ws(rel_scratch_dir), 'clearance_batch-', '.npz')
-        osc_arrays = [matio.load(fn)['DISTANCE_BATCH'] for fn in osc_files]
-        osc = util.safe_concatente(osc_arrays)
-        assert osc.shape[0] == oskey.shape[0], 'osc shape {} != oskey shape {}'.format(osc.shape, oskey.shape)
-        mean = np.mean(osc, axis=1)
-        # remove the initial root and goal root
-        mean = mean[util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS:]
-        top_k = mean.argsort()[:K]
-        # Get the original indices
-        top_k += util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS
-        top_oskey = oskey[top_k,:]
-        gk_key = np.load(ws.keyconf_file_from_fmt(puzzle_name, util.GEOMETRIK_KEY_PREDICTION_FMT))['KEYQ_OMPL']
-        # also remove the initial and goal roots
-        gk_key = gk_key[util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS:]
-        uskey_fn = ws.keyconf_prediction_file(puzzle_name)
-        ig_key = oskey[:util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS]
-        comb_key = util.safe_concatente([ig_key, top_oskey, gk_key])
-        np.savez(uskey_fn, KEYQ_OMPL=comb_key)
-        util.ack('[least_visible_keyconf] save combined key to {}, shape {}'.format(uskey_fn, comb_key.shape))
-
-class TmpDriverArgs(object):
-    pass
-
-def FMT_to_keyfile(ws, FMT):
-    return ws.local_ws(util.TESTING_DIR, wag.puzzle_name, FMT.format(trial=ws.current_trial))
-
-def least_visible_keyconf2(args, ws):
-    # wait for all key confs
-    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
-        rel_scratch_dir = join(util.SOLVER_SCRATCH, puzzle_name, util.KEYCONF_CLEARANCE_DIR, str(ws.current_trial))
-        condor.local_wait(ws.local_ws(rel_scratch_dir))
-
-    K = ws.config.getint('Prediction', 'SurfacePairsToSample')
-    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
-        rel_scratch_dir = join(util.SOLVER_SCRATCH, puzzle_name, util.KEYCONF_CLEARANCE_DIR, str(ws.current_trial))
-        oskey_fn = ws.oversampled_keyconf_prediction_file(puzzle_name)
-        oskey = matio.load(oskey_fn)['KEYQ_OMPL']
-        # TODO: Pickup top key confs
-        '''
-        '''
-        osc_files = util.lsv(ws.local_ws(rel_scratch_dir), 'clearance_batch-', '.npz')
-        osc_arrays = [matio.load(fn)['DISTANCE_BATCH'] for fn in osc_files]
-        osc = util.safe_concatente(osc_arrays)
-        assert osc.shape[0] == oskey.shape[0], 'osc shape {} != oskey shape {}'.format(osc.shape, oskey.shape)
-        mean = np.mean(osc, axis=1)
-        # remove the initial root and goal root
-        mean = mean[util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS:]
-        top_k = mean.argsort()[:K]
-        # Get the original indices
-        top_k += util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS
-        top_oskey = oskey[top_k,:]
-        downsampled_key_fn = ws.keyconf_file_from_fmt(puzzle_name, util.NEURAL_KEY_FMT)
-        np.savez(downsampled_key_fn, KEYQ_OMPL=top_oskey)
-        util.ack(f'[least_visible_keyconf2] save top {K} key to {downsampled_key_fn}, shape {top_oskey.shape}')
+        fl = FileLocations(args, ws, puzzle_name)
+        condor.local_wait(fl.screen)
 
 def assemble_roots(args, ws):
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
-        ge_kfn = FMT_to_file(ws, util.GERATIO_KEY_FMT)
-        nt_kfn = FMT_to_file(ws, util.NOTCH_KEY_FMT)
-        nn_kfn = FMT_to_file(ws, util.NEURAL_KEY_FMT)
-        ge_keys = matio.load(ge_kfn)['KEYQ_OMPL']
-        nt_keys = matio.load(nt_kfn)['KEYQ_OMPL']
-        nn_keys = matio.load(nn_kfn)['KEYQ_OMPL']
-        trim = util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS
-        keys = util.safe_concatente([ge_keys, nt_keys[trim:], nn_keys[trim:]], axis=0)
-        cmb_kfn = FMT_to_file(ws, util.COMBINED_KEY_FMT)
-        np.savez(cmb_kfn, KEYQ_OMPL=keys)
-        util.ack(f'[assemble_pds] combine ge {ge_keys.shape} nt {nt_keys.shape} nn {nn_keys.shape} to {cmb_kfn}, shape {keys.shape}')
-
-def _sample_pds_old(args, ws):
-    if 'pipeline.se3solver' not in sys.modules:
-        raise RuntimeError("se3solver is not loaded")
-    max_trial = ws.config.getint('Solver', 'Trials', fallback=1)
-    nsamples = ws.config.getint('Solver', 'PDSSize')
-    for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
-        util.log('[sample_pds] sampling puzzle {}'.format(puzzle_name))
-        driver_args = TmpDriverArgs()
-        driver_args.puzzle = puzzle_fn
-        driver_args.planner_id = se3solver.PLANNER_PRM
-        driver_args.sampler_id = 0
-        driver = se3solver.create_driver(driver_args)
+        fl = FileLocations(args, ws, puzzle_name)
         uw = util.create_unit_world(puzzle_fn)
-        for i in range(max_trial):
-            # util.log('[sample_pds] trial id {}'.format(_trial_id(ws, 0)))
-            Q = driver.presample(nsamples)
-            uQ = uw.translate_ompl_to_unit(Q)
-            n = Q.shape[0]
-            QF = np.zeros((n, 1), dtype=np.uint32)
-            for j, uq in enumerate(uQ):
-                if uw.is_disentangled(uq):
-                    QF[j] = se3solver.PDS_FLAG_TERMINATE
-            fn = _puzzle_pds(ws, puzzle_name, i)
-            np.savez(fn, Q=Q, QF=QF)
-            util.log('[sample_pds] samples stored at {}'.format(fn))
 
-# Bloom from roots
-def sample_pds(args, ws):
+        keyfn = fl.assembled_raw_key_fn
+        d = matio.load(keyfn)
+        keys = d['KEYQ_OMPL']
+        bases = d['BASES_WITH_END']
+        nkey = keys.shape[0]
+        '''
+        Reading all edges
+        '''
+        util.log('[screen_keyconf][{}] nkey (unscreened) {}'.format(puzzle_name, nkey))
+        fn_list = pathlib.Path(fl.screen).glob("edge_batch-*.npz")
+        all_edge_from = []
+        all_edge_to = []
+        for fn in progressbar(fn_list):
+            d = matio.load(fn)
+            all_edge_from.append(d['EDGE_FROM'])
+            all_edge_to.append(d['EDGE_TO'])
+        edges_from = util.safe_concatente(all_edge_from, axis=0)
+        edges_to = util.safe_concatente(all_edge_to, axis=0)
+        assert edges_from.shape[0] == edges_to.shape[0]
+
+        range_dic = {}
+        for i, scheme in enumerate(RAW_KEY_PRED_SCHEMES):
+            range_dic[scheme] = (bases[i], bases[i+1])
+        range_dic['cmb'] = (util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS, nkey)
+
+        for scheme, rtup in range_dic.items():
+            util.log(f'[assemble_roots][scheme {scheme}] rtup {rtup}')
+            fl.update_scheme(scheme)
+            vert_ids = [i for i in range(rtup[0], rtup[1])]
+            djs = disjoint_set.DisjointSet(vert_ids)
+            for r,c in zip(d['EDGE_FROM'], d['EDGE_TO']):
+                if r >= rtup[1] or r < rtup[0]:
+                    continue
+                if c >= rtup[1] or c < rtup[0]:
+                    continue
+                djs.union(r,c)
+            cluster = djs.get_cluster()
+            screened_index = []
+
+            unit_keys = uw.translate_ompl_to_unit(keys)
+            util.log("[screen_keyconf][{}][scheme {scheme}] Screening roots".format(puzzle_name, scheme, scheme=scheme))
+            for k in progressbar(cluster):
+                nondis = []
+                for member in cluster[k]:
+                    if not uw.is_disentangled(unit_keys[member]):
+                        nondis.append(member)
+                        break
+                # TODO: clustering?
+                screened_index += nondis # No effect if nondis == []
+            screened_index = list(range(util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS)) + screened_index
+            screened = keys[screened_index]
+            util.log("[screen_keyconf][{}][scheme {scheme}] Screened {} roots into {}".format(
+                      puzzle_name,
+                      rtup[1] - rtup[0] + util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS, screened.shape, scheme=scheme))
+            np.savez_compressed(fl.screened_key_fn, KEYQ_OMPL=screened)
+            util.ack("[screen_keyconf][scheme {scheme}] Save screened roots {} to {}".format(screened.shape, fl.screened_key_fn, scheme=scheme))
+
+def blooming(args, ws):
     if not args.only_wait:
         for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+            fl = FileLocations(args, ws, puzzle_name)
             _, config = parse_ompl.parse_simple(puzzle_fn)
-            rel_bloom = _rel_bloom_scratch(ws, puzzle_name, ws.current_trial)
-            util.log('[sample_pds]  rel_bloom {}'.format(rel_bloom))
-            scratch_dir = ws.local_ws(rel_bloom)
-            os.makedirs(scratch_dir, exist_ok=True)
-            key_fn = ws.screened_keyconf_prediction_file(puzzle_name)
+
+            util.log('[blooming] scratch {}'.format(fl.rel_bloom))
+            key_fn = fl.screened_key_fn
+            nkey = matio.load(key_fn)['KEYQ_OMPL'].shape[0]
+            bloom_quota = ws.config.getint('Solver', 'PDSBloom')
+            if fl.scheme != 'cmb':
+                all_keys = matio.load(fl.cmb_screened_key_fn)['KEYQ_OMPL']
+                total_quota = bloom_quota * all_keys.shape[0]
+                bloom_quota = total_quota // nkey + int(not not (total_quota % nkey))
             condor_job_args = ['se3solver.py',
                     'solve',
                     '--cdres', config.getfloat('problem', 'collision_resolution', fallback=0.0001),
                     '--replace_istate',
-                    'file={},key=KEYQ_OMPL,offset=$$([$(Process)]),size=1,out={}'.format(key_fn, scratch_dir),
+                    f'file={key_fn},key=KEYQ_OMPL,offset=$$([$(Process)]),size=1,out={fl.bloom}',
                     '--bloom_out',
-                    join(scratch_dir, 'bloom-from_$(Process).npz'),
+                    join(fl.bloom, 'bloom-from_$(Process).npz'),
                     puzzle_fn,
                     util.RDT_FOREST_ALGORITHM_ID,
-                    0.25,
+                    0.1,
                     '--bloom_limit',
-                    ws.config.getint('Solver', 'PDSBloom')
-                              ]
-            keys = matio.load(key_fn)
+                    bloom_quota]
             condor.local_submit(ws,
                                 util.PYTHON,
-                                iodir_rel=rel_bloom,
+                                iodir_rel=fl.rel_bloom,
                                 arguments=condor_job_args,
-                                instances=keys['KEYQ_OMPL'].shape[0],
+                                instances=nkey,
                                 wait=False) # do NOT wait here, we have to submit EVERY puzzle at once
     if args.no_wait:
         return
-
-def assemble_pds(args, ws):
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
-        rel_bloom = _rel_bloom_scratch(ws, puzzle_name, ws.current_trial)
-        scratch_dir = ws.local_ws(rel_bloom)
-        condor.local_wait(scratch_dir)
-        pds_fn = _puzzle_pds(ws, puzzle_name, ws.current_trial)
+        fl = FileLocations(args, ws, puzzle_name)
+        condor.local_wait(fl.bloom)
+
+def assemble_blooming(args, ws):
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+        fl = FileLocations(args, ws, puzzle_name)
+        pds_fn = fl.pds_fn
         Q_list = []
         QE_list = []
         tree_base_list = []
         edge_base_list = []
-        fn_list = sorted(pathlib.Path(scratch_dir).glob("bloom-from_*.npz"))
+        INDEX_TO_BLOOM_NO = []
+        fn_list = sorted(pathlib.Path(fl.bloom).glob("bloom-from_*.npz"))
+        BLOOM_NO_TO_INDEX = np.full((len(fn_list)), -1, dtype=np.int32)
+        # fn_list = util.lsv(scratch_dir, prefix="bloom-from_", suffix=".npz")
         tree_base = 0
         edge_base = 0
-        for fn in progressbar(fn_list):
+        for fni, fn in enumerate(progressbar(fn_list)):
             d = matio.load(fn)
             s = d['BLOOM'].shape
             if s[0] == 0:
                 continue
             assert s[1] == 7, "{}'s shape is {}".format(fn, s)
+            fnstr = str(fn.name)
+            assert fnstr.startswith('bloom-from_')
+            bloom_idstr = fnstr[len('bloom-from_'):]
+            assert bloom_idstr.endswith('.npz')
+            bloom_idstr = bloom_idstr[:-len('.npz')]
+            assert f"bloom-from_{bloom_idstr}.npz" == fnstr
+            bloom_id = int(bloom_idstr)
+            BLOOM_NO_TO_INDEX[bloom_id] = len(INDEX_TO_BLOOM_NO)
+            INDEX_TO_BLOOM_NO.append(bloom_id)
+
             bloom = d['BLOOM']
             Q_list.append(bloom)
             if 'BLOOM_EDGE' in d and QE_list is not None:
@@ -349,216 +312,296 @@ def assemble_pds(args, ws):
         if QE_list:
             QE = np.concatenate(QE_list, axis=0)
             assert QE.shape[0] == Q.shape[0] - len(tree_base_list), 'San check failed. Broken tree edges'
-            np.savez_compressed(pds_fn, Q=Q, QF=QF, QB=tree_base_list, QE=QE, QEB=edge_base_list)
+            np.savez_compressed(pds_fn, Q=Q, QF=QF, QB=tree_base_list,
+                                QE=QE, QEB=edge_base_list,
+                                BLOOM_NO_TO_INDEX=BLOOM_NO_TO_INDEX,
+                                INDEX_TO_BLOOM_NO=INDEX_TO_BLOOM_NO)
         else:
-            np.savez_compressed(pds_fn, Q=Q, QF=QF, QB=tree_base_list)
-        util.log('[sample_pds] samples stored at {}'.format(pds_fn))
-
-def forest_rdt(args, ws):
-    if args.algorithm_version == ALGORITHM_VERSION_PHASE2_WITH_BLOOMING_TREE:
-        algoprefix = 'withbt-'
-    else:
-        algoprefix = ''
-    trial_str = algoprefix + 'trial-{}'.format(_trial_id(ws, ws.current_trial))
-    for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
-        # if --puzzle_name presents, skip unmatched puzzles
-        if args.puzzle_name and args.puzzle_name != puzzle_name:
-            continue
-        rel_scratch_dir = os.path.join(util.SOLVER_SCRATCH, puzzle_name, trial_str)
-        _, config = parse_ompl.parse_simple(puzzle_fn)
-        scratch_dir = ws.local_ws(rel_scratch_dir)
-        if args.only_wait:
-            condor.local_wait(scratch_dir)
-            continue
-        # se3solver.py solve
-        # /u/zxy/applique/puzzle-geometry/puzzles/claw/claw.cfg 15 1.00
-        # --samset mkobs-claw/pds/1m.0.npz --replace_istate
-        # file=mkobs-claw/key.ompl.withig.npz,offset=$$([$(Process)*1]),size=1,out=mkobs-claw/trial-1/pdsrdt/
-        #key_fn = ws.local_ws(util.TESTING_DIR, puzzle_name, util.KEY_PREDICTION)
-
-        # Note: no need to probe the key configuration, which has been done in sample_pds and
-        #       ws.screened_keyconf_prediction_file should always point to a valid keyconf
-        key_fn = ws.screened_keyconf_prediction_file(puzzle_name)
-        condor_job_args = ['se3solver.py',
-                'solve',
-                '--cdres', config.getfloat('problem', 'collision_resolution', fallback=0.0001),
-                '--samset', _puzzle_pds(ws, puzzle_name, ws.current_trial),
-                '--replace_istate',
-                'file={},key=KEYQ_OMPL,offset=$$([$(Process)]),size=1,out={}'.format(key_fn, scratch_dir)]
-        if args.algorithm_version == ALGORITHM_VERSION_PHASE2_WITH_BLOOMING_TREE:
-            condor_job_args += ['--use_blooming_tree']
-        condor_job_args += [puzzle_fn,
-                util.RDT_FOREST_ALGORITHM_ID,
-                1.0]
-        keys = matio.load(key_fn)
-        condor.local_submit(ws,
-                            util.PYTHON,
-                            iodir_rel=rel_scratch_dir,
-                            arguments=condor_job_args,
-                            instances=keys['KEYQ_OMPL'].shape[0],
-                            wait=False) # do NOT wait here, we have to submit EVERY puzzle at once
-    if args.no_wait:
-        return
-    if not args.only_wait:
-        only_wait_args = copy.deepcopy(args)
-        only_wait_args.only_wait = True
-        forest_rdt(only_wait_args, ws)
-
-def forest_edges(args, ws):
-#pdsrdt-g9ae-1-edges.hdf5:
-#    ./pds_edge.py --pdsflags dual/pdsrdt-g9ae-1/pds-4m.0.npz --out pdsrdt-g9ae-1-edges.hdf5 `ls -v dual/pdsrdt-g9ae-1/pdsrdt/ssc-*.mat`
-    if args.algorithm_version == ALGORITHM_VERSION_PHASE2_WITH_BLOOMING_TREE:
-        algoprefix = 'withbt-'
-    else:
-        algoprefix = ''
-    trial_str = algoprefix + 'trial-{}'.format(_trial_id(ws, ws.current_trial))
-    for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
-        if args.puzzle_name and args.puzzle_name != puzzle_name:
-            continue
-        rel_scratch_dir = os.path.join(util.SOLVER_SCRATCH, puzzle_name, trial_str)
-        shell_script = './pds_edge.py --pdsflags '
-        shell_script += _puzzle_pds(ws, puzzle_name, ws.current_trial)
-        shell_script += ' --out {}'.format(ws.local_ws(rel_scratch_dir, algoprefix + 'edges.hdf5'))
-        shell_script += ' `ls -v {}/ssc-*.mat`'.format(ws.local_ws(rel_scratch_dir))
-        util.shell(['bash', '-c', shell_script])
-
-def connect_forest(args, ws):
-# pdsrdt-g9ae-1-path-1.txt: pdsrdt-g9ae-1-edges-1.hdf5
-#   ./forest_dijkstra.py --indir dual/pdsrdt-g9ae-1/pdsrdt-1/ \
-#               --forest_edge pdsrdt-g9ae-1-edges-1.hdf5 \
-#               --rootf dual/pdsrdt-g9ae-1/postscreen-1_withig.npz \
-#               --pdsf dual/pdsrdt-g9ae-1/pds-4m.0.npz \
-#               --out pdsrdt-g9ae-1-path-1.txt
-#
-    if args.no_wait: # No wait, no answer
-        return
-    if args.algorithm_version == ALGORITHM_VERSION_PHASE2_WITH_BLOOMING_TREE:
-        algoprefix = 'withbt-'
-    else:
-        algoprefix = ''
-    trial_str = algoprefix + 'trial-{}'.format(_trial_id(ws, ws.current_trial))
-    for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
-        if args.puzzle_name and args.puzzle_name != puzzle_name:
-            continue
-        # key_fn = ws.local_ws(util.TESTING_DIR, puzzle_name, util.KEY_PREDICTION)
-        key_fn = ws.screened_keyconf_prediction_file(puzzle_name)
-        rel_scratch_dir = join(util.SOLVER_SCRATCH, puzzle_name, trial_str)
-        rel_edges = join(rel_scratch_dir, algoprefix + 'edges.hdf5')
-        path_out = ws.local_ws(rel_scratch_dir, algoprefix + 'path.txt')
-        shell_script = './forest_dijkstra.py'
-        shell_script += ' --indir '
-        shell_script += ws.local_ws(rel_scratch_dir)
-        shell_script += ' --forest_edge '
-        shell_script += ws.local_ws(rel_edges)
-        shell_script += ' --rootf '
-        shell_script += key_fn
-        shell_script += ' --pdsf '
-        shell_script += _puzzle_pds(ws, puzzle_name, ws.current_trial)
-        shell_script += ' --out {}'.format(path_out)
-        ret = util.shell(['bash', '-c', shell_script])
-        if ret != 0:
-            util.fatal("[solve] FALIED TO SOLVE PUZZLE {}".format(puzzle_name))
-            continue
-        util.ack("Saving OMPL solution of {} to {}".format(puzzle_name, path_out))
-
-        ompl_q = matio.load(path_out)
-        uw = util.create_unit_world(puzzle_fn)
-        unit_q = uw.translate_ompl_to_unit(ompl_q)
-        sol_out = ws.solution_file(puzzle_name, type_name=algoprefix+'unit')
-        matio.savetxt(sol_out, unit_q)
-        util.ack("Saving UNIT solution of {} to {}".format(puzzle_name, sol_out))
+            np.savez_compressed(pds_fn, Q=Q, QF=QF, QB=tree_base_list,
+                                BLOOM_NO_TO_INDEX=BLOOM_NO_TO_INDEX,
+                                INDEX_TO_BLOOM_NO=INDEX_TO_BLOOM_NO)
+        util.log('[assemble_blooming] samples stored at {}'.format(pds_fn))
 
 '''
 knn_forest:
     Connect forest with prm like algorithm
 '''
-def knn_forest(args, ws):
-    ALGO_VERSION = 0 if args.algorithm_version is None else args.algorithm_version
-    trial_list = util.rangestring_to_list(args.current_trial)
-    trial_str = 'knn_forest-{}-algver_{}'.format(args.current_trial, ALGO_VERSION)
-    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
-        rel_scratch_dir = os.path.join(util.BASELINE_SCRATCH, puzzle_name, trial_str)
-        _, config = parse_ompl.parse_simple(puzzle_fn)
-        scratch_dir = ws.local_ws(rel_scratch_dir)
-        if args.only_wait:
-            condor.local_wait(scratch_dir)
-            continue
-        if args.task_id is None:
+def pairwise_knn(args, ws):
+    ALGO_VERSION = 3
+    if args.task_id is None and not args.only_wait:
+        for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+            fl = FileLocations(args, ws, puzzle_name)
+            _, config = parse_ompl.parse_simple(puzzle_fn)
+            key_fn = fl.screened_key_fn
+            keys = matio.load(key_fn)
             condor_job_args = ['./facade.py',
-                    'solve',
-                    '--stage', 'knn_forest',
-                    '--current_trial', args.current_trial,
+                    'solve2',
+                    '--stage', 'pairwise_knn',
+                    '--current_trial', str(args.current_trial),
                     '--puzzle_name', puzzle_name,
-                    '--algorithm_version', ALGO_VERSION,
+                    '--scheme', args.scheme,
                     '--task_id', '$(Process)',
                     ws.local_ws()]
             condor.local_submit(ws,
                                 util.PYTHON,
-                                iodir_rel=rel_scratch_dir,
+                                iodir_rel=fl.rel_knn,
                                 arguments=condor_job_args,
-                                instances=len(trial_list),
+                                instances=keys['KEYQ_OMPL'].shape[0],
                                 wait=False) # do NOT wait here, we have to submit EVERY puzzle at once
-        else:
+    if args.task_id is not None:
+        for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+            fl = FileLocations(args, ws, puzzle_name)
             solver_args = TmpDriverArgs()
             solver_args.puzzle = puzzle_fn
-            ws.current_trial = trial_list[args.task_id]
-            rel_bloom = _rel_bloom_scratch(ws, puzzle_name, ws.current_trial)
+            rel_bloom = fl.rel_bloom
             solver_args.bloom_dir = ws.local_ws(rel_bloom)
-            solver_args.out = os.path.join(scratch_dir, 'edges-{}.npz'.format(ws.current_trial))
+            solver_args.out = fl.knn_fn
             solver_args.knn = 8 # default
             solver_args.algo_version = ALGO_VERSION # algorithm version
+            solver_args.subset = np.array([args.task_id], dtype=np.int)
             se3solver.merge_blooming_forest(solver_args)
-    if args.task_id is not None:
         return
     if args.no_wait:
         return
-    if not args.only_wait:
-        only_wait_args = copy.deepcopy(args)
-        only_wait_args.only_wait = True
-        forest_rdt(only_wait_args, ws)
+
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+        fl = FileLocations(args, ws, puzzle_name)
+        condor.local_wait(fl.knn)
+
+def assemble_knn(args, ws):
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+        fl = FileLocations(args, ws, puzzle_name)
+        ITE_array = [matio.load(fn)['INTER_BLOOMING_TREE_EDGES'] for _,fn in fl.knn_fn_gen]
+        ITE = util.safe_concatente(ITE_array, axis=0)
+        if ITE.shape[0] != 0:
+            dedupITE = np.unique(ITE[:,[0,2]], axis=0)
+        else:
+            dedupITE = np.array([], dtype=ITE.dtype)
+        np.savez_compressed(fl.ibte_fn, INTER_BLOOMING_TREE_EDGES=ITE, DEDUP_INTER_BLOOMING_TREE_EDGES=dedupITE)
+
+VIRTUAL_OPEN_SPACE_NODE = 1j
+OPENSPACE_FLAG = 1
+
+def _extract_bound(B, total, i):
+    f = B[i]
+    t = total if i == B.shape[0] - 1 else B[i+1]
+    return f, t
+
+def tree_level_path(Q, QB, QE, QEB, QF, from_fi, from_vi, to_fi, to_vi):
+    import networkx as nx
+    assert from_fi == to_fi, f'from_fi {from_fi} does not match to_fi {to_fi}'
+    q_from, q_to = _extract_bound(QB, Q.shape[0], from_fi)
+    from_gvi = q_from + from_vi
+    to_gvi = q_from + to_vi
+    print(f'from_fi {from_fi} to_fi {to_fi}')
+    print(f'from_vi {from_vi}')
+    print(f'to_vi {to_vi}')
+    print(f'from_gvi {from_gvi}')
+    print(f'to_gvi {to_gvi}')
+    qe_from, qe_to = _extract_bound(QEB, QE.shape[0], from_fi)
+    print(f'NQ {q_to - q_from}')
+    print(f'NE {qe_to - qe_from}')
+    G = nx.Graph()
+    # G.add_nodes_from([i for i in range(q_from, q_to)] + [VIRTUAL_OPEN_SPACE_NODE])
+    G.add_nodes_from([i for i in range(q_from, q_to)])
+    G.add_edges_from(QE[qe_from:qe_to])
+    if to_vi == VIRTUAL_OPEN_SPACE_NODE:
+        virtual_edges = []
+        to_gvi = None
+        for index, flag in enumerate(QF[q_from:q_to]):
+            gindex = index + q_from
+            '''
+            if flag & OPENSPACE_FLAG:
+                assert q_from <= gindex
+                virtual_edges.append((gindex, VIRTUAL_OPEN_SPACE_NODE))
+            '''
+            if flag & OPENSPACE_FLAG:
+                to_gvi = gindex
+                break
+        assert to_gvi is not None
+        '''
+        util.log("virtual_edges {}".format(virtual_edges))
+        G.add_edges_from(virtual_edges)
+        '''
+    '''
+    # San check
+    for qi in progressbar(range(q_from, q_to)):
+        nx.shortest_path(G, from_gvi, qi)
+    '''
+    ids = np.array(nx.shortest_path(G, from_gvi, to_gvi))
+    return ids
+
+def connect_knn(args, ws):
+    if args.no_wait:
+        return
+    algoprefix = f'{args.scheme}-pairwise_knn-'
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+        fl = FileLocations(args, ws, puzzle_name)
+
+        d = matio.load(fl.ibte_fn)
+        ITE = d['INTER_BLOOMING_TREE_EDGES']
+        dedupITE = d['DEDUP_INTER_BLOOMING_TREE_EDGES']
+        util.log(f"[connect_knn] IBTE (shape: {ITE.shape}) loaded from {fl.ibte_fn}")
+        if ITE.shape[0] == 0:
+            util.warn(f'[connect_knn] Cannot find path for puzzle {puzzle_name} since there is no IBTE (shape {ITE.shape})')
+            continue
+        pds_fn = fl.pds_fn
+        d = matio.load(pds_fn)
+        QF = d['QF']
+        QB = d['QB']
+        """
+        We need to be aware of one important differents between bloom-from_*.npz files and the PDS
+        file. Some blooming tree may be empty.
+        Hence the Bloom No. (denoted by the number in the file name) may not be aligned to
+        the index in the PDS file.
+
+        However, the inter_blooming_tree_edges (ITE) uses bloom no. rather than the PDS index.
+        Thus the translation is needed.
+        """
+        BLOOM_NO_TO_INDEX = d['BLOOM_NO_TO_INDEX']
+        INDEX_TO_BLOOM_NO = d['INDEX_TO_BLOOM_NO']
+
+        import networkx as nx
+        # Forest level path
+        G = nx.Graph()
+        G.add_nodes_from([i for i in range(len(BLOOM_NO_TO_INDEX))] + [VIRTUAL_OPEN_SPACE_NODE])
+        G.add_edges_from(dedupITE)
+        openset = []
+        virtual_edges = []
+        """
+        Connect OpenSet trees to VIRTUAL_OPEN_SPACE_NODE
+        """
+        for tree_index, tree_base in enumerate(QB):
+            _, tree_end = _extract_bound(QB, QF.shape[0], tree_index)
+            """
+            Translate back to bloom no. to be compatitable with ITE
+            """
+            tree_no = INDEX_TO_BLOOM_NO[tree_index]
+            # print(tree_base)
+            # print(tree_end)
+            for flag in QF[tree_base:tree_end]:
+                if flag & OPENSPACE_FLAG:
+                    openset.append(tree_no)
+                    virtual_edges.append((tree_no, VIRTUAL_OPEN_SPACE_NODE))
+                    break
+        util.log("OpenSet {}".format(openset))
+        G.add_edges_from(virtual_edges)
+        try:
+            ids = nx.shortest_path(G, 0, VIRTUAL_OPEN_SPACE_NODE)
+            util.log('Forest-level shortest path {}'.format(ids))
+        except nx.exception.NetworkXNoPath:
+            util.warn(f'[connect_knn] Cannot find path for puzzle {puzzle_name}')
+            continue
+        util.ack('[solve2][connect_knn] forest level path (bloom no.) {}'.format(ids))
+        ids = [BLOOM_NO_TO_INDEX[i] for i in ids[:-1]]
+        ids.append(VIRTUAL_OPEN_SPACE_NODE)
+        util.ack('[solve2][connect_knn] forest level path (PDS index) {}'.format(ids))
+
+        """
+        We use bloom no. in forest level path, because ITE uses bloom no.
+        In tree level path we uses pds index instead,
+        because we tree level data mainly comes from the PDS file.
+        """
+        ITE_meta = {}
+        def insert_ite(from_fi, from_vi, to_fi, to_vi):
+            '''
+            if from_fi == 0 and to_fi == 78:
+                util.log('ite {}'.format(ite))
+            '''
+            if from_fi not in ITE_meta:
+                ITE_meta[from_fi] = {}
+            if to_fi not in ITE_meta[from_fi]:
+                ITE_meta[from_fi][to_fi] = [(from_vi, to_vi)]
+            else:
+                ITE_meta[from_fi][to_fi].append((from_vi, to_vi))
+        for index, ite in progressbar(enumerate(ITE)):
+            from_fi, from_vi, to_fi, to_vi = ite
+            from_fi = BLOOM_NO_TO_INDEX[from_fi]
+            to_fi = BLOOM_NO_TO_INDEX[to_fi]
+            insert_ite(from_fi, from_vi, to_fi, to_vi)
+            insert_ite(to_fi, to_vi, from_fi, from_vi)
+        # from_fi, to_fi = 0, 82
+        # util.log(f'ITE_meta[{from_fi}][{to_fi}] {ITE_meta[from_fi][to_fi]}')
+        Q = d['Q']
+        QE = d['QE']
+        QEB = d['QEB']
+        ompl_q = []
+        prev_fi = 0
+        prev_vi = matio.load(fl.bloom0_fn)['IS_INDICES'][0]
+        try:
+            for from_fi, to_fi in zip(ids, ids[1:]):
+                if to_fi != VIRTUAL_OPEN_SPACE_NODE:
+                    from_vi, to_vi = ITE_meta[from_fi][to_fi][0]
+                else:
+                    from_fi = prev_fi
+                    from_vi = VIRTUAL_OPEN_SPACE_NODE
+                # if to_vi == VIRTUAL_OPEN_SPACE_NODE:
+                #     ids = ids[:-1]
+                util.log(f"prev_fi {prev_fi} prev_vi {prev_vi} from_fi {from_fi} from_vi {from_vi}")
+                ids = tree_level_path(Q, QB, QE, QEB, QF, prev_fi, prev_vi, from_fi, from_vi)
+                q_from = QB[from_fi]
+                local_ids = ids - q_from
+                util.log(f"Tree {from_fi} IDS {ids}, Local IDS {local_ids}")
+                qs = Q[ids, :]
+                util.log(f"Shape {qs.shape}")
+                ompl_q.append(qs)
+                # if to_fi != VIRTUAL_OPEN_SPACE_NODE:
+                #   gvi = QB[to_fi] + to_vi
+                #   ompl_q.append(Q[gvi:gvi+1,:])
+                prev_fi = to_fi
+                prev_vi = to_vi
+            # ompl_q.append(tree_level_path(Q, QB, QE, QEB, QF, prev_fi, prev_vi, prev_fi, VIRTUAL_OPEN_SPACE_NODE))
+        except nx.exception.NetworkXNoPath:
+            assert False, "Should not happen. Found forest-level path but no tree-level path."
+            continue
+        ompl_q = util.safe_concatente(ompl_q, axis=0)
+        path_out = fl.path_out_fn
+        matio.savetxt(path_out, ompl_q)
+        util.ack("Saving OMPL solution of {} to {}".format(puzzle_name, path_out))
+
+        uw = util.create_unit_world(puzzle_fn)
+        unit_q = uw.translate_ompl_to_unit(ompl_q)
+        sol_out = fl.unit_out_fn
+        matio.savetxt(sol_out, unit_q)
+        util.ack("Saving UNIT solution of {} to {}".format(puzzle_name, sol_out))
 
 function_dict = {
-        'least_visible_keyconf' : least_visible_keyconf,
-        'least_visible_keyconf2' : least_visible_keyconf2,
-        'screen_keyconf' : screen_keyconf,
-        'sample_pds' : sample_pds,
-        'assemble_pds' : assemble_pds,
-        'forest_rdt' : forest_rdt,
-        'forest_edges' : forest_edges,
-        'connect_forest' : connect_forest,
-        'assemble_roots' : assemble_roots,
+        'least_visible_keyconf_fixed': least_visible_keyconf_fixed,
+        'assemble_raw_keyconf': assemble_raw_keyconf,
+        'screen_keyconf': screen_keyconf,
+        'assemble_roots': assemble_roots,
+        'blooming' : blooming,
+        'assemble_blooming' : assemble_blooming,
+        'pairwise_knn': pairwise_knn,
+        'assemble_knn': assemble_knn,
+        'connect_knn': connect_knn,
 }
 
-def setup_parser(subparsers):
-    return
-    p = subparsers.add_parser('solve', help='Final step to solve the puzzle',
+def setup_parser(subparsers, module_name='solve2'):
+    p = subparsers.add_parser(module_name, help='Solve the puzzle with path planner',
                               formatter_class=choice_formatter.Formatter)
     p.add_argument('--stage',
                    choices=list(function_dict.keys()),
                    help='R|Possible stages:\n'+'\n'.join(list(function_dict.keys())),
                    default='',
                    metavar='')
-    p.add_argument('--select',
-                   help='Only use the heuristics from one module',
-                   choices=KEY_PRED_MODULE_NAME,
-                   required=True)
     p.add_argument('--only_wait', action='store_true')
     p.add_argument('--no_wait', action='store_true')
     p.add_argument('--task_id', help='Feed $(Process) from HTCondor', type=int, default=None)
     p.add_argument('--current_trial', help='Trial to solve the puzzle', type=str, default='0')
     p.add_argument('--puzzle_name', help='Pick a single puzzle to solve (default to all)', default='')
-    p.add_argument('--algorithm_version', help='Algorithm version (varying among stages', type=int, default=None)
+    p.add_argument('--scheme', help='Choose key prediction scheme',
+                   choices=KEY_PRED_SCHEMES,
+                   required=True)
     p.add_argument('dir', help='Workspace directory')
+    return p
 
 def run(args):
     if args.stage in function_dict:
         ws = util.Workspace(args.dir)
-        if args.stage == 'knn_forest': # knn_forest takes current_trial list instead of single trial
+        for current_trial in util.rangestring_to_list(args.current_trial):
+            ws.current_trial = current_trial
             function_dict[args.stage](args, ws)
-        else:
-            for current_trial in util.rangestring_to_list(args.current_trial):
-                ws.current_trial = current_trial
-                function_dict[args.stage](args, ws)
     else:
         print("Unknown solve pipeline stage {}".format(args.stage))
 
@@ -591,46 +634,60 @@ def _remote_command_auto(ws, cmd, extra_args=''):
     else:
         _remote_command(ws, cmd, extra_args=extra_args)
 
-class Remoter(object):
-    def __init__(self, stage_name, sel, extra_args=''):
-        self.stage_name = stage_name
-        self.sel = sel
-        self.extra_args = extra_args
+def remote_least_visible_keyconf_fixed(ws):
+    _remote_command_auto(ws, 'least_visible_keyconf_fixed', extra_args='--scheme cmb')
+
+def remote_assemble_raw_keyconf(ws):
+    _remote_command_auto(ws, 'assemble_raw_keyconf', extra_args='--scheme cmb')
+
+def remote_screen_keyconf(ws):
+    _remote_command_auto(ws, 'screen_keyconf', extra_args='--scheme cmb --no_wait')
+    _remote_command_auto(ws, 'screen_keyconf', extra_args='--scheme cmb --only_wait')
+
+def remote_assemble_roots(ws):
+    _remote_command(ws, 'assemble_roots', extra_args='--scheme cmb')
+
+class Launcher(object):
+    def __init__(self, stage_name, extra_args):
+        self._stage_name = str(stage_name)
+        self._extra_args = str(extra_args)
 
     def __call__(self, ws):
-        for host,_,puzzle_name in ws.condor_host_vs_test_puzzle_generator():
-            _remote_command(ws, self.stage_name,
-                            alter_host=host,
-                            extra_args=f' --select {self.sel} --puzzle_name {puzzle_name} {self.extra_args}')
+        _remote_command(ws, self._stage_name, extra_args=self._extra_args)
 
-def get_all_remoter(stage_name, prev_stage):
-    lauch = [(f'{stage_name}_{suffix}', Remoter(stage_name, suffix, prev_stage=prev_stage, extra_args='--no_wait')) for suffix in KEY_PRED_MODULE_NAME]
-    return launch + sync
+def get_schemed_remoter(stage_name, is_async=False):
+    ret = []
+    if is_async:
+        for scheme in KEY_PRED_SCHEMES:
+            ret.append((f'{stage_name}_{scheme}_launch', Launcher(stage_name, f'--no_wait --scheme {scheme}')))
+
+        for scheme in KEY_PRED_SCHEMES:
+            ret.append((f'{stage_name}_{scheme}_sync', Launcher(stage_name, f'--only_wait --scheme {scheme}')))
+    else:
+        for scheme in KEY_PRED_SCHEMES:
+            ret.append((f'{stage_name}_{scheme}', Launcher(stage_name, f'--scheme {scheme}')))
+    return ret
 
 def collect_stages(variant=0):
     if variant in [6]:
         ret = [
-                ('least_visible_keyconf2', remote_least_visible_keyconf2),
+                ('least_visible_keyconf_fixed', remote_least_visible_keyconf_fixed),
+                ('assemble_raw_keyconf', remote_assemble_raw_keyconf),
+                ('screen_keyconf', remote_screen_keyconf),
+                ('assemble_roots', remote_assemble_roots)
               ]
-        stages = ['screen_keyconf',
-                  'assemble_roots',
-                  'sample_pds',
-                  'assemble_pds',
-                  'forest_rdt_withbt',
-                  'forest_edges_withbt',
-                  'connect_forest_withbt',
+        stages = [
+                  'blooming',
+                  'assemble_blooming',
+                  'pairwise_knn',
+                  'assemble_knn',
+                  'connect_knn',
                 ]
-        prev_stage = None
-        for curr_stage in stages:
-            ret += get_all_remoter(curr=curr_stage, prev=prev_stage)
+        ret += get_schemed_remoter('blooming', is_async=True)
+        ret += get_schemed_remoter('assemble_blooming')
+        ret += get_schemed_remoter('pairwise_knn', is_async=True)
+        ret += get_schemed_remoter('assemble_knn')
+        ret += get_schemed_remoter('connect_knn')
     else:
         assert False, f'Solve Pipeline Variant {variant} has not been implemented'
     return ret
-
-def autorun(args):
-    ws = util.Workspace(args.dir)
-    ws.current_trial = args.current_trial
-    pdesc = collect_stages()
-    for _,func in pdesc:
-        func(ws)
-

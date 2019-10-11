@@ -8,9 +8,12 @@ def chunk_it(seq, num):
     avg = len(seq) / float(num)
     out = []
     last = 0.0
-    while last < len(seq):
+    while last < len(seq) and len(out) < num:
         out.append(seq[int(last):int(last + avg)])
         last += avg
+        print(last)
+    out[-1] += seq[int(last):]
+    assert len(out) == num, f'len(out) ({len(out)}) != {num}'
     return out
 
 def guess_chunk_number(shape, max_chunk_number, minimal_chunk_size):

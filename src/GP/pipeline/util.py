@@ -55,12 +55,13 @@ GERATIO_POINT_FMT = 'geometrik_geratio_point_of_{geo_type}-{trial}.npz'
 NOTCH_POINT_FMT = 'geometrik_notch_point_of_{geo_type}-{trial}.npz'
 GERATIO_KEY_FMT = 'geometrik_geratio_keyconf-{trial}.npz'
 NOTCH_KEY_FMT = 'geometrik_notch_keyconf-{trial}.npz'
+OVERSAMPLED_NEURAL_KEY_FMT = 'neural_keyconf-{trial}-oversampled.npz'
 NEURAL_KEY_FMT = 'neural_keyconf-{trial}.npz'
-GEOMETRIK_KEY_PREDICTION_FMT = 'geometrik_forest_roots-{}.npz'
-OVERSAMPLED_KEY_PREDICTION_FMT = 'oversampled_forest_roots-{}.npz'
+GEOMETRIK_KEY_PREDICTION_FMT = 'geometrik_forest_roots-{trial}.npz'
+OVERSAMPLED_KEY_PREDICTION_FMT = 'oversampled_forest_roots-{trial}.npz'
 COMBINED_KEY_FMT = 'combined_keyconf-{trial}.npz'
-UNSCREENED_KEY_PREDICTION_FMT = 'unscreened_forest_roots-{}.npz'
-SCREENED_KEY_PREDICTION_FMT = 'forest_roots-{}.npz'
+UNSCREENED_KEY_PREDICTION_FMT = 'unscreened_forest_roots-{trial}.npz'
+SCREENED_KEY_PREDICTION_FMT = 'forest_roots-{trial}.npz'
 SOLUTION_FMT = 'path-{trial}.{type_name}.txt'
 PDS_SUBDIR = 'pds'
 
@@ -427,7 +428,7 @@ class Workspace(object):
     def keyconf_file_from_fmt(self, puzzle_name, FMT, trial_override=None):
         trial = self.current_trial if trial_override is None else trial_override
         ret = self.local_ws(TESTING_DIR, puzzle_name,
-                            FMT.format(trial))
+                            FMT.format(trial=trial))
         return ret
 
     def solution_file(self, puzzle_name, type_name, trial_override=None):

@@ -219,7 +219,7 @@ function_dict = {
         '_debug_notch' : _debug_notch,
 }
 
-def setup_parser(subparsers, module_name='geometrik'):
+def setup_parser(subparsers, module_name='geometrik', function_dict=function_dict):
     p = subparsers.add_parser(module_name, help='Sample Key configuration from Geometric features',
                               formatter_class=choice_formatter.Formatter)
     p.add_argument('--stage',

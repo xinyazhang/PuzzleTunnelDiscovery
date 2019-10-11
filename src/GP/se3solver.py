@@ -73,7 +73,9 @@ If a directory is provided, all .mat files in this directory will be loaded''', 
     parser.add_argument('--knn', help='K-nearest', type=int, default=8)
     parser.add_argument('--algo_version',
                         help='Reversion of Algorithm. 0: single KNN DS, 1: KNN for each DS',
-                        type=int, default=0, choices=[0,1])
+                        type=int, default=0, choices=[0,1,2,3])
+    parser.add_argument('--subset',
+                        type=int, default=None, nargs='*')
 
     args = main_parser.parse_args()
     # Empty dic 

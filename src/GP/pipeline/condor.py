@@ -80,9 +80,12 @@ def query_last_cputime(ws,
     log_fn = ws.local_ws(iodir_rel, 'log')
     if not os.path.isfile(log_fn):
         return None
+    '''
     util.shell(['rsync', log_fn,
                 '{}:tmp/condor_log_to_analysis'.format(ws.condor_host)])
     logbytes = subprocess.check_output(f'ssh {ws.condor_host} condor_userlog tmp/condor_log_to_analysis | tail -n 1', shell=True)
+    '''
+    logbytes = subprocess.check_output(f'condor_userlog {log_fn} | tail -n 1', shell=True)
     logstr = logbytes.decode('utf-8')
     util.log(f"[logstr] {logstr}")
     sp = logstr.split()

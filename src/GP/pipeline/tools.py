@@ -437,6 +437,7 @@ def _print_stat_header(writer):
                      'Mean PDS size',
                      'Solved/Total',
                      'Solved/Total (WithBT)',
+                     'Solved/Total (KNN Ver. 3)',
                     ])
 
 def _print_stat(puzzle_name, stat_dic, writer):
@@ -452,7 +453,9 @@ def _print_stat(puzzle_name, stat_dic, writer):
                      '{}/{}'.format(np.sum(stat_dic['puzzle_success_int']),
                                     len(stat_dic['puzzle_success'])),
                      '{}/{}'.format(np.sum(stat_dic['puzzle_withbt_success_int']),
-                                    len(stat_dic['puzzle_withbt_success']))
+                                    len(stat_dic['puzzle_withbt_success'])),
+                     '{}/{}'.format(np.sum(stat_dic['puzzle_knn3_success_int']),
+                                    len(stat_dic['puzzle_knn3_success_int']))
                     ])
 
 def conclude(args):
@@ -518,6 +521,11 @@ def conclude(args):
                     puzzle_withbt_success = 'Y'
                 else:
                     puzzle_withbt_success = 'N'
+                sol_fn = ws.solution_file(puzzle_name, type_name='pairwise_knn-unit')
+                if os.path.exists(sol_fn):
+                    puzzle_knn3_success = 'Y'
+                else:
+                    puzzle_knn3_success = 'N'
                 _dic_add(stat_dic, 'trial_id', trial)
                 _dic_add(stat_dic, 'puzzle_method', puzzle_method)
                 _dic_add(stat_dic, 'puzzle_kps_env', puzzle_kps_env)
@@ -532,6 +540,8 @@ def conclude(args):
                 _dic_add(stat_dic, 'puzzle_success_int', 1 if puzzle_success == 'Y' else 0)
                 _dic_add(stat_dic, 'puzzle_withbt_success', puzzle_withbt_success)
                 _dic_add(stat_dic, 'puzzle_withbt_success_int', 1 if puzzle_withbt_success == 'Y' else 0)
+                _dic_add(stat_dic, 'puzzle_knn3_success', puzzle_knn3_success)
+                _dic_add(stat_dic, 'puzzle_knn3_success_int', 1 if puzzle_knn3_success == 'Y' else 0)
             stat_dic['trial_range'] = args.trial_range
             if 'puzzle_success' not in stat_dic:
                 util.warn('workspace {} has not solution data for puzzle {}. No corresponding information will be printed'.format(ws_dir, puzzle_name))
@@ -680,13 +690,18 @@ def forest_rdt_dir(puzzle_name, current_trial):
 def forest_rdt_withbt_dir(puzzle_name, current_trial):
     return join(util.SOLVER_SCRATCH, puzzle_name, 'withbt-trial-{}'.format(current_trial))
 
+def knn3_dir(puzzle_name, current_trial):
+    return join(util.SOLVER_SCRATCH, puzzle_name, 'pairwise_knn-{}'.format(current_trial))
+
 _CONDOR_SOLSTAGE_TO_DIR = {
         'estimate_keyconf_clearance' : estimate_keyconf_clearance_dir,
         'screen_keyconf' : screen_keyconf_dir,
         'sample_pds' : sample_pds_dir,
         'forest_rdt' : forest_rdt_dir,
         'forest_rdt_withbt' : forest_rdt_withbt_dir,
+        'knn3' : knn3_dir,
 }
+
 def condor_ppbreakdown(args):
     grand_dict = {}
     trial_list = util.rangestring_to_list(args.trial_range)
@@ -819,8 +834,8 @@ function_dict = {
         'animate' : animate,
         'conclude' : conclude,
         'breakdown' : breakdown,
-        'condor_breakdown' : condor_ppbreakdown,
         'condor_breakdown' : condor_breakdown,
+        'condor_ppbreakdown' : condor_ppbreakdown,
         'blender' : blender_animate,
 }
 

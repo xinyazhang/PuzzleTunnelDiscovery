@@ -265,6 +265,7 @@ def estimate_keyconf_clearance(args, ws):
             import pyosr
             task_id = 0 if total_chunks == 1 else args.task_id
             tindices = partt.get_task_chunk(task_shape, total_chunks, task_id)
+            print("[estimate_keyconf_clearance] tindices {}".format(tindices))
             uw = util.create_unit_world(puzzle_fn)
             nsample = ws.config.getint('Prediction', 'OversamplingClearanceSample')
             distances_batch = []
