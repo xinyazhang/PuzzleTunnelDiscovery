@@ -92,11 +92,13 @@ def predict_notch_key_worker(ws, wag_pair):
     kqs1, keyid_ge1, keyid_nt2 = ks.get_all_key_configs(ge1, nt2, nrot)
     kqs2, keyid_ge2, keyid_nt1 = ks.get_all_key_configs(ge2, nt1, nrot)
     kqs = util.safe_concatente([kqs1, kqs2], axis=0)
-
-    uw = util.create_unit_world(wag1.puzzle_fn)
-    unit_q = uw.translate_vanilla_to_unit(kqs)
-    ompl_q = uw.translate_unit_to_ompl(unit_q)
-    ompl_q = prefix_iq_and_gq(wag1, ompl_q)
+    if kqs.shape[0] > 0:
+        uw = util.create_unit_world(wag1.puzzle_fn)
+        unit_q = uw.translate_vanilla_to_unit(kqs)
+        ompl_q = uw.translate_unit_to_ompl(unit_q)
+        ompl_q = prefix_iq_and_gq(wag1, ompl_q)
+    else:
+        ompl_q = kqs # empty
     kfn = FMT_to_file(ws, wag1, util.NOTCH_KEY_FMT)
 
     # Remind ge1 and nt1 come from env, and *2 come from rob
@@ -107,6 +109,7 @@ def predict_notch_key_worker(ws, wag_pair):
              ROB_GEKEYID=keyid_ge2,
              ENV_NTKEYID=keyid_nt1,
              ROB_NTKEYID=keyid_nt2)
+    util.ack(f'[predict_geratio_key] save {ompl_q.shape} keys to {kfn}')
     return None
 
 def _detect_geratio_feature_worker(ws, wag):
