@@ -175,7 +175,9 @@ def launch_with_params(params, do_training, load=False):
         util.ack('[launch_with_params] load dir {}'.format(load_dir))
         model.training_init(nEpochs=params['nepochs'], epochSize=params['epoch_size'], saveStep=params['saver_step'], dataset=None, load=load_dir)
     else:
-        model.testing_init(nEpochs=1, epochSize=params['prediction_epoch_size'], saveStep=0, dataset=None, load=params['checkpoint_dir'])
+        out_dir = param['checkpoint_dir'] if 'output_dir' not in params else params['output_dir']
+        model.testing_init(nEpochs=1, epochSize=params['prediction_epoch_size'], saveStep=0,
+                           dataset=None, load=params['checkpoint_dir'], out_dir=out_dir)
 
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)

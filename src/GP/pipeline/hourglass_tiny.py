@@ -313,7 +313,7 @@ class HourglassModel():
             print('  Relative Improvement: ' + str((self.resume['err'][-1] - self.resume['err'][0]) * 100) +'%')
             print('  Training Time: ' + str( datetime.timedelta(seconds=time.time() - startTime)))
 
-    def testing_init(self, nEpochs = 1, epochSize = 1000, saveStep = 0, dataset=None, load=None):
+    def testing_init(self, nEpochs = 1, epochSize = 1000, saveStep = 0, dataset=None, load=None, out_dir=None):
             with tf.name_scope('Session'):
                 with tf.device(self.gpu):
                     self._init_weight()
@@ -324,7 +324,9 @@ class HourglassModel():
                     assert ckpt and ckpt.model_checkpoint_path
                     ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
                     self.saver.restore(self.Session, os.path.join(load, ckpt_name))
-                    self._test(nEpochs=1, epochSize=epochSize, saveStep=0, out_dir=load)
+                    if out_dir is None:
+                        out_dir = load
+                    self._test(nEpochs=1, epochSize=epochSize, saveStep=0, out_dir=out_dir)
 
     def _test(self, nEpochs = 1, epochSize = 1000, saveStep = 500, out_dir=None):
             assert nEpochs == 1
@@ -415,7 +417,7 @@ class HourglassModel():
                 avgpng_fn = '{}/{}-atex-avg.png'.format(out_dir, self.dataset_name)
                 print('Testing Done. Saving files to\n{}\n{}'.format(npz_fn, png_fn))
                 np.clip(atex_count, a_min=1, a_max=None, out=atex_count)
-                np.savez(npz_fn, ATEX=atex)
+                np.savez(npz_fn, ATEX=atex, COUNT=atex_count)
                 np.savez(avgnpz_fn, ATEX=atex/atex_count)
                 natex = atex / np.amax(atex)
                 imsave(png_fn, natex)

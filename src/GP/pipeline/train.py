@@ -119,8 +119,8 @@ def _predict_surface(args, ws, geo_type, generator):
     rews_dir = ws.config.get('Prediction', 'ReuseWorkspace')
     if rews_dir:
         rews_dir = join(ws.dir, rews_dir) # Relative path
-        rews = copy.deepcopy(ws)
-        rews.workspace_dir = rews_dir
+        rews = util.Workspace(rews_dir)
+        rews.nn_profile = ws.nn_profile
     else:
         rews = ws
     for puzzle_fn, puzzle_name in generator():
@@ -135,6 +135,9 @@ def _predict_surface(args, ws, geo_type, generator):
         params['ompl_config'] = puzzle_fn
         params['what_to_render'] = geo_type
         params['checkpoint_dir'] = rews.checkpoint_dir(geo_type) + '/'
+        if rews_dir:
+            os.makedirs(ws.checkpoint_dir(geo_type), exist_ok=True)
+            params['output_dir'] = ws.checkpoint_dir(geo_type) + '/'
         params['dataset_name'] = puzzle_name # Enforce the generated filename
         util.log("[prediction] Predicting {}:{}".format(puzzle_fn, geo_type))
         # NEVER call launch_with_params in the same process for multiple times
