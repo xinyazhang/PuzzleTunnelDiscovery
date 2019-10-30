@@ -69,7 +69,7 @@ def _train(args, ws, geo_type):
         for puzzle_fn, puzzle_name in ws.training_puzzle_generator():
             all_omplcfgs.append(puzzle_fn)
         params['all_ompl_configs'] = all_omplcfgs
-        params['nepochs'] = 50 + 25 * len(all_omplcfgs)
+        params['nepochs'] = 50 + 50 * len(all_omplcfgs)
     params['what_to_render'] = geo_type
     params['checkpoint_dir'] = ws.checkpoint_dir(geo_type) + '/'
     params['suppress_hot'] = 0.0
