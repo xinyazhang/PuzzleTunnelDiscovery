@@ -177,7 +177,7 @@ PYBIND11_PLUGIN(pyosr) {
 				py::arg("verify_magnitude"),
 				py::arg("enable_mt") = true,
 				py::call_guard<py::gil_scoped_release>())
-#if PYOSR_HAS_CGAL
+#if PYOSR_HAS_MESHBOOL
 		.def("intersection_region_surface_areas", &UnitWorld::intersectionRegionSurfaceAreas, py::call_guard<py::gil_scoped_release>())
 		.def("intersecting_geometry", &UnitWorld::intersectingGeometry, py::call_guard<py::gil_scoped_release>())
 #endif

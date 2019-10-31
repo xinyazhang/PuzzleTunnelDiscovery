@@ -2,6 +2,7 @@
 #include "cdmodel.h"
 #include <fstream>
 #include <glm/gtx/io.hpp>
+#include <glm/gtx/transform.hpp>
 
 namespace {
 // Code copied from assimpUtil, to ensure we can reproduce the OMPL's center
@@ -216,6 +217,11 @@ void Scene::clear()
 	bbox_ = BoundingBox();
 	root_.reset();
 	meshes_.clear();
+}
+
+void Scene::scale(glm::vec3 factor)
+{
+	xform_= glm::scale(factor) * xform_;
 }
 
 std::shared_ptr<const Mesh>

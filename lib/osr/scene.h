@@ -74,7 +74,7 @@ public:
 	void translate(float x, float y, float z) {
 		xform_= glm::translate(xform_, glm::vec3(x, y, z));
 	}
-	void scale(glm::vec3 factor) { xform_= glm::scale(factor) * xform_; }
+	void scale(glm::vec3 factor);
 	void scale(float x, float y, float z) {
 		scale(glm::vec3(x,y,z));
 	}

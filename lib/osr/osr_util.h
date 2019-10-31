@@ -47,7 +47,7 @@ std::tuple<
 >
 loadOBJ1(const std::string& fn);
 
-#if PYOSR_HAS_CGAL
+#if PYOSR_HAS_MESHBOOL
 std::tuple<
 	Eigen::Matrix<double, -1, -1>,
 	Eigen::Matrix<int, -1, -1>

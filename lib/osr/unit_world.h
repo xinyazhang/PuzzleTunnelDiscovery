@@ -174,7 +174,7 @@ public:
 	using VMatrix = Eigen::Matrix<StateScalar, -1, 3>;
 	using FMatrix = Eigen::Matrix<int, -1, 3>;
 
-#if PYOSR_HAS_CGAL
+#if PYOSR_HAS_MESHBOOL
 	Eigen::Matrix<StateScalar, -1, 1>
 	intersectionRegionSurfaceAreas(ArrayOfStates qs,
 	                               bool qs_are_unit_states);

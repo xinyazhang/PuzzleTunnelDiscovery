@@ -13,7 +13,7 @@
 #include <igl/writeOBJ.h>
 #include <tritri/tritri_igl.h>
 #include <tritri/tritri_cop.h>
-#if PYOSR_HAS_CGAL
+#if PYOSR_HAS_MESHBOOL
 #include <meshbool/join.h>
 #endif
 
@@ -834,7 +834,7 @@ UnitWorld::calculateVisibilityPair(ArrayOfStates qs0,
 }
 
 
-#if PYOSR_HAS_CGAL
+#if PYOSR_HAS_MESHBOOL
 Eigen::Matrix<StateScalar, -1, 1>
 UnitWorld::intersectionRegionSurfaceAreas(ArrayOfStates qs,
                                           bool qs_are_unit_states)
@@ -887,7 +887,7 @@ UnitWorld::intersectingGeometry(const StateVector& q,
 #endif
 }
 
-#endif // PYOSR_HAS_CGAL
+#endif // PYOSR_HAS_MESHBOOL
 
 std::tuple<UnitWorld::VMatrix, UnitWorld::FMatrix>
 UnitWorld::getRobotGeometry(const StateVector& q,
