@@ -22,7 +22,7 @@ bool nvidia_platform = false;
 std::vector<int> opended_drifds;
 
 /*
- * Request OpenGL 4.3
+ * Request OpenGL 4.4
  */
 class IEglContexter {
 public:
@@ -175,10 +175,10 @@ EGLDisplay create_display(int device_idx)
 
 EGLContext create_gl_context(EGLDisplay dpy, EGLContext share_context)
 {
-	// Requesting OpenGL 4.3
+	// Requesting OpenGL 4.5
 	static const EGLint ctx_attribs[] = {
 		EGL_CONTEXT_MAJOR_VERSION, 4,
-		EGL_CONTEXT_MINOR_VERSION, 3,
+		EGL_CONTEXT_MINOR_VERSION, 5,
 		EGL_NONE
 	};
 
