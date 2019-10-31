@@ -91,11 +91,6 @@ public:
 
 	Eigen::MatrixXf getPermutationToWorld(int view);
 
-#if 0
-	void setUVFeedback(bool);
-	bool getUVFeedback() const;
-#endif
-
 	static const uint32_t BARY_RENDERING_ROBOT = 0;
 	static const uint32_t BARY_RENDERING_SCENE = 1;
 
@@ -139,16 +134,8 @@ private:
 
 	glm::mat4 camera_rot_;
 
-	RtTexturePtr uv_tex_; // GLuint uv_texture_;
-#if 0
-	bool uvfeedback_enabled_ = false;
-	void setupUVFeedbackBuffer();
-#endif
-
-	RtTexturePtr pid_tex_; // GLuint pid_texture_;
-#if 0
-	void enablePidBuffer();
-#endif
+	RtTexturePtr uv_tex_;
+	RtTexturePtr pid_tex_;
 
 	/*
 	 * Code to support barycentric rendering
@@ -174,9 +161,6 @@ private:
 
 	RtTexturePtr bary_tex_;
 	FbPtr bary_fb_;
-	// GLuint bary_texture_ = 0;
-	// GLuint bary_fb_ = 0;
-	// GLuint bary_dep_ = 0;
 
 	GLuint bary_vs_ = 0;
 	GLuint bary_gs_ = 0;

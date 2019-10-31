@@ -205,64 +205,26 @@ void Renderer::setupNonSharedObjects()
 	/*
 	 * Create depth FB
 	 */
-#if 0
-	CHECK_GL_ERROR(glGenFramebuffers(1, &framebufferID));
-	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, framebufferID));
-	CHECK_GL_ERROR(glGenTextures(1, &renderTarget));
-	CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D, renderTarget));
-	CHECK_GL_ERROR(glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, pbufferWidth, pbufferHeight, 0, GL_RED, GL_FLOAT, 0));
-	CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
-	CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
-
-	CHECK_GL_ERROR(glGenRenderbuffers(1, &depthbufferID));
-	CHECK_GL_ERROR(glBindRenderbuffer(GL_RENDERBUFFER, depthbufferID));
-	CHECK_GL_ERROR(glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, pbufferWidth, pbufferHeight));
-	CHECK_GL_ERROR(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthbufferID));
-	CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, renderTarget, 0));
-	CHECK_GL_ERROR(glDrawBuffers(1, drawBuffers));
-#else
 	make_with_default(depth_tex_);
 	depth_tex_->ensure(pbufferWidth, pbufferHeight, 1, RtTexture::FLOAT_TYPE);
 	make_with_default(depth_only_fb_);
 	depth_only_fb_->attachRt(0, depth_tex_);
 	depth_only_fb_->create(pbufferWidth, pbufferHeight);
-#endif
 
 	/*
 	 * Create RGBD FB
 	 */
-#if 0
-	CHECK_GL_ERROR(glGenFramebuffers(1, &rgbdFramebuffer));
-	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, rgbdFramebuffer));
-	CHECK_GL_ERROR(glGenTextures(1, &rgbTarget));
-	if (false /* No MSAA for now */) {
-		CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, rgbTarget));
-		CHECK_GL_ERROR(glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, 4, GL_RGB8, pbufferWidth, pbufferHeight, false));
-		CHECK_GL_ERROR(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D_MULTISAMPLE, rgbTarget, 0));
-	} else {
-		CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D, rgbTarget));
-		CHECK_GL_ERROR(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, pbufferWidth, pbufferHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, 0));
-		CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
-		CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
-		CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, rgbTarget, 0));
-	}
-	CHECK_GL_ERROR(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthbufferID));
-	CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, renderTarget, 0));
-	CHECK_GL_ERROR(glDrawBuffers(2, rgbdDrawBuffers));
-
-	/*
-	 * Switch back to depth-only FB
-	 */
-	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, framebufferID));
-#else
 	make_with_default(rgb_tex_);
 	rgb_tex_->ensure(pbufferWidth, pbufferHeight, 3, RtTexture::BYTE_TYPE);
 	make_with_default(rgbd_fb_);
 	rgbd_fb_->attachRt(1, rgb_tex_);
 	rgbd_fb_->attachRt(0, depth_tex_);
 	rgbd_fb_->create(pbufferWidth, pbufferHeight);
+
+	/*
+	 * Switch back to depth-only FB
+	 */
 	depth_only_fb_->activate();
-#endif
 
 	make_with_default(uv_tex_);
 	make_with_default(bary_tex_);
@@ -273,18 +235,11 @@ void Renderer::setupNonSharedObjects()
 
 void Renderer::teardown()
 {
-#if 0
-	CHECK_GL_ERROR(glDeleteFramebuffers(1, &framebufferID));
-	CHECK_GL_ERROR(glDeleteRenderbuffers(1, &depthbufferID));
-	CHECK_GL_ERROR(glDeleteTextures(1, &renderTarget));
-	CHECK_GL_ERROR(glDeleteTextures(1, &rgbTarget));
-	CHECK_GL_ERROR(glDeleteTextures(1, &uv_texture_));
-#else
 	depth_only_fb_.reset();
 	rgbd_fb_.reset();
 	depth_tex_.reset();
 	rgb_tex_.reset();
-#endif
+
 	CHECK_GL_ERROR(glDeleteProgram(shaderProgram));
 	CHECK_GL_ERROR(glDeleteProgram(rgbdShaderProgram));
 	shaderProgram = 0;
@@ -451,11 +406,6 @@ void Renderer::render_mvrgbd(uint32_t flags)
 void Renderer::render_depth()
 {
 	Camera camera = setup_camera(0);
-#if 0
-	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, 0));
-	CHECK_GL_ERROR(glClearTexImage(renderTarget, 0, GL_RED, GL_FLOAT, &default_depth));
-	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, framebufferID));
-#endif
 	depth_only_fb_->deactivate();
 	depth_tex_->clear(&default_depth);
 	depth_only_fb_->activate();
@@ -487,21 +437,6 @@ void Renderer::render_rgbd(uint32_t flags)
 
 	glm::mat4 perturbation_mat = translate_state_to_matrix(perturbate_);
 	Camera camera = setup_camera(flags);
-#if 0
-	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, 0));
-	static const uint8_t black[] = {0, 0, 0, 0};
-	CHECK_GL_ERROR(glClearTexImage(rgbTarget, 0, GL_RGB, GL_UNSIGNED_BYTE, &black));
-	CHECK_GL_ERROR(glClearTexImage(renderTarget, 0, GL_RED, GL_FLOAT, &default_depth));
-	if (uv_texture_) {
-		static const float invalid_uv[] = {-1.0f, -1.0f};
-		CHECK_GL_ERROR(glClearTexImage(uv_texture_, 0, GL_RG, GL_FLOAT, invalid_uv));
-	}
-	if (pid_texture_) {
-		static const int invalid_pid[] = {-1};
-		CHECK_GL_ERROR(glClearTexImage(pid_texture_, 0, GL_RED_INTEGER, GL_INT, invalid_pid));
-	}
-	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, rgbdFramebuffer));
-#else
 	rgbd_fb_->deactivate();
 	depth_tex_->clear();
 	rgb_tex_->clear();
@@ -512,7 +447,6 @@ void Renderer::render_rgbd(uint32_t flags)
 	pid_tex_->clear(invalid_pid);
 	normal_tex_->clear();
 	rgbd_fb_->activate();
-#endif
 #if 0
 	CHECK_GL_ERROR(glFlush());
 	return;
@@ -575,24 +509,6 @@ void Renderer::render_rgbd(uint32_t flags)
 	CHECK_GL_ERROR(glFlush());
 }
 
-
-#if 0
-void Renderer::setUVFeedback(bool enable)
-{
-	uvfeedback_enabled_ = enable;
-
-	/*
-	 * Switch back to depth-only FB
-	 */
-	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, framebufferID));
-}
-
-
-bool Renderer::getUVFeedback() const
-{
-	return uvfeedback_enabled_;
-}
-#endif
 
 std::shared_ptr<Scene>
 Renderer::getBaryTarget(uint32_t target)
@@ -668,55 +584,12 @@ Renderer::renderBarycentric(uint32_t target,
 {
 	auto target_scene = getBaryTarget(target);
 
-#if 0
-	/*
-	 * Initialization on demand
-	 */
-	if (!bary_texture_) {
-		CHECK_GL_ERROR(glGenTextures(1, &bary_texture_));
-		CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D, bary_texture_));
-		// Not sure if we need allocate space before calling glTexParameteri
-		CHECK_GL_ERROR(glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, res(0), res(1), 0, GL_RED, GL_FLOAT, 0));
-		CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
-		CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
-	}
-	// Resize on demand <-- Wrong, tex cannot be resized
-	CHECK_GL_ERROR(glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, res(0), res(1), 0, GL_RED, GL_FLOAT, 0));
-#else
 	bary_tex_->ensure(res(0), res(1), 1, RtTexture::FLOAT_TYPE);
-#endif
-
-#if 0
-	// Framebuffer creation
-	if (!bary_fb_) {
-		CHECK_GL_ERROR(glGenFramebuffers(1, &bary_fb_));
-		CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, bary_fb_));
-		CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, bary_texture_, 0));
-		// We MUST attach something to depth
-		CHECK_GL_ERROR(glGenRenderbuffers(1, &bary_dep_));
-		CHECK_GL_ERROR(glBindRenderbuffer(GL_RENDERBUFFER, bary_dep_));
-		CHECK_GL_ERROR(glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, res(0), res(1)));
-		CHECK_GL_ERROR(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, bary_dep_));
-		CHECK_GL_ERROR(glDrawBuffers(1, drawBuffers));
-
-		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-			throw std::runtime_error(std::string(__func__) + " Failed to create framebuffer object as render target");
-	}
-#else
 	bary_fb_->attachRt(0, bary_tex_);
 	bary_fb_->create(pbufferWidth, pbufferHeight);
-#endif
 
-#if 0
-	// Clear texture
-	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, 0));
-	static const uint8_t black[] = {0, 0, 0, 0};
-	CHECK_GL_ERROR(glClearTexImage(bary_texture_, 0, GL_RED, GL_UNSIGNED_BYTE, &black));
-	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, bary_fb_));
-#else
 	bary_tex_->clear();
 	bary_fb_->activate();
-#endif
 
 	CHECK_GL_ERROR(glDisable(GL_DEPTH_TEST));
 	CHECK_GL_ERROR(glDisable(GL_CULL_FACE));
@@ -876,68 +749,6 @@ Renderer::renderBarycentric(uint32_t target,
 
 	return pixels;
 }
-
-#if 0
-void Renderer::setupUVFeedbackBuffer()
-{
-	bool enable = uvfeedback_enabled_;
-	if (uv_texture_ == 0 && enable) {
-		CHECK_GL_ERROR(glGenTextures(1, &uv_texture_));
-		CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D, uv_texture_));
-		CHECK_GL_ERROR(glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, pbufferWidth, pbufferHeight, 0, GL_RG, GL_FLOAT, 0));
-		CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
-		CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
-		CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D, 0));
-	}
-	if (enable) {
-		CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, rgbdFramebuffer));
-		CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, renderTarget, 0));
-		CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, rgbTarget, 0));
-		CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, uv_texture_, 0));
-		CHECK_GL_ERROR(glDrawBuffers(3, rgbduvDrawBuffers));
-	} else {
-		CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, rgbdFramebuffer));
-		CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, renderTarget, 0));
-		CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, rgbTarget, 0));
-		CHECK_GL_ERROR(glDrawBuffers(2, rgbdDrawBuffers));
-	}
-}
-#endif
-
-
-#if 0
-void Renderer::enablePidBuffer()
-{
-	if (!pid_texture_) {
-		CHECK_GL_ERROR(glGenTextures(1, &pid_texture_));
-		CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D, pid_texture_));
-		CHECK_GL_ERROR(glTexImage2D(GL_TEXTURE_2D, 0, GL_R32I, pbufferWidth, pbufferHeight, 0, GL_RED_INTEGER, GL_INT, 0));
-		CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
-		CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
-		CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D, 0));
-	}
-	static const GLenum draw_buffers[] = {
-		GL_COLOR_ATTACHMENT0,
-		GL_COLOR_ATTACHMENT1,
-		GL_COLOR_ATTACHMENT2,
-		GL_COLOR_ATTACHMENT3,
-	};
-
-	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, rgbdFramebuffer));
-	CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, renderTarget, 0));
-	CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, rgbTarget, 0));
-	if (uv_texture_ > 0)
-		CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, uv_texture_, 0));
-	else
-		CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, 0, 0));
-	CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, pid_texture_, 0));
-	CHECK_GL_ERROR(glDrawBuffers(4, draw_buffers));
-
-	// Switch back to depth-only FB
-	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, framebufferID));
-}
-#endif
-
 
 Camera Renderer::setup_camera(uint32_t flags)
 {
