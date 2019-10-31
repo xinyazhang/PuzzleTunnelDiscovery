@@ -30,6 +30,7 @@ void worker(char* argv[])
 	osr::writePNG("osrsc_worker.png",
 		      renderer.pbufferWidth, renderer.pbufferHeight,
 		      renderer.mvrgb.data());
+	printf("MAIN THREAD WRITTEN osrsc_worker.png\n");
 #endif
 }
 
@@ -54,6 +55,17 @@ int main(int argc, char *argv[])
 	osr::writePNG("osrsc.png",
 		      renderer.pbufferWidth, renderer.pbufferHeight,
 		      renderer.mvrgb.data());
+	renderer.render_mvrgbd(osr::Renderer::NORMAL_RENDERING);
+	osr::writePNG("osrsc_1.png",
+		      renderer.pbufferWidth, renderer.pbufferHeight,
+		      renderer.mvrgb.data());
+	printf("MAIN THREAD WRITTEN osrsc_1.png\n");
+	osr::Renderer::RMMatrixXb normalmap;
+	normalmap = ((renderer.mvnormal.array() + 1.0f) * 255.0f).cast<uint8_t>().matrix();
+	printf("MAIN THREAD normalmap size %lu\n", normalmap.size());
+	osr::writePNG("osrsc_1n.png",
+		      renderer.pbufferWidth, renderer.pbufferHeight,
+		      normalmap.data());
 	printf("MAIN THREAD TESTING FINISHED\n");
 	std::thread t1(worker, argv);
 

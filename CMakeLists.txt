@@ -132,5 +132,6 @@ use_fcl(mapmerger)
 
 include(cmake/pybinds.cmake)
 include(cmake/symlinks.cmake)
+include(cmake/sanchecks.cmake)
 
 # vim: tw=0

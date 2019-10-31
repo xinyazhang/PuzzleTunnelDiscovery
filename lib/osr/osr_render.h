@@ -19,6 +19,10 @@ namespace osr {
 
 class SceneRenderer;
 class Camera;
+class RtTexture;
+class FrameBuffer;
+using RtTexturePtr = std::shared_ptr<RtTexture>;
+using FbPtr = std::shared_ptr<FrameBuffer>;
 
 /*
  * osr::Renderer
@@ -38,6 +42,8 @@ public:
 	static const uint32_t NO_ROBOT_RENDERING = (1 << 1);
 	static const uint32_t HAS_NTR_RENDERING = (1 << 2);
 	static const uint32_t UV_MAPPINNG_RENDERING = (1 << 3);
+	static const uint32_t NORMAL_RENDERING = (1 << 4);
+	static const uint32_t PID_RENDERING = (1 << 5);
 	/*
 	 * Define type for framebuffer attributes.
 	 */
@@ -65,6 +71,7 @@ public:
 	RMMatrixXf mvdepth;
 	RMMatrixXf mvuv;
 	RMMatrixXi mvpid;
+	RMMatrixXf mvnormal;
 
 	int pbufferWidth = 224;
 	int pbufferHeight = 224;
@@ -84,8 +91,10 @@ public:
 
 	Eigen::MatrixXf getPermutationToWorld(int view);
 
+#if 0
 	void setUVFeedback(bool);
 	bool getUVFeedback() const;
+#endif
 
 	static const uint32_t BARY_RENDERING_ROBOT = 0;
 	static const uint32_t BARY_RENDERING_SCENE = 1;
@@ -115,11 +124,11 @@ private:
 
 	GLuint shaderProgram = 0;
 	GLuint rgbdShaderProgram = 0;
-	GLuint framebufferID = 0;
-	GLuint depthbufferID = 0;
-	GLuint renderTarget = 0;
-	GLuint rgbdFramebuffer = 0;
-	GLuint rgbTarget = 0;
+	// GLuint depthbufferID = 0;
+	FbPtr depth_only_fb_; // GLuint framebufferID = 0;
+	FbPtr rgbd_fb_; // GLuint rgbdFramebuffer = 0;
+	RtTexturePtr depth_tex_; // GLuint renderTarget = 0;
+	RtTexturePtr rgb_tex_; // GLuint rgbTarget = 0;
 
 	std::shared_ptr<SceneRenderer> scene_renderer_;
 	std::shared_ptr<SceneRenderer> robot_renderer_;
@@ -130,12 +139,16 @@ private:
 
 	glm::mat4 camera_rot_;
 
-	GLuint uv_texture_ = 0;
+	RtTexturePtr uv_tex_; // GLuint uv_texture_;
+#if 0
 	bool uvfeedback_enabled_ = false;
 	void setupUVFeedbackBuffer();
+#endif
 
-	GLuint pid_texture_ = 0;
+	RtTexturePtr pid_tex_; // GLuint pid_texture_;
+#if 0
 	void enablePidBuffer();
+#endif
 
 	/*
 	 * Code to support barycentric rendering
@@ -159,9 +172,12 @@ private:
 	BaryRenderData brds_[2];
 	std::shared_ptr<Scene> getBaryTarget(uint32_t);
 
-	GLuint bary_texture_ = 0;
-	GLuint bary_fb_ = 0;
-	GLuint bary_dep_ = 0;
+	RtTexturePtr bary_tex_;
+	FbPtr bary_fb_;
+	// GLuint bary_texture_ = 0;
+	// GLuint bary_fb_ = 0;
+	// GLuint bary_dep_ = 0;
+
 	GLuint bary_vs_ = 0;
 	GLuint bary_gs_ = 0;
 	GLuint bary_fs_ = 0;
@@ -173,6 +189,8 @@ private:
 	GLuint bary_ibo_ = 0;
 
 	StateTrans final_scaling_;
+
+	RtTexturePtr normal_tex_;
 };
 
 }

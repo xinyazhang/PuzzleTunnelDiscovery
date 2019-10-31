@@ -275,6 +275,8 @@ PYBIND11_PLUGIN(pyosr) {
 		.def_readonly_static("NO_ROBOT_RENDERING", &Renderer::NO_ROBOT_RENDERING)
 		.def_readonly_static("HAS_NTR_RENDERING", &Renderer::HAS_NTR_RENDERING)
 		.def_readonly_static("UV_MAPPINNG_RENDERING", &Renderer::UV_MAPPINNG_RENDERING)
+		.def_readonly_static("NORMAL_RENDERING", &Renderer::NORMAL_RENDERING)
+		.def_readonly_static("PID_RENDERING", &Renderer::PID_RENDERING)
 		.def_readonly_static("BARY_RENDERING_ROBOT", &Renderer::BARY_RENDERING_ROBOT)
 		.def_readonly_static("BARY_RENDERING_SCENE", &Renderer::BARY_RENDERING_SCENE)
 		.def_readwrite("pbufferWidth", &Renderer::pbufferWidth)
@@ -289,7 +291,8 @@ PYBIND11_PLUGIN(pyosr) {
 		.def_readwrite("flat_surface", &Renderer::flat_surface)
 		.def_readwrite("light_position", &Renderer::light_position)
 		.def_property("final_scaling", &Renderer::getFinalScaling, &Renderer::setFinalScaling)
-		.def_property("uv_feedback", &Renderer::getUVFeedback, &Renderer::setUVFeedback);
+		// .def_property("uv_feedback", &Renderer::getUVFeedback, &Renderer::setUVFeedback)
+		;
 #endif // GPU_ENABLED
 	using osr::GTGenerator;
 	py::class_<GTGenerator>(m, "GTGenerator")

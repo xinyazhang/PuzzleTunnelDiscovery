@@ -1,5 +1,7 @@
 R"zzz(
 #version 430 core
+uniform mat4 view; // needed for normal output
+
 in vec3 fragColor;
 in float linearZ;
 in vec4 vert_normal;
@@ -9,6 +11,7 @@ layout(location=0) out float outDepth;
 layout(location=1) out vec4 outColor;
 layout(location=2) out vec2 outUV;
 layout(location=3) out int outPid;
+layout(location=4) out vec3 outNormal;
 const float far = 20.0;
 const float near = 1.0;
 layout(location=16) uniform bool phong;
@@ -38,6 +41,7 @@ void main() {
     outUV = uv;
     outDepth = linearZ;
     outPid = int(gl_PrimitiveID);
+    outNormal = normalize((view * vert_normal).xyz);
     // outPid = 1;
 }
 )zzz";

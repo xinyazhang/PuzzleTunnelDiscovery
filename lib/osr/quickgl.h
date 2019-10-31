@@ -3,6 +3,7 @@
 
 #if GPU_ENABLED
 
+#include <iostream>
 #ifndef QUICKGL_NOT_INCLUDE_GLEW
 #include <GL/glew.h>
 #endif

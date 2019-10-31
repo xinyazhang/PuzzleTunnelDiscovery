@@ -50,9 +50,8 @@ def _predict_atlas2prim(tup):
             pass
         if r is None:
             r = util.create_offscreen_renderer(puzzle_fn, ws.chart_resolution)
-            r.uv_feedback = True
             r.avi = False
-        r.render_mvrgbd(pyosr.Renderer.UV_MAPPINNG_RENDERING|flags)
+        r.render_mvrgbd(pyosr.Renderer.UV_MAPPINNG_RENDERING|pyosr.Renderer.PID_RENDERING|flags)
         atlas2prim = np.copy(r.mvpid.reshape((r.pbufferWidth, r.pbufferHeight)))
         #imsave(geo_type+'-a2p-nt.png', atlas2prim) # This is for debugging
         atlas2prim = texture_format.framebuffer_to_file(atlas2prim)

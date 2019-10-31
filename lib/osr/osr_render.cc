@@ -4,6 +4,7 @@
 #include "scene.h"
 #include "scene_renderer.h"
 #include "camera.h"
+#include "osr_rt_texture.h"
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtx/io.hpp>
 #include <fstream>
@@ -59,6 +60,12 @@ glm::mat4 translate_state_to_matrix(const StateVector& state)
 	// return rot;
 }
 
+template<typename T>
+void make_with_default(std::shared_ptr<T>& ptr)
+{
+	ptr = std::make_shared<T>();
+}
+
 }
 
 namespace osr {
@@ -66,6 +73,8 @@ const uint32_t Renderer::NO_SCENE_RENDERING;
 const uint32_t Renderer::NO_ROBOT_RENDERING;
 const uint32_t Renderer::HAS_NTR_RENDERING;
 const uint32_t Renderer::UV_MAPPINNG_RENDERING;
+const uint32_t Renderer::NORMAL_RENDERING;
+const uint32_t Renderer::PID_RENDERING;
 
 const uint32_t Renderer::BARY_RENDERING_ROBOT;
 const uint32_t Renderer::BARY_RENDERING_SCENE;
@@ -78,6 +87,7 @@ Renderer::Renderer()
 
 Renderer::~Renderer()
 {
+	teardown();
 }
 
 void Renderer::setup()
@@ -195,6 +205,7 @@ void Renderer::setupNonSharedObjects()
 	/*
 	 * Create depth FB
 	 */
+#if 0
 	CHECK_GL_ERROR(glGenFramebuffers(1, &framebufferID));
 	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, framebufferID));
 	CHECK_GL_ERROR(glGenTextures(1, &renderTarget));
@@ -202,16 +213,25 @@ void Renderer::setupNonSharedObjects()
 	CHECK_GL_ERROR(glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, pbufferWidth, pbufferHeight, 0, GL_RED, GL_FLOAT, 0));
 	CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
 	CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+
 	CHECK_GL_ERROR(glGenRenderbuffers(1, &depthbufferID));
 	CHECK_GL_ERROR(glBindRenderbuffer(GL_RENDERBUFFER, depthbufferID));
 	CHECK_GL_ERROR(glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, pbufferWidth, pbufferHeight));
 	CHECK_GL_ERROR(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthbufferID));
 	CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, renderTarget, 0));
 	CHECK_GL_ERROR(glDrawBuffers(1, drawBuffers));
+#else
+	make_with_default(depth_tex_);
+	depth_tex_->ensure(pbufferWidth, pbufferHeight, 1, RtTexture::FLOAT_TYPE);
+	make_with_default(depth_only_fb_);
+	depth_only_fb_->attachRt(0, depth_tex_);
+	depth_only_fb_->create(pbufferWidth, pbufferHeight);
+#endif
 
 	/*
 	 * Create RGBD FB
 	 */
+#if 0
 	CHECK_GL_ERROR(glGenFramebuffers(1, &rgbdFramebuffer));
 	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, rgbdFramebuffer));
 	CHECK_GL_ERROR(glGenTextures(1, &rgbTarget));
@@ -234,17 +254,41 @@ void Renderer::setupNonSharedObjects()
 	 * Switch back to depth-only FB
 	 */
 	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, framebufferID));
+#else
+	make_with_default(rgb_tex_);
+	rgb_tex_->ensure(pbufferWidth, pbufferHeight, 3, RtTexture::BYTE_TYPE);
+	make_with_default(rgbd_fb_);
+	rgbd_fb_->attachRt(1, rgb_tex_);
+	rgbd_fb_->attachRt(0, depth_tex_);
+	rgbd_fb_->create(pbufferWidth, pbufferHeight);
+	depth_only_fb_->activate();
+#endif
+
+	make_with_default(uv_tex_);
+	make_with_default(bary_tex_);
+	make_with_default(bary_fb_);
+	make_with_default(pid_tex_);
+	make_with_default(normal_tex_);
 }
 
 void Renderer::teardown()
 {
+#if 0
 	CHECK_GL_ERROR(glDeleteFramebuffers(1, &framebufferID));
 	CHECK_GL_ERROR(glDeleteRenderbuffers(1, &depthbufferID));
 	CHECK_GL_ERROR(glDeleteTextures(1, &renderTarget));
 	CHECK_GL_ERROR(glDeleteTextures(1, &rgbTarget));
 	CHECK_GL_ERROR(glDeleteTextures(1, &uv_texture_));
+#else
+	depth_only_fb_.reset();
+	rgbd_fb_.reset();
+	depth_tex_.reset();
+	rgb_tex_.reset();
+#endif
 	CHECK_GL_ERROR(glDeleteProgram(shaderProgram));
 	CHECK_GL_ERROR(glDeleteProgram(rgbdShaderProgram));
+	shaderProgram = 0;
+	rgbdShaderProgram = 0;
 
 	scene_.reset();
 	robot_.reset();
@@ -320,10 +364,13 @@ Renderer::RMMatrixXf Renderer::render_mvdepth_to_buffer()
 	RMMatrixXf mvpixels;
 	mvpixels.resize(views.rows(), pbufferWidth * pbufferHeight);
 
+	depth_only_fb_->activate();
 	for(int i = 0; i < views.rows(); i++) {
 		angleCamera(views(i, 0), views(i, 1));
 		render_depth();
-		CHECK_GL_ERROR(glReadBuffer(GL_COLOR_ATTACHMENT0));
+
+		depth_only_fb_->readShaderLocation(0);
+		// CHECK_GL_ERROR(glReadBuffer(GL_COLOR_ATTACHMENT0));
 		CHECK_GL_ERROR(glReadPixels(0, 0, pbufferWidth, pbufferHeight,
 					    GL_RED, GL_FLOAT, mvpixels.row(i).data()));
 	}
@@ -333,45 +380,69 @@ Renderer::RMMatrixXf Renderer::render_mvdepth_to_buffer()
 
 void Renderer::render_mvrgbd(uint32_t flags)
 {
-	int is_render_uv_mapping = !!(flags & UV_MAPPINNG_RENDERING);
+	bool is_rendering_pid = !!(flags & PID_RENDERING);
+	bool is_rendering_uv = !!(flags & UV_MAPPINNG_RENDERING);
+	bool is_rendering_normal = !!(flags & NORMAL_RENDERING);
 #if 0
-	std::cerr << "is_render_uv_mapping " << is_render_uv_mapping << std::endl;
+	std::cerr << "is_rendering_uv " << is_rendering_uv << std::endl;
 #endif
 
-	setupUVFeedbackBuffer();
-	if (is_render_uv_mapping) {
-		enablePidBuffer();
+	rgbd_fb_->attachRt(0, depth_tex_);
+	rgbd_fb_->attachRt(1, rgb_tex_);
+	if (is_rendering_uv) {
+		mvuv.resize(views.rows(), pbufferWidth * pbufferHeight * 2);
+		uv_tex_->ensure(pbufferWidth, pbufferHeight, 2, RtTexture::FLOAT_TYPE);
+		rgbd_fb_->attachRt(2, uv_tex_);
+	} else {
+		rgbd_fb_->detachRt(2);
+		mvuv.resize(0, 0);
 	}
+	if (is_rendering_pid) {
+		mvpid.resize(views.rows(), pbufferWidth * pbufferHeight);
+		pid_tex_->ensure(pbufferWidth, pbufferHeight, 1, RtTexture::INT32_TYPE);
+		rgbd_fb_->attachRt(3, pid_tex_);
+	}
+	if (is_rendering_normal) {
+		mvnormal.resize(views.rows(), pbufferWidth * pbufferHeight * 3);
+		normal_tex_->ensure(pbufferWidth, pbufferWidth, 3, RtTexture::FLOAT_TYPE);
+		rgbd_fb_->attachRt(4, normal_tex_);
+	}
+	rgbd_fb_->activate();
 
 	mvrgb.resize(views.rows(), pbufferWidth * pbufferHeight * 3);
 	mvdepth.resize(views.rows(), pbufferWidth * pbufferHeight);
-	if (uvfeedback_enabled_)
-		mvuv.resize(views.rows(), pbufferWidth * pbufferHeight * 2);
-	else
-		mvuv.resize(0, 0);
 
 	for(int i = 0; i < views.rows(); i++) {
 		angleCamera(views(i, 0), views(i, 1));
 		render_rgbd(flags);
-		CHECK_GL_ERROR(glReadBuffer(GL_COLOR_ATTACHMENT0));
+		rgbd_fb_->readShaderLocation(0);
+		// CHECK_GL_ERROR(glReadBuffer(GL_COLOR_ATTACHMENT0));
 		CHECK_GL_ERROR(glReadPixels(0, 0, pbufferWidth, pbufferHeight,
 					    GL_RED, GL_FLOAT, mvdepth.row(i).data()));
-		CHECK_GL_ERROR(glReadBuffer(GL_COLOR_ATTACHMENT1));
+		rgbd_fb_->readShaderLocation(1);
+		// CHECK_GL_ERROR(glReadBuffer(GL_COLOR_ATTACHMENT1));
 		CHECK_GL_ERROR(glReadPixels(0, 0, pbufferWidth, pbufferHeight,
 					    GL_RGB, GL_UNSIGNED_BYTE, mvrgb.row(i).data()));
-		if (uvfeedback_enabled_) {
-			CHECK_GL_ERROR(glReadBuffer(GL_COLOR_ATTACHMENT2));
+		if (is_rendering_uv) {
+			rgbd_fb_->readShaderLocation(2);
+			// CHECK_GL_ERROR(glReadBuffer(GL_COLOR_ATTACHMENT2));
 			CHECK_GL_ERROR(glReadPixels(0, 0, pbufferWidth, pbufferHeight,
 			                            GL_RG, GL_FLOAT, mvuv.row(i).data()));
 		}
-		if (is_render_uv_mapping) {
+		if (is_rendering_pid) {
 #if 1
-			CHECK_GL_ERROR(glReadBuffer(GL_COLOR_ATTACHMENT3));
+			rgbd_fb_->readShaderLocation(3);
+			// CHECK_GL_ERROR(glReadBuffer(GL_COLOR_ATTACHMENT3));
 			CHECK_GL_ERROR(glReadPixels(0, 0, pbufferWidth, pbufferHeight,
 			                            GL_RED_INTEGER, GL_INT, mvpid.row(i).data()));
 #else
 			CHECK_GL_ERROR(glGetTextureImage(uv_texture_, 0, GL_RED_INTEGER, GL_INT, mvpid.cols() * sizeof(int32_t), mvpid.row(i).data()));
 #endif
+		}
+		if (is_rendering_normal) {
+			rgbd_fb_->readShaderLocation(4);
+			CHECK_GL_ERROR(glReadPixels(0, 0, pbufferWidth, pbufferHeight,
+			                            GL_RGB, GL_FLOAT, mvnormal.row(i).data()));
 		}
 	}
 }
@@ -380,9 +451,14 @@ void Renderer::render_mvrgbd(uint32_t flags)
 void Renderer::render_depth()
 {
 	Camera camera = setup_camera(0);
+#if 0
 	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 	CHECK_GL_ERROR(glClearTexImage(renderTarget, 0, GL_RED, GL_FLOAT, &default_depth));
 	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, framebufferID));
+#endif
+	depth_only_fb_->deactivate();
+	depth_tex_->clear(&default_depth);
+	depth_only_fb_->activate();
 
 	CHECK_GL_ERROR(glEnable(GL_DEPTH_TEST));
 	CHECK_GL_ERROR(glDepthFunc(GL_LESS));
@@ -404,20 +480,16 @@ void Renderer::render_depth()
 
 void Renderer::render_rgbd(uint32_t flags)
 {
-	int is_render_uv_mapping = !!(flags & UV_MAPPINNG_RENDERING);
+	int is_rendering_uv = !!(flags & UV_MAPPINNG_RENDERING);
 #if 0
-	std::cerr << "is_render_uv_mapping " << is_render_uv_mapping << "\n";
+	std::cerr << "is_rendering_uv " << is_rendering_uv << "\n";
 #endif
 
 	glm::mat4 perturbation_mat = translate_state_to_matrix(perturbate_);
 	Camera camera = setup_camera(flags);
-	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 #if 0
-	static const uint8_t black[] = {0, 0, 255, 0};
-	static const float zeros[] = {0.0f, 0.0f, 0.0f, 0.0f};
-#else
+	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 	static const uint8_t black[] = {0, 0, 0, 0};
-#endif
 	CHECK_GL_ERROR(glClearTexImage(rgbTarget, 0, GL_RGB, GL_UNSIGNED_BYTE, &black));
 	CHECK_GL_ERROR(glClearTexImage(renderTarget, 0, GL_RED, GL_FLOAT, &default_depth));
 	if (uv_texture_) {
@@ -429,6 +501,18 @@ void Renderer::render_rgbd(uint32_t flags)
 		CHECK_GL_ERROR(glClearTexImage(pid_texture_, 0, GL_RED_INTEGER, GL_INT, invalid_pid));
 	}
 	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, rgbdFramebuffer));
+#else
+	rgbd_fb_->deactivate();
+	depth_tex_->clear();
+	rgb_tex_->clear();
+	pid_tex_->clear();
+	static const float invalid_uv[] = {-1.0f, -1.0f};
+	uv_tex_->clear(invalid_uv);
+	static const int invalid_pid[] = {-1};
+	pid_tex_->clear(invalid_pid);
+	normal_tex_->clear();
+	rgbd_fb_->activate();
+#endif
 #if 0
 	CHECK_GL_ERROR(glFlush());
 	return;
@@ -445,13 +529,13 @@ void Renderer::render_rgbd(uint32_t flags)
 
 	CHECK_GL_ERROR(glUseProgram(rgbdShaderProgram));
 	// AVI is disabled when rendering UV
-	CHECK_GL_ERROR(glUniform1i(16, is_render_uv_mapping ? 0 : avi));
+	CHECK_GL_ERROR(glUniform1i(16, is_rendering_uv ? 0 : avi));
 	CHECK_GL_ERROR(glUniform3fv(17, 1, light_position.data()));
 	CHECK_GL_ERROR(glUniform1i(18, 0));
-	CHECK_GL_ERROR(glUniform1i(19, is_render_uv_mapping));
+	CHECK_GL_ERROR(glUniform1i(19, is_rendering_uv));
 
 #if 0
-	if (is_render_uv_mapping) {
+	if (is_rendering_uv) {
 		glDisable(GL_CULL_FACE);
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	} else {
@@ -492,6 +576,7 @@ void Renderer::render_rgbd(uint32_t flags)
 }
 
 
+#if 0
 void Renderer::setUVFeedback(bool enable)
 {
 	uvfeedback_enabled_ = enable;
@@ -507,6 +592,7 @@ bool Renderer::getUVFeedback() const
 {
 	return uvfeedback_enabled_;
 }
+#endif
 
 std::shared_ptr<Scene>
 Renderer::getBaryTarget(uint32_t target)
@@ -582,6 +668,7 @@ Renderer::renderBarycentric(uint32_t target,
 {
 	auto target_scene = getBaryTarget(target);
 
+#if 0
 	/*
 	 * Initialization on demand
 	 */
@@ -593,9 +680,13 @@ Renderer::renderBarycentric(uint32_t target,
 		CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
 		CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
 	}
-	// Resize on demand
+	// Resize on demand <-- Wrong, tex cannot be resized
 	CHECK_GL_ERROR(glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, res(0), res(1), 0, GL_RED, GL_FLOAT, 0));
+#else
+	bary_tex_->ensure(res(0), res(1), 1, RtTexture::FLOAT_TYPE);
+#endif
 
+#if 0
 	// Framebuffer creation
 	if (!bary_fb_) {
 		CHECK_GL_ERROR(glGenFramebuffers(1, &bary_fb_));
@@ -611,11 +702,21 @@ Renderer::renderBarycentric(uint32_t target,
 		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 			throw std::runtime_error(std::string(__func__) + " Failed to create framebuffer object as render target");
 	}
+#else
+	bary_fb_->attachRt(0, bary_tex_);
+	bary_fb_->create(pbufferWidth, pbufferHeight);
+#endif
+
+#if 0
 	// Clear texture
 	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 	static const uint8_t black[] = {0, 0, 0, 0};
 	CHECK_GL_ERROR(glClearTexImage(bary_texture_, 0, GL_RED, GL_UNSIGNED_BYTE, &black));
 	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, bary_fb_));
+#else
+	bary_tex_->clear();
+	bary_fb_->activate();
+#endif
 
 	CHECK_GL_ERROR(glDisable(GL_DEPTH_TEST));
 	CHECK_GL_ERROR(glDisable(GL_CULL_FACE));
@@ -627,7 +728,6 @@ Renderer::renderBarycentric(uint32_t target,
 	CHECK_GL_ERROR(glClear(GL_DEPTH_BUFFER_BIT));
 
 	CHECK_GL_ERROR(glUseProgram(bary_shader_program_));
-
 #if 0
 	Camera cam;
 	glm::vec4 eye = glm::vec4(0.0f, 0.0f, -1.5, 1.0f);
@@ -777,6 +877,7 @@ Renderer::renderBarycentric(uint32_t target,
 	return pixels;
 }
 
+#if 0
 void Renderer::setupUVFeedbackBuffer()
 {
 	bool enable = uvfeedback_enabled_;
@@ -801,8 +902,10 @@ void Renderer::setupUVFeedbackBuffer()
 		CHECK_GL_ERROR(glDrawBuffers(2, rgbdDrawBuffers));
 	}
 }
+#endif
 
 
+#if 0
 void Renderer::enablePidBuffer()
 {
 	if (!pid_texture_) {
@@ -813,7 +916,6 @@ void Renderer::enablePidBuffer()
 		CHECK_GL_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
 		CHECK_GL_ERROR(glBindTexture(GL_TEXTURE_2D, 0));
 	}
-	mvpid.resize(views.rows(), pbufferWidth * pbufferHeight);
 	static const GLenum draw_buffers[] = {
 		GL_COLOR_ATTACHMENT0,
 		GL_COLOR_ATTACHMENT1,
@@ -834,6 +936,7 @@ void Renderer::enablePidBuffer()
 	// Switch back to depth-only FB
 	CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, framebufferID));
 }
+#endif
 
 
 Camera Renderer::setup_camera(uint32_t flags)

@@ -1,6 +1,6 @@
 SANCHECK(fatten)
 SANCHECK(ccd)
-use_ccd(ccd)
+use_ccd(sancheck_ccd)
 
 SANCHECK(ode)
 target_link_libraries(sancheck_ode ${ODE_LIBRARIES})
