@@ -120,13 +120,14 @@ def augment_image(rgbd, aug_dict, i, train_img, heat_map, random_patch_size):
         patch_tl = patch_finder_1(coldmap=rgbd[:,:,0], heatmap=rgbd[:,:,1], patch_size=random_patch_size)
         patch_size = random_patch_size
         aug_func = patch_rgb
-        gt_aug_func = focus
+        gt_aug_func = patch_rgb
     if patch_tl is None: # Cannot find a patch, cancel
         aug_func = None
+        gt_aug_func = None
     if aug_func is not None:
         train_img[i] = aug_func(train_img[i], patch_tl, patch_size)
     if gt_aug_func is not None:
-        heat_map = aug_func(heat_map, patch_tl, patch_size)
+        heat_map = gt_aug_func(heat_map, patch_tl, patch_size)
 
 def flip_images(i, train_img, j, uv_map):
     p = np.random.random()
