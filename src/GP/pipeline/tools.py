@@ -879,6 +879,28 @@ def dump_training_data(args):
             imsave(f'{args.out}/{index}-hm.png', gt[0])
         index += 1
 
+def debug(args):
+    import pygeokey
+    puzzle_fn = 'condor.uw/duet-g9/test/duet-g9/puzzle.cfg'
+    env_fn = 'condor.uw/duet-g9/test/duet-g9/duet.dt.tcp.obj'
+    rob_fn = 'condor.uw/duet-g9/test/duet-g9/knotted_ring.dt.tcp.obj'
+    nrot = 256
+    env_feat = matio.load('condor.uw/duet-g9/test/duet-g9/geometrik_notch_point_of_env-50.npz', key='NOTCH_POINT_AMBIENT')
+    rob_feat = matio.load('condor.uw/duet-g9/test/duet-g9/geometrik_geratio_point_of_rob-50.npz', key='KEY_POINT_AMBIENT')
+    # env_feat = matio.load('condor.uw/duet-g9/test/duet-g9/geometrik_geratio_point_of_env-50.npz', key='KEY_POINT_AMBIENT')
+    # rob_feat = matio.load('condor.uw/duet-g9/test/duet-g9/geometrik_notch_point_of_rob-50.npz', key='NOTCH_POINT_AMBIENT')
+    ks = pygeokey.KeySampler(env_fn, rob_fn)
+    keys, keyid_env, keyid_rob = ks.get_all_key_configs(env_feat, rob_feat, nrot)
+    util.log(f"keys {keys.shape} from {env_feat.shape} and {rob_feat.shape}")
+    if keys.shape[0] == 0:
+        util.log("No key configurations predicated, exiting")
+        return
+    uw = util.create_unit_world(puzzle_fn)
+    ukeys = uw.translate_ompl_to_unit(keys)
+    matio.savetxt('viskey.tmp.txt', ukeys)
+    cmd = ['./vispath', env_fn, rob_fn, 'viskey.tmp.txt', '0.5']
+    util.shell(cmd)
+
 function_dict = {
         'read_roots' : read_roots,
         'write_roots' : write_roots,
@@ -901,6 +923,7 @@ function_dict = {
         'condor_ppbreakdown' : condor_ppbreakdown,
         'blender' : blender_animate,
         'dump_training_data' : dump_training_data,
+        'debug' : debug,
 }
 
 def setup_parser(subparsers):
@@ -1027,6 +1050,8 @@ def setup_parser(subparsers):
     p.add_argument('--nn_profile', help='NN profile', default='256hg+normal')
     p.add_argument('dir', help='Workspace directory')
     p.add_argument('out', help='Output directory')
+
+    p = toolp.add_parser('debug', help='Temporary debugging code. Eveything should be hardcoded')
 
 def run(args):
     function_dict[args.tool_name](args)
