@@ -17,6 +17,7 @@ from . import condor
 from . import parse_ompl
 from . import atlas
 from . import partt
+from .file_locations import FEAT_PRED_SCHEMES, RAW_KEY_PRED_SCHEMES, KEY_PRED_SCHEMES, SCHEME_TO_FMT, SCHEME_FEAT_NPZ_KEY, FileLocations
 
 def read_roots(args):
     uw = util.create_unit_world(args.puzzle_fn)
@@ -193,13 +194,24 @@ def viskey(args):
         if args.puzzle_name and args.puzzle_name == 'train':
             yield ws.training_puzzle, 'train', ws.local_ws(util.KEY_FILE)
         else:
-            for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
-                if args.puzzle_name and args.puzzle_name != puzzle_name:
-                    continue
-                if args.unscreened:
-                    key_fn = ws.keyconf_prediction_file(puzzle_name)
+            for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+                if args.scheme is not None:
+                    """
+                    Autorun6 nameing protocol: with --scheme
+                    """
+                    fl = FileLocations(args, ws, puzzle_name, scheme=args.scheme)
+                    if args.unscreened:
+                        key_fn = fl.raw_key_fn
+                    else:
+                        key_fn = fl.screened_key_fn
                 else:
-                    key_fn = ws.screened_keyconf_prediction_file(puzzle_name)
+                    """
+                    Autorun4 nameing protocol: without --scheme
+                    """
+                    if args.unscreened:
+                        key_fn = ws.keyconf_prediction_file(puzzle_name)
+                    else:
+                        key_fn = ws.screened_keyconf_prediction_file(puzzle_name)
                 if not isfile(key_fn):
                     util.log("[viskey] Could not find {}".format(key_fn))
                     continue
@@ -249,12 +261,21 @@ def viskey(args):
             cmd.append('viskey.karma.txt')
         util.shell(cmd)
 
-def visimp(args):
+def visfeat(args):
     ws = util.Workspace(args.dir)
     ws.current_trial = args.current_trial
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
         cfg, _ = parse_ompl.parse_simple(puzzle_fn)
         uw = util.create_unit_world(puzzle_fn)
+        if args.scheme is not None: # New code path, enabled by --scheme
+            fl = FileLocations(args, ws, puzzle_name, scheme=args.scheme)
+            for geo_type, geo_flag in zip(['rob', 'env'], [uw.GEO_ROB, uw.GEO_ENV]):
+                pts = matio.load(fl.get_feat_pts_fn(geo_type=geo_type), key=fl.feat_npz_key)
+                unit_imp_1 = uw.translate_vanilla_pts_to_unit(geo_flag, pts[:, 0:3])
+                unit_imp_2 = uw.translate_vanilla_pts_to_unit(geo_flag, pts[:, 3:6])
+                matio.savetxt('visfeat.tmp.txt', np.concatenate((unit_imp_1, unit_imp_2), axis=0))
+                util.shell(['./vispath', cfg.env_fn, cfg.rob_fn, 'visfeat.tmp.txt', '0.5'])
+            continue
         for geo_type, geo_flag in zip(['rob', 'env'], [uw.GEO_ROB, uw.GEO_ENV]):
             kps_fn = ws.keypoint_prediction_file(puzzle_name, geo_type)
             d = matio.load(kps_fn)
@@ -266,10 +287,10 @@ def visimp(args):
                     continue
                 unit_imp_1 = uw.translate_vanilla_pts_to_unit(geo_flag, pts[:, 0:3])
                 unit_imp_2 = uw.translate_vanilla_pts_to_unit(geo_flag, pts[:, 3:6])
-                matio.savetxt('visimp.tmp.txt', np.concatenate((unit_imp_1, unit_imp_2), axis=0))
-                util.shell(['./vispath', cfg.env_fn, cfg.rob_fn, 'visimp.tmp.txt', '0.5'])
+                matio.savetxt('visfeat.tmp.txt', np.concatenate((unit_imp_1, unit_imp_2), axis=0))
+                util.shell(['./vispath', cfg.env_fn, cfg.rob_fn, 'visfeat.tmp.txt', '0.5'])
 
-def _old_visimp(args):
+def _old_visfeat(args):
     import pygeokey
     class WorkerArgs(object):
         pass
@@ -295,13 +316,13 @@ def _old_visimp(args):
         uw = util.create_unit_world(wag.puzzle_fn)
         unit_imp_1 = uw.translate_vanilla_pts_to_unit(uw.GEO_ROB, pts[:, 0:3])
         unit_imp_2 = uw.translate_vanilla_pts_to_unit(uw.GEO_ROB, pts[:, 3:6])
-        matio.savetxt('visimp.tmp.txt', np.concatenate((unit_imp_1, unit_imp_2), axis=0))
-        matio.savetxt('visimp.vanilla.txt', np.concatenate((pts[:, 0:3], pts[:,3:6]), axis=0))
-        util.shell(['./vispath', cfg.env_fn, cfg.rob_fn, 'visimp.tmp.txt', '0.5'])
+        matio.savetxt('visfeat.tmp.txt', np.concatenate((unit_imp_1, unit_imp_2), axis=0))
+        matio.savetxt('visfeat.vanilla.txt', np.concatenate((pts[:, 0:3], pts[:,3:6]), axis=0))
+        util.shell(['./vispath', cfg.env_fn, cfg.rob_fn, 'visfeat.tmp.txt', '0.5'])
 
 
 def visnotch(args):
-    # FIXME: this function is mostly copied from visimp
+    # FIXME: this function is mostly copied from visfeat
     import pygeokey
     class WorkerArgs(object):
         pass
@@ -328,9 +349,9 @@ def visnotch(args):
         util.log("Found {} key points".format(pts.shape[0]))
         unit_imp_1 = uw.translate_vanilla_pts_to_unit(uw.GEO_ROB, pts[:, 0:3])
         unit_imp_2 = uw.translate_vanilla_pts_to_unit(uw.GEO_ROB, pts[:, 3:6])
-        matio.savetxt('visimp.tmp.txt', np.concatenate((unit_imp_1, unit_imp_2), axis=0))
-        matio.savetxt('visimp.vanilla.txt', np.concatenate((pts[:, 0:3], pts[:,3:6]), axis=0))
-        util.shell(['./vispath', cfg.env_fn, cfg.rob_fn, 'visimp.tmp.txt', '0.5'])
+        matio.savetxt('visfeat.tmp.txt', np.concatenate((unit_imp_1, unit_imp_2), axis=0))
+        matio.savetxt('visfeat.vanilla.txt', np.concatenate((pts[:, 0:3], pts[:,3:6]), axis=0))
+        util.shell(['./vispath', cfg.env_fn, cfg.rob_fn, 'visfeat.tmp.txt', '0.5'])
 
 
 def vistouchv(args):
@@ -869,7 +890,7 @@ function_dict = {
         'visnnpred' : visnnpred,
         'visnnsample' : visnnsample,
         'viskey' : viskey,
-        'visimp' : visimp,
+        'visfeat' : visfeat,
         'visnotch' : visnotch,
         'vistouchv' : vistouchv,
         'vistouchdisp' : vistouchdisp,
@@ -935,16 +956,18 @@ def setup_parser(subparsers):
     p.add_argument('dir', help='Workspace directory')
 
     p = toolp.add_parser('viskey', help='Use vispath to visualize the key configuration')
+    p.add_argument('--scheme', help='Select which set of key points to visualize', default=None, choices=KEY_PRED_SCHEMES)
     p.add_argument('--current_trial', help='Trial to predict the keyconf', type=int, default=None)
     p.add_argument('--range', help='Range of key confs, e.g. 1,2,3,4-7,11', default='')
     p.add_argument('--puzzle_name', help='Only show one specific puzzle', default='')
     p.add_argument('--unscreened', help='Show the unscreened key configurations', action='store_true')
     p.add_argument('dir', help='Workspace directory')
 
-    p = toolp.add_parser('visimp', help='Use vispath to visualize the key configuration')
+    p = toolp.add_parser('visfeat', help='Use vispath to visualize the key configuration')
     p.add_argument('--current_trial', help='Trial to predict the keyconf', type=int, default=None)
     p.add_argument('--range', help='Range of key confs, e.g. 1,2,3,4-7,11', default='')
     p.add_argument('--puzzle_name', help='Only show one specific puzzle', default='')
+    p.add_argument('--scheme', help='Select which set of key points to visualize', default=None, choices=FEAT_PRED_SCHEMES)
     p.add_argument('dir', help='Workspace directory')
 
     p = toolp.add_parser('visnotch', help='Visualize Notch from geometric hueristics')

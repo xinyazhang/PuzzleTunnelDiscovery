@@ -6,6 +6,7 @@ from . import util
 import os
 from os.path import join, isdir, isfile
 
+FEAT_PRED_SCHEMES = ['ge', 'nt' ]
 RAW_KEY_PRED_SCHEMES = ['ge', 'nt', 'nn']
 KEY_PRED_SCHEMES = RAW_KEY_PRED_SCHEMES + ['cmb']
 SCHEME_TO_FMT = {
@@ -14,6 +15,16 @@ SCHEME_TO_FMT = {
         'nn' : util.NEURAL_KEY_FMT,
         'cmb' : util.COMBINED_KEY_FMT
         }
+
+SCHEME_FEAT_FMT = {
+        'ge' : util.GERATIO_POINT_FMT,
+        'nt' : util.NOTCH_POINT_FMT,
+        }
+
+SCHEME_FEAT_NPZ_KEY = {
+        'ge' : 'KEY_POINT_AMBIENT',
+        'nt' : 'NOTCH_POINT_AMBIENT',
+}
 
 class FileLocations(object):
     def __init__(self, args, ws, puzzle_name, scheme=None):
@@ -65,6 +76,15 @@ class FileLocations(object):
     def downsampled_key_fn(self):
         return self._ws.keyconf_file_from_fmt(self._puzzle_name,
                                               util.NEURAL_KEY_FMT)
+    def get_feat_pts_fn(self, geo_type):
+        fmt = SCHEME_FEAT_FMT[self.scheme]
+        return self._ws.local_ws(util.TESTING_DIR,
+                                 self._puzzle_name,
+                                 fmt.format(geo_type=geo_type, trial=self.trial))
+    @property
+    def feat_npz_key(self):
+        return SCHEME_FEAT_NPZ_KEY[self.scheme]
+
     @property
     def raw_key_fn_gen(self):
         def gen():
