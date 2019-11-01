@@ -261,7 +261,7 @@ void Renderer::loadRobotFromFile(const std::string& fn)
 {
 	UnitWorld::loadRobotFromFile(fn);
 	robot_renderer_.reset(new SceneRenderer(robot_));
-	robot_renderer_->probe_texture(fn);
+	// robot_renderer_->probe_texture(fn);
 }
 
 void Renderer::loadRobotTextureImage(std::string tex_fn)

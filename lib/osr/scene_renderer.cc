@@ -73,6 +73,10 @@ void SceneRenderer::load_texture(const std::string& tex_fn)
 		iformat = GL_RGB8;
 		dformat = GL_RGB;
 	}
+	if (tex_) {
+		CHECK_GL_ERROR(glDeleteTextures(1, &tex_));
+		tex_ = 0;
+	}
 	if (!tex_) {
 		CHECK_GL_ERROR(glGenTextures(1, &tex_));
 	}
