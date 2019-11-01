@@ -145,14 +145,14 @@ void FrameBuffer::activate()
 			max_loc = std::max(kv.first, max_loc);
 		}
 		draws_.resize(max_loc + 1, GL_NONE);
-		std::cerr << "max_loc: " << max_loc << std::endl;
+		// std::cerr << "max_loc: " << max_loc << std::endl;
 		int attid = 0;
 		for (const auto& kv : rt_locactions_) {
 			auto att_enum = GL_COLOR_ATTACHMENT0 + attid;
 			GLuint tex_id = 0;
 			if (kv.second) { // RtTexturePtr may be reset
 				tex_id = kv.second->getTex();
-			std::cerr << "draws_[" << kv.first << "] = " << attid << std::endl;
+				// std::cerr << "draws_[" << kv.first << "] = " << attid << std::endl;
 				draws_[kv.first] = att_enum;
 			}
 			CHECK_GL_ERROR(glFramebufferTexture(GL_FRAMEBUFFER, att_enum, tex_id, 0));
