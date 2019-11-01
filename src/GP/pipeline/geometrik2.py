@@ -90,7 +90,7 @@ def predict_notch_key_worker(ws, wag_pair):
     ks = pygeokey.KeySampler(wag1.geo_fn, wag2.geo_fn)
     nrot = ws.config.getint('GeometriK', 'KeyConfigRotations')
     kqs1, keyid_ge1, keyid_nt2 = ks.get_all_key_configs(ge1, nt2, nrot)
-    kqs2, keyid_ge2, keyid_nt1 = ks.get_all_key_configs(ge2, nt1, nrot)
+    kqs2, keyid_nt1, keyid_ge2 = ks.get_all_key_configs(nt1, ge2, nrot)
     kqs = util.safe_concatente([kqs1, kqs2], axis=0)
     if kqs.shape[0] > 0:
         uw = util.create_unit_world(wag1.puzzle_fn)
