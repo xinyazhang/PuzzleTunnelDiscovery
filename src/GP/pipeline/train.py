@@ -63,17 +63,18 @@ def _train(args, ws, geo_type):
         params = hg_launcher.create_config_from_profile(ws.nn_profile)
     else:
         params = hg_launcher.create_default_config()
-    params['ompl_config'] = ws.training_puzzle
-    if isdir(ws.local_ws(util.EXTRA_TRAINING_DIR)):
-        all_omplcfgs = []
-        for puzzle_fn, puzzle_name in ws.training_puzzle_generator():
-            all_omplcfgs.append(puzzle_fn)
-        params['all_ompl_configs'] = all_omplcfgs
-        params['nepochs'] = 50 + 50 * len(all_omplcfgs)
+
+    all_omplcfgs = []
+    for puzzle_fn, puzzle_name in ws.training_puzzle_generator():
+        all_omplcfgs.append(puzzle_fn)
+    params['all_ompl_configs'] = all_omplcfgs
+    params['nepochs'] = 50 + 50 * len(all_omplcfgs)
+
     params['what_to_render'] = geo_type
     params['checkpoint_dir'] = ws.checkpoint_dir(geo_type) + '/'
     params['suppress_hot'] = 0.0
     params['suppress_cold'] = 0.7
+    params['dataset_name'] = f'{ws.dir}.{geo_type}'
     global_gpu_lock(ws)
     ws.timekeeper_start('train_{}'.format(geo_type))
 
@@ -132,7 +133,7 @@ def _predict_surface(args, ws, geo_type, generator):
             continue
         global_gpu_lock(ws)
         ws.timekeeper_start('predict_{}'.format(geo_type), puzzle_name)
-        params['ompl_config'] = puzzle_fn
+        params['all_ompl_configs'] = [puzzle_fn]
         params['what_to_render'] = geo_type
         params['checkpoint_dir'] = rews.checkpoint_dir(geo_type) + '/'
         if rews_dir:

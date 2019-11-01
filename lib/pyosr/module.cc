@@ -286,6 +286,7 @@ PYBIND11_PLUGIN(pyosr) {
 		.def_readwrite("mvdepth", &Renderer::mvdepth)
 		.def_readwrite("mvuv", &Renderer::mvuv)
 		.def_readwrite("mvpid", &Renderer::mvpid)
+		.def_readwrite("mvnormal", &Renderer::mvnormal)
 		.def_readwrite("views", &Renderer::views)
 		.def_readwrite("avi", &Renderer::avi)
 		.def_readwrite("flat_surface", &Renderer::flat_surface)

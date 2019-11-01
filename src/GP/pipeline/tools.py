@@ -9,6 +9,7 @@ import pathlib
 import csv
 import numpy as np
 import argparse
+from imageio import imwrite as imsave
 
 from . import util
 from . import matio
@@ -816,6 +817,47 @@ def blender_animate(args):
             print(f'OMPL interpolate: {van3}')
         util.shell(['blender', '-P', 'SolVis.py', '--', cfg.env_fn, cfg.rob_fn, vanilla_path, args.outdir, '--O'] + ocstr)
 
+def dump_training_data(args):
+    ws = util.Workspace(args.dir)
+    from . import hg_launcher
+    params = hg_launcher.create_config_from_profile(args.nn_profile)
+    all_omplcfgs = []
+    #for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+    for puzzle_fn, puzzle_name in ws.training_puzzle_generator():
+        all_omplcfgs.append(puzzle_fn)
+        break
+    params['all_ompl_configs'] = all_omplcfgs
+    params['what_to_render'] = args.geo_type
+    params['checkpoint_dir'] = ws.checkpoint_dir(args.geo_type) + '/'
+    # params['enable_augmentation'] = False
+    """
+    params['suppress_hot'] = 0.0
+    params['suppress_cold'] = 0.0
+    params['red_noise'] = 0.9
+    """
+    params['suppress_hot'] = 0.25
+    params['suppress_cold'] = 0.25
+    params['red_noise'] = 0.25
+    params['dataset_name'] = f'{ws.dir}.{args.geo_type}'
+    from . import hg_datagen
+    dataset = hg_datagen.create_dataset_from_params(params)
+    gen = dataset._aux_generator(batch_size=16, stacks=2, normalize=True, sample_set='train')
+    img_train, gt_train, _ = next(gen)
+    index = 0
+    for img, gt in zip(img_train, gt_train):
+        if dataset.gen_surface_normal:
+            rgb = np.zeros((img.shape[0], img.shape[1], 3), dtype=img.dtype)
+            rgb[:, :, 0] = img[:,:,0]
+            imsave(f'{args.out}/{index}-rgb.png', rgb)
+            imsave(f'{args.out}/{index}-normal.png', img[:,:,1:4])
+            imsave(f'{args.out}/{index}-dep.png', img[:,:,4])
+            imsave(f'{args.out}/{index}-hm.png', gt[0])
+        else:
+            imsave(f'{args.out}/{index}-rgb.png', img[:,:,0:3])
+            imsave(f'{args.out}/{index}-dep.png', img[:,:,3])
+            imsave(f'{args.out}/{index}-hm.png', gt[0])
+        index += 1
+
 function_dict = {
         'read_roots' : read_roots,
         'write_roots' : write_roots,
@@ -837,6 +879,7 @@ function_dict = {
         'condor_breakdown' : condor_breakdown,
         'condor_ppbreakdown' : condor_ppbreakdown,
         'blender' : blender_animate,
+        'dump_training_data' : dump_training_data,
 }
 
 def setup_parser(subparsers):
@@ -954,6 +997,13 @@ def setup_parser(subparsers):
     p.add_argument('--puzzle_name', help='Puzzle selection. Will exit after displaying all puzzle names if not present', default='')
     p.add_argument('dir', help='Workspace directory')
     p.add_argument('outdir', help='Output directory')
+
+    p = toolp.add_parser('dump_training_data', help='Dump the training data to output file')
+    p.add_argument('--puzzle_name', help='Training Puzzle selection. The name of the default puzzle is "train".', default='')
+    p.add_argument('--geo_type', help='Type of the geometry (env/rob)', default='rob')
+    p.add_argument('--nn_profile', help='NN profile', default='256hg+normal')
+    p.add_argument('dir', help='Workspace directory')
+    p.add_argument('out', help='Output directory')
 
 def run(args):
     function_dict[args.tool_name](args)

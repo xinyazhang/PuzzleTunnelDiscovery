@@ -9,12 +9,6 @@ import six.moves.configparser as configparser
 import sys
 
 from . import util
-try:
-    from . import hourglass_tiny
-    HourglassModel = hourglass_tiny.HourglassModel
-except ImportError as e:
-    util.warn(str(e))
-    raise e
 from . import hg_datagen as datagen
 
 _CONFIG_TEMPLATE= \
@@ -50,6 +44,7 @@ mcam: False
 
 # New segment that describes the image augmentation
 [Augmentation]
+enable_augmentation: True
 suppress_hot: 0.1
 red_noise: 0.1
 suppress_cold: 0.1
@@ -106,46 +101,39 @@ def create_config_from_profile(name):
     elif name == '256hg':
         ret['nlow'] = 6
         ret['batch_size'] = 4
+    elif name == '256hg+normal':
+        ret['nlow'] = 6
+        ret['batch_size'] = 4
+        ret['training_data_include_surface_normal'] = 1
+    elif name == '256hg+normal-aug':
+        ret['nlow'] = 6
+        ret['batch_size'] = 4
+        ret['training_data_include_surface_normal'] = 1
+        ret['enable_augmentation'] = False
     else:
-        raise NotImplemented("Unknown profile {}".format(name))
+        print(f"Unknown profile {name}")
+        raise NotImplementedError()
     util.log("[create_config_from_profile] {}".format(ret))
     return ret
 
-def _craft_dict(params):
-    dic = {}
-    for k in ['suppress_hot', 'red_noise', 'suppress_cold']:
-        if k in params:
-            dic[k] = float(params[k])
-        else:
-            dic[k] = 0.0
-    return dic
-
 def launch_with_params(params, do_training, load=False):
     print('--Creating Dataset')
-    assert 'ompl_config' in params
-    ompl_cfg = params['ompl_config']
-    geo_type = params['what_to_render']
-    assert isabs(ompl_cfg)
     # According to workspace hierarchy, the foloder name is the actual puzzle name
     # Note: all traing data are named after 'train'
-    ds_name = basename(dirname(ompl_cfg)) if 'dataset_name' not in params else params['dataset_name']
-    aug_dict = _craft_dict(params)
-    if 'all_ompl_configs' in params:
-        dataset = datagen.create_multidataset(params['all_ompl_configs'],
-                                              geo_type=geo_type,
-                                              aug_patch=True,
-                                              aug_scaling=0.5,
-                                              aug_dict=aug_dict)
-    else:
-        dataset = datagen.create_dataset(ompl_cfg, geo_type=geo_type,
-                                         aug_patch=True,
-                                         aug_scaling=0.5,
-                                         aug_dict=aug_dict)
+    assert 'dataset_name' in params
+    ds_name = params['dataset_name']
+    dataset = datagen.create_dataset_from_params(params)
 
     params['num_joints'] = dataset.d_dim
     assert params['weighted_loss'] is False, "No support for weighted loss for now"
 
     util.log("[hg_launcher] create module with params {}".format(params))
+    try:
+        from . import hourglass_tiny
+        HourglassModel = hourglass_tiny.HourglassModel
+    except ImportError as e:
+        util.warn(str(e))
+        raise e
     model = HourglassModel(nFeat=params['nfeats'],
                            nStack=params['nstacks'],
                            nModules=params['nmodules'],

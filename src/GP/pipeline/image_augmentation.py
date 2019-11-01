@@ -87,3 +87,57 @@ def focus(img, tl, size):
     img = np.zeros(shape=img.shape, dtype=img.dtype)
     img[tl[0]:maxs[0], tl[1]:maxs[1], :] = old[tl[0]:maxs[0], tl[1]:maxs[1], :]
     return img
+
+def augment_image(rgbd, aug_dict, i, train_img, heat_map, random_patch_size):
+    '''
+    Randomly patch non-NTR retion
+    '''
+
+    aug_suppress_hot = aug_dict['suppress_hot'] if 'suppress_hot' in aug_dict else 0.0
+    aug_red_noise = aug_dict['red_noise'] if 'red_noise' in aug_dict else 0.0
+    aug_suppress_cold = aug_dict['suppress_cold'] if 'suppress_cold' in aug_dict else 0.0
+
+    rnd = np.random.random()
+    aug_func = None
+    gt_aug_func = None
+    # print("rnd {}".format(rnd))
+    if rnd < aug_suppress_hot:
+        # Remove the hot region
+        # print("aug_suppress_hot")
+        patch_tl, patch_size = patch_finder_hot(heatmap=rgbd[:,:,1], margin_pix=16)
+        aug_func = patch_rgb
+        gt_aug_func = patch_rgb
+    elif rnd < aug_suppress_hot + aug_red_noise:
+        patch_tl, patch_size = patch_finder_hot(heatmap=rgbd[:,:,1], margin_pix=64)
+        # print("aug_red_noise {} {}".format(patch_tl, patch_size))
+        aug_func = red_noise
+        gt_aug_func = None
+    elif rnd < aug_suppress_hot + aug_red_noise + aug_suppress_cold:
+        patch_tl, patch_size = patch_finder_hot(heatmap=rgbd[:,:,1], margin_pix=64)
+        aug_func = focus
+        gt_aug_func = focus
+    else:
+        patch_tl = patch_finder_1(coldmap=rgbd[:,:,0], heatmap=rgbd[:,:,1], patch_size=random_patch_size)
+        patch_size = random_patch_size
+        aug_func = patch_rgb
+        gt_aug_func = focus
+    if patch_tl is None: # Cannot find a patch, cancel
+        aug_func = None
+    if aug_func is not None:
+        train_img[i] = aug_func(train_img[i], patch_tl, patch_size)
+    if gt_aug_func is not None:
+        heat_map = aug_func(heat_map, patch_tl, patch_size)
+
+def flip_images(i, train_img, j, uv_map):
+    p = np.random.random()
+    # p = 0.1
+    # Flipping
+    if p < 0.25:
+        uv_map[j] = uv_map[j, :, ::-1, :]
+        train_img[i] = train_img[i, :, ::-1, :]
+    elif 0.25 <= p < 0.5:
+        uv_map[j] = uv_map[j, ::-1, :, :]
+        train_img[i] = train_img[i, ::-1, :, :]
+    elif 0.5 <= p < 0.75:
+        uv_map[j] = uv_map[j, ::-1, ::-1, :]
+        train_img[i] = train_img[i, ::-1, ::-1, :]
