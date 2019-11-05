@@ -17,8 +17,10 @@ def run_pipeline(ppl_stages, args):
     pdesc = ppl_stages
     cont = None
     till = None
+    pdesc_dic = {}
     for index,(k,v) in enumerate(pdesc):
-        util.log(f'[{args.command}] checking {k}')
+        # util.log(f'[{args.command}] checking {k}')
+        pdesc_dic[k] = v
         if k == args.stage:
             if cont is not None:
                 raise RuntimeError("Duplicated key name {} in the pipeline".format(k))
@@ -33,7 +35,11 @@ def run_pipeline(ppl_stages, args):
     if args.condor_host:
         ws.override_condor_host(args.condor_host)
     nstage = []
-    if args.till:
+    if args.stage_list:
+        stage_list = []
+        for sname in args.stage_list:
+            stage_list.append((sname, pdesc_dic[sname]))
+    elif args.till:
         stage_list = pdesc[cont:till]
         if till is not None:
             nstage = pdesc[till:][0:1] # still works if till is out of range/None, or pdesc[till:] is empty
@@ -78,6 +84,11 @@ def setup_autorun_parser(subparsers, name, pdesc, helptext='Run all pipelines au
     p.add_argument('--till', help='Continue to run until the given stage',
                    choices=stage_names,
                    default=None,
+                   metavar='')
+    p.add_argument('--stage_list', help='Only run these stages in the given order. Overrides --stage and --till',
+                   choices=stage_names,
+                   default=None,
+                   nargs='*',
                    metavar='')
     p.add_argument('--current_trial', help='Trial to solve the puzzle', type=str, default=None)
     p.add_argument('--nn_profile', help='NN profile', default='')
