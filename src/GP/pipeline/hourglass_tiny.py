@@ -274,6 +274,7 @@ class HourglassModel():
                 epochstartTime = time.time()
                 avg_cost = 0.
                 cost = 0.
+                c = 0
                 print('Epoch :' + str(epoch) + '/' + str(nEpochs) + '\n')
                 # Training Set
                 for i in range(epochSize):
@@ -283,8 +284,11 @@ class HourglassModel():
                     num = np.int(20*percent/100)
                     tToEpoch = int((time.time() - epochstartTime) * (100 - percent)/(percent))
                     sys.stdout.write('\r Train: {0}>'.format("="*num) + "{0}>".format(" "*(20-num)) + '||' + str(percent)[:4] + '%' + ' -cost: ' + str(cost)[:6] + ' -avg_loss: ' + str(avg_cost)[:5] + ' -timeToEnd: ' + str(tToEpoch) + ' sec.')
+                    pgbar = "=" * num + '>' + " " * (20 - num) + '>'
+                    sys.stdout.write(f'\r Train: {pgbar}||{str(percent)[:4]}% -cost: {str(cost)[:6]} -avg_loss: {str(avg_cost)[:5]} -last_loss {str(c)[:5]} -timeToEnd: {tToEpoch} sec.')
                     sys.stdout.flush()
                     img_train, gt_train, weight_train = next(self.generator)
+                    assert gt_train.any() >= 0
                     if saveStep >= 0 and i % saveStep == 0:
                         if self.w_loss:
                             _, c, summary = self.Session.run([self.train_optimize, self.loss, self.train_op], feed_dict = {self.img : img_train, self.gtMaps: gt_train, self.weights: weight_train})
@@ -299,7 +303,7 @@ class HourglassModel():
                         else:
                             _, c, = self.Session.run([self.train_optimize, self.loss], feed_dict = {self.img : img_train, self.gtMaps: gt_train})
                     cost += c
-                    avg_cost += c/epochSize
+                    avg_cost = cost/(i+1)
                 epochfinishTime = time.time()
                 #Save Weight (axis = epoch)
                 if self.w_loss:
