@@ -68,7 +68,7 @@ def _train(args, ws, geo_type):
     for puzzle_fn, puzzle_name in ws.training_puzzle_generator():
         all_omplcfgs.append(puzzle_fn)
     params['all_ompl_configs'] = all_omplcfgs
-    params['nepochs'] = 50 + 50 * len(all_omplcfgs)
+    params['nepochs'] = 25 + 50 * len(all_omplcfgs)
 
     params['what_to_render'] = geo_type
     params['checkpoint_dir'] = ws.checkpoint_dir(geo_type) + '/'
@@ -117,7 +117,7 @@ def wait_for_training(args, ws):
         write_pidfile(pidfile, -1)
 
 def _predict_surface(args, ws, geo_type, generator):
-    rews_dir = ws.config.get('Prediction', 'ReuseWorkspace')
+    rews_dir = ws.config.get('Prediction', 'ReuseWorkspace', fallback='')
     if rews_dir:
         rews_dir = join(ws.dir, rews_dir) # Relative path
         rews = util.Workspace(rews_dir)

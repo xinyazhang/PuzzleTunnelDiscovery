@@ -176,6 +176,7 @@ class HourglassModel():
                 if self.w_loss:
                     self.loss = tf.reduce_mean(self.weighted_bce_loss(), name='reduced_loss')
                 else:
+                    print(f'--Loss b/w: {self.output.shape} and {self.gtMaps.shape}')
                     self.loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=self.output, labels= self.gtMaps), name= 'cross_entropy_loss')
             lossTime = time.time()
             print('---Loss : Done (' + str(int(abs(graphTime-lossTime))) + ' sec.)')
@@ -368,6 +369,7 @@ class HourglassModel():
                         if PROFILING2:
                             continue
                         [test_y] = self.Session.run([pred], feed_dict = {self.img : img_test})
+                        # np.savez(f'debug-test/{i}', img_test=img_test, batch_uv=batch_uv, test_y=test_y)
                         if PROFILING:
                             continue # Profiling, check the % of time used by prediction
                         for uvi,labeli in zip(batch_uv, test_y):
