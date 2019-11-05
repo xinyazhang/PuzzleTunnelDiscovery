@@ -246,6 +246,24 @@ class HourglassModel():
         """
         with tf.name_scope('Train'):
             self.generator = self.dataset._aux_generator(self.batchSize, self.nStack, normalize = True, sample_set = 'train')
+            if True:
+                debug_generator = self.dataset._aux_generator(64, self.nStack, normalize = True, sample_set = 'train')
+                img_train, gt_train, weight_train = next(debug_generator)
+                out_dir = 'debug-test'
+                index = 0
+                for img, gt in zip(img_train, gt_train):
+                    if self.dataset.gen_surface_normal:
+                        rgb = np.zeros((img.shape[0], img.shape[1], 3), dtype=img.dtype)
+                        rgb[:, :, 0] = img[:,:,0]
+                        imsave(f'{out_dir}/{index}-rgb.png', rgb)
+                        imsave(f'{out_dir}/{index}-normal.png', img[:,:,1:4])
+                        imsave(f'{out_dir}/{index}-dep.png', img[:,:,4])
+                        imsave(f'{out_dir}/{index}-hm.png', gt[0])
+                    else:
+                        imsave(f'{out_dir}/{index}-rgb.png', img[:,:,0:3])
+                        imsave(f'{out_dir}/{index}-dep.png', img[:,:,3])
+                        imsave(f'{out_dir}/{index}-hm.png', gt[0])
+                    index += 1
             self.valid_gen = self.dataset._aux_generator(self.batchSize, self.nStack, normalize = True, sample_set = 'valid')
             startTime = time.time()
             self.resume = {}
@@ -324,7 +342,9 @@ class HourglassModel():
                     ckpt = tf.train.get_checkpoint_state(load)
                     assert ckpt and ckpt.model_checkpoint_path
                     ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
-                    self.saver.restore(self.Session, os.path.join(load, ckpt_name))
+                    ckpt_fn = os.path.join(load, ckpt_name)
+                    print(f"Restore ckpt from {ckpt_fn}")
+                    self.saver.restore(self.Session, ckpt_fn)
                     if out_dir is None:
                         out_dir = load
                     self._test(nEpochs=1, epochSize=epochSize, saveStep=0, out_dir=out_dir)
@@ -337,6 +357,25 @@ class HourglassModel():
             tres = 2048
             atex = np.zeros(shape=(tres,tres), dtype=np.float32) # accumulator texture
             atex_count = np.zeros(shape=(tres,tres), dtype=np.int) # present in the input image
+
+            if True:
+                debug_generator = self.dataset._aux_generator(16, self.nStack, normalize = True, sample_set = 'train')
+                img_train, gt_train, weight_train = next(debug_generator)
+                out_dir = 'debug-test'
+                index = 0
+                for img, gt in zip(img_train, gt_train):
+                    if self.dataset.gen_surface_normal:
+                        rgb = np.zeros((img.shape[0], img.shape[1], 3), dtype=img.dtype)
+                        rgb[:, :, 0] = img[:,:,0]
+                        imsave(f'{out_dir}/{index}-rgb.png', rgb)
+                        imsave(f'{out_dir}/{index}-normal.png', img[:,:,1:4])
+                        imsave(f'{out_dir}/{index}-dep.png', img[:,:,4])
+                        imsave(f'{out_dir}/{index}-hm.png', gt[0])
+                    else:
+                        imsave(f'{out_dir}/{index}-rgb.png', img[:,:,0:3])
+                        imsave(f'{out_dir}/{index}-dep.png', img[:,:,3])
+                        imsave(f'{out_dir}/{index}-hm.png', gt[0])
+                    index += 1
             """
             """
             with tf.name_scope('Train'):
@@ -492,7 +531,7 @@ class HourglassModel():
             raise ValueError('Train/Test directory not assigned')
         else:
             with tf.device(self.cpu):
-                self.saver = tf.train.Saver()
+                self.saver = tf.train.Saver(max_to_keep=150)
             if summary:
                 with tf.device(self.gpu):
                     self.train_summary = tf.summary.FileWriter(self.logdir_train, tf.get_default_graph())

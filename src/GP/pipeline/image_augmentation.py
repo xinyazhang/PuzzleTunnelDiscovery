@@ -101,7 +101,10 @@ def augment_image(rgbd, aug_dict, i, train_img, heat_map, random_patch_size):
     aug_func = None
     gt_aug_func = None
     # print("rnd {}".format(rnd))
-    if rnd < aug_suppress_hot:
+    if False and rnd < aug_suppress_hot:
+        """
+        This MUST be DISABLED, otherwise we won't have enough training signals
+        """
         # Remove the hot region
         # print("aug_suppress_hot")
         patch_tl, patch_size = patch_finder_hot(heatmap=rgbd[:,:,1], margin_pix=16)
