@@ -59,7 +59,9 @@ def write_pidfile(pidfile, pid):
         print(pid, file=f)
 
 def _train(args, ws, geo_type):
-    if ws.nn_profile:
+    if ws.nn_tags:
+        params, ws.nn_profile = hg_launcher.create_config_from_tagstring(ws.nn_tags)
+    elif ws.nn_profile:
         params = hg_launcher.create_config_from_profile(ws.nn_profile)
     else:
         params = hg_launcher.create_default_config()
@@ -125,7 +127,9 @@ def _predict_surface(args, ws, geo_type, generator):
     else:
         rews = ws
     for puzzle_fn, puzzle_name in generator():
-        if ws.nn_profile:
+        if ws.nn_tags:
+            params, ws.nn_profile = hg_launcher.create_config_from_tagstring(ws.nn_tags)
+        elif ws.nn_profile:
             params = hg_launcher.create_config_from_profile(ws.nn_profile)
         else:
             params = hg_launcher.create_default_config()
@@ -198,7 +202,11 @@ def run(args):
         # Unset resource limit
         resource.setrlimit(resource.RLIMIT_AS, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
         ws = util.Workspace(args.dir)
-        ws.nn_profile = args.nn_profile
+        if args.nn_profile.startswith('tag:'):
+            ws.nn_tags = args.nn_profile[len('tag:'):]
+            ws.nn_profile = ''
+        else:
+            ws.nn_profile = args.nn_profile
         ws.current_trial = args.current_trial
         function_dict[args.stage](args, ws)
     else:
@@ -229,15 +237,6 @@ def remote_predict_rob(ws):
 
 def remote_predict_env(ws):
     _remote_command(ws, 'predict_env', auto_retry=True, in_tmux=False)
-
-def autorun(args):
-    ws = util.Workspace(args.dir)
-    ws.nn_profile = args.nn_profile
-    _deploy(ws)
-    remote_train(ws)
-    remote_wait_for_training(ws)
-    remote_predict_surface(ws)
-    _fetch(ws)
 
 def collect_stages(variant=0):
     if variant in [0]:

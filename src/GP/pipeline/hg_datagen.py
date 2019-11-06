@@ -86,7 +86,10 @@ class MultiPuzzleDataSet(object):
     Arguments:
         render_flag: choose which geometry to render
     '''
-    def __init__(self, render_flag, q_range=1.0, res=256, patch_size=32, aug_patch=False, aug_scaling=0.0, aug_dict={}, flat_surface=False, gen_surface_normal=False):
+    def __init__(self, render_flag, q_range=1.0, res=256,
+                 patch_size=32, aug_patch=False, aug_scaling=0.0, aug_dict={},
+                 flat_surface=False, gen_surface_normal=False,
+                 weighted_loss=False):
         self.gen_surface_normal = gen_surface_normal
         self.c_dim = 1 + 3 + 1 if gen_surface_normal else 4
         self.d_dim = 1
@@ -98,6 +101,7 @@ class MultiPuzzleDataSet(object):
         self.aug_scaling = aug_scaling
         self.q_range = q_range
         self.renders = []
+        self.weighted_loss = weighted_loss
 
     def add_puzzle(self, rob, env, rob_texfn, flat_surface=False):
         ds = OsrDataSet(rob=rob, env=env, rob_texfn=rob_texfn,
@@ -123,7 +127,10 @@ class MultiPuzzleDataSet(object):
                 train_gtmap = np.zeros((batch_size, stacks, self.res, self.res, self.d_dim), np.float32)
             else:
                 uv_map = np.zeros((batch_size, self.res, self.res, 2), np.float32)
-            train_weights = None
+            if self.weighted_loss:
+                train_weights = np.zeros((batch_size, self.d_dim), np.float32)
+            else:
+                train_weights = None
             for i in range(batch_size):
                 """
                 Scaling
@@ -151,6 +158,8 @@ class MultiPuzzleDataSet(object):
                     r.render_mvrgbd(self.render_flag|pyosr.Renderer.HAS_NTR_RENDERING)
                     rgbd = r.mvrgb.reshape(subds.rgb_shape)
                     hm = np.copy(rgbd[:,:,1:2]) # Extract HeatMap from green region
+                    if self.weighted_loss:
+                        train_weights[i,:] = np.sum(hm, axis=(0,1)) + 0.5 # Ensure the weight is non-zero
                     if self.aug_patch:
                         aug.augment_image(rgbd, self.aug_dict, i, train_img, hm,
                                           random_patch_size=self.patch_size)
@@ -168,7 +177,9 @@ class MultiPuzzleDataSet(object):
                 to_yield = [train_img, uv_map, train_weights]
             yield to_yield
 
-def create_multidataset(ompl_cfgs, geo_type, res=256, aug_patch=True, aug_scaling=1.0, aug_dict={}, gen_surface_normal=False):
+def create_multidataset(ompl_cfgs, geo_type, res=256,
+                        aug_patch=True, aug_scaling=1.0, aug_dict={},
+                        gen_surface_normal=False, weighted_loss=False):
     render_flag = pyosr.Renderer.NO_SCENE_RENDERING
     patch_size=64
     ds = MultiPuzzleDataSet(render_flag=render_flag,
@@ -177,7 +188,8 @@ def create_multidataset(ompl_cfgs, geo_type, res=256, aug_patch=True, aug_scalin
                             aug_patch=aug_patch,
                             aug_dict=aug_dict,
                             aug_scaling=aug_scaling,
-                            gen_surface_normal=gen_surface_normal
+                            gen_surface_normal=gen_surface_normal,
+                            weighted_loss=weighted_loss
                             )
     for ompl_cfg in ompl_cfgs:
         cfg, _ = parse_ompl.parse_simple(ompl_cfg)
@@ -207,6 +219,7 @@ def create_dataset_from_params(params):
                                   aug_patch=params['enable_augmentation'],
                                   aug_scaling=0.5,
                                   aug_dict=aug_dict,
-                                  gen_surface_normal=gen_surface_normal)
+                                  gen_surface_normal=gen_surface_normal,
+                                  weighted_loss=params['weighted_loss'])
     return dataset
 

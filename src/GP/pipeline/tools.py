@@ -864,6 +864,7 @@ def dump_training_data(args):
     dataset = hg_datagen.create_dataset_from_params(params)
     gen = dataset._aux_generator(batch_size=16, stacks=2, normalize=True, sample_set='train')
     img_train, gt_train, _ = next(gen)
+    assert 0 <= gt_train.any() <= 1.0, 'incorrect gt_train mag. max {np.max(gt_train)} min {np.max(gt_train)}'
     index = 0
     for img, gt in zip(img_train, gt_train):
         if dataset.gen_surface_normal:

@@ -116,6 +116,26 @@ def create_config_from_profile(name):
     util.log("[create_config_from_profile] {}".format(ret))
     return ret
 
+def create_config_from_tagstring(tagstring):
+    ret = create_default_config()
+    tags = sorted(tagstring.split('.'))
+    if '256hg' in tags:
+        ret['nlow'] = 6
+        ret['batch_size'] = 4
+    if 'hg4' in tags:
+        ret['nstacks'] = 4
+    if '+normal':
+        ret['training_data_include_surface_normal'] = 1
+    if '+weight':
+        ret['weighted_loss'] = True
+    if '-aug':
+        ret['enable_augmentation'] = False
+    if 'lowmem':
+        ret['batch_size'] = 2
+        ret['epoch_size'] = 2000
+    util.log("[create_config_from_tagstring] {} -> {} -> {}".format(tagstring, tags, ret))
+    return ret, '.'.join(tags)
+
 def launch_with_params(params, do_training, load=False):
     print('--Creating Dataset')
     # According to workspace hierarchy, the foloder name is the actual puzzle name

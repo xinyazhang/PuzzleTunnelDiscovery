@@ -179,6 +179,7 @@ class Workspace(object):
             self.verify_signature()
         self._current_trial = 0
         self.nn_profile = ''
+        self.nn_tags = ''
         self._timekeeper = {}
         self._override_condor_host = None
         self._extra_condor_hosts = None
