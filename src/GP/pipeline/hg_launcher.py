@@ -62,7 +62,8 @@ weighted_loss: False
 # valid_iteration: 10
 
 [Prediction]
-prediction_epoch_size = 4096
+prediction_epoch_size: 4096
+debug_predction: False
 
 [Saver]
 # Obsoluted, we now save logs under subdirectories of ckpt_dir
@@ -125,13 +126,13 @@ def create_config_from_tagstring(tagstring):
         ret['batch_size'] = 4
     if 'hg4' in tags:
         ret['nstacks'] = 4
-    if '+normal':
+    if '+normal' in tags:
         ret['training_data_include_surface_normal'] = 1
-    if '+weight':
+    if '+weight' in tags:
         ret['weighted_loss'] = True
-    if '-aug':
+    if '-aug' in tags:
         ret['enable_augmentation'] = False
-    if 'lowmem':
+    if 'lowmem' in tags:
         ret['batch_size'] = 2
         ret['epoch_size'] = 2000
     util.log("[create_config_from_tagstring] {} -> {} -> {}".format(tagstring, tags, ret))
