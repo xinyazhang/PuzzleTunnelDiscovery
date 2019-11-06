@@ -141,6 +141,6 @@ endfunction(use_ccd)
 
 find_package(PNG REQUIRED) # Used by OSR
 
-find_package(PythonLibs 3 REQUIRED)
+find_package(Python3 COMPONENTS Development)
 find_package(pybind11 REQUIRED)
 message(STATUS "Python version string: ${PYTHONLIBS_VERSION_STRING}")
