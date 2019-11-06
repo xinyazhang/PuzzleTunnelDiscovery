@@ -41,9 +41,15 @@ public:
 	static const uint32_t NO_SCENE_RENDERING = (1 << 0);
 	static const uint32_t NO_ROBOT_RENDERING = (1 << 1);
 	static const uint32_t HAS_NTR_RENDERING = (1 << 2);
+	// When set, the mapping of each texel in the texture atlas to primitive ID in the mesh
+	// will be stored at mvpid
 	static const uint32_t UV_MAPPINNG_RENDERING = (1 << 3);
+	// When set, the face normal of each pixel in the framebuffer will be
+	// stored at mvnormal
 	static const uint32_t NORMAL_RENDERING = (1 << 4);
-	static const uint32_t PID_RENDERING = (1 << 5);
+	// When set, the UV coordinates of the each pixel will be
+	// stored at mvuv
+	static const uint32_t UV_FEEDBACK = (1 << 5); 
 	/*
 	 * Define type for framebuffer attributes.
 	 */

@@ -168,7 +168,7 @@ class MultiPuzzleDataSet(object):
 
                     train_gtmap[i] = np.repeat(hm, stacks, axis=0) # each hourglass needs an output
                 else:
-                    r.render_mvrgbd(self.render_flag|pyosr.Renderer.UV_MAPPINNG_RENDERING)
+                    r.render_mvrgbd(self.render_flag|pyosr.Renderer.UV_FEEDBACK)
                     uv_map[i] = r.mvuv.reshape((self.res, self.res, 2))
                     aug.flip_images(i, train_img, i, uv_map)
             if is_training:

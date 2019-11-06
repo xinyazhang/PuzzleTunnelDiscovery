@@ -74,7 +74,7 @@ const uint32_t Renderer::NO_ROBOT_RENDERING;
 const uint32_t Renderer::HAS_NTR_RENDERING;
 const uint32_t Renderer::UV_MAPPINNG_RENDERING;
 const uint32_t Renderer::NORMAL_RENDERING;
-const uint32_t Renderer::PID_RENDERING;
+const uint32_t Renderer::UV_FEEDBACK;
 
 const uint32_t Renderer::BARY_RENDERING_ROBOT;
 const uint32_t Renderer::BARY_RENDERING_SCENE;
@@ -335,8 +335,8 @@ Renderer::RMMatrixXf Renderer::render_mvdepth_to_buffer()
 
 void Renderer::render_mvrgbd(uint32_t flags)
 {
-	bool is_rendering_pid = !!(flags & PID_RENDERING);
-	bool is_rendering_uv = !!(flags & UV_MAPPINNG_RENDERING);
+	bool enable_uv_feedback = !!(flags & UV_FEEDBACK);
+	bool is_rendering_uv_mapping = !!(flags & UV_MAPPINNG_RENDERING);
 	bool is_rendering_normal = !!(flags & NORMAL_RENDERING);
 #if 0
 	std::cerr << "is_rendering_uv " << is_rendering_uv << std::endl;
@@ -344,7 +344,7 @@ void Renderer::render_mvrgbd(uint32_t flags)
 
 	rgbd_fb_->attachRt(0, depth_tex_);
 	rgbd_fb_->attachRt(1, rgb_tex_);
-	if (is_rendering_uv) {
+	if (enable_uv_feedback) {
 		mvuv.resize(views.rows(), pbufferWidth * pbufferHeight * 2);
 		uv_tex_->ensure(pbufferWidth, pbufferHeight, 2, RtTexture::FLOAT_TYPE);
 		rgbd_fb_->attachRt(2, uv_tex_);
@@ -352,7 +352,7 @@ void Renderer::render_mvrgbd(uint32_t flags)
 		rgbd_fb_->detachRt(2);
 		mvuv.resize(0, 0);
 	}
-	if (is_rendering_pid) {
+	if (is_rendering_uv_mapping) {
 		mvpid.resize(views.rows(), pbufferWidth * pbufferHeight);
 		pid_tex_->ensure(pbufferWidth, pbufferHeight, 1, RtTexture::INT32_TYPE);
 		rgbd_fb_->attachRt(3, pid_tex_);
@@ -378,13 +378,13 @@ void Renderer::render_mvrgbd(uint32_t flags)
 		// CHECK_GL_ERROR(glReadBuffer(GL_COLOR_ATTACHMENT1));
 		CHECK_GL_ERROR(glReadPixels(0, 0, pbufferWidth, pbufferHeight,
 					    GL_RGB, GL_UNSIGNED_BYTE, mvrgb.row(i).data()));
-		if (is_rendering_uv) {
+		if (enable_uv_feedback) {
 			rgbd_fb_->readShaderLocation(2);
 			// CHECK_GL_ERROR(glReadBuffer(GL_COLOR_ATTACHMENT2));
 			CHECK_GL_ERROR(glReadPixels(0, 0, pbufferWidth, pbufferHeight,
 			                            GL_RG, GL_FLOAT, mvuv.row(i).data()));
 		}
-		if (is_rendering_pid) {
+		if (is_rendering_uv_mapping) {
 #if 1
 			rgbd_fb_->readShaderLocation(3);
 			// CHECK_GL_ERROR(glReadBuffer(GL_COLOR_ATTACHMENT3));
