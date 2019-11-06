@@ -33,6 +33,7 @@ what_to_render: 'rob' # 'rob' for robot, 'env' for environment
 # 'name' was obsoluted due to confusion
 # name: 'dual-ntrs/hg_ver3-env_flat/'
 checkpoint_dir: '/CHECK/POINT/DIRECTORY/'
+epoch_to_load: -1
 
 nFeats: 256
 nStacks: 2 # 2 is good enough
@@ -181,11 +182,18 @@ def launch_with_params(params, do_training, load=False):
         # Alternatively we can let TF handles this.
         load_dir = params['checkpoint_dir'] if load else None
         util.ack('[launch_with_params] load dir {}'.format(load_dir))
-        model.training_init(nEpochs=params['nepochs'], epochSize=params['epoch_size'], saveStep=params['saver_step'], dataset=None, load=load_dir)
+        model.training_init(nEpochs=params['nepochs'],
+                            epochSize=params['epoch_size'],
+                            saveStep=params['saver_step'],
+                            dataset=None,
+                            load=load_dir)
     else:
         out_dir = params['checkpoint_dir'] if 'output_dir' not in params else params['output_dir']
         model.testing_init(nEpochs=1, epochSize=params['prediction_epoch_size'], saveStep=0,
-                           dataset=None, load=params['checkpoint_dir'], out_dir=out_dir)
+                           dataset=None,
+                           load=params['checkpoint_dir'],
+                           load_at=params['epoch_to_load'],
+                           out_dir=out_dir)
 
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)

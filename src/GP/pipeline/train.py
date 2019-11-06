@@ -140,6 +140,8 @@ def _predict_surface(args, ws, geo_type, generator):
         params['all_ompl_configs'] = [puzzle_fn]
         params['what_to_render'] = geo_type
         params['checkpoint_dir'] = rews.checkpoint_dir(geo_type) + '/'
+        if args.load_epoch is not None:
+            params['epoch_to_load'] = args.load_epoch
         if rews_dir:
             os.makedirs(ws.checkpoint_dir(geo_type), exist_ok=True)
             params['output_dir'] = ws.checkpoint_dir(geo_type) + '/'
@@ -192,6 +194,7 @@ def setup_parser(subparsers):
     p.add_argument('--only_wait', action='store_true')
     p.add_argument('--nn_profile', help="NN Profile", default='256hg')
     p.add_argument('--load', help="Load existing checkpoints and continue", action='store_true')
+    p.add_argument('--load_epoch', help="Load checkpoint at specific epoch for prediction", default=None, type=int)
     p.add_argument('--puzzle_name', help="puzzle to predict", default=None)
     p.add_argument('--current_trial', help='Trial to solve the puzzle', type=int, default=0)
     p.add_argument('dir', help='Workspace directory')

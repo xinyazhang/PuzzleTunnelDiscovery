@@ -283,7 +283,7 @@ class HourglassModel():
                     percent = (float(i+1)/float(epochSize)) * 100
                     num = np.int(20*percent/100)
                     tToEpoch = int((time.time() - epochstartTime) * (100 - percent)/(percent))
-                    sys.stdout.write('\r Train: {0}>'.format("="*num) + "{0}>".format(" "*(20-num)) + '||' + str(percent)[:4] + '%' + ' -cost: ' + str(cost)[:6] + ' -avg_loss: ' + str(avg_cost)[:5] + ' -timeToEnd: ' + str(tToEpoch) + ' sec.')
+                    # sys.stdout.write('\r Train: {0}>'.format("="*num) + "{0}>".format(" "*(20-num)) + '||' + str(percent)[:4] + '%' + ' -cost: ' + str(cost)[:6] + ' -avg_loss: ' + str(avg_cost)[:5] + ' -timeToEnd: ' + str(tToEpoch) + ' sec.')
                     pgbar = "=" * num + '>' + " " * (20 - num) + '>'
                     sys.stdout.write(f'\r Train: {pgbar}||{str(percent)[:4]}% -cost: {str(cost)[:6]} -avg_loss: {str(avg_cost)[:5]} -last_loss {str(c)[:5]} -timeToEnd: {tToEpoch} sec.')
                     sys.stdout.flush()
@@ -336,7 +336,7 @@ class HourglassModel():
             print('  Relative Improvement: ' + str((self.resume['err'][-1] - self.resume['err'][0]) * 100) +'%')
             print('  Training Time: ' + str( datetime.timedelta(seconds=time.time() - startTime)))
 
-    def testing_init(self, nEpochs = 1, epochSize = 1000, saveStep = 0, dataset=None, load=None, out_dir=None):
+    def testing_init(self, nEpochs = 1, epochSize = 1000, saveStep = 0, dataset=None, load=None, load_at=-1, out_dir=None):
             with tf.name_scope('Session'):
                 with tf.device(self.gpu):
                     self._init_weight()
@@ -345,7 +345,10 @@ class HourglassModel():
 
                     ckpt = tf.train.get_checkpoint_state(load)
                     assert ckpt and ckpt.model_checkpoint_path
-                    ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
+                    if load_at < 0:
+                        ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
+                    else:
+                        ckpt_name = f'_{load_at}'
                     ckpt_fn = os.path.join(load, ckpt_name)
                     print(f"Restore ckpt from {ckpt_fn}")
                     self.saver.restore(self.Session, ckpt_fn)
