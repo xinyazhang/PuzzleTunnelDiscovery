@@ -244,7 +244,7 @@ def estimate_keyconf_clearance(args, ws):
         oskey = matio.load(oskey_fn)['KEYQ_OMPL']
         task_shape = (oskey.shape[0])
         total_chunks = partt.guess_chunk_number(task_shape,
-                ws.config.getint('DEFAULT', 'CondorQuota') * 4,
+                ws.config.getint('SYSTEM', 'CondorQuota') * 4,
                 1)
         if args.task_id is None:
             condor_args = [ws.condor_local_exec('facade.py'),

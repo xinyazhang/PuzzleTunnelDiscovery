@@ -43,7 +43,7 @@ def _partition_screening(ws, keyfn, index=None):
     task_indices = np.tril_indices(nkey)
     task_shape = task_indices[0].shape
     total_chunks = partt.guess_chunk_number(task_shape,
-            ws.config.getint('DEFAULT', 'CondorQuota') * 4,
+            ws.config.getint('SYSTEM', 'CondorQuota') * 4,
             ws.config.getint('TrainingKeyConf', 'ClearanceTaskGranularity'))
     if index is None:
         return keys, total_chunks

@@ -49,6 +49,8 @@ _CONFIG_TEMPLATE = \
 # Note: each type of node only stores necessary files for its compute task,
 # in order to save harddrive space.
 [DEFAULT]
+
+[SYSTEM]
 # Host name of GPU node, SSH host alias can be used
 GPUHost = {GPUHost}
 # facade.py path on GPU node
@@ -70,6 +72,11 @@ CondorWorkspacePath = {CondorWorkspacePath}
 CondorQuota = 150
 
 ChartReslution = 2048
+
+# the email address to send the notifications
+# Note only situations that require user interactions will be notified, e.g.:
+#  A job is on hold on HTCondor.
+mailto = SHOULD_NOT_BE_HERE_AND_KEEP_IT_PRIVATE
 
 [TrainingTrajectory]
 # RDT algorithm. This is usually the best choice among classical algorithms
@@ -146,6 +153,7 @@ PDSBloom = 3072
 
 # In day(s), 0.01 ~= 14 minutes, 0.02 ~= 0.5 hour
 TimeThreshold = 0.02
+
 '''
 
 def init_config_file(args, ws, oldws=None):
@@ -156,18 +164,18 @@ def init_config_file(args, ws, oldws=None):
             if oldws is not None:
                 rel_old_to_new = os.path.relpath(ws.dir, start=oldws.dir)
                 old_reuse = oldws.config.get('Prediction', 'ReuseWorkspace')
-                gpu_ws = normpath(join(oldws.config.get('DEFAULT', 'GPUWorkspacePath'), rel_old_to_new))
+                gpu_ws = normpath(join(oldws.config.get('SYSTEM', 'GPUWorkspacePath'), rel_old_to_new))
                 if old_reuse:
                     new_reuse = os.path.relpath(join(oldws.dir, old_reuse), start=gpu_ws)
                 else:
                     new_reuse = ''
                 dic = {
-                        'GPUHost': oldws.config.get('DEFAULT', 'GPUHost'),
-                        'GPUExecPath': oldws.config.get('DEFAULT', 'GPUExecPath'),
+                        'GPUHost': oldws.config.get('SYSTEM', 'GPUHost'),
+                        'GPUExecPath': oldws.config.get('SYSTEM', 'GPUExecPath'),
                         'GPUWorkspacePath': gpu_ws,
-                        'CondorHost': oldws.config.get('DEFAULT', 'CondorHost'),
-                        'CondorExecPath': oldws.config.get('DEFAULT', 'CondorExecPath'),
-                        'CondorWorkspacePath': normpath(join(oldws.config.get('DEFAULT', 'CondorWorkspacePath'), rel_old_to_new)),
+                        'CondorHost': oldws.config.get('SYSTEM', 'CondorHost'),
+                        'CondorExecPath': oldws.config.get('SYSTEM', 'CondorExecPath'),
+                        'CondorWorkspacePath': normpath(join(oldws.config.get('SYSTEM', 'CondorWorkspacePath'), rel_old_to_new)),
                         'ReuseWorkspace': new_reuse
                       }
                 if hasattr(args, 'override') and args.override is not None:
@@ -190,11 +198,5 @@ def init_config_file(args, ws, oldws=None):
     except FileNotFoundError as e:
         print(e)
         return
-    '''
-    config = configparser.ConfigParser()
-    config.read(cfg)
-    util.deploy_workspace(args.dir, cfg.get('DEFAULT', 'GPUHost'), cfg.get('DEFAULT', 'GPUWorkspacePath'))
-    util.deploy_workspace(args.dir, cfg.get('DEFAULT', 'CondorHost'), cfg.get('DEFAULT', 'CondorWorkspacePath'))
-    '''
     # print('''The Puzzle Workspace is Ready! Use 'runall' to run the pipeline automatically.''')
     # print('''Use -h to list commands to run each pipeline stage independently.''')

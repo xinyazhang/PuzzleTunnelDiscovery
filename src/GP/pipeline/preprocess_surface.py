@@ -48,7 +48,7 @@ def sample_touch(args, ws):
     nkey = keys.shape[0]
     task_shape = (nkey, tqn) # 2D, we may specify large number of samples per key configuration
     total_chunks = partt.guess_chunk_number(task_shape,
-            ws.config.getint('DEFAULT', 'CondorQuota') * 2,
+            ws.config.getint('SYSTEM', 'CondorQuota') * 2,
             ws.config.getint('TrainingWeightChart', 'TouchSampleGranularity'))
     if total_chunks > 1 and args.task_id is None:
         # Submit a Condor job
@@ -99,7 +99,7 @@ def group_touch(args, ws):
     tqn = ws.config.getint('TrainingWeightChart', 'TouchSample')
     task_shape = (nkey, tqn) # 2D, we may specify large number of samples per key configuration
     total_chunks = partt.guess_chunk_number(task_shape,
-            ws.config.getint('DEFAULT', 'CondorQuota') * 2,
+            ws.config.getint('SYSTEM', 'CondorQuota') * 2,
             ws.config.getint('TrainingWeightChart', 'TouchSampleGranularity'))
     touch_batch_fns = []
     for task_id in range(total_chunks):
@@ -129,7 +129,7 @@ def isect_geometry(args, ws):
     task_shape = (touch_n)
     util.log("[isect_geometry] Task shape {}".format(task_shape))
     total_chunks = partt.guess_chunk_number(task_shape,
-            ws.config.getint('DEFAULT', 'CondorQuota') * 6,
+            ws.config.getint('SYSTEM', 'CondorQuota') * 6,
             ws.config.getint('TrainingWeightChart', 'MeshBoolGranularity'))
     if total_chunks > 1 and args.task_id is None:
         # Submit a Condor job
@@ -187,7 +187,7 @@ def uvproject(args, ws):
     # Same task partition as isect_geometry
     task_shape = (touch_n)
     total_chunks = partt.guess_chunk_number(task_shape,
-            ws.config.getint('DEFAULT', 'CondorQuota') * 6,
+            ws.config.getint('SYSTEM', 'CondorQuota') * 6,
             ws.config.getint('TrainingWeightChart', 'MeshBoolGranularity'))
     fn_list = sorted(pathlib.Path(prev_scratch_dir).glob('isect_batch-*.hdf5.xz'))
     if total_chunks > 1 and args.task_id is None:

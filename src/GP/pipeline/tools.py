@@ -164,7 +164,7 @@ def visclearance(args):
     nq = cf[trajs[0]].shape[0]
     task_shape = (ntraj, nq)
     total_chunks = partt.guess_chunk_number(task_shape,
-            ws.config.getint('DEFAULT', 'CondorQuota') * 2,
+            ws.config.getint('SYSTEM', 'CondorQuota') * 2,
             ws.config.getint('TrainingKeyConf', 'ClearanceTaskGranularity'))
     task_partition = partt.get_task_partition(task_shape, total_chunks)
     tgt = (args.traj_id, args.point_id)

@@ -181,11 +181,11 @@ class Workspace(object):
         self.nn_profile = ''
         self.nn_tags = ''
         self._timekeeper = {}
-        self._override_condor_host = None
+        # self._override_condor_host = None
         self._extra_condor_hosts = None
 
     def get_path(self, optname):
-        return self.config.get('DEFAULT', optname)
+        return self.config.get('SYSTEM', optname)
 
     @property
     def dir(self):
@@ -200,7 +200,7 @@ class Workspace(object):
 
     @property
     def chart_resolution(self):
-        return self.config.getint('DEFAULT', 'ChartReslution')
+        return self.config.getint('SYSTEM', 'ChartReslution')
 
     # This function is designed to be called on non-condor hosts
     def condor_exec(self, xfile=''):
@@ -270,18 +270,19 @@ class Workspace(object):
         return self.local_ws(CONDOR_TEMPLATE)
 
     def override_condor_host(self, new_host):
-        self._override_condor_host = str(new_host)
+        # self._override_condor_host = str(new_host)
+        self.config.set('SYSTEM', 'CondorHost', str(new_host))
 
     @property
     def condor_host(self):
-        if self._override_condor_host:
-            return self._override_condor_host
-        return self.config.get('DEFAULT', 'CondorHost')
+        #if self._override_condor_host:
+            #return self._override_condor_host
+        return self.config.get('SYSTEM', 'CondorHost')
 
     @property
     def condor_extra_hosts(self):
         if self._extra_condor_hosts is None:
-            hostlist = self.config.get('DEFAULT', 'ExtraCondorHosts', fallback='')
+            hostlist = self.config.get('SYSTEM', 'ExtraCondorHosts', fallback='')
             self._extra_condor_hosts = hostlist.split(',')
         return self._extra_condor_hosts
 
@@ -291,7 +292,7 @@ class Workspace(object):
 
     @property
     def gpu_host(self):
-        return self.config.get('DEFAULT', 'GPUHost')
+        return self.config.get('SYSTEM', 'GPUHost')
 
     def condor_unit_world(self, puzzle_dir):
         if puzzle_dir not in self._uw_dic:

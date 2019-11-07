@@ -131,7 +131,7 @@ def estimate_clearance_volume(args, ws):
         return
     task_shape = (ntraj, nq)
     total_chunks = partt.guess_chunk_number(task_shape,
-            ws.config.getint('DEFAULT', 'CondorQuota') * 2,
+            ws.config.getint('SYSTEM', 'CondorQuota') * 2,
             ws.config.getint('TrainingKeyConf', 'ClearanceTaskGranularity'))
     if args.task_id is None:
         util.log('[estimate_clearance_volume] task shape {}'.format(task_shape))
