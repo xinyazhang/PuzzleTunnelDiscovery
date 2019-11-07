@@ -264,7 +264,7 @@ class HourglassModel():
                         imsave(f'{out_dir}/{index}-dep.png', img[:,:,3])
                         imsave(f'{out_dir}/{index}-hm.png', gt[0])
                     index += 1
-            self.valid_gen = self.dataset._aux_generator(self.batchSize, self.nStack, normalize = True, sample_set = 'valid')
+            # self.valid_gen = self.dataset._aux_generator(self.batchSize, self.nStack, normalize = True, sample_set = 'valid')
             startTime = time.time()
             self.resume = {}
             self.resume['accur'] = []
@@ -336,7 +336,7 @@ class HourglassModel():
             print('  Relative Improvement: ' + str((self.resume['err'][-1] - self.resume['err'][0]) * 100) +'%')
             print('  Training Time: ' + str( datetime.timedelta(seconds=time.time() - startTime)))
 
-    def testing_init(self, nEpochs = 1, epochSize = 1000, saveStep = 0, dataset=None, load=None, load_at=-1, out_dir=None):
+    def testing_init(self, nEpochs = 1, epochSize = 1000, saveStep = 0, dataset=None, load=None, load_at=-1, out_dir=None, debug_predction=False):
             with tf.name_scope('Session'):
                 with tf.device(self.gpu):
                     self._init_weight()
@@ -354,9 +354,9 @@ class HourglassModel():
                     self.saver.restore(self.Session, ckpt_fn)
                     if out_dir is None:
                         out_dir = load
-                    self._test(nEpochs=1, epochSize=epochSize, saveStep=0, out_dir=out_dir)
+                    self._test(nEpochs=1, epochSize=epochSize, saveStep=0, out_dir=out_dir, load_at=load_at, debug_predction=debug_predction)
 
-    def _test(self, nEpochs = 1, epochSize = 1000, saveStep = 500, out_dir=None):
+    def _test(self, nEpochs = 1, epochSize = 1000, saveStep = 500, out_dir=None, load_at=-1, debug_predction=False):
             assert nEpochs == 1
             assert self.w_loss is False
             assert out_dir is not None
@@ -365,23 +365,23 @@ class HourglassModel():
             atex = np.zeros(shape=(tres,tres), dtype=np.float32) # accumulator texture
             atex_count = np.zeros(shape=(tres,tres), dtype=np.int) # present in the input image
 
-            if True:
+            debug_out_dir = 'debug-test'
+            if False:
                 debug_generator = self.dataset._aux_generator(16, self.nStack, normalize = True, sample_set = 'train')
                 img_train, gt_train, weight_train = next(debug_generator)
-                out_dir = 'debug-test'
                 index = 0
                 for img, gt in zip(img_train, gt_train):
                     if self.dataset.gen_surface_normal:
                         rgb = np.zeros((img.shape[0], img.shape[1], 3), dtype=img.dtype)
                         rgb[:, :, 0] = img[:,:,0]
-                        imsave(f'{out_dir}/{index}-rgb.png', rgb)
-                        imsave(f'{out_dir}/{index}-normal.png', img[:,:,1:4])
-                        imsave(f'{out_dir}/{index}-dep.png', img[:,:,4])
-                        imsave(f'{out_dir}/{index}-hm.png', gt[0])
+                        imsave(f'{debug_out_dir}/{index}-rgb.png', rgb)
+                        imsave(f'{debug_out_dir}/{index}-normal.png', img[:,:,1:4])
+                        imsave(f'{debug_out_dir}/{index}-dep.png', img[:,:,4])
+                        imsave(f'{debug_out_dir}/{index}-hm.png', gt[0])
                     else:
-                        imsave(f'{out_dir}/{index}-rgb.png', img[:,:,0:3])
-                        imsave(f'{out_dir}/{index}-dep.png', img[:,:,3])
-                        imsave(f'{out_dir}/{index}-hm.png', gt[0])
+                        imsave(f'{debug_out_dir}/{index}-rgb.png', img[:,:,0:3])
+                        imsave(f'{debug_out_dir}/{index}-dep.png', img[:,:,3])
+                        imsave(f'{debug_out_dir}/{index}-hm.png', gt[0])
                     index += 1
             """
             """
@@ -404,6 +404,7 @@ class HourglassModel():
                 '''
                 PROFILING2=False # w/o prediction and assignment (generation only)
                 PROFILING=False or PROFILING2 # w/o assignment
+                index = 0
                 for epoch in range(nEpochs):
                     epochstartTime = time.time()
                     print('Epoch :' + str(epoch) + '/' + str(nEpochs) + '\n')
@@ -418,7 +419,7 @@ class HourglassModel():
                         # np.savez(f'debug-test/{i}', img_test=img_test, batch_uv=batch_uv, test_y=test_y)
                         if PROFILING:
                             continue # Profiling, check the % of time used by prediction
-                        for uvi,labeli in zip(batch_uv, test_y):
+                        for uvi,labeli,img in zip(batch_uv, test_y, img_test):
                             # np.clip(labeli, 0.0, 1.0, out=labeli)
                             if self.nLow == 4:
                                 labeli = np.reshape(labeli, (64,64))
@@ -427,6 +428,20 @@ class HourglassModel():
                                 labeli = np.reshape(labeli, (256,256))
                             else:
                                 raise NotImplemented()
+                            if debug_predction:
+                                if self.dataset.gen_surface_normal:
+                                    rgb = np.zeros((img.shape[0], img.shape[1], 3), dtype=img.dtype)
+                                    rgb[:, :, 0] = img[:,:,0]
+                                    imsave(f'{debug_out_dir}/epoch-{load_at}-{index}-rgb.png', rgb)
+                                    imsave(f'{debug_out_dir}/epoch-{load_at}-{index}-normal.png', img[:,:,1:4])
+                                    imsave(f'{debug_out_dir}/epoch-{load_at}-{index}-dep.png', img[:,:,4])
+                                    # imsave(f'{debug_out_dir}/epoch-{load_at}-{index}-u.png', uvi[:,:,0])
+                                    # imsave(f'{debug_out_dir}/epoch-{load_at}-{index}-v.png', uvi[:,:,1])
+                                else:
+                                    imsave(f'{debug_out_dir}/epoch-{load_at}-{index}-rgb.png', img[:,:,0:3])
+                                    imsave(f'{debug_out_dir}/epoch-{load_at}-{index}-dep.png', img[:,:,3])
+                                imsave(f'{debug_out_dir}/epoch-{load_at}-{index}-pred.png', labeli)
+                                index += 1
                             # util.log("uvi: {}".format(uvi.shape))
                             # util.log("labeli: {}".format(labeli.shape))
                             nz = np.nonzero(labeli)

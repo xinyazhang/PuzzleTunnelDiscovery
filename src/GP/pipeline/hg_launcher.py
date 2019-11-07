@@ -194,7 +194,8 @@ def launch_with_params(params, do_training, load=False):
                            dataset=None,
                            load=params['checkpoint_dir'],
                            load_at=params['epoch_to_load'],
-                           out_dir=out_dir)
+                           out_dir=out_dir,
+                           debug_predction=params['debug_predction'])
 
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)

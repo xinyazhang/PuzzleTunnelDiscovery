@@ -142,6 +142,8 @@ def _predict_surface(args, ws, geo_type, generator):
         params['checkpoint_dir'] = rews.checkpoint_dir(geo_type) + '/'
         if args.load_epoch is not None:
             params['epoch_to_load'] = args.load_epoch
+            params['debug_predction'] = True
+            params['prediction_epoch_size'] = 32
         if rews_dir:
             os.makedirs(ws.checkpoint_dir(geo_type), exist_ok=True)
             params['output_dir'] = ws.checkpoint_dir(geo_type) + '/'
