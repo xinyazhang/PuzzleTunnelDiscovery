@@ -103,6 +103,10 @@ class MultiPuzzleDataSet(object):
         self.renders = []
         self.weighted_loss = weighted_loss
 
+    @property
+    def number_of_geometries(self):
+        return len(self.renders)
+
     def add_puzzle(self, rob, env, rob_texfn, flat_surface=False):
         ds = OsrDataSet(rob=rob, env=env, rob_texfn=rob_texfn,
                         center=None, res=self.res,
@@ -191,13 +195,21 @@ def create_multidataset(ompl_cfgs, geo_type, res=256,
                             gen_surface_normal=gen_surface_normal,
                             weighted_loss=weighted_loss
                             )
+    def gen_from_geo_type(cfg, geo_type):
+        p = pathlib.Path(cfg.rob_fn).parents[0]
+        if geo_type == 'rob':
+            yield cfg.rob_fn, cfg.env_fn, str(p.joinpath('rob_chart_screened_uniform.png'))
+        elif geo_type == 'env':
+            yield cfg.env_fn, cfg.env_fn, str(p.joinpath('env_chart_screened_uniform.png'))
+        elif geo_type == 'both':
+            yield cfg.rob_fn, cfg.env_fn, str(p.joinpath('rob_chart_screened_uniform.png'))
+            yield cfg.env_fn, cfg.env_fn, str(p.joinpath('env_chart_screened_uniform.png'))
+        else:
+            assert False
     for ompl_cfg in ompl_cfgs:
         cfg, _ = parse_ompl.parse_simple(ompl_cfg)
-        rob = cfg.rob_fn if geo_type == 'rob' else cfg.env_fn
-        env = cfg.env_fn
-        p = pathlib.Path(cfg.rob_fn).parents[0]
-        rob_texfn = str(p.joinpath('{}_chart_screened_uniform.png'.format(geo_type)))
-        ds.add_puzzle(rob=rob, env=env, rob_texfn=rob_texfn)
+        for rob, env, rob_texfn in gen_from_geo_type(cfg, geo_type):
+            ds.add_puzzle(rob=rob, env=env, rob_texfn=rob_texfn)
     return ds
 
 def craft_dict(params):

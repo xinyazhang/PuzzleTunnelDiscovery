@@ -70,7 +70,6 @@ def _train(args, ws, geo_type):
     for puzzle_fn, puzzle_name in ws.training_puzzle_generator():
         all_omplcfgs.append(puzzle_fn)
     params['all_ompl_configs'] = all_omplcfgs
-    params['nepochs'] = 25 + 50 * len(all_omplcfgs)
 
     params['what_to_render'] = geo_type
     params['checkpoint_dir'] = ws.checkpoint_dir(geo_type) + '/'
@@ -98,6 +97,14 @@ def train_env(args, ws):
     if args.only_wait:
         print("Note: --only_wait has no effect in train_env")
     _train(args, ws, 'env')
+
+'''
+Train a single network for both pieces of the geometry
+'''
+def train_both(args, ws):
+    if args.only_wait:
+        print("Note: --only_wait has no effect in train_both")
+    _train(args, ws, 'both')
 
 def wait_for_training(args, ws):
     for geo_type in ['rob', 'env']:
@@ -177,6 +184,7 @@ def validate_env(args, ws):
 function_dict = {
         'train_rob' : train_rob,
         'train_env' : train_env,
+        'train_both' : train_both,
         'wait_for_training' : wait_for_training,
         'predict_rob' : predict_rob,
         'predict_env' : predict_env,
@@ -233,6 +241,9 @@ def remote_train_rob(ws):
 
 def remote_train_env(ws):
     _remote_command(ws, 'train_env', auto_retry=True, in_tmux=True)
+
+def remote_train_both(ws):
+    _remote_command(ws, 'train_both', auto_retry=True, in_tmux=True)
 
 def remote_wait_for_training(ws):
     _remote_command(ws, 'wait_for_training', auto_retry=True, in_tmux=False)
