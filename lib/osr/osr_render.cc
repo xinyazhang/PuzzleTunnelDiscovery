@@ -240,8 +240,12 @@ void Renderer::teardown()
 	depth_tex_.reset();
 	rgb_tex_.reset();
 
-	CHECK_GL_ERROR(glDeleteProgram(shaderProgram));
-	CHECK_GL_ERROR(glDeleteProgram(rgbdShaderProgram));
+	// GL Spec says "A value of 0 for program will be silently ignored."
+	// but it is apparently not the case...
+	if (shaderProgram)
+		CHECK_GL_ERROR(glDeleteProgram(shaderProgram));
+	if (rgbdShaderProgram)
+		CHECK_GL_ERROR(glDeleteProgram(rgbdShaderProgram));
 	shaderProgram = 0;
 	rgbdShaderProgram = 0;
 
