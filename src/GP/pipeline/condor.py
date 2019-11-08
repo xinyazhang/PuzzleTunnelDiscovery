@@ -31,7 +31,9 @@ def extract_template(fin, fout):
 def local_wait(iodir):
     log_fn = os.path.join(iodir, 'log')
     util.log('[condor] waiting on condor log file {}'.format(log_fn))
-    util.shell(['condor_wait' , log_fn])
+    ret = 1
+    while ret != 0:
+        ret = util.shell(['condor_wait' , '-wait', '3600', log_fn])
 
 '''
 Side effect:
