@@ -1,3 +1,5 @@
+#if GPU_ENABLED
+
 #ifndef OSR_RT_TEXTURE_H
 #define OSR_RT_TEXTURE_H
 
@@ -57,3 +59,5 @@ private:
 }
 
 #endif
+
+#endif // GPU_ENABLED

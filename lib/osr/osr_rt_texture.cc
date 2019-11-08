@@ -1,3 +1,4 @@
+#if GPU_ENABLED
 #include "quickgl.h"
 #include "osr_rt_texture.h"
 #include <stdexcept>
@@ -173,3 +174,5 @@ void FrameBuffer::readShaderLocation(int shader_location)
 }
 
 }
+
+#endif // GPU_ENABLED
