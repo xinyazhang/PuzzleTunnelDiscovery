@@ -77,6 +77,8 @@ ChartReslution = 2048
 # Note only situations that require user interactions will be notified, e.g.:
 #  A job is on hold on HTCondor.
 mailto = SHOULD_NOT_BE_HERE_AND_KEEP_IT_PRIVATE
+# Sometimes we do not have access to mail locally
+mailfrom_host = SHOULD_NOT_BE_HERE_AND_KEEP_IT_PRIVATE
 
 [TrainingTrajectory]
 # RDT algorithm. This is usually the best choice among classical algorithms
@@ -162,20 +164,30 @@ def init_config_file(args, ws, oldws=None):
         cfg = ws.configuration_file
         if not os.path.isfile(cfg):
             if oldws is not None:
+                old_config = configparser.ConfigParser()
+                old_config.read_string(_CONFIG_TEMPLATE)
+                old_dic = oldws.config_as_dict
+                if 'SYSTEM' not in old_dic:
+                    """
+                    Copy DEFAULT to SYSTEM
+                    This handles DEFAULT -> SYSTEM section renaming
+                    """
+                    old_dic['SYSTEM'] = { k:v for k,v in oldws.config.items("DEFAULT")}
+                util.update_config_with_dict(old_config, old_dic)
                 rel_old_to_new = os.path.relpath(ws.dir, start=oldws.dir)
-                old_reuse = oldws.config.get('Prediction', 'ReuseWorkspace')
-                gpu_ws = normpath(join(oldws.config.get('SYSTEM', 'GPUWorkspacePath'), rel_old_to_new))
+                old_reuse = old_config.get('Prediction', 'ReuseWorkspace')
+                gpu_ws = normpath(join(old_config.get('SYSTEM', 'GPUWorkspacePath'), rel_old_to_new))
                 if old_reuse:
                     new_reuse = os.path.relpath(join(oldws.dir, old_reuse), start=gpu_ws)
                 else:
                     new_reuse = ''
                 dic = {
-                        'GPUHost': oldws.config.get('SYSTEM', 'GPUHost'),
-                        'GPUExecPath': oldws.config.get('SYSTEM', 'GPUExecPath'),
+                        'GPUHost': old_config.get('SYSTEM', 'GPUHost'),
+                        'GPUExecPath': old_config.get('SYSTEM', 'GPUExecPath'),
                         'GPUWorkspacePath': gpu_ws,
-                        'CondorHost': oldws.config.get('SYSTEM', 'CondorHost'),
-                        'CondorExecPath': oldws.config.get('SYSTEM', 'CondorExecPath'),
-                        'CondorWorkspacePath': normpath(join(oldws.config.get('SYSTEM', 'CondorWorkspacePath'), rel_old_to_new)),
+                        'CondorHost': old_config.get('SYSTEM', 'CondorHost'),
+                        'CondorExecPath': old_config.get('SYSTEM', 'CondorExecPath'),
+                        'CondorWorkspacePath': normpath(join(old_config.get('SYSTEM', 'CondorWorkspacePath'), rel_old_to_new)),
                         'ReuseWorkspace': new_reuse
                       }
                 if hasattr(args, 'override') and args.override is not None:
