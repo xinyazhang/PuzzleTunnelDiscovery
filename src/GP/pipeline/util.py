@@ -225,7 +225,7 @@ class Workspace(object):
     def override_config(self, optstr):
         if not optstr:
             return
-        self._override_condor_host = optstr # For ssh remote
+        self._override_config_string = optstr # For ssh remote
         statements = optstr.split(';')
         dic = {}
         for statement in statements:
@@ -363,7 +363,7 @@ class Workspace(object):
             script += ' --current_trial {} '.format(self.current_trial)
         if use_nn_profile and self.nn_profile:
             script += ' --nn_profile {} '.format(self.nn_profile)
-        if self._override_condor_host:
+        if self._override_config_string:
             script += ' --override_config {} '.format(self._override_config_string)
         if extra_args:
             script += ' {} '.format(extra_args)
