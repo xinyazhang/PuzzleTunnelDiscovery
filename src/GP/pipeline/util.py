@@ -231,11 +231,11 @@ class Workspace(object):
         for statement in statements:
             dot = statement.find('.')
             if dot < 0:
-                util.warn(f"[override_config] incorrect syntax {statement}")
+                warn(f"[override_config] incorrect syntax {statement}")
                 continue
             equal = statement.find('=', dot)
             if equal < 0:
-                util.warn(f"[override_config] incorrect syntax {statement}")
+                warn(f"[override_config] incorrect syntax {statement}")
                 continue
             sec = statement[:dot]
             opt = statement[dot + 1:equal]
