@@ -20,8 +20,8 @@ from . import baseline_pwrdtc
 from . import tools
 from . import keyconf
 from . import autorun2
-from . import autorun3
-from . import robogeok
+# from . import autorun3
+# from . import robogeok
 from . import copy_training_data
 from . import autorun4
 from . import autorun5
