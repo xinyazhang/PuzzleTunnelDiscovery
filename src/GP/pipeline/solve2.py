@@ -491,6 +491,8 @@ def connect_knn(args, ws):
             util.log('Forest-level shortest path {}'.format(ids))
         except nx.exception.NetworkXNoPath:
             util.warn(f'[connect_knn] Cannot find path for puzzle {puzzle_name}')
+            with ws.open_performance_log() as f:
+                print(f"<{ws.current_trial}> [solve2][connect_knn] FAIL_TO_SOLVE {puzzle_name}", file=f)
             continue
         util.ack('[solve2][connect_knn] forest level path (bloom no.) {}'.format(ids))
         ids = [BLOOM_NO_TO_INDEX[i] for i in ids[:-1]]
@@ -565,6 +567,9 @@ def connect_knn(args, ws):
         matio.savetxt(sol_out, unit_q)
         util.ack("Saving UNIT solution of {} to {}".format(puzzle_name, sol_out))
 
+        with ws.open_performance_log() as f:
+            print(f"<{ws.current_trial}> [solve2][connect_knn] SOLVED {puzzle_name}", file=f)
+
 function_dict = {
         'least_visible_keyconf_fixed': least_visible_keyconf_fixed,
         'assemble_raw_keyconf': assemble_raw_keyconf,
@@ -588,20 +593,27 @@ def setup_parser(subparsers, module_name='solve2'):
     p.add_argument('--only_wait', action='store_true')
     p.add_argument('--no_wait', action='store_true')
     p.add_argument('--task_id', help='Feed $(Process) from HTCondor', type=int, default=None)
-    p.add_argument('--current_trial', help='Trial to solve the puzzle', type=str, default='0')
     p.add_argument('--puzzle_name', help='Pick a single puzzle to solve (default to all)', default='')
     p.add_argument('--scheme', help='Choose key prediction scheme',
                    choices=KEY_PRED_SCHEMES,
                    required=True)
+    """
+    p.add_argument('--current_trial', help='Trial to solve the puzzle', type=str, default='0')
     p.add_argument('dir', help='Workspace directory')
+    """
+    util.set_common_arguments(p)
     return p
 
 def run(args):
     if args.stage in function_dict:
+        ws = util.create_workspace_from_args(args)
+        function_dict[args.stage](args, ws)
+        """
         ws = util.Workspace(args.dir)
         for current_trial in util.rangestring_to_list(args.current_trial):
             ws.current_trial = current_trial
             function_dict[args.stage](args, ws)
+        """
     else:
         print("Unknown solve pipeline stage {}".format(args.stage))
 

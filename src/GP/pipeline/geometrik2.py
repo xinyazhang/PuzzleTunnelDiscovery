@@ -163,8 +163,7 @@ def setup_parser(subparsers):
 
 def run(args):
     if args.stage in function_dict:
-        ws = util.Workspace(args.dir)
-        ws.current_trial = args.current_trial
+        ws = util.create_workspace_from_args(args)
         function_dict[args.stage](args, ws)
     else:
         print("Unknown geometrik2 pipeline stage {}".format(args.stage))

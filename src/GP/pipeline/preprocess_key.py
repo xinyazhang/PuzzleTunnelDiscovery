@@ -319,11 +319,11 @@ def setup_parser(subparsers):
                    metavar='')
     p.add_argument('--only_wait', action='store_true')
     p.add_argument('--task_id', help='Feed $(Process) from HTCondor', type=int, default=None)
-    p.add_argument('dir', help='Workspace directory')
+    util.set_common_arguments(p)
 
 def run(args):
     if args.stage in function_dict:
-        ws = util.Workspace(args.dir)
+        ws = util.create_workspace_from_args(args)
         function_dict[args.stage](args, ws)
     else:
         print("Unknown preprocessing pipeline stage {}".format(args.stage))

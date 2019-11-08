@@ -320,10 +320,13 @@ def setup_parser(subparsers, module_name='solve'):
 
 def run(args):
     if args.stage in function_dict:
-        ws = util.Workspace(args.dir)
+        ws = util.create_workspace_from_args(args)
+        function_dict[args.stage](args, ws)
+        """
         for current_trial in util.rangestring_to_list(args.current_trial):
             ws.current_trial = current_trial
             function_dict[args.stage](args, ws)
+        """
     else:
         print("Unknown solve pipeline stage {}".format(args.stage))
 

@@ -34,6 +34,7 @@ def run_pipeline(ppl_stages, args):
     ws.nn_profile = args.nn_profile
     if args.condor_host:
         ws.override_condor_host(args.condor_host)
+    ws.override_config(args.override_config)
     nstage = []
     if args.stage_list:
         stage_list = []
@@ -58,6 +59,12 @@ def run_pipeline(ppl_stages, args):
     for trial in trials:
         ws.current_trial = trial
         ws.timekeeper_start(args.command)
+        with ws.open_performance_log() as f:
+            print(f"[{args.command}] TRIAL {trial}", file=f)
+            print(f"[{args.command}][arguments] {args}", file=f)
+            print(f"[{args.command}][options] {ws.config_as_dict}", file=f)
+        with open(ws.local_ws(util.PERFORMANCE_LOG_DIR, 'active_config.{}'.format(ws.current_trial)), 'w') as f:
+            ws.config.write(f)
         for k,v in stage_list:
             ws.timekeeper_start(k)
             util.ack('<{}> [{}] starting...'.format(ws.current_trial, k))
@@ -67,6 +74,8 @@ def run_pipeline(ppl_stages, args):
         if nstage:
             util.ack('[{}] Next stage is {}'.format(args.command, nstage[0][0]))
         ws.timekeeper_finish(args.command)
+        with ws.open_performance_log() as f:
+            print(f"[{args.command}] END_OF_TRIAL {trial}", file=f)
 
 def setup_autorun_parser(subparsers, name, pdesc, helptext='Run all pipelines automatically'):
     p = subparsers.add_parser(name, help=helptext,
@@ -93,6 +102,8 @@ def setup_autorun_parser(subparsers, name, pdesc, helptext='Run all pipelines au
     p.add_argument('--current_trial', help='Trial to solve the puzzle', type=str, default=None)
     p.add_argument('--nn_profile', help='NN profile', default='')
     p.add_argument('--condor_host', help='Override the CondorHost option provided by config File in workspace', type=str, default=None)
+    p.add_argument('--override_config', help='Override configurations by config file in workspace. Syntax: SECTION.OPTION=VALUE. Separated by semicolon (;)',
+                   type=str, default=None)
     # print('Total Stages: ' + str(len(stage_names)))
 
 

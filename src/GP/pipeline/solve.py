@@ -461,7 +461,10 @@ knn_forest:
 '''
 def knn_forest(args, ws):
     ALGO_VERSION = 0 if args.algorithm_version is None else args.algorithm_version
+    """
     trial_list = util.rangestring_to_list(args.current_trial)
+    """
+    trial_list = [args.current_trial]
     trial_str = 'knn_forest-{}-algver_{}'.format(args.current_trial, ALGO_VERSION)
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
         rel_scratch_dir = os.path.join(util.BASELINE_SCRATCH, puzzle_name, trial_str)
@@ -527,21 +530,31 @@ def setup_parser(subparsers, module_name='solve', function_dict=function_dict):
     p.add_argument('--only_wait', action='store_true')
     p.add_argument('--no_wait', action='store_true')
     p.add_argument('--task_id', help='Feed $(Process) from HTCondor', type=int, default=None)
-    p.add_argument('--current_trial', help='Trial to solve the puzzle', type=str, default='0')
     p.add_argument('--puzzle_name', help='Pick a single puzzle to solve (default to all)', default='')
     p.add_argument('--algorithm_version', help='Algorithm version (varying among stages', type=int, default=None)
+    """
+    p.add_argument('--override_config', help='Override the options', type=str, default=None)
     p.add_argument('dir', help='Workspace directory')
+    """
+    util.set_common_arguments(p)
     return p
 
 def run(args):
     if args.stage in function_dict:
+        """
         ws = util.Workspace(args.dir)
+        ws.override_config(args.override_config)
+        """
+        ws = util.create_workspace_from_args(args)
+        function_dict[args.stage](args, ws)
+        """
         if args.stage == 'knn_forest': # knn_forest takes current_trial list instead of single trial
             function_dict[args.stage](args, ws)
         else:
             for current_trial in util.rangestring_to_list(args.current_trial):
                 ws.current_trial = current_trial
                 function_dict[args.stage](args, ws)
+        """
     else:
         print("Unknown solve pipeline stage {}".format(args.stage))
 

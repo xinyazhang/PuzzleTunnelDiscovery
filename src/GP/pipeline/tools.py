@@ -881,6 +881,8 @@ def dump_training_data(args):
         index += 1
 
 def debug(args):
+    print(args)
+    return
     import pygeokey
     puzzle_fn = 'condor.uw/duet-g9/test/duet-g9/puzzle.cfg'
     env_fn = 'condor.uw/duet-g9/test/duet-g9/duet.dt.tcp.obj'

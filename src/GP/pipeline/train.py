@@ -125,7 +125,14 @@ def wait_for_training(args, ws):
         util.log("[wait_for_training] {} (pid: {}) waited".format(geo_type, pid))
         write_pidfile(pidfile, -1)
 
-def _predict_surface(args, ws, geo_type, generator):
+"""
+Note: we separate geo_type and checkpoint_geo_type.
+geo_type controls what to render as the testing image
+checkpoint_geo_type controls where to load the trained weights.
+
+The separation is due to the introduction of joint network.
+"""
+def _predict_surface(args, ws, geo_type, generator, checkpoint_geo_type=None):
     rews_dir = ws.config.get('Prediction', 'ReuseWorkspace', fallback='')
     if rews_dir:
         rews_dir = join(ws.dir, rews_dir) # Relative path
@@ -133,6 +140,8 @@ def _predict_surface(args, ws, geo_type, generator):
         rews.nn_profile = ws.nn_profile
     else:
         rews = ws
+    if checkpoint_geo_type is None:
+        checkpoint_geo_type = geo_type
     for puzzle_fn, puzzle_name in generator():
         if ws.nn_tags:
             params, ws.nn_profile = hg_launcher.create_config_from_tagstring(ws.nn_tags)
@@ -146,14 +155,18 @@ def _predict_surface(args, ws, geo_type, generator):
         ws.timekeeper_start('predict_{}'.format(geo_type), puzzle_name)
         params['all_ompl_configs'] = [puzzle_fn]
         params['what_to_render'] = geo_type
-        params['checkpoint_dir'] = rews.checkpoint_dir(geo_type) + '/'
+        params['checkpoint_dir'] = rews.checkpoint_dir(checkpoint_geo_type) + '/'
         if args.load_epoch is not None:
             params['epoch_to_load'] = args.load_epoch
             params['debug_predction'] = True
             params['prediction_epoch_size'] = 32
         if rews_dir:
-            os.makedirs(ws.checkpoint_dir(geo_type), exist_ok=True)
-            params['output_dir'] = ws.checkpoint_dir(geo_type) + '/'
+            """
+            In this case the checkpoint_dir may belong to another workspace.
+            At the same time our current workspace may not have a checkpoint dir.
+            """
+            os.makedirs(ws.checkpoint_dir(checkpoint_geo_type), exist_ok=True)
+            params['output_dir'] = ws.checkpoint_dir(checkpoint_geo_type) + '/'
         params['dataset_name'] = puzzle_name # Enforce the generated filename
         util.log("[prediction] Predicting {}:{}".format(puzzle_fn, geo_type))
         # NEVER call launch_with_params in the same process for multiple times
@@ -162,7 +175,7 @@ def _predict_surface(args, ws, geo_type, generator):
         # hg_launcher.launch_with_params(params, do_training=False)
         proc.start()
         proc.join()
-        src = join(ws.checkpoint_dir(geo_type), '{}-atex.npz'.format(puzzle_name))
+        src = join(ws.checkpoint_dir(checkpoint_geo_type), '{}-atex.npz'.format(puzzle_name))
         dst = ws.atex_prediction_file(puzzle_fn, geo_type)
         util.log("[prediction] Copy surface prediction file {} => {}".format(src, dst))
         shutil.copy(src, dst)
@@ -174,6 +187,10 @@ def predict_rob(args, ws):
 
 def predict_env(args, ws):
     _predict_surface(args, ws, 'env', ws.test_puzzle_generator)
+
+def predict_both(args, ws):
+    _predict_surface(args, ws, 'rob', ws.test_puzzle_generator, checkpoint_geo_type='both')
+    _predict_surface(args, ws, 'env', ws.test_puzzle_generator, checkpoint_geo_type='both')
 
 def validate_rob(args, ws):
     _predict_surface(args, ws, 'rob', ws.training_puzzle_generator)
@@ -188,6 +205,7 @@ function_dict = {
         'wait_for_training' : wait_for_training,
         'predict_rob' : predict_rob,
         'predict_env' : predict_env,
+        'predict_both' : predict_both,
         'validate_rob' : validate_rob,
         'validate_env' : validate_env,
 }
@@ -206,21 +224,19 @@ def setup_parser(subparsers):
     p.add_argument('--load', help="Load existing checkpoints and continue", action='store_true')
     p.add_argument('--load_epoch', help="Load checkpoint at specific epoch for prediction", default=None, type=int)
     p.add_argument('--puzzle_name', help="puzzle to predict", default=None)
-    p.add_argument('--current_trial', help='Trial to solve the puzzle', type=int, default=0)
-    p.add_argument('dir', help='Workspace directory')
+    util.set_common_arguments(p)
 
 # As always, run() serves as a separator between local function and remote proxy functions
 def run(args):
     if args.stage in function_dict:
         # Unset resource limit
         resource.setrlimit(resource.RLIMIT_AS, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
-        ws = util.Workspace(args.dir)
+        ws = util.create_workspace_from_args(args)
         if args.nn_profile.startswith('tag:'):
             ws.nn_tags = args.nn_profile[len('tag:'):]
             ws.nn_profile = ''
         else:
             ws.nn_profile = args.nn_profile
-        ws.current_trial = args.current_trial
         function_dict[args.stage](args, ws)
     else:
         print("Unknown train pipeline stage {}".format(args.stage))
@@ -254,6 +270,9 @@ def remote_predict_rob(ws):
 def remote_predict_env(ws):
     _remote_command(ws, 'predict_env', auto_retry=True, in_tmux=False)
 
+def remote_predict_both(ws):
+    _remote_command(ws, 'predict_both', auto_retry=True, in_tmux=False)
+
 def collect_stages(variant=0):
     if variant in [0]:
         return [ ('deploy_to_gpu', _deploy),
@@ -268,8 +287,9 @@ def collect_stages(variant=0):
     elif variant in [4,6]:
         return [
                  ('deploy_to_gpu', _deploy),
-                 ('predict_rob', remote_predict_rob),
-                 ('predict_env', remote_predict_env),
+                 # ('predict_rob', remote_predict_rob),
+                 # ('predict_env', remote_predict_env),
+                 ('predict_both', remote_predict_both),
                  ('fetch_from_gpu', _fetch),
                ]
     assert False, f'Train Pipeline Variant {variant} has not been implemented'

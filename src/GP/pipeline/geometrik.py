@@ -25,6 +25,7 @@ def get_task_args(ws, args, per_geometry, FMT=util.UNSCREENED_KEY_PREDICTION_FMT
         cfg, config = parse_ompl.parse_simple(puzzle_fn)
         wag = WorkerArgs()
         wag.dir = ws.dir
+        wag.args = args
         wag.current_trial = ws.current_trial
         wag.puzzle_fn = puzzle_fn
         wag.puzzle_name = puzzle_name
@@ -81,7 +82,7 @@ def detect_notch_feature_worker(ws, wag):
     return npts
 
 def _sample_key_point_worker(wag):
-    ws = util.Workspace(wag.dir)
+    ws = util.create_workspace_from_args(args)
     ws.current_trial = wag.current_trial
     pts = detect_geratio_feature_worker(ws, wag)
     SAMPLE_NOTCH = ws.config.getboolean('GeometriK', 'EnableNotchDetection', fallback=True)
@@ -96,7 +97,7 @@ def _sample_key_point_worker(wag):
         np.savez(kps_fn, KEY_POINT_AMBIENT=pts)
 
 def _debug_notch_worker(wag):
-    ws = util.Workspace(wag.dir)
+    ws = util.create_workspace_from_args(wag.args)
     ws.current_trial = wag.current_trial
     kpp = pygeokey.KeyPointProber(wag.refined_env_fn)
     os.makedirs(ws.local_ws('debug'), exist_ok=True)
@@ -155,8 +156,7 @@ def sample_key_point(args, ws):
             _sample_key_point_worker(wag)
 
 def _sample_key_conf_worker(wag):
-    ws = util.Workspace(wag.dir)
-    ws.current_trial = wag.current_trial
+    ws = util.create_workspace_from_args(args)
     FMT = wag.FMT
     kfn = ws.keyconf_file_from_fmt(wag.puzzle_name, FMT)
     util.log('[sample_key_conf] trial {}'.format(ws.current_trial))
@@ -228,14 +228,12 @@ def setup_parser(subparsers, module_name='geometrik', function_dict=function_dic
                    default='',
                    metavar='')
     p.add_argument('--only_wait', action='store_true')
-    p.add_argument('--current_trial', help='Trial to solve the puzzle', type=int, default=0)
     p.add_argument('--no_refine', help='Do not refine the mesh with TetWild, nor use the refined version in later stages', action='store_true')
-    p.add_argument('dir', help='Workspace directory')
+    util.set_common_arguments(p)
 
 def run(args):
     if args.stage in function_dict:
-        ws = util.Workspace(args.dir)
-        ws.current_trial = args.current_trial
+        ws = util.create_workspace_from_args(args)
         function_dict[args.stage](args, ws)
     else:
         print("Unknown geometrik pipeline stage {}".format(args.stage))

@@ -31,9 +31,7 @@ from . import parse_ompl
 def _predict_atlas2prim(tup):
     import pyosr
     import hashlib
-    ws_dir, puzzle_fn, puzzle_name, trial = tup
-    ws = util.Workspace(ws_dir)
-    ws.current_trial = trial
+    ws, puzzle_fn, puzzle_name = tup
     r = None
     puzzle, config = parse_ompl.parse_simple(puzzle_fn)
     for geo_type,flags,model_fn in zip(['rob', 'env'], [pyosr.Renderer.NO_SCENE_RENDERING, pyosr.Renderer.NO_ROBOT_RENDERING], [puzzle.rob_fn, puzzle.env_fn]):
@@ -71,9 +69,14 @@ def _predict_atlas2prim(tup):
 def generate_atlas2prim(args, ws):
     task_tup = []
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
-        task_tup.append((ws.dir, puzzle_fn, puzzle_name, ws.current_trial))
-    pgpu = multiprocessing.Pool(1)
-    pgpu.map(_predict_atlas2prim, task_tup)
+        task_tup.append((ws, puzzle_fn, puzzle_name))
+    USE_MP = False
+    if USE_MP:
+        pgpu = multiprocessing.Pool(1)
+        pgpu.map(_predict_atlas2prim, task_tup)
+    else:
+        for tup in task_tup:
+            _predict_atlas2prim(tup)
 
 def export_keyconf(ws, uw, puzzle_fn, puzzle_name, key_conf, FMT=util.UNSCREENED_KEY_PREDICTION_FMT):
     cfg, config = parse_ompl.parse_simple(puzzle_fn)
@@ -306,14 +309,12 @@ def setup_parser(subparsers):
     p.add_argument('--no_wait', action='store_true')
     p.add_argument('--puzzle_name', help='puzzle name for estimate_keyconf_clearance', default='')
     p.add_argument('--task_id', help='task id for estimate_keyconf_clearance worker process', type=int, default=None)
-    p.add_argument('--current_trial', help='Trial to solve the puzzle', type=int, default=0)
-    p.add_argument('dir', help='Workspace directory')
+    util.set_common_arguments(p)
 
 
 def run(args):
     if args.stage in function_dict:
-        ws = util.Workspace(args.dir)
-        ws.current_trial = args.current_trial
+        ws = util.create_workspace_from_args(args)
         function_dict[args.stage](args, ws)
     else:
         print("Unknown keyconf pipeline stage {}".format(args.stage))

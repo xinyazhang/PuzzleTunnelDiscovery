@@ -20,6 +20,7 @@ def _memory_limit():
     # cap = min(free - 8 * 1024 * 1024 * 1024, total / 2)
     cap = total
     resource.setrlimit(resource.RLIMIT_AS, (cap, hard))
+    print(f"Set RLIMIT_AS to ({cap}, {hard})")
 
 def _get_memory():
     with open('/proc/meminfo', 'r') as mem:
