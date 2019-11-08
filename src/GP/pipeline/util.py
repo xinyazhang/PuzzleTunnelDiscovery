@@ -162,9 +162,27 @@ def _rsync(from_host, from_pather, to_host, to_pather, *paths):
     from_prefix = '' if from_host is None else from_host+':'
     to_prefix = '' if to_host is None else to_host+':'
     for rel_path in paths:
-        ret = shell(['rsync', '-aR',
-                     '{}{}/./{}'.format(from_prefix, from_pather(), rel_path),
-                     '{}{}/'.format(to_prefix, to_pather())])
+        while True:
+            ret = shell(['rsync', '-aR',
+                         '{}{}/./{}'.format(from_prefix, from_pather(), rel_path),
+                         '{}{}/'.format(to_prefix, to_pather())])
+            if ret == 0:
+                break
+            to = random.uniform(3,7)
+            log(f"rsync failed. retry after {to} seconds")
+            time.sleep(to)
+
+def set_common_arguments(p):
+    p.add_argument('--current_trial', help='Trial to solve the puzzle', type=int, default=0)
+    p.add_argument('--override_config', help='Override the options. Syntax: SECTION.OPTION=VALUE Separated with semicolon (;)', type=str, default=None)
+    p.add_argument('dir', help='Workspace directory')
+
+def update_config_with_dict(config, dic):
+    for k, sec_dic in dic.items():
+        if not config.has_section(k):
+            config.add_section(k)
+        for opt, val in sec_dic.items():
+            config.set(k, opt, val)
 
 class Workspace(object):
     _egl_dpy = None
@@ -183,6 +201,7 @@ class Workspace(object):
         self._timekeeper = {}
         # self._override_condor_host = None
         self._extra_condor_hosts = None
+        self._override_config_string = None
 
     def get_path(self, optname):
         return self.config.get('SYSTEM', optname)
@@ -197,6 +216,33 @@ class Workspace(object):
             self._config = configparser.ConfigParser()
             self._config.read(self.configuration_file)
         return self._config
+
+    @property
+    def config_as_dict(self):
+        return { s:dict(self.config.items(s)) for s in self.config.sections() }
+
+    def override_config(self, optstr):
+        if not optstr:
+            return
+        self._override_condor_host = optstr # For ssh remote
+        statements = optstr.split(';')
+        dic = {}
+        for statement in statements:
+            dot = statement.find('.')
+            if dot < 0:
+                util.warn(f"[override_config] incorrect syntax {statement}")
+                continue
+            equal = statement.find('=', dot)
+            if equal < 0:
+                util.warn(f"[override_config] incorrect syntax {statement}")
+                continue
+            sec = statement[:dot]
+            opt = statement[dot + 1:equal]
+            val = statement[equal+1:]
+            if sec not in dic:
+                dic[sec] = {}
+            dic[sec][opt] = val
+        update_config_with_dict(self.config, dic)
 
     @property
     def chart_resolution(self):
@@ -316,6 +362,8 @@ class Workspace(object):
             script += ' --current_trial {} '.format(self.current_trial)
         if use_nn_profile and self.nn_profile:
             script += ' --nn_profile {} '.format(self.nn_profile)
+        if self._override_condor_host:
+            script += ' --override_config {} '.format(self._override_config_string)
         if extra_args:
             script += ' {} '.format(extra_args)
         script += ' {ws}'.format(ws=ws_path)
@@ -466,6 +514,12 @@ class Workspace(object):
         with self.open_performance_log() as f:
             print('[{}][{}] finished at {}'.format(stage_name, puzzle_name, t.isoformat()), file=f)
             print(f'[{stage_name}][{puzzle_name}] cost {delta.days}+{delta.seconds//3600}:{delta.seconds % 3600 // 60}:{delta.seconds % 60}.{delta.microseconds:06d}', file=f)
+
+def create_workspace_from_args(args):
+    ws = Workspace(args.dir)
+    ws.current_trial = args.current_trial
+    ws.override_config(args.override_config)
+    return ws
 
 def trim_suffix(fn):
     return os.path.splitext(fn)[0]
