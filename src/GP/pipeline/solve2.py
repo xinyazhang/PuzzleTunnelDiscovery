@@ -223,10 +223,23 @@ def assemble_roots(args, ws):
             np.savez_compressed(fl.screened_key_fn, KEYQ_OMPL=screened)
             util.ack("[screen_keyconf][scheme {scheme}] Save screened roots {} to {}".format(screened.shape, fl.screened_key_fn, scheme=scheme))
 
+"""
+Note: In later stages, we are not going to evaluate the schemes that failed to
+      predicate any key configuration. Hence valid_puzzle_generator should be used.
+"""
+def valid_puzzle_generator(ws, args):
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+        fl = FileLocations(args, ws, puzzle_name)
+        key_fn = fl.screened_key_fn
+        nkey = matio.load(key_fn)['KEYQ_OMPL'].shape[0]
+        if nkey <= util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS:
+            util.log(f"[{args.stage}] No {fl.scheme} key configurations predicated for {puzzle_fn}, skipping")
+            continue
+        yield puzzle_fn, puzzle_name, fl
+
 def blooming(args, ws):
     if not args.only_wait:
-        for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
-            fl = FileLocations(args, ws, puzzle_name)
+        for puzzle_fn, puzzle_name, fl in valid_puzzle_generator(ws, args):
             _, config = parse_ompl.parse_simple(puzzle_fn)
 
             util.log('[blooming] scratch {}'.format(fl.rel_bloom))
@@ -257,13 +270,11 @@ def blooming(args, ws):
                                 wait=False) # do NOT wait here, we have to submit EVERY puzzle at once
     if args.no_wait:
         return
-    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
-        fl = FileLocations(args, ws, puzzle_name)
+    for puzzle_fn, puzzle_name, fl in valid_puzzle_generator(ws, args):
         condor.local_wait(fl.bloom)
 
 def assemble_blooming(args, ws):
-    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
-        fl = FileLocations(args, ws, puzzle_name)
+    for puzzle_fn, puzzle_name, fl in valid_puzzle_generator(ws, args):
         pds_fn = fl.pds_fn
         Q_list = []
         QE_list = []
@@ -329,8 +340,7 @@ knn_forest:
 def pairwise_knn(args, ws):
     ALGO_VERSION = 3
     if args.task_id is None and not args.only_wait:
-        for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
-            fl = FileLocations(args, ws, puzzle_name)
+        for puzzle_fn, puzzle_name, fl in valid_puzzle_generator(ws, args):
             _, config = parse_ompl.parse_simple(puzzle_fn)
             key_fn = fl.screened_key_fn
             keys = matio.load(key_fn)
@@ -349,8 +359,7 @@ def pairwise_knn(args, ws):
                                 instances=keys['KEYQ_OMPL'].shape[0],
                                 wait=False) # do NOT wait here, we have to submit EVERY puzzle at once
     if args.task_id is not None:
-        for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
-            fl = FileLocations(args, ws, puzzle_name)
+        for puzzle_fn, puzzle_name, fl in valid_puzzle_generator(ws, args):
             solver_args = TmpDriverArgs()
             solver_args.puzzle = puzzle_fn
             rel_bloom = fl.rel_bloom
@@ -364,13 +373,11 @@ def pairwise_knn(args, ws):
     if args.no_wait:
         return
 
-    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
-        fl = FileLocations(args, ws, puzzle_name)
+    for puzzle_fn, puzzle_name, fl in valid_puzzle_generator(ws, args):
         condor.local_wait(fl.knn)
 
 def assemble_knn(args, ws):
-    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
-        fl = FileLocations(args, ws, puzzle_name)
+    for puzzle_fn, puzzle_name, fl in valid_puzzle_generator(ws, args):
         ITE_array = [matio.load(fn)['INTER_BLOOMING_TREE_EDGES'] for _,fn in fl.knn_fn_gen]
         ITE = util.safe_concatente(ITE_array, axis=0)
         if ITE.shape[0] != 0:
@@ -435,8 +442,7 @@ def connect_knn(args, ws):
     if args.no_wait:
         return
     algoprefix = f'{args.scheme}-pairwise_knn-'
-    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
-        fl = FileLocations(args, ws, puzzle_name)
+    for puzzle_fn, puzzle_name, fl in valid_puzzle_generator(ws, args):
 
         d = matio.load(fl.ibte_fn)
         ITE = d['INTER_BLOOMING_TREE_EDGES']
