@@ -348,7 +348,7 @@ void Renderer::render_mvrgbd(uint32_t flags)
 
 	rgbd_fb_->attachRt(0, depth_tex_);
 	rgbd_fb_->attachRt(1, rgb_tex_);
-	if (enable_uv_feedback) {
+	if (enable_uv_feedback || is_rendering_uv_mapping) {
 		mvuv.resize(views.rows(), pbufferWidth * pbufferHeight * 2);
 		uv_tex_->ensure(pbufferWidth, pbufferHeight, 2, RtTexture::FLOAT_TYPE);
 		rgbd_fb_->attachRt(2, uv_tex_);
@@ -382,7 +382,7 @@ void Renderer::render_mvrgbd(uint32_t flags)
 		// CHECK_GL_ERROR(glReadBuffer(GL_COLOR_ATTACHMENT1));
 		CHECK_GL_ERROR(glReadPixels(0, 0, pbufferWidth, pbufferHeight,
 					    GL_RGB, GL_UNSIGNED_BYTE, mvrgb.row(i).data()));
-		if (enable_uv_feedback) {
+		if (enable_uv_feedback || is_rendering_uv_mapping) {
 			rgbd_fb_->readShaderLocation(2);
 			// CHECK_GL_ERROR(glReadBuffer(GL_COLOR_ATTACHMENT2));
 			CHECK_GL_ERROR(glReadPixels(0, 0, pbufferWidth, pbufferHeight,
