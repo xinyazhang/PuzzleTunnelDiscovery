@@ -1,5 +1,4 @@
 import numpy as np
-import h5py
 from scipy.io import loadmat,savemat
 import pathlib
 import lzma
@@ -9,6 +8,7 @@ def _load_csv(fn):
     return np.loadtxt(fn, delimiter=',')
 
 def _load_hdf5(fn):
+    import h5py
     return h5py.File(fn, 'r')
 
 def _load_xz(fn):
@@ -52,6 +52,7 @@ hdf5_safefile:
     The only way to ensure its safety is to overwite.
 '''
 def hdf5_safefile(fn):
+    import h5py
     return h5py.File(fn, 'w')
 
 def hdf5_overwrite(f, path, ds):

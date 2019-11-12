@@ -5,7 +5,6 @@ from os.path import join, abspath, expanduser
 import subprocess
 import pathlib
 import numpy as np
-import h5py
 import os
 try:
     from progressbar import progressbar
