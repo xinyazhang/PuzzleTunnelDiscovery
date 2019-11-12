@@ -74,24 +74,29 @@ def predict_notch_key_worker(ws, wag_pair):
     assert wag1.geo_type == 'env'
     assert wag2.geo_type == 'rob'
 
-    ge_fn1 = FMT_to_file(ws, wag1, util.GERATIO_POINT_FMT)
-    ge_fn2 = FMT_to_file(ws, wag2, util.GERATIO_POINT_FMT)
-    ge1 = matio.load(ge_fn1)['KEY_POINT_AMBIENT']
-    ge2 = matio.load(ge_fn2)['KEY_POINT_AMBIENT']
-    util.log(f"{wag1.geo_type}_gepts {ge1.shape}")
-    util.log(f"{wag2.geo_type}_gepts {ge2.shape}")
-    nt_fn1 = FMT_to_file(ws, wag1, util.NOTCH_POINT_FMT)
-    nt_fn2 = FMT_to_file(ws, wag2, util.NOTCH_POINT_FMT)
-    nt1 = matio.load(nt_fn1)['NOTCH_POINT_AMBIENT']
-    nt2 = matio.load(nt_fn2)['NOTCH_POINT_AMBIENT']
-    util.log(f"{wag1.geo_type}_ntpts {nt1.shape}")
-    util.log(f"{wag2.geo_type}_ntpts {nt2.shape}")
+    SAMPLE_NOTCH = ws.config.getboolean('GeometriK', 'EnableNotchDetection', fallback=True)
+    if SAMPLE_NOTCH:
+        ge_fn1 = FMT_to_file(ws, wag1, util.GERATIO_POINT_FMT)
+        ge_fn2 = FMT_to_file(ws, wag2, util.GERATIO_POINT_FMT)
+        ge1 = matio.load(ge_fn1)['KEY_POINT_AMBIENT']
+        ge2 = matio.load(ge_fn2)['KEY_POINT_AMBIENT']
+        util.log(f"{wag1.geo_type}_gepts {ge1.shape}")
+        util.log(f"{wag2.geo_type}_gepts {ge2.shape}")
+        nt_fn1 = FMT_to_file(ws, wag1, util.NOTCH_POINT_FMT)
+        nt_fn2 = FMT_to_file(ws, wag2, util.NOTCH_POINT_FMT)
+        nt1 = matio.load(nt_fn1)['NOTCH_POINT_AMBIENT']
+        nt2 = matio.load(nt_fn2)['NOTCH_POINT_AMBIENT']
+        util.log(f"{wag1.geo_type}_ntpts {nt1.shape}")
+        util.log(f"{wag2.geo_type}_ntpts {nt2.shape}")
 
-    ks = pygeokey.KeySampler(wag1.geo_fn, wag2.geo_fn)
-    nrot = ws.config.getint('GeometriK', 'KeyConfigRotations')
-    kqs1, keyid_ge1, keyid_nt2 = ks.get_all_key_configs(ge1, nt2, nrot)
-    kqs2, keyid_nt1, keyid_ge2 = ks.get_all_key_configs(nt1, ge2, nrot)
-    kqs = util.safe_concatente([kqs1, kqs2], axis=0)
+        ks = pygeokey.KeySampler(wag1.geo_fn, wag2.geo_fn)
+        nrot = ws.config.getint('GeometriK', 'KeyConfigRotations')
+        kqs1, keyid_ge1, keyid_nt2 = ks.get_all_key_configs(ge1, nt2, nrot)
+        kqs2, keyid_nt1, keyid_ge2 = ks.get_all_key_configs(nt1, ge2, nrot)
+        kqs = util.safe_concatente([kqs1, kqs2], axis=0)
+    else:
+        util.log("[predict_notch_key_worker] Notch detection is disabled in this workspace")
+        keyid_ge1 = keyid_nt2 = keyid_nt1 = keyid_ge2 = kqs = np.array([])
     if kqs.shape[0] > 0:
         uw = util.create_unit_world(wag1.puzzle_fn)
         unit_q = uw.translate_vanilla_to_unit(kqs)
