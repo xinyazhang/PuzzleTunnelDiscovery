@@ -77,7 +77,8 @@ def main():
     getattr(pipeline, args.command).run(args)
 
 if __name__ == '__main__':
-    _memory_limit() # Limitates maximun memory usage to half
+    # Disable this to avoid weird MemoryError exceptions
+    # _memory_limit() # Limitates maximun memory usage to half
     try:
         #subprocess.call(['/usr/bin/env'])
         main()
