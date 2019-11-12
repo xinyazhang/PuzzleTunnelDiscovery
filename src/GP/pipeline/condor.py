@@ -61,6 +61,7 @@ def local_submit(ws,
         print('environment = "OMP_NUM_THREADS=1"', file=f)
         print('getenv = True', file=f) # We need it because
         print('request_memory = 3072', file=f) # 3G memory
+        print('on_exit_hold = (ExitBySignal != False) || (ExitCode != 0)', file=f) # hold the job for reruning when error occurs
         print('Output = {}/$(Process).out'.format(local_scratch), file=f)
         print('Error = {}/$(Process).err'.format(local_scratch), file=f)
         print('Log = {}/log'.format(local_scratch), file=f)
