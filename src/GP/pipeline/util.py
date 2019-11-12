@@ -364,7 +364,7 @@ class Workspace(object):
         if use_nn_profile and self.nn_profile:
             script += ' --nn_profile {} '.format(self.nn_profile)
         if self._override_config_string:
-            script += ' --override_config {} '.format(self._override_config_string)
+            script += " --override_config '{}' ".format(self._override_config_string)
         if extra_args:
             script += ' {} '.format(extra_args)
         script += ' {ws}'.format(ws=ws_path)
