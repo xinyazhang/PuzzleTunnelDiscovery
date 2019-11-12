@@ -1,5 +1,15 @@
 #if GPU_ENABLED
 
+/*
+ * CAVEAT: do NOT include eglew.h, which creates an chicken-and-egg problem:
+ *         1. We need call EGL functions to create an offscreen EGL context;
+ *         2. After including eglew.h, EGL functions are not available until
+ *            we call glewInit()
+ *         3. glewInit() would fail without calling eglMakeCurrent with an
+ *            offscreen context.
+ * This can be resolved with yet-to-release glewContextInit API. However
+ * currently we have to leave our implementation as is.
+ */
 #include <GL/glew.h>
 #include "osr_init.h"
 #include <string.h>
