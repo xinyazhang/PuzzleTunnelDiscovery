@@ -36,6 +36,26 @@ from .file_locations import RAW_KEY_PRED_SCHEMES, KEY_PRED_SCHEMES, SCHEME_TO_FM
 class TmpDriverArgs(object):
     pass
 
+class ScreeningPartition(object):
+    def __init__(self, ws, key_fn):
+        util.log(f'loading {keyfn}')
+        self.keys = matio.load(keyfn)['KEYQ_OMPL']
+        self.nkey = keys.shape[0] - util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS
+        self.task_indices = np.tril_indices(nkey)
+        self.task_shape = task_indices[0].shape
+        self.total_chunks = partt.guess_chunk_number(task_shape,
+                ws.config.getint('SYSTEM', 'CondorQuota') * 4,
+                ws.config.getint('TrainingKeyConf', 'ClearanceTaskGranularity'))
+        self.ws = ws
+        self.chunk = None
+
+    def get(self, index):
+        if self.chunk is None:
+            self.chunk = partt.get_task_chunk(self.task_shape, self.total_chunks, index)
+            self.chunk = np.array(self.chunk).reshape(-1)
+        return (self.task_indices[0][self.chunk] + util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS,
+                self.task_indices[1][self.chunk] + util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS)
+
 def _partition_screening(ws, keyfn, index=None):
     util.log(f'loading {keyfn}')
     keys = matio.load(keyfn)['KEYQ_OMPL']
@@ -55,6 +75,8 @@ def _partition_screening(ws, keyfn, index=None):
             task_indices[1][chunk] + util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS)
 
 def least_visible_keyconf_fixed(args, ws):
+    if args.rerun:
+        util.warn('[least_visible_keyconf_fixed] --rerun is not supported')
     # wait for all key confs
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
         fl = FileLocations(args, ws, puzzle_name)
@@ -69,7 +91,8 @@ def least_visible_keyconf_fixed(args, ws):
         # TODO: Pickup top key confs
         '''
         '''
-        osc_files = util.lsv(fl.clearance, 'clearance_batch-', '.npz')
+        osc_files, eoc = util.lsv2(fl.clearance, 'clearance_batch-', '.npz')
+        util.log(f"[least_visible_keyconf_fixed][{puzzle_name}] load file from 0 to {eoc}")
         osc_arrays = [matio.load(fn)['DISTANCE_BATCH'] for fn in osc_files]
         osc = util.safe_concatente(osc_arrays)
         assert osc.shape[0] == oskey.shape[0], 'osc shape {} != oskey shape {}'.format(osc.shape, oskey.shape)
@@ -84,6 +107,8 @@ def least_visible_keyconf_fixed(args, ws):
         util.ack(f'[least_visible_keyconf_fixed] save top {K} key to {fl.downsampled_key_fn}, shape {top_oskey.shape}')
 
 def assemble_raw_keyconf(args, ws):
+    if args.rerun:
+        util.warn('[assemble_raw_keyconf] --rerun is not supported')
     if args.no_wait:
         return
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
@@ -114,6 +139,27 @@ def assemble_raw_keyconf(args, ws):
         util.ack(f'[assemble_raw_keyconf] save {save_dic["KEYQ_OMPL"].shape} to {fl.assembled_raw_key_fn}')
 
 def screen_keyconf(args, ws):
+    if args.rerun:
+        for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+            fl = FileLocations(args, ws, puzzle_name)
+            sp = ScreeningPartition(ws, fl.assembled_raw_key_fn)
+            uw = None
+            for i in range(sp.total_chunks):
+                outfn = join(fl.screen, 'edge_batch-{}.npz'.format(i))
+                if os.path.isfile(outfn):
+                    continue
+                util.log(f'<args.current_trial> [screen_keyconf][{puzzle_name}] rerun task {i}')
+                if uw is None:
+                    uw = util.create_unit_world(puzzle_fn)
+                from_indices, to_indices = sp.get(i)
+                visb_pairs = uw.calculate_visibility_pair(keys[from_indices], False,
+                                                          keys[to_indices], False,
+                                                          uw.recommended_cres,
+                                                          enable_mt=False)
+                visb_vec = visb_pairs.reshape((-1))
+                visibile_indices = visb_vec.nonzero()[0]
+                np.savez_compressed(outfn, EDGE_FROM=from_indices[visibile_indices], EDGE_TO=to_indices[visibile_indices])
+        return
     if args.task_id is None and not args.only_wait:
         # submit condor job
         for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
@@ -238,6 +284,37 @@ def valid_puzzle_generator(ws, args):
         yield puzzle_fn, puzzle_name, fl
 
 def blooming(args, ws):
+    if args.rerun:
+        for puzzle_fn, puzzle_name, fl in valid_puzzle_generator(ws, args):
+            _, config = parse_ompl.parse_simple(puzzle_fn)
+            key_fn = fl.screened_key_fn
+            nkey = matio.load(key_fn)['KEYQ_OMPL'].shape[0]
+            bloom_quota = ws.config.getint('Solver', 'PDSBloom')
+            if fl.scheme != 'cmb':
+                all_keys = matio.load(fl.cmb_screened_key_fn)['KEYQ_OMPL']
+                total_quota = bloom_quota * all_keys.shape[0]
+                bloom_quota = total_quota // nkey + int(not not (total_quota % nkey))
+            for i in progressbar(range(nkey)):
+                outfn = join(fl.bloom, f'bloom-from_{i}.npz')
+                if os.path.isfile(outfn):
+                    continue
+                util.log(f'<{args.current_trial}> [blooming][{puzzle_name}] rerun task {i}')
+                shell_args = ['python3',
+                        'se3solver.py',
+                        'solve',
+                        '--cdres',
+                        config.getfloat('problem', 'collision_resolution', fallback=0.0001),
+                        '--replace_istate',
+                        f'file={key_fn},key=KEYQ_OMPL,offset={i},size=1,out={fl.bloom}',
+                        '--bloom_out',
+                        outfn,
+                        puzzle_fn,
+                        util.RDT_FOREST_ALGORITHM_ID,
+                        0.1,
+                        '--bloom_limit',
+                        bloom_quota]
+                util.shell(shell_args)
+        return
     if not args.only_wait:
         for puzzle_fn, puzzle_name, fl in valid_puzzle_generator(ws, args):
             _, config = parse_ompl.parse_simple(puzzle_fn)
@@ -339,6 +416,25 @@ knn_forest:
 '''
 def pairwise_knn(args, ws):
     ALGO_VERSION = 3
+    if args.rerun:
+        for puzzle_fn, puzzle_name, fl in valid_puzzle_generator(ws, args):
+            key_fn = fl.screened_key_fn
+            keys = matio.load(key_fn)['KEYQ_OMPL']
+            nkey = keys.shape[0]
+            for i in progressbar(range(nkey)):
+                fl.update_task_id(i)
+                if os.path.isfile(fl.knn_fn):
+                    continue
+                util.log(f'\n<{args.current_trial}> [pairwise_knn][{puzzle_name}] rerun task {i}')
+                util.shell(['./facade.py',
+                    'solve2',
+                    '--stage', 'pairwise_knn',
+                    '--current_trial', str(args.current_trial),
+                    '--puzzle_name', puzzle_name,
+                    '--scheme', args.scheme,
+                    '--task_id', str(i),
+                    ws.local_ws()])
+        return
     if args.task_id is None and not args.only_wait:
         for puzzle_fn, puzzle_name, fl in valid_puzzle_generator(ws, args):
             _, config = parse_ompl.parse_simple(puzzle_fn)
@@ -603,6 +699,7 @@ def setup_parser(subparsers, module_name='solve2'):
     p.add_argument('--scheme', help='Choose key prediction scheme',
                    choices=KEY_PRED_SCHEMES,
                    required=True)
+    p.add_argument('--rerun', action='store_true')
     """
     p.add_argument('--current_trial', help='Trial to solve the puzzle', type=str, default='0')
     p.add_argument('dir', help='Workspace directory')

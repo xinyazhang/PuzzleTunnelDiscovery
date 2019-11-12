@@ -617,12 +617,15 @@ def access_keypoints(d, geo_type):
                 kps = nps
     return kps
 
-def lsv(indir, prefix, suffix):
+def lsv2(indir, prefix, suffix):
     ret = []
     for i in itertools.count(0):
         fn = "{}/{}{}{}".format(indir, prefix, i, suffix)
         if not os.path.exists(fn):
             if not ret:
                 raise FileNotFoundError("Cannot even locate the a single file under {}. Complete path: {}".format(indir, fn))
-            return ret
+            return ret, i
         ret.append(fn)
+
+def lsv(indir, prefix, suffix):
+    return lsv2(indir, prefix, suffix)[0]

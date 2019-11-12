@@ -32,9 +32,13 @@ class FileLocations(object):
         self._ws = ws
         self._puzzle_name = puzzle_name
         self._scheme = args.scheme if hasattr(args, 'scheme') else ''
+        self._task_id = None
 
     def update_scheme(self, scheme):
         self._scheme = scheme
+
+    def update_task_id(self, task_id):
+        self._task_id = task_id
 
     @property
     def scheme(self):
@@ -53,6 +57,8 @@ class FileLocations(object):
 
     @property
     def task_id(self):
+        if self._task_id is not None:
+            return self._task_id
         assert self._args.task_id is not None
         return self._args.task_id
 
