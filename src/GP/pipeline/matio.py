@@ -47,6 +47,25 @@ def load(fn, key=None):
         return d[key]
     return d
 
+"""
+load_safeshape:
+    fn: file name
+    key: key in the filename
+
+Return
+    the shape of the np.ndarray stored in the file[key].
+    [None] if the file does not exist or the key is not in the file.
+"""
+def load_safeshape(fn, key):
+    p = pathlib.PosixPath(fn)
+    if not p.is_file():
+        return [None]
+    # print(f'loadding {fn}')
+    d = load(fn)
+    if key not in d:
+        return [None]
+    return d[key].shape
+
 '''
 hdf5_safefile:
     The only way to ensure its safety is to overwite.
