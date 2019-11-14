@@ -4,8 +4,12 @@
 #if GPU_ENABLED
 
 #include <iostream>
+#if 0
 #ifndef QUICKGL_NOT_INCLUDE_GLEW
 #include <GL/glew.h>
+#endif
+#else
+#include <glad/glad.h>
 #endif
 
 #define CHECK_SUCCESS(x)   \

@@ -13,18 +13,28 @@ SET(USE_GPU FALSE)
 
 SET(OpenGL_GL_PREFERENCE GLVND) # Prefer GLVND since all our platforms are using it
 find_package(OpenGL QUIET)
-find_package(GLEW QUIET)
+if (OpenGL_FOUND)
+	add_library(glad STATIC ${CMAKE_SOURCE_DIR}/third-party/glad/src/glad.c)
+	target_include_directories(glad
+		PUBLIC ${CMAKE_SOURCE_DIR}/third-party/glad/include
+		)
+	target_include_directories(glad
+		INTERFACE ${CMAKE_SOURCE_DIR}/third-party/glad/include
+		)
+	set_property(TARGET glad PROPERTY POSITION_INDEPENDENT_CODE ON)
+	set(OpenGL_Loader_Target glad)
+endif()
 pkg_search_module(GLFW3 QUIET glfw3)
 
-if (OpenGL_FOUND AND GLEW_FOUND AND GLFW3_FOUND)
+if (OpenGL_FOUND AND GLFW3_FOUND)
 	SET(USE_GPU TRUE)
-	SET(VISUAL_PACK ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARIES})
+	SET(VISUAL_PACK ${OPENGL_LIBRARIES} ${OpenGL_Loader_Target} ${GLFW3_LIBRARIES})
 	message("VISUAL_PACK ${VISUAL_PACK}")
 	
 	message(STATUS "Using GPU ${USE_GPU}")
 else ()
 	message(WARNING "GPU related functions are NOT enabled")
-endif (OpenGL_FOUND AND GLEW_FOUND AND GLFW3_FOUND)
+endif ()
 
 # Apple
 if (APPLE)
@@ -38,31 +48,6 @@ if (NOT ODE_FOUND)
 endif (NOT ODE_FOUND)
 message("ODE_INCLUDE_DIRS ${ODE_INCLUDE_DIRS}")
 message("ODE_CFLAGS ${ODE_CFLAGS}")
-
-if (FALSE) # Legacy cruft
-	if (OpenGL_FOUND)
-		include_directories(${OpenGL_INCLUDE_DIRS})
-		link_directories(${OpenGL_LIBRARY_DIRS})
-	else (OpenGL_FOUND)
-		SET(USE_GPU FALSE)
-	endif (OpenGL_FOUND)
-
-	if (GLEW_FOUND)
-		include_directories(${GLEW_INCLUDE_DIRS})
-		#link_libraries(${GLEW_LIBRARIES})
-	else (GLEW_FOUND)
-		SET(USE_GPU FALSE)
-	endif (GLEW_FOUND)
-
-	# GLFW
-	include_directories(${GLFW3_INCLUDE_DIRS})
-	if (GLFW3_FOUND)
-		SET(GLFW3_LIBRARY ${GLFW3_LIBRARIES})
-		MESSAGE(STATUS "GLFW: ${GLFW3_LIBRARIES}")
-	else (GLFW3_FOUND)
-		SET(USE_GPU FALSE)
-	endif(GLFW3_FOUND)
-endif() # Legacy cruft
 
 # Include lib/ so every app under src/ can use them
 include_directories(${CMAKE_SOURCE_DIR}/lib/)

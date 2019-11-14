@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.13)
 # We need 3.13+ to support target_include_directories
 # Alternative solutions (e.g. set_target_properties) cannot override the system's ompl library
 
-project(mkobs3d CXX)
+project(mkobs3d CXX C)
 # SET(CMAKE_BUILD_TYPE Debug) # Seems CMAKE does not recognize -DCMAKE_BUILD_TYPE
 set (mkobs3d_VERSION_MAJOR 0)
 set (mkobs3d_VERSION_MINOR 9)

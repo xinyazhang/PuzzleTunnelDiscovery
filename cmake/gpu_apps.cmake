@@ -5,7 +5,7 @@ EASYLIB(omplaux ccdxx)
 # All visualizer require GPU
 #
 
-EASYLIB(renderer ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${GLFW3_LIBRARY})
+EASYLIB(renderer ${OPENGL_LIBRARIES} ${OpenGL_Loader_Target} ${GLFW3_LIBRARY})
 SET(viscommon renderer ${VISUAL_PACK})
 
 EASYADD(visheat ${CMAKE_THREAD_LIBS_INIT} ${VISUAL_PACK} tetio heatio advplyio)

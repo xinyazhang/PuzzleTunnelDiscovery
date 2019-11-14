@@ -1,5 +1,6 @@
 #if GPU_ENABLED
 
+#if 0
 /*
  * CAVEAT: do NOT include eglew.h, which creates an chicken-and-egg problem:
  *         1. We need call EGL functions to create an offscreen EGL context;
@@ -11,6 +12,9 @@
  * currently we have to leave our implementation as is.
  */
 #include <GL/glew.h>
+#else
+#include "quickgl.h"
+#endif
 #include "osr_init.h"
 #include <string.h>
 #include <stdint.h>
@@ -183,6 +187,12 @@ EGLDisplay create_display(int device_idx)
 	return contexter->createDisplay(device_idx);
 }
 
+void* shimEglGetProcAddress(const char* name)
+{
+	auto ptr = eglGetProcAddress(name);
+	return (void*)ptr;
+}
+
 EGLContext create_gl_context(EGLDisplay dpy, EGLContext share_context)
 {
 	// Requesting OpenGL 4.5
@@ -207,6 +217,7 @@ EGLContext create_gl_context(EGLDisplay dpy, EGLContext share_context)
 	auto egl_surf = contexter->getSurfaceForCreation(dpy, egl_cfg);
 	eglMakeCurrent(dpy, egl_surf, egl_surf, core_ctx);
 
+#if 0
 	glewExperimental = true;
 	auto glew_err = glewInit();
 	if (glew_err != GLEW_OK) {
@@ -215,6 +226,15 @@ EGLContext create_gl_context(EGLDisplay dpy, EGLContext share_context)
 		// exit(EXIT_SUCCESS);
 	}
 	std::cerr << "glew initialized for dpy : " << dpy << std::endl;
+#else
+	if (!gladLoadGLLoader(shimEglGetProcAddress)) {
+		std::cerr << "glad init fails for dpy: " << dpy << std::endl;
+	} else {
+		std::cerr << "glad initialized for dpy : " << dpy
+		          << " with OpenGL "<<  GLVersion.major << ", " << GLVersion.minor
+		          << std::endl;
+	}
+#endif
 	return core_ctx;
 }
 

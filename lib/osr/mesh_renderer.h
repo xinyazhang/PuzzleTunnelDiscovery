@@ -4,7 +4,6 @@
 #if GPU_ENABLED
 
 #include <glm/glm.hpp>
-#include <GL/glew.h>
 #include <memory>
 
 namespace osr {
@@ -26,9 +25,9 @@ using std::shared_ptr;
  */
 class MeshRenderer {
 private:
-	GLuint vao_;
-	GLuint vbo_;
-	GLuint ibo_;
+	unsigned int vao_;
+	unsigned int vbo_;
+	unsigned int ibo_;
 	size_t number_of_faces_;
 	shared_ptr<MeshRenderer> shared_from_;
 
@@ -36,13 +35,13 @@ private:
 	void uploadData(const shared_ptr<Mesh>& mesh);
 	void bindAttributes();
 
-	GLuint uv_vbo_ = 0;
+	unsigned int uv_vbo_ = 0;
 public:
 	MeshRenderer(shared_ptr<Mesh> mesh);
 	MeshRenderer(shared_ptr<MeshRenderer> other);
 	~MeshRenderer();
 	
-	void render(GLuint program, Camera& camera, glm::mat4 globalXform, uint32_t flags);
+	void render(unsigned int program, Camera& camera, glm::mat4 globalXform, uint32_t flags);
 };
 
 }

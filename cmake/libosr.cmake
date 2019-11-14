@@ -16,7 +16,8 @@ target_link_libraries(osr PRIVATE ${ODE_LIBRARIES})
 ## OPTIONAL FUNCTION 1: rendering
 if (USE_GPU)
 	target_compile_definitions(osr PUBLIC GPU_ENABLED=1)
-	target_link_libraries(osr PRIVATE gbm EGL ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${Boost_LIBRARIES})
+	target_link_libraries(osr PRIVATE gbm EGL ${OPENGL_LIBRARIES} ${Boost_LIBRARIES})
+	target_link_libraries(osr PUBLIC ${OpenGL_Loader_Target})
 
 	EASYADD(vistexture osr ${VISUAL_PACK})
 	# target_compile_definitions(vistexture PRIVATE GPU_ENABLED=1)
