@@ -457,7 +457,7 @@ public:
 					}
 				}
 			}
-		} else if (version == 3) {
+		} else if (version == 3 || version == 4) {
 			if (subset.size() != 1)
 				throw std::runtime_error("mergeExistingGraph algorithm ver. 3 requies one and only one element in argument subset");
 			auto NTree = ex_graph_v_.size();
@@ -501,13 +501,21 @@ public:
 						last_pc = pc;
 					}
 				}
-				for (auto nn: nmotions) {
-					if (!si->checkMotion(m->state, nn->state))
+				for (auto n: nmotions) {
+					if (!si->checkMotion(m->state, n->state))
 						continue;
 					Eigen::Vector4i e;
 					e << m->forest_index, m->motion_index,
-					     nn->forest_index, nn->motion_index;
+					     n->forest_index, n->motion_index;
 					edges.emplace_back(e);
+					if (version == 4) {
+						// Remove the whole tree from
+						// the KNN DS
+						for (auto t = tree_offset[n->forest_index]; t < tree_offset[n->forest_index + 1]; t++) {
+							nn->remove(all_motions[t]);
+						}
+					}
+					
 				}
 			}
 		}
