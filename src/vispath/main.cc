@@ -151,6 +151,16 @@ bool predraw(Viewer& viewer)
 			auto& env_data = viewer.data_list[env_data_index];
 			Eigen::MatrixXd pc = Qs.block(0, 0, nv, 3);
 			env_data.set_points(pc, pc_color);
+			Eigen::MatrixXi e_elem(nv/2, 2);
+			for (int i = 0; i < nv/2; i++) {
+				e_elem(i, 0) = i;
+				e_elem(i, 1) = i + nv / 2;
+			}
+			Eigen::MatrixXd e_color(1, 3);
+			e_color(0) = 0.0;
+			e_color(1) = 0.0;
+			e_color(2) = 1.0;
+			env_data.set_edges(pc, e_elem, e_color);
 		}
 		load_all = false;
 	}
