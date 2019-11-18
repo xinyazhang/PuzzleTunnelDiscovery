@@ -27,12 +27,13 @@ SCHEME_FEAT_NPZ_KEY = {
 }
 
 class FileLocations(object):
-    def __init__(self, args, ws, puzzle_name, scheme=None):
+    def __init__(self, args, ws, puzzle_name, scheme=None, ALGO_VERSION=3):
         self._args = args
         self._ws = ws
         self._puzzle_name = puzzle_name
         self._scheme = args.scheme if hasattr(args, 'scheme') else ''
         self._task_id = None
+        self.ALGO_VERSION = ALGO_VERSION
 
     def update_scheme(self, scheme):
         self._scheme = scheme
@@ -161,7 +162,7 @@ class FileLocations(object):
 
     @property
     def rel_knn(self):
-        return join(util.SOLVER_SCRATCH, self._puzzle_name, f'{self.scheme}-knn3-{self.trial}')
+        return join(util.SOLVER_SCRATCH, self._puzzle_name, f'{self.scheme}-knn{self.ALGO_VERSION}-{self.trial}')
 
     @property
     def knn(self):

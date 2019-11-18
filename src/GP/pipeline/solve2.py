@@ -270,12 +270,16 @@ def assemble_roots(args, ws):
             util.ack("[screen_keyconf][scheme {scheme}] Save screened roots {} to {}".format(screened.shape, fl.screened_key_fn, scheme=scheme))
 
 """
-Note: In later stages, we are not going to evaluate the schemes that failed to
+Note: In stage starting from bloomings, we are NOT going to evaluate the schemes that failed to
       predicate any key configuration. Hence valid_puzzle_generator should be used.
+
+      Also the ALGO_VERSION shall be set here
 """
 def valid_puzzle_generator(ws, args):
+    # ALGO_VERSION = 3
+    ALGO_VERSION = 4
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
-        fl = FileLocations(args, ws, puzzle_name)
+        fl = FileLocations(args, ws, puzzle_name, ALGO_VERSION=ALGO_VERSION)
         key_fn = fl.screened_key_fn
         nkey = matio.load(key_fn)['KEYQ_OMPL'].shape[0]
         if nkey <= util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS:
@@ -415,7 +419,6 @@ knn_forest:
     Connect forest with prm like algorithm
 '''
 def pairwise_knn(args, ws):
-    ALGO_VERSION = 3
     if args.rerun:
         for puzzle_fn, puzzle_name, fl in valid_puzzle_generator(ws, args):
             key_fn = fl.screened_key_fn
@@ -462,7 +465,7 @@ def pairwise_knn(args, ws):
             solver_args.bloom_dir = ws.local_ws(rel_bloom)
             solver_args.out = fl.knn_fn
             solver_args.knn = 8 # default
-            solver_args.algo_version = ALGO_VERSION # algorithm version
+            solver_args.algo_version = fl.ALGO_VERSION # algorithm version
             solver_args.subset = np.array([args.task_id], dtype=np.int)
             se3solver.merge_blooming_forest(solver_args)
         return
@@ -594,7 +597,7 @@ def connect_knn(args, ws):
         except nx.exception.NetworkXNoPath:
             util.warn(f'[connect_knn] Cannot find path for puzzle {puzzle_name}')
             with ws.open_performance_log() as f:
-                print(f"<{ws.current_trial}> [solve2][connect_knn] FAIL_TO_SOLVE {puzzle_name}", file=f)
+                print(f"<{ws.current_trial}> [solve2][connect_knn][{args.scheme}] FAIL_TO_SOLVE {puzzle_name}", file=f)
             continue
         util.ack('[solve2][connect_knn] forest level path (bloom no.) {}'.format(ids))
         ids = [BLOOM_NO_TO_INDEX[i] for i in ids[:-1]]
@@ -670,7 +673,7 @@ def connect_knn(args, ws):
         util.ack("Saving UNIT solution of {} to {}".format(puzzle_name, sol_out))
 
         with ws.open_performance_log() as f:
-            print(f"<{ws.current_trial}> [solve2][connect_knn] SOLVED {puzzle_name}", file=f)
+            print(f"<{ws.current_trial}> [solve2][connect_knn][{args.scheme}] SOLVED {puzzle_name}", file=f)
 
 function_dict = {
         'least_visible_keyconf_fixed': least_visible_keyconf_fixed,
