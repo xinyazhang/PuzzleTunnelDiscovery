@@ -17,6 +17,8 @@
 #include "config_planner.h"
 #include <iostream>
 #include <vector>
+#include <unordered_set>
+
 namespace py = pybind11;
 
 enum {
@@ -322,9 +324,12 @@ public:
 				// pc: percent
 				int pc = i / (all_motions.size() / 100);
 				if (verbose && last_pc < pc) {
-					std::cerr << pc << "%" << std::endl;
+					if (pc > 0)
+						std::cerr << "\r";
+					std::cerr << pc << "%";
 					last_pc = pc;
 				}
+				std::cerr << std::endl;
 			}
 		} else if (version == 1) {
 			/*
@@ -466,6 +471,8 @@ public:
 			auto nn = createKNNForRDT(real_planner.get());
 			ex_knn_.emplace_back(nn);
 			int source = subset[0];
+			std::unordered_set<int> knn_containing(NTree);
+
 			for (size_t i = 0; i < NTree; i++) {
 				const auto& V = ex_graph_v_[i];
 				tree_offset[i] = all_motions.size();
@@ -478,6 +485,8 @@ public:
 						nn->add(m);
 					all_motions.emplace_back(m);
 				}
+				if (V.rows() > 0 && i != source)
+					knn_containing.insert(i);
 			}
 			// upper bound.
 			tree_offset[NTree] = all_motions.size();
@@ -509,10 +518,14 @@ public:
 					     n->forest_index, n->motion_index;
 					edges.emplace_back(e);
 					if (version == 4) {
-						// Remove the whole tree from
-						// the KNN DS
-						for (auto t = tree_offset[n->forest_index]; t < tree_offset[n->forest_index + 1]; t++) {
-							nn->remove(all_motions[t]);
+						auto iter = knn_containing.find(n->forest_index);
+						if (iter != knn_containing.end()) {
+							// Remove the whole tree from
+							// the KNN DS
+							for (auto t = tree_offset[n->forest_index]; t < tree_offset[n->forest_index + 1]; t++) {
+								nn->remove(all_motions[t]);
+							}
+							knn_containing.erase(iter);
 						}
 					}
 					
@@ -524,6 +537,61 @@ public:
 		ret.resize(edges.size(), 4);
 		for (size_t i = 0; i < edges.size(); i++)
 			ret.row(i) << edges[i](0), edges[i](1), edges[i](2), edges[i](3);
+		return ret;
+	}
+
+	Eigen::VectorXi
+	validateStates(const Eigen::MatrixXd& qs0)
+	{
+		ompl::app::SE3RigidBodyPlanning setup;
+		{
+			auto bak = planner_id_;
+			planner_id_ = PLANNER_ReRRT;
+			configSE3RigidBodyPlanning(setup, false);
+			planner_id_ = bak;
+		}
+		auto generic_planner = setup.getPlanner();
+		auto si = generic_planner->getSpaceInformation();
+		auto ss = si->getStateSpace();
+		Eigen::VectorXi ret;
+		ret.setZero(qs0.rows());
+		auto m0 = new Motion(si);
+		for (int i = 0; i < qs0.rows(); i++) {
+			ss->copyFromEigen3(m0->state, qs0.row(i));
+			if (si->isValid(m0->state))
+				ret(i) = 1;
+		}
+		delete m0;
+		return ret;
+	}
+
+	Eigen::VectorXi
+	validateMotionPairs(const Eigen::MatrixXd& qs0,
+			    const Eigen::MatrixXd& qs1)
+	{
+		ompl::app::SE3RigidBodyPlanning setup;
+		{
+			auto bak = planner_id_;
+			planner_id_ = PLANNER_ReRRT;
+			configSE3RigidBodyPlanning(setup, false);
+			planner_id_ = bak;
+		}
+		auto generic_planner = setup.getPlanner();
+		auto si = generic_planner->getSpaceInformation();
+		auto ss = si->getStateSpace();
+
+		Eigen::VectorXi ret;
+		ret.setZero(qs0.rows());
+		auto m0 = new Motion(si);
+		auto m1 = new Motion(si);
+		for (int i = 0; i < std::min(qs0.rows(), qs1.rows()); i++) {
+			ss->copyFromEigen3(m0->state, qs0.row(i));
+			ss->copyFromEigen3(m1->state, qs1.row(i));
+			if (si->checkMotion(m0->state, m1->state))
+				ret(i) = 1;
+		}
+		delete m0;
+		delete m1;
 		return ret;
 	}
 
@@ -756,6 +824,11 @@ PYBIND11_MODULE(pyse3ompl, m) {
 		     py::arg("version") = 0,
 		     py::arg("subset") = Eigen::VectorXi()
 		    )
+		.def("validate_states", &OmplDriver::validateStates,
+		     py::arg("qs0"))
+		.def("validate_motion_pairs", &OmplDriver::validateMotionPairs,
+		     py::arg("qs0"),
+		     py::arg("qs1"))
 		.def("set_sample_set", &OmplDriver::setSampleSet)
 		.def("set_sample_set_edges", &OmplDriver::setSampleSetEdges,
 		     py::arg("QB"),
