@@ -47,6 +47,14 @@ def load(fn, key=None):
         return d[key]
     return d
 
+def safeload(fn, key):
+    p = pathlib.PosixPath(fn)
+    try:
+        d = _SUFFIX_TO_LOADER[p.suffix](fn)
+        return d[key]
+    except Exception as e:
+        return np.array([])
+
 """
 load_safeshape:
     fn: file name

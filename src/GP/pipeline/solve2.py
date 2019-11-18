@@ -44,6 +44,11 @@ def create_driver(puzzle_fn):
     driver = se3solver.create_driver(driver_args)
     return driver
 
+def remove_invalid(driver, ompl_q):
+    valids = driver.validate_states(ompl_q)
+    indices = valids.reshape((-1)).nonzero()[0]
+    return ompl_q[indices, :]
+
 class ScreeningPartition(object):
     def __init__(self, ws, key_fn):
         util.log(f'loading {keyfn}')
@@ -120,10 +125,11 @@ def assemble_raw_keyconf(args, ws):
     if args.no_wait:
         return
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+        driver = create_driver(puzzle_fn)
         fl = FileLocations(args, ws, puzzle_name)
         keyq_dic = {}
         for scheme, fn in fl.raw_key_fn_gen:
-            kq = matio.load(fn)['KEYQ_OMPL']
+            kq = matio.safeload(fn, 'KEYQ_OMPL')
             keyq_dic[scheme] = kq
             util.log(f'[assemble_raw_keyconf] loaded {kq.shape} from {fn} (scheme {scheme})')
         save_dic = {}
@@ -132,14 +138,16 @@ def assemble_raw_keyconf(args, ws):
         base_list = []
         for scheme in RAW_KEY_PRED_SCHEMES:
             keyq = keyq_dic[scheme]
-            if base != 0: # strip off the IG states
+            keyq = remove_invalid(driver, keyq)
+            nkey = keyq.shape[0]
+            if nkey != 0 and base != 0: # strip off the IG states
                 keyq = keyq[util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS:]
             keyq_list.append(keyq)
             if base == 0:
-                base_list.append(util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS)
+                base_list.append(util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS if nkey > 0 else 0)
             else:
                 base_list.append(base)
-            base += keyq.shape[0]
+            base += nkey
         base_list.append(base)
         save_dic['KEYQ_OMPL'] = util.safe_concatente(keyq_list)
         save_dic['BASES_WITH_END'] = base_list
