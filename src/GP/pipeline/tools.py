@@ -496,6 +496,26 @@ def dump_training_data(args):
         index += 1
 
 def debug(args):
+    puzzle_fn = 'u2/claw-rightbv.dt.tcp/test/claw-rightbv.dt.tcp/puzzle.cfg'
+    # keys = matio.load('condor.u2/claw-rightbv.dt.tcp/test/claw-rightbv.dt.tcp/', KEY='KEYQ_OMPL')
+    keys = matio.load('u2/claw-rightbv.dt.tcp/test/claw-rightbv.dt.tcp/geometrik_geratio_keyconf-20.npz', key='KEYQ_OMPL')
+    """
+    uw = util.create_unit_world(puzzle_fn)
+    print(uw.calculate_visibility_pair(keys[[989], :], False,
+                                       keys[[990], :], False,
+                                       uw.recommended_cres,
+                                       enable_mt=False))
+    """
+    class TmpDriverArgs(object):
+        pass
+    from . import se3solver
+    driver_args = TmpDriverArgs()
+    driver_args.puzzle = puzzle_fn
+    driver_args.planner_id = se3solver.PLANNER_RDT
+    driver_args.sampler_id = 0
+    driver = se3solver.create_driver(driver_args)
+    print(driver.validate_motion_pairs(keys[[989], :], keys[[990], :]))
+    return
     print(args)
     return
     import pygeokey
