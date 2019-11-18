@@ -36,6 +36,14 @@ from .file_locations import RAW_KEY_PRED_SCHEMES, KEY_PRED_SCHEMES, SCHEME_TO_FM
 class TmpDriverArgs(object):
     pass
 
+def create_driver(puzzle_fn):
+    driver_args = TmpDriverArgs()
+    driver_args.puzzle = puzzle_fn
+    driver_args.planner_id = se3solver.PLANNER_RDT
+    driver_args.sampler_id = 0
+    driver = se3solver.create_driver(driver_args)
+    return driver
+
 class ScreeningPartition(object):
     def __init__(self, ws, key_fn):
         util.log(f'loading {keyfn}')
@@ -189,11 +197,9 @@ def screen_keyconf(args, ws):
             keys, from_indices, to_indices = _partition_screening(ws,
                                                                   fl.assembled_raw_key_fn,
                                                                   index=args.task_id)
-            uw = util.create_unit_world(puzzle_fn)
-            visb_pairs = uw.calculate_visibility_pair(keys[from_indices], False,
-                                                      keys[to_indices], False,
-                                                      uw.recommended_cres,
-                                                      enable_mt=False)
+            driver = create_driver(puzzle_fn)
+            visb_pairs = driver.validate_motion_pairs(keys[from_indices], keys[to_indices])
+
             visb_vec = visb_pairs.reshape((-1))
             visibile_indices = visb_vec.nonzero()[0]
             outfn = join(fl.screen, 'edge_batch-{}.npz'.format(args.task_id))
@@ -242,13 +248,15 @@ def assemble_roots(args, ws):
             fl.update_scheme(scheme)
             vert_ids = [i for i in range(rtup[0], rtup[1])]
             djs = disjoint_set.DisjointSet(vert_ids)
-            for r,c in zip(d['EDGE_FROM'], d['EDGE_TO']):
+            for r,c in zip(edges_from, edges_to):
+                # util.log(f'[screen_keyconf][{puzzle_name}][scheme {scheme}] union {r} {c}')
                 if r >= rtup[1] or r < rtup[0]:
                     continue
                 if c >= rtup[1] or c < rtup[0]:
                     continue
                 djs.union(r,c)
             cluster = djs.get_cluster()
+            util.log("[screen_keyconf][{}][scheme {scheme}] DisjointSet cluster number {nc}".format(puzzle_name, scheme=scheme, nc=len(cluster)))
             screened_index = []
 
             unit_keys = uw.translate_ompl_to_unit(keys)
