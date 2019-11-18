@@ -57,9 +57,13 @@ def predict_geratio_key_worker(ws, wag_pair):
     nrot = ws.config.getint('GeometriK', 'KeyConfigRotations')
     kqs, keyid1, keyid2 = ks.get_all_key_configs(ge1, ge2, nrot)
 
+    """
+    Post processing
+    1. Translate to OMPL configuration
+    2. Prefix initial state and goal state
+    """
     uw = util.create_unit_world(wag1.puzzle_fn)
-    unit_q = uw.translate_vanilla_to_unit(kqs)
-    ompl_q = uw.translate_unit_to_ompl(unit_q)
+    ompl_q = uw.translate_vanilla_to_ompl(kqs)
     ompl_q = prefix_iq_and_gq(wag1, ompl_q)
 
     kfn = FMT_to_file(ws, wag1, util.GERATIO_KEY_FMT)
