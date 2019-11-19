@@ -95,7 +95,8 @@ def add_performance_numbers_to_dic(driver, dic):
     dic['PF_LOG_MCHECK_N'] = pn.motion_check
     dic['PF_LOG_MCHECK_T'] = pn.motion_check_time
     dic['PF_LOG_DCHECK_N'] = pn.motion_discrete_state_check
-    dic['PF_LOG_KNN_T'] = pn.knn_time
+    dic['PF_LOG_KNN_QUERY_T'] = pn.knn_query_time
+    dic['PF_LOG_KNN_DELETE_T'] = pn.knn_delete_time
 
 def solve(args):
     driver = create_driver(args)

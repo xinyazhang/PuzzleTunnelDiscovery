@@ -51,7 +51,8 @@ public:
 		unsigned long motion_check = 0;
 		double motion_check_time = 0;
 		unsigned long motion_discrete_state_check = 0;
-		double knn_time = 0;
+		double knn_query_time = 0;
+		double knn_delete_time = 0;
 	};
 
 	OmplDriver()

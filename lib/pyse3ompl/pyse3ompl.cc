@@ -39,7 +39,8 @@ PYBIND11_MODULE(pyse3ompl, m) {
 		.def_readonly("motion_check", &OmplDriver::PerformanceNumbers::motion_check)
 		.def_readonly("motion_check_time", &OmplDriver::PerformanceNumbers::motion_check_time)
 		.def_readonly("motion_discrete_state_check", &OmplDriver::PerformanceNumbers::motion_discrete_state_check)
-		.def_readonly("knn_time", &OmplDriver::PerformanceNumbers::knn_time)
+		.def_readonly("knn_query_time", &OmplDriver::PerformanceNumbers::knn_query_time)
+		.def_readonly("knn_delete_time", &OmplDriver::PerformanceNumbers::knn_delete_time)
 		;
 	py::class_<OmplDriver>(m, "OmplDriver")
 		.def(py::init<>())

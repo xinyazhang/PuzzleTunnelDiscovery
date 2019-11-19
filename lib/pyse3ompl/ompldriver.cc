@@ -155,6 +155,7 @@ OmplDriver::mergeExistingGraph(int KNN,
 			ttl += V.rows();
 		all_motions.reserve(ttl);
 	}
+	latest_pn_.knn_delete_time = 0;
 	if (version == 0) {
 		/*
 		 * Put all blooming trees into single KNN DS
@@ -357,7 +358,9 @@ OmplDriver::mergeExistingGraph(int KNN,
 		auto nn = createKNNForRDT(real_planner.get());
 		ex_knn_.emplace_back(nn);
 		int source = subset[0];
-		std::unordered_set<int> knn_containing(NTree);
+
+		std::vector<bool> knn_containing(NTree, true);
+		knn_containing[source] = false;
 
 		for (size_t i = 0; i < NTree; i++) {
 			const auto& V = ex_graph_v_[i];
@@ -367,15 +370,33 @@ OmplDriver::mergeExistingGraph(int KNN,
 				ss->copyFromEigen3(m->state, V.row(j));
 				m->motion_index = j;
 				m->forest_index = i;
-				if (i != source)
-					nn->add(m);
 				all_motions.emplace_back(m);
 			}
-			if (V.rows() > 0 && i != source)
-				knn_containing.insert(i);
 		}
 		// upper bound.
 		tree_offset[NTree] = all_motions.size();
+
+		// Lambda function to build KNN DS
+		// Capture everything by reference, and will be called again
+		// for rebuild
+		auto build_knn = [&]()  {
+			if (verbose)
+				std::cerr << "building KNN" << std::endl;
+			for (size_t i = 0; i < NTree; i++) {
+				if (!knn_containing[i])
+					continue;
+				auto qfrom = tree_offset[i];
+				auto qto = tree_offset[i+1];
+				for (int j = qfrom; j < qto; j++) {
+					auto m = all_motions[j];
+					nn->add(m);
+				}
+			}
+			if (verbose)
+				std::cerr << "building KNN done" << std::endl;
+		};
+		build_knn();
+
 		auto qfrom = tree_offset[source];
 		auto qto = tree_offset[source+1];
 		if (verbose) {
@@ -396,6 +417,7 @@ OmplDriver::mergeExistingGraph(int KNN,
 					last_pc = pc;
 				}
 			}
+			bool knn_dirty = false;
 			for (auto n: nmotions) {
 				if (!si->checkMotion(m->state, n->state))
 					continue;
@@ -404,17 +426,42 @@ OmplDriver::mergeExistingGraph(int KNN,
 				     n->forest_index, n->motion_index;
 				edges.emplace_back(e);
 				if (version == 4) {
+#if 0
 					auto iter = knn_containing.find(n->forest_index);
 					if (iter != knn_containing.end()) {
 						// Remove the whole tree from
 						// the KNN DS
+						auto plan_start = hclock::now();
+						std::cerr << "deleting tree " << n->forest_index << std::endl;
 						for (auto t = tree_offset[n->forest_index]; t < tree_offset[n->forest_index + 1]; t++) {
 							nn->remove(all_motions[t]);
 						}
+						std::chrono::duration<uint64_t, std::nano> plan_dur = hclock::now() - plan_start;
+						latest_pn_.planning_time += plan_dur.count() * 1e-6;
 						knn_containing.erase(iter);
 					}
+#else
+					// Logically it's not necessary since
+					// knn_containing[n->forest_index]
+					// should always be true (at least for one),
+					// but the reason is not clear so
+					// let's make it explicit.
+					knn_dirty = knn_dirty || knn_containing[n->forest_index];
+					knn_containing[n->forest_index] = false;
+					if (verbose)
+						std::cerr << "mark " << n->forest_index << " as to delete" <<std::endl;
+#endif
 				}
-				
+			}
+			if (version == 4 && knn_dirty) {
+				// Rebuild is faster emperically, and ... it
+				// is also the de-facto implementation of most
+				// KNN algorithms in OMPL ...
+				auto rebuild_start = hclock::now();
+				nn->clear();
+				build_knn();
+				std::chrono::duration<uint64_t, std::nano> rebuild_dur = hclock::now() - rebuild_start;
+				latest_pn_.knn_delete_time += rebuild_dur.count() * 1e-6;
 			}
 		}
 	}
@@ -556,9 +603,9 @@ OmplDriver::updatePerformanceNumbers(ompl::app::SE3RigidBodyPlanning& setup)
 	auto real_planner = std::dynamic_pointer_cast<ompl::geometric::ReRRT>(generic_planner);
 	if (real_planner) {
 		auto nn = real_planner->_accessNearestNeighbors();
-		latest_pn_.knn_time = nn->getTimeCounter() * 1e-6;
+		latest_pn_.knn_query_time = nn->getTimeCounter() * 1e-6;
 	} else {
-		latest_pn_.knn_time = 0.0;
+		latest_pn_.knn_query_time = 0.0;
 	}
 	latest_pn_.motion_check = validator->getCheckedMotionCount();
 	latest_pn_.motion_check_time = validator->getMotionCheckTime() * 1e-6;
