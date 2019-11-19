@@ -89,6 +89,14 @@ def _pair_generator(istate_dic, gstate_dic):
             gstate = np.zeros(shape=(0)) if B is None else B[gs_index]
             yield istate, gstate, is_index, gs_index, pds_tree_index, out_dir
 
+def add_performance_numbers_to_dic(driver, dic):
+    pn = driver.latest_performance_numbers
+    dic['PF_LOG_PLAN_T'] = pn.planning_time
+    dic['PF_LOG_MCHECK_N'] = pn.motion_check
+    dic['PF_LOG_MCHECK_T'] = pn.motion_check_time
+    dic['PF_LOG_DCHECK_N'] = pn.motion_discrete_state_check
+    dic['PF_LOG_KNN_T'] = pn.knn_time
+
 def solve(args):
     driver = create_driver(args)
     ccd = (args.cdres <= 0.0)
@@ -168,12 +176,13 @@ def solve(args):
             _, _, CE = driver.get_compact_graph()
             np.savez(args.bloom_out, BLOOM=V, BLOOM_EDGE=CE)
             '''
-            np.savez(args.bloom_out,
-                     BLOOM=V,
-                     BLOOM_EDGE=np.array(E.nonzero()),
-                     IS_INDICES=driver.get_graph_istate_indices(),
-                     GS_INDICES=driver.get_graph_gstate_indices()
-                     )
+            dic = { 'BLOOM': V,
+                    'BLOOM_EDGE': np.array(E.nonzero()),
+                    'IS_INDICES': driver.get_graph_istate_indices(),
+                    'GS_INDICES': driver.get_graph_gstate_indices()
+                  }
+            add_performance_numbers_to_dic(driver, dic)
+            np.savez(args.bloom_out, **dic)
             util.log("saving bloom results to {}".format(args.bloom_out))
     if h5traj is not None:
         matio.hdf5_overwrite(h5traj, 'COMPLETE_TUPLE', complete_tuple)
@@ -226,7 +235,9 @@ def merge_blooming_forest(args):
                                                    version=args.algo_version,
                                                    subset=args.subset)
     if args.out is not None:
-        np.savez(args.out, INTER_BLOOMING_TREE_EDGES=inter_tree_edges)
+        dic = { 'INTER_BLOOMING_TREE_EDGES': inter_tree_edges }
+        add_performance_numbers_to_dic(driver, dic)
+        np.savez(args.out, **dic)
     if args.algo_version >= 2:
         return
     import networkx as nx
