@@ -138,7 +138,8 @@ def assemble_raw_keyconf(args, ws):
         base_list = []
         for scheme in RAW_KEY_PRED_SCHEMES:
             keyq = keyq_dic[scheme]
-            keyq = remove_invalid(driver, keyq)
+            if keyq.shape[0] > 0:
+                keyq = remove_invalid(driver, keyq)
             nkey = keyq.shape[0]
             if nkey != 0 and base != 0: # strip off the IG states
                 keyq = keyq[util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS:]
