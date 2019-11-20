@@ -155,6 +155,8 @@ OmplDriver::mergeExistingGraph(int KNN,
 			ttl += V.rows();
 		all_motions.reserve(ttl);
 	}
+	// PerformanceNumbers
+	auto plan_start = hclock::now();
 	latest_pn_.knn_delete_time = 0;
 	if (version == 0) {
 		/*
@@ -465,6 +467,8 @@ OmplDriver::mergeExistingGraph(int KNN,
 			}
 		}
 	}
+	std::chrono::duration<uint64_t, std::nano> plan_dur = hclock::now() - plan_start;
+	latest_pn_.planning_time = plan_dur.count() * 1e-6;
 	updatePerformanceNumbers(setup);
 	// FIXME: all_motions is leaked
 	Eigen::MatrixXi ret;
