@@ -144,7 +144,7 @@ def _predict_surface(args, ws, geo_type, generator, checkpoint_geo_type=None):
         checkpoint_geo_type = geo_type
     for puzzle_fn, puzzle_name in generator():
         if ws.nn_tags:
-            params, ws.nn_profile = hg_launcher.create_config_from_tagstring(ws.nn_tags)
+            params, rews.nn_profile = hg_launcher.create_config_from_tagstring(ws.nn_tags)
         elif ws.nn_profile:
             params = hg_launcher.create_config_from_profile(ws.nn_profile)
         else:
