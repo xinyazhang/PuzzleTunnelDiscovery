@@ -4,7 +4,7 @@ TRAIN LAUNCHER
 """
 
 import argparse
-from os.path import join,dirname,basename,isabs
+from os.path import join,dirname,basename,isabs,isfile
 import six.moves.configparser as configparser
 import sys
 
@@ -33,6 +33,8 @@ what_to_render: 'rob' # 'rob' for robot, 'env' for environment
 # 'name' was obsoluted due to confusion
 # name: 'dual-ntrs/hg_ver3-env_flat/'
 checkpoint_dir: '/CHECK/POINT/DIRECTORY/'
+# Note: do NOT change the default value here.
+#       Its default value is set by _process_config
 epoch_to_load: -1
 
 nFeats: 256
@@ -81,6 +83,7 @@ def _process_config(config):
     for section in config.sections():
         for option in config.options(section):
                 params[option] = eval(config.get(section, option))
+    params['epoch_to_load'] = None
     return params
 
 def process_config(conf_file):
@@ -188,7 +191,8 @@ def launch_with_params(params, do_training, load=False):
                             epochSize=params['epoch_size'],
                             saveStep=params['saver_step'],
                             dataset=None,
-                            load=load_dir)
+                            load=load_dir,
+                            continue_from=params['load_epoch'])
     else:
         out_dir = params['checkpoint_dir'] if 'output_dir' not in params else params['output_dir']
         model.testing_init(nEpochs=1, epochSize=params['prediction_epoch_size'], saveStep=0,

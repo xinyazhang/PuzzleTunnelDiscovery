@@ -241,7 +241,7 @@ class HourglassModel():
                 else:
                     print('Please give a Model in args (see README for further information)')
 
-    def _train(self, nEpochs = 10, epochSize = 1000, saveStep = 500, validIter = 10):
+    def _train(self, nEpochs = 10, epochSize = 1000, saveStep = 500, validIter = 10, epochStart = 0):
         """
         """
         with tf.name_scope('Train'):
@@ -270,7 +270,7 @@ class HourglassModel():
             self.resume['accur'] = []
             self.resume['loss'] = []
             self.resume['err'] = []
-            for epoch in range(nEpochs):
+            for epoch in range(epochStart, nEpochs):
                 epochstartTime = time.time()
                 avg_cost = 0.
                 cost = 0.
@@ -502,7 +502,7 @@ class HourglassModel():
                     out_file.write(out_string)
         print('Training Record Saved')
 
-    def training_init(self, nEpochs = 10, epochSize = 1000, saveStep = 500, dataset = None, load = None):
+    def training_init(self, nEpochs = 10, epochSize = 1000, saveStep = 500, dataset = None, load = None, continue_from = None):
         """ Initialize the training
         Args:
             nEpochs        : Number of Epochs to train
@@ -515,16 +515,28 @@ class HourglassModel():
             with tf.device(self.gpu):
                 self._init_weight()
                 self._define_saver_summary()
+                epochStart = 0
                 if load is not None:
-                    self.saver.restore(self.Session, tf.train.latest_checkpoint(load))
-                    print("Loading model from {}".format(load))
+                    ckpt_fn = self.get_checkpoint_name(load, continue_from)
+                    print("Loading model from {}".format(ckpt_fn))
+                    self.saver.restore(self.Session, ckpt_fn)
+                    if continue_from is not None:
+                        epochStart = continue_from + 1
+                    """
+                    if continue_from is None:
+                        self.saver.restore(self.Session, tf.train.latest_checkpoint(load))
+                        print("Loading model from {}".format(load))
+                    else:
+                        ckpt_name = f'_{continue_from}'
+                        ckpt_fn = os.path.join(load, ckpt_name)
+                    """
                 else:
                     print("Start from scratching")
                     #try:
                         #    self.saver.restore(self.Session, load)
                     #except Exception:
                         #    print('Loading Failed! (Check README file for further information)')
-                self._train(nEpochs, epochSize, saveStep, validIter=10)
+                self._train(nEpochs, epochSize, saveStep, validIter=10, epochStart=epochStart)
 
     def weighted_bce_loss(self):
         """ Create Weighted Loss Function

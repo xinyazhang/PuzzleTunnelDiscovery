@@ -76,6 +76,7 @@ def _train(args, ws, geo_type):
     params['suppress_hot'] = 0.0
     params['suppress_cold'] = 0.7
     params['dataset_name'] = f'{ws.dir}.{geo_type}'
+    params['load_epoch'] = args.load_epoch
     global_gpu_lock(ws)
     ws.timekeeper_start('train_{}'.format(geo_type))
 
@@ -222,7 +223,7 @@ def setup_parser(subparsers):
     p.add_argument('--only_wait', action='store_true')
     p.add_argument('--nn_profile', help="NN Profile", default='256hg')
     p.add_argument('--load', help="Load existing checkpoints and continue", action='store_true')
-    p.add_argument('--load_epoch', help="Load checkpoint at specific epoch for prediction", default=None, type=int)
+    p.add_argument('--load_epoch', help="Load checkpoint at specific epoch either as the starting epoch to train or predict", default=None, type=int)
     p.add_argument('--puzzle_name', help="puzzle to predict", default=None)
     util.set_common_arguments(p)
 
