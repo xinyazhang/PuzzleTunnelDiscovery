@@ -33,8 +33,10 @@ RtTexture::RtTexture()
 
 RtTexture::~RtTexture()
 {
-	if (p_)
-		glDeleteTextures(1, &p_->tex);
+	if (p_ && p_->tex != 0) {
+		CHECK_GL_ERROR(glDeleteTextures(1, &p_->tex));
+		p_->tex = 0;
+	}
 }
 
 void RtTexture::ensure(int w, int h, int nchannel, int type)
@@ -103,6 +105,15 @@ FrameBuffer::FrameBuffer()
 
 FrameBuffer::~FrameBuffer()
 {
+	deactivate();
+	if (fb_) {
+		CHECK_GL_ERROR(glDeleteFramebuffers(1, &fb_));
+		fb_ = 0;
+	}
+	if (depth_component_) {
+		CHECK_GL_ERROR(glDeleteRenderbuffers(1, &depth_component_));
+		depth_component_ = 0;
+	}
 }
 
 void FrameBuffer::attachRt(int shader_location, RtTexturePtr rt)
