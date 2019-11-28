@@ -181,6 +181,33 @@ def launch_with_params(params, do_training, load=False):
                            w_loss=params['weighted_loss'],
                            joints= params['joint_list'],
                            modif=False)
+    """
+    Cached output
+    """
+    prediction_output = None if 'prediction_output' not in params else params['prediction_output']
+    if not do_training:
+        def cache_hit(prediction_output):
+            if prediction_output is None:
+                print(f"[hg_launcher][cache miss] prediction_output was not supplied as a parameter, cache is disabled")
+                return False
+            from . import matio
+            new_hash = model.hash_saved_model(load=params['checkpoint_dir'], load_at=params['epoch_to_load'])
+            if not isfile(prediction_output):
+                print(f"[hg_launcher][cache miss] {prediction_output} does exist")
+                return False
+            d = matio.load(prediction_output)
+            if 'MODEL_BLAKE2B' not in d:
+                print(f"[hg_launcher][cache miss] {prediction_output} does not have model signature")
+                return False
+            old_hash = bytes(d['MODEL_BLAKE2B'])
+            if old_hash != new_hash:
+                print(f"[hg_launcher][cache miss] {prediction_output}'s model signature ({old_hash}) does not match our current model ({new_hash}), leaving")
+                return False
+            return True
+        if cache_hit(prediction_output):
+            print(f"[hg_launcher][cache hit] {prediction_output} is a valid cached model prediction, leaving")
+            return
+
     model.generate_model()
     if do_training:
         # TODO: passing load= to continue if checkpoint presents
@@ -200,6 +227,7 @@ def launch_with_params(params, do_training, load=False):
                            load=params['checkpoint_dir'],
                            load_at=params['epoch_to_load'],
                            out_dir=out_dir,
+                           prediction_output=prediction_output,
                            debug_predction=params['debug_predction'])
 
 def main():

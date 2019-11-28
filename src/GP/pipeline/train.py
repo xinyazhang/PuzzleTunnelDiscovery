@@ -168,6 +168,7 @@ def _predict_surface(args, ws, geo_type, generator, checkpoint_geo_type=None):
             """
             os.makedirs(ws.checkpoint_dir(checkpoint_geo_type), exist_ok=True)
             params['output_dir'] = ws.checkpoint_dir(checkpoint_geo_type) + '/'
+            params['prediction_output'] = ws.atex_prediction_file(puzzle_fn, geo_type)
         params['dataset_name'] = puzzle_name # Enforce the generated filename
         util.log("[prediction] Predicting {}:{}".format(puzzle_fn, geo_type))
         # NEVER call launch_with_params in the same process for multiple times
@@ -176,10 +177,12 @@ def _predict_surface(args, ws, geo_type, generator, checkpoint_geo_type=None):
         # hg_launcher.launch_with_params(params, do_training=False)
         proc.start()
         proc.join()
+        """
         src = join(ws.checkpoint_dir(checkpoint_geo_type), '{}-atex.npz'.format(puzzle_name))
         dst = ws.atex_prediction_file(puzzle_fn, geo_type)
         util.log("[prediction] Copy surface prediction file {} => {}".format(src, dst))
         shutil.copy(src, dst)
+        """
         ws.timekeeper_finish('predict_{}'.format(geo_type), puzzle_name)
         global_gpu_unlock(ws)
 

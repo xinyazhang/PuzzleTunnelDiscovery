@@ -94,6 +94,7 @@ class HourglassModel():
         self.njoints = len(self.joints)
         self.w_loss = w_loss
         self.c_dim = dataset.c_dim
+        self._model_hash = b''
         assert self.njoints == dataset.d_dim, 'Number of joints ({}) does not match output dimensions ({})'.format(self.njoints, dataset.d_dim)
 
     # ACCESSOR
@@ -224,6 +225,7 @@ class HourglassModel():
         del endTime, startTime, initTime, optimTime, minimTime, lrTime, accurTime, lossTime, graphTime, inputTime
 
 
+    # This function is not used anywhere, weird
     def restore(self, load = None):
         """ Restore a pretrained model
         Args:
@@ -336,13 +338,34 @@ class HourglassModel():
             print('  Relative Improvement: ' + str((self.resume['err'][-1] - self.resume['err'][0]) * 100) +'%')
             print('  Training Time: ' + str( datetime.timedelta(seconds=time.time() - startTime)))
 
-    def testing_init(self, nEpochs = 1, epochSize = 1000, saveStep = 0, dataset=None, load=None, load_at=-1, out_dir=None, debug_predction=False):
+    def get_checkpoint_name(self, load : str, load_at : int = None):
+        ckpt = tf.train.get_checkpoint_state(load)
+        if load_at is None:
+            return ckpt.model_checkpoint_path
+        ckpt_name = f'_{load_at}'
+        return os.path.join(load, ckpt_name)
+
+    def hash_saved_model(self, load : str, load_at : int = None):
+        import hashlib
+        import pathlib
+        hasher = hashlib.blake2b()
+        ckpt_prefix = self.get_checkpoint_name(load, load_at)
+        p_ckpt_full = pathlib.Path(ckpt_prefix)
+        p_ckpt_dir = p_ckpt_full.parent
+        p_ckpt_prefix = p_ckpt_full.stem
+        fns = sorted([f for f in p_ckpt_dir.glob(f'{p_ckpt_prefix}.*')])
+        for f in fns:
+            hasher.update(f.read_bytes())
+        return hasher.digest()
+
+    def testing_init(self, nEpochs = 1, epochSize = 1000, saveStep = 0, dataset=None, load=None, load_at=-1, out_dir=None, prediction_output=None, debug_predction=False):
             with tf.name_scope('Session'):
                 with tf.device(self.gpu):
                     self._init_weight()
                     self._define_saver_summary()
                     assert load is not None
 
+                    """
                     ckpt = tf.train.get_checkpoint_state(load)
                     assert ckpt and ckpt.model_checkpoint_path
                     if load_at < 0:
@@ -350,13 +373,16 @@ class HourglassModel():
                     else:
                         ckpt_name = f'_{load_at}'
                     ckpt_fn = os.path.join(load, ckpt_name)
+                    """
+                    ckpt_fn = self.get_checkpoint_name(load, load_at)
                     print(f"Restore ckpt from {ckpt_fn}")
                     self.saver.restore(self.Session, ckpt_fn)
+                    self._model_hash = self.hash_saved_model(load, load_at);
                     if out_dir is None:
                         out_dir = load
-                    self._test(nEpochs=1, epochSize=epochSize, saveStep=0, out_dir=out_dir, load_at=load_at, debug_predction=debug_predction)
+                    self._test(nEpochs=1, epochSize=epochSize, saveStep=0, out_dir=out_dir, prediction_output=prediction_output, load_at=load_at, debug_predction=debug_predction)
 
-    def _test(self, nEpochs = 1, epochSize = 1000, saveStep = 500, out_dir=None, load_at=-1, debug_predction=False):
+    def _test(self, nEpochs = 1, epochSize = 1000, saveStep = 500, out_dir=None, prediction_output=None, load_at=-1, debug_predction=False):
             assert nEpochs == 1
             assert self.w_loss is False
             assert out_dir is not None
@@ -474,13 +500,16 @@ class HourglassModel():
                     print('Epoch ' + str(epoch) + '/' + str(nEpochs) + ' done in ' + str(int(epochfinishTime-epochstartTime)) + ' sec.' + ' -avg_time/batch: ' + str(((epochfinishTime-epochstartTime)/epochSize))[:4] + ' sec.')
                 if PROFILING or PROFILING2: # Explicit better than implicit (PROFILING2 implies PROFILING)
                     return
-                npz_fn = '{}/{}-atex.npz'.format(out_dir, self.dataset_name)
+                npz_fn = '{}/{}-atex.npz'.format(out_dir, self.dataset_name) if prediction_output is None else prediction_output
                 png_fn = '{}/{}-atex.png'.format(out_dir, self.dataset_name)
                 avgnpz_fn = '{}/{}-atex-avg.npz'.format(out_dir, self.dataset_name)
                 avgpng_fn = '{}/{}-atex-avg.png'.format(out_dir, self.dataset_name)
                 print('Testing Done. Saving files to\n{}\n{}'.format(npz_fn, png_fn))
                 np.clip(atex_count, a_min=1, a_max=None, out=atex_count)
-                np.savez(npz_fn, ATEX=atex, COUNT=atex_count)
+                if prediction_output is None:
+                    np.savez(npz_fn, ATEX=atex, COUNT=atex_count)
+                else:
+                    np.savez(npz_fn, ATEX=atex, COUNT=atex_count, MODEL_BLAKE2B=self._model_hash)
                 np.savez(avgnpz_fn, ATEX=atex/atex_count)
                 natex = atex / np.amax(atex)
                 imsave(png_fn, natex)
