@@ -36,6 +36,7 @@ checkpoint_dir: '/CHECK/POINT/DIRECTORY/'
 # Note: do NOT change the default value here.
 #       Its default value is set by _process_config
 epoch_to_load: -1
+multichannel: False
 
 nFeats: 256
 nStacks: 2 # 2 is good enough
@@ -135,6 +136,10 @@ def create_config_from_tagstring(tagstring):
         ret['weighted_loss'] = True
     if '-aug' in tags:
         ret['enable_augmentation'] = False
+    if '+multichannel' in tags:
+        # Note 'joints' should also be modified, but we do not have this info yet.
+        #      This info is added at hg_datagen.create_dataset_from_params()
+        ret['multichannel'] = True
     if 'lowmem' in tags:
         ret['batch_size'] = 2
         ret['epoch_size'] = 2000
@@ -150,6 +155,7 @@ def launch_with_params(params, do_training, load=False):
     dataset = datagen.create_dataset_from_params(params)
     params['nepochs'] = 25 + 50 * dataset.number_of_geometries
 
+    assert dataset.d_dim == 4
     params['num_joints'] = dataset.d_dim
     assert params['weighted_loss'] is False, "No support for weighted loss for now"
 

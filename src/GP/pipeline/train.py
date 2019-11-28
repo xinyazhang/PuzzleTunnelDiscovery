@@ -67,9 +67,13 @@ def _train(args, ws, geo_type):
         params = hg_launcher.create_default_config()
 
     all_omplcfgs = []
+    all_puzzle_names = []
     for puzzle_fn, puzzle_name in ws.training_puzzle_generator():
         all_omplcfgs.append(puzzle_fn)
+        all_puzzle_names.append(f'{puzzle_name}.piece1')
+        all_puzzle_names.append(f'{puzzle_name}.piece2')
     params['all_ompl_configs'] = all_omplcfgs
+    params['all_puzzle_names'] = all_puzzle_names
 
     params['what_to_render'] = geo_type
     params['checkpoint_dir'] = ws.checkpoint_dir(geo_type) + '/'
@@ -141,6 +145,14 @@ def _predict_surface(args, ws, geo_type, generator, checkpoint_geo_type=None):
         rews.nn_profile = ws.nn_profile
     else:
         rews = ws
+    all_puzzle_names = []
+    all_omplcfgs = []
+    for puzzle_fn, puzzle_name in rews.training_puzzle_generator():
+        all_omplcfgs.append(puzzle_fn)
+        all_puzzle_names.append(f'{puzzle_name}.piece1')
+        all_puzzle_names.append(f'{puzzle_name}.piece2')
+    assert len(all_puzzle_names) == 4, all_puzzle_names
+
     if checkpoint_geo_type is None:
         checkpoint_geo_type = geo_type
     for puzzle_fn, puzzle_name in generator():
@@ -150,6 +162,10 @@ def _predict_surface(args, ws, geo_type, generator, checkpoint_geo_type=None):
             params = hg_launcher.create_config_from_profile(ws.nn_profile)
         else:
             params = hg_launcher.create_default_config()
+        if params['multichannel']:
+            params['all_puzzle_names'] = all_puzzle_names
+        else:
+            assert False
         if args.puzzle_name is not None and args.puzzle_name != puzzle_name:
             continue
         global_gpu_lock(ws)

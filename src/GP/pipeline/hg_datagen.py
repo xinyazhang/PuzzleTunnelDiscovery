@@ -89,10 +89,9 @@ class MultiPuzzleDataSet(object):
     def __init__(self, render_flag, q_range=1.0, res=256,
                  patch_size=32, aug_patch=False, aug_scaling=0.0, aug_dict={},
                  flat_surface=False, gen_surface_normal=False,
-                 weighted_loss=False):
+                 weighted_loss=False, multichannel=None):
         self.gen_surface_normal = gen_surface_normal
         self.c_dim = 1 + 3 + 1 if gen_surface_normal else 4
-        self.d_dim = 1
         self.render_flag = render_flag
         self.res = res
         self.patch_size = np.array([patch_size, patch_size], dtype=np.int32)
@@ -102,6 +101,11 @@ class MultiPuzzleDataSet(object):
         self.q_range = q_range
         self.renders = []
         self.weighted_loss = weighted_loss
+        self.multichannel = multichannel
+
+    @property
+    def d_dim(self):
+        return self.multichannel if self.multichannel is not None else 1
 
     @property
     def number_of_geometries(self):
@@ -124,7 +128,9 @@ class MultiPuzzleDataSet(object):
         '''
         aug_scaling = self.aug_scaling
         while True:
-            subds = random.choice(self.renders)
+            subds_index = random.randint(0, self.number_of_geometries - 1)
+            subds = self.renders[subds_index]
+            # subds = random.choice(self.renders)
             r = subds.r
             train_img = np.zeros((batch_size, self.res, self.res, self.c_dim), dtype = np.float32)
             if is_training:
@@ -167,10 +173,13 @@ class MultiPuzzleDataSet(object):
                     if self.aug_patch:
                         aug.augment_image(rgbd, self.aug_dict, i, train_img, hm,
                                           random_patch_size=self.patch_size)
-                    hm = np.expand_dims(hm, axis=0) # reshape to [1, 256, 256]
+                    hm = np.expand_dims(hm, axis=0) # reshape to [1, 256, 256, 1]
                     aug.flip_images(i, train_img, 0, hm)
 
-                    train_gtmap[i] = np.repeat(hm, stacks, axis=0) # each hourglass needs an output
+                    if self.multichannel is not None:
+                        train_gtmap[i,:,:,:,subds_index:subds_index+1] = np.repeat(hm, stacks, axis=0) # each hourglass needs an output
+                    else:
+                        train_gtmap[i] = np.repeat(hm, stacks, axis=0) # each hourglass needs an output
                 else:
                     r.render_mvrgbd(self.render_flag|pyosr.Renderer.UV_FEEDBACK)
                     uv_map[i] = r.mvuv.reshape((self.res, self.res, 2))
@@ -183,7 +192,9 @@ class MultiPuzzleDataSet(object):
 
 def create_multidataset(ompl_cfgs, geo_type, res=256,
                         aug_patch=True, aug_scaling=1.0, aug_dict={},
-                        gen_surface_normal=False, weighted_loss=False):
+                        gen_surface_normal=False, weighted_loss=False,
+                        multichannel=None
+                        ):
     render_flag = pyosr.Renderer.NO_SCENE_RENDERING
     patch_size=64
     ds = MultiPuzzleDataSet(render_flag=render_flag,
@@ -193,7 +204,8 @@ def create_multidataset(ompl_cfgs, geo_type, res=256,
                             aug_dict=aug_dict,
                             aug_scaling=aug_scaling,
                             gen_surface_normal=gen_surface_normal,
-                            weighted_loss=weighted_loss
+                            weighted_loss=weighted_loss,
+                            multichannel=multichannel
                             )
     def gen_from_geo_type(cfg, geo_type):
         p = pathlib.Path(cfg.rob_fn).parents[0]
@@ -226,12 +238,22 @@ def create_dataset_from_params(params):
     geo_type = params['what_to_render']
     aug_dict = craft_dict(params)
     gen_surface_normal = bool(params['training_data_include_surface_normal']) if 'training_data_include_surface_normal' in params else False
+    print(f"create_dataset_from_params with {params}")
+    nchannel = None
+    if params['multichannel']:
+        params['joint_list'] = list(params['all_puzzle_names'])
+        nchannel = len(params['joint_list'])
     dataset = create_multidataset(params['all_ompl_configs'],
                                   geo_type=geo_type,
                                   aug_patch=params['enable_augmentation'],
                                   aug_scaling=0.5,
                                   aug_dict=aug_dict,
                                   gen_surface_normal=gen_surface_normal,
-                                  weighted_loss=params['weighted_loss'])
+                                  weighted_loss=params['weighted_loss'],
+                                  multichannel=nchannel
+                                  )
+    if params['multichannel']:
+        assert dataset.d_dim == nchannel
+        params['num_joints'] = dataset.d_dim
     return dataset
 

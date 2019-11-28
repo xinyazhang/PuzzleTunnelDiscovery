@@ -248,7 +248,7 @@ class HourglassModel():
         """
         with tf.name_scope('Train'):
             self.generator = self.dataset._aux_generator(self.batchSize, self.nStack, normalize = True, sample_set = 'train')
-            if True:
+            if False:
                 debug_generator = self.dataset._aux_generator(64, self.nStack, normalize = True, sample_set = 'train')
                 img_train, gt_train, weight_train = next(debug_generator)
                 out_dir = 'debug-test'
@@ -388,8 +388,9 @@ class HourglassModel():
             assert out_dir is not None
             assert saveStep <= 0
             tres = 2048
-            atex = np.zeros(shape=(tres,tres), dtype=np.float32) # accumulator texture
-            atex_count = np.zeros(shape=(tres,tres), dtype=np.int) # present in the input image
+            ndim = self.njoints
+            atex = np.zeros(shape=(tres,tres, ndim), dtype=np.float32) # accumulator texture
+            atex_count = np.zeros(shape=(tres,tres, ndim), dtype=np.int) # present in the input image
 
             debug_out_dir = 'debug-test'
             if False:
@@ -451,7 +452,7 @@ class HourglassModel():
                                 labeli = np.reshape(labeli, (64,64))
                                 labeli = np.kron(labeli, np.ones((4,4))) # 64x64 -> 256x256
                             elif self.nLow == 6:
-                                labeli = np.reshape(labeli, (256,256))
+                                mc_labeli = np.reshape(labeli, (256,256, ndim))
                             else:
                                 raise NotImplemented()
                             if debug_predction:
@@ -470,25 +471,27 @@ class HourglassModel():
                                 index += 1
                             # util.log("uvi: {}".format(uvi.shape))
                             # util.log("labeli: {}".format(labeli.shape))
-                            nz = np.nonzero(labeli)
-                            scores = labeli[nz]
-                            uvs = uvi[nz]
-                            # util.log("uvs: {}".format(uvs.shape))
-                            us = 1.0 - uvs[:,1]
-                            us = np.array(tres * us, dtype=int)
-                            vs = uvs[:,0]
-                            vs = np.array(tres * vs, dtype=int)
-                            # Filtering US and VS
-                            us_inrange = (us >= 0)
-                            us_inrange = np.logical_and(us < tres, us_inrange) # Not sure the effect when out=one of the input
-                            vs_inrange = (vs >= 0)
-                            vs_inrange = np.logical_and(vs < tres, vs_inrange) # Not sure the effect when out=one of the input
-                            inrange = np.logical_and(us_inrange, vs_inrange)
-                            f_us = us[inrange]
-                            f_vs = vs[inrange]
-                            f_sc = scores[inrange]
-                            atex[f_us,f_vs] += f_sc
-                            atex_count[f_us,f_vs] += 1
+                            for channel in range(ndim):
+                                labeli = mc_labeli[:,:,channel]
+                                nz = np.nonzero(labeli)
+                                scores = labeli[nz]
+                                uvs = uvi[nz]
+                                # util.log("uvs: {}".format(uvs.shape))
+                                us = 1.0 - uvs[:,1]
+                                us = np.array(tres * us, dtype=int)
+                                vs = uvs[:,0]
+                                vs = np.array(tres * vs, dtype=int)
+                                # Filtering US and VS
+                                us_inrange = (us >= 0)
+                                us_inrange = np.logical_and(us < tres, us_inrange) # Not sure the effect when out=one of the input
+                                vs_inrange = (vs >= 0)
+                                vs_inrange = np.logical_and(vs < tres, vs_inrange) # Not sure the effect when out=one of the input
+                                inrange = np.logical_and(us_inrange, vs_inrange)
+                                f_us = us[inrange]
+                                f_vs = vs[inrange]
+                                f_sc = scores[inrange]
+                                atex[f_us,f_vs, channel] += f_sc
+                                atex_count[f_us,f_vs, channel] += 1
                             '''
                             # TODO: Better efficiency
                             for iu,iv,s in zip(us,vs,scores):
@@ -501,20 +504,22 @@ class HourglassModel():
                 if PROFILING or PROFILING2: # Explicit better than implicit (PROFILING2 implies PROFILING)
                     return
                 npz_fn = '{}/{}-atex.npz'.format(out_dir, self.dataset_name) if prediction_output is None else prediction_output
-                png_fn = '{}/{}-atex.png'.format(out_dir, self.dataset_name)
                 avgnpz_fn = '{}/{}-atex-avg.npz'.format(out_dir, self.dataset_name)
-                avgpng_fn = '{}/{}-atex-avg.png'.format(out_dir, self.dataset_name)
-                print('Testing Done. Saving files to\n{}\n{}'.format(npz_fn, png_fn))
+                print('Testing Done. Saving files to\n{}'.format(npz_fn))
                 np.clip(atex_count, a_min=1, a_max=None, out=atex_count)
                 if prediction_output is None:
                     np.savez(npz_fn, ATEX=atex, COUNT=atex_count)
                 else:
                     np.savez(npz_fn, ATEX=atex, COUNT=atex_count, MODEL_BLAKE2B=self._model_hash)
                 np.savez(avgnpz_fn, ATEX=atex/atex_count)
-                natex = atex / np.amax(atex)
-                imsave(png_fn, natex)
-                natex = atex/atex_count
-                imsave(avgpng_fn, natex)
+                if False: # PNG
+                    print('Saving Image to\n{}'.format(png_fn))
+                    png_fn = '{}/{}-atex.png'.format(out_dir, self.dataset_name)
+                    avgpng_fn = '{}/{}-atex-avg.png'.format(out_dir, self.dataset_name)
+                    natex = atex / np.amax(atex)
+                    imsave(png_fn, natex)
+                    natex = atex/atex_count
+                    imsave(avgpng_fn, natex)
 
     def record_training(self, record):
         """ Record Training Data and Export them in CSV file
