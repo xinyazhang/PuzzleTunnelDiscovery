@@ -125,7 +125,7 @@ def assemble_raw_keyconf(args, ws):
     if args.no_wait:
         return
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
-        driver = create_driver(puzzle_fn)
+        # driver = create_driver(puzzle_fn)
         fl = FileLocations(args, ws, puzzle_name)
         keyq_dic = {}
         for scheme, fn in fl.raw_key_fn_gen:
@@ -138,11 +138,11 @@ def assemble_raw_keyconf(args, ws):
         base_list = []
         for scheme in RAW_KEY_PRED_SCHEMES:
             keyq = keyq_dic[scheme]
-            if keyq.shape[0] > 0:
-                keyq = remove_invalid(driver, keyq)
+            #keyq = remove_invalid(driver, keyq)
             nkey = keyq.shape[0]
             if nkey != 0 and base != 0: # strip off the IG states
                 keyq = keyq[util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS:]
+                nkey = keyq.shape[0]
             keyq_list.append(keyq)
             if base == 0:
                 base_list.append(util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS if nkey > 0 else 0)
@@ -588,6 +588,11 @@ def connect_knn(args, ws):
         G = nx.Graph()
         G.add_nodes_from([i for i in range(len(BLOOM_NO_TO_INDEX))] + [VIRTUAL_OPEN_SPACE_NODE])
         G.add_edges_from(dedupITE)
+        """
+        # Goal tree is default at open set
+        openset = [1]
+        virtual_edges = [(1, VIRTUAL_OPEN_SPACE_NODE)]
+        """
         openset = []
         virtual_edges = []
         """

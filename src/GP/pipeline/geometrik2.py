@@ -62,9 +62,12 @@ def predict_geratio_key_worker(ws, wag_pair):
     1. Translate to OMPL configuration
     2. Prefix initial state and goal state
     """
-    uw = util.create_unit_world(wag1.puzzle_fn)
-    ompl_q = uw.translate_vanilla_to_ompl(kqs)
-    ompl_q = prefix_iq_and_gq(wag1, ompl_q)
+    if kqs.shape[0] != 0:
+        uw = util.create_unit_world(wag1.puzzle_fn)
+        ompl_q = uw.translate_vanilla_to_ompl(kqs)
+        ompl_q = prefix_iq_and_gq(wag1, ompl_q)
+    else:
+        ompl_q = kqs
 
     kfn = FMT_to_file(ws, wag1, util.GERATIO_KEY_FMT)
     np.savez(kfn, KEYQ_OMPL=ompl_q, ENV_KEYID=keyid1, ROB_KEYID=keyid2)
