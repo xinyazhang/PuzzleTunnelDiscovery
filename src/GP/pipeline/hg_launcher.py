@@ -153,7 +153,7 @@ def launch_with_params(params, do_training, load=False):
     assert 'dataset_name' in params
     ds_name = params['dataset_name']
     dataset = datagen.create_dataset_from_params(params)
-    params['nepochs'] = 25 + 50 * dataset.number_of_geometries
+    params['nepochs'] = 25 + 75 * dataset.number_of_geometries
 
     assert dataset.d_dim == 4
     params['num_joints'] = dataset.d_dim
