@@ -17,7 +17,6 @@
 #include "config_planner.h"
 #include <iostream>
 #include <vector>
-#include <unordered_set>
 
 enum {
 	MODEL_PART_ENV = 0,

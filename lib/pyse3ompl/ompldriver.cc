@@ -1,5 +1,6 @@
 #include "ompldriver.h"
 #include <chrono>
+#include <unordered_set>
 
 using hclock = std::chrono::high_resolution_clock;
 using GraphV = OmplDriver::GraphV;
@@ -341,7 +342,7 @@ OmplDriver::mergeExistingGraph(int KNN,
 				}
 			}
 		}/*}}}*/
-	} else if (version == 3 || version == 4) {
+	} else if (version >= 3 && version <= 6) {
 		/*
  		 * Version 3 and 4 are the multi-processed variants of Version 0.
 		 *
@@ -357,7 +358,8 @@ OmplDriver::mergeExistingGraph(int KNN,
 		auto NTree = ex_graph_v_.size();
 		std::vector<int> tree_offset(NTree + 1);
 		ex_knn_.clear();
-		auto nn = createKNNForRDT(real_planner.get());
+		// do NOT create yet another KNN!
+		// auto nn = createKNNForRDT(real_planner.get());
 		ex_knn_.emplace_back(nn);
 		int source = subset[0];
 
@@ -377,6 +379,23 @@ OmplDriver::mergeExistingGraph(int KNN,
 		}
 		// upper bound.
 		tree_offset[NTree] = all_motions.size();
+		if (version == 5) {
+			std::cerr << "NN DS: " << nn->getName() << std::endl;
+			auto real_nn = std::dynamic_pointer_cast<ompl::NearestNeighborsGNATNoThreadSafety<Motion*> >(nn);
+			if (!real_nn)
+				throw std::runtime_error(std::string("nn is not ompl::NearestNeighborsGNATNoThreadSafety"));
+			auto nsize = std::max(real_nn->getRemovedCacheSize(), all_motions.size()/10);
+			real_nn->setRemovedCacheSize(nsize);
+		}
+		if (version == 6) {
+			auto mask_func = [&knn_containing](const Motion* node) -> bool {
+				return knn_containing[node->forest_index];
+			};
+			auto real_nn = std::dynamic_pointer_cast<ompl::NearestNeighborsGNATNoThreadSafety<Motion*> >(nn);
+			if (!real_nn)
+				throw std::runtime_error(std::string("Version 6 requires nn to be ompl::NearestNeighborsGNATNoThreadSafety"));
+			real_nn->setMaskFunction(mask_func);
+		}
 
 		// Lambda function to build KNN DS
 		// Capture everything by reference, and will be called again
@@ -420,6 +439,7 @@ OmplDriver::mergeExistingGraph(int KNN,
 				}
 			}
 			bool knn_dirty = false;
+			std::unordered_set<int> to_remove;
 			for (auto n: nmotions) {
 				if (!si->checkMotion(m->state, n->state))
 					continue;
@@ -427,7 +447,7 @@ OmplDriver::mergeExistingGraph(int KNN,
 				e << m->forest_index, m->motion_index,
 				     n->forest_index, n->motion_index;
 				edges.emplace_back(e);
-				if (version == 4) {
+				if (version == 4 || version == 6) {
 #if 0
 					auto iter = knn_containing.find(n->forest_index);
 					if (iter != knn_containing.end()) {
@@ -454,6 +474,9 @@ OmplDriver::mergeExistingGraph(int KNN,
 						std::cerr << "mark " << n->forest_index << " as to delete" <<std::endl;
 #endif
 				}
+				if (version == 5) {
+					to_remove.insert(n->forest_index);
+				}
 			}
 			if (version == 4 && knn_dirty) {
 				// Rebuild is faster emperically, and ... it
@@ -462,6 +485,18 @@ OmplDriver::mergeExistingGraph(int KNN,
 				auto rebuild_start = hclock::now();
 				nn->clear();
 				build_knn();
+				std::chrono::duration<uint64_t, std::nano> rebuild_dur = hclock::now() - rebuild_start;
+				latest_pn_.knn_delete_time += rebuild_dur.count() * 1e-6;
+			}
+			if (version == 5 && !to_remove.empty()) {
+				auto rebuild_start = hclock::now();
+				for (auto ti : to_remove) {
+					auto qfrom = tree_offset[ti];
+					auto qto = tree_offset[ti+1];
+					for (auto j = qfrom; j < qto; j++) {
+						nn->remove(all_motions[j]);
+					}
+				}
 				std::chrono::duration<uint64_t, std::nano> rebuild_dur = hclock::now() - rebuild_start;
 				latest_pn_.knn_delete_time += rebuild_dur.count() * 1e-6;
 			}
