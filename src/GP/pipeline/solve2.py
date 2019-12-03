@@ -50,9 +50,6 @@ def remove_invalid(driver, ompl_q):
     preds = ompl_q[RESERVE:]
     valids = driver.validate_states(preds)
     indices = valids.reshape((-1)).nonzero()[0]
-    print(f'{preds.shape}')
-    print(f'{valids}')
-    print(f'{indices}')
     return util.safe_concatente([reserve, preds[indices, :]])
 
 class ScreeningPartition(object):
