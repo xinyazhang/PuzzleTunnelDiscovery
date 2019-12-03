@@ -59,6 +59,8 @@ def write_pidfile(pidfile, pid):
         print(pid, file=f)
 
 def _train(args, ws, geo_type):
+    if args.load_epoch is not None:
+        assert args.load, "--load_epoch has zero effect if --load is not specified"
     if ws.nn_tags:
         params, ws.nn_profile = hg_launcher.create_config_from_tagstring(ws.nn_tags)
     elif ws.nn_profile:
