@@ -45,9 +45,15 @@ def create_driver(puzzle_fn):
     return driver
 
 def remove_invalid(driver, ompl_q):
-    valids = driver.validate_states(ompl_q)
+    RESERVE = util.RDT_FOREST_INIT_AND_GOAL_RESERVATIONS
+    reserve = ompl_q[:RESERVE]
+    preds = ompl_q[RESERVE:]
+    valids = driver.validate_states(preds)
     indices = valids.reshape((-1)).nonzero()[0]
-    return ompl_q[indices, :]
+    print(f'{preds.shape}')
+    print(f'{valids}')
+    print(f'{indices}')
+    return util.safe_concatente([reserve, preds[indices, :]])
 
 class ScreeningPartition(object):
     def __init__(self, ws, key_fn):
@@ -294,7 +300,8 @@ Note: In stage starting from bloomings, we are NOT going to evaluate the schemes
 """
 def valid_puzzle_generator(ws, args):
     # ALGO_VERSION = 3
-    ALGO_VERSION = 4
+    ALGO_VERSION = 4 if args.algorithm_version is None else args.algorithm_version
+    # ALGO_VERSION = 5
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
         fl = FileLocations(args, ws, puzzle_name, ALGO_VERSION=ALGO_VERSION)
         key_fn = fl.screened_key_fn
@@ -725,6 +732,7 @@ def setup_parser(subparsers, module_name='solve2'):
                    choices=KEY_PRED_SCHEMES,
                    required=True)
     p.add_argument('--rerun', action='store_true')
+    p.add_argument('--algorithm_version', help="Override NN algorithm version.", type=int, default=None)
     """
     p.add_argument('--current_trial', help='Trial to solve the puzzle', type=str, default='0')
     p.add_argument('dir', help='Workspace directory')
