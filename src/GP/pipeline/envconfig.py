@@ -117,6 +117,7 @@ MeshBoolGranularity = 1024
 # UVProjectGranularity = 1024
 
 [Prediction]
+Enable = yes
 # Set the number of processes that predict the key configuration from
 # the surface distribution, auto means number of (logic) processors
 NumberOfPredictionProcesses = auto

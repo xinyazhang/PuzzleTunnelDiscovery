@@ -5,6 +5,7 @@ from . import matio
 from . import util
 import os
 from os.path import join, isdir, isfile
+import pathlib
 
 FEAT_PRED_SCHEMES = ['ge', 'nt' ]
 RAW_KEY_PRED_SCHEMES = ['ge', 'nt', 'nn']
@@ -156,6 +157,15 @@ class FileLocations(object):
         return join(self.bloom, 'bloom-from_0.npz')
 
     @property
+    def bloom_fn_gen(self):
+        keys = matio.safeload(self.screened_key_fn, key='KEYQ_OMPL')
+        NTree = keys.shape[0]
+        def gen():
+            for i in range(NTree):
+                yield i, join(self.bloom, f'bloom-from_{i}.npz')
+        return gen()
+
+    @property
     def pds_fn(self):
         fn ='{}.npz'.format(self.trial)
         return join(self.pds, fn)
@@ -174,8 +184,8 @@ class FileLocations(object):
 
     @property
     def knn_fn_gen(self):
-        keys = matio.load(self.screened_key_fn)
-        NTree = keys['KEYQ_OMPL'].shape[0]
+        keys = matio.safeload(self.screened_key_fn, key='KEYQ_OMPL')
+        NTree = keys.shape[0]
         def gen():
             for i in range(NTree):
                 yield i, join(self.knn, f'pairwise_knn_edges-{i}.npz')

@@ -47,13 +47,21 @@ def load(fn, key=None):
         return d[key]
     return d
 
-def safeload(fn, key):
+def safeopen(fn):
+    p = pathlib.PosixPath(fn)
+    try:
+        d = _SUFFIX_TO_LOADER[p.suffix](fn)
+        return d
+    except Exception as e:
+        return {}
+
+def safeload(fn, key, fallback=np.array([])):
     p = pathlib.PosixPath(fn)
     try:
         d = _SUFFIX_TO_LOADER[p.suffix](fn)
         return d[key]
     except Exception as e:
-        return np.array([])
+        return np.copy(fallback)
 
 """
 load_safeshape:

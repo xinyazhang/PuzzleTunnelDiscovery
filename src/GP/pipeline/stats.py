@@ -449,17 +449,32 @@ class Tabler(object):
     }
 
 class FeatStatTabler(Tabler):
+    """
+    Variables to list schemes
+
+    Commonly override
+    """
     SCHEMES = FEAT_PRED_SCHEMES
 
     def __init__(self, args):
         self.args = args
 
+    """
+    _fl_to_raw_data: generate raw data for each FileLocations object
+
+    Commonly override
+    """
     def _fl_to_raw_data(self, fl):
         for geo_type in ['env', 'rob']:
             keyfn = fl.get_feat_pts_fn(geo_type)
             key = fl.feat_npz_key
             yield geo_type, matio.load_safeshape(keyfn, key)[0]
 
+    """
+    raw_data_gen: generate raw data from (dir, trial, puzzle_fn) tuples
+
+    Rarely override
+    """
     def raw_data_gen(self):
         args = self.args
         trial_list = util.rangestring_to_list(args.trial_range)
@@ -468,7 +483,7 @@ class FeatStatTabler(Tabler):
             for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
                 for trial in trial_list:
                     ws.current_trial = trial
-                    fl = FileLocations(args, ws, puzzle_name)
+                    fl = FileLocations(args, ws, puzzle_name, ALGO_VERSION=4)
                     for scheme in self.SCHEMES:
                         fl.update_scheme(scheme)
                         for geo_type, data in self._fl_to_raw_data(fl):
@@ -476,6 +491,8 @@ class FeatStatTabler(Tabler):
 
     """
     Collect (puzzle_name, geo_type, number of feature points/key confs) tuples
+
+    Rarely override
     """
     def collect_raw_data(self):
         dic = {}
@@ -485,6 +502,11 @@ class FeatStatTabler(Tabler):
             _dic_add_path(dic, p, nfeat)
         return dic
 
+    """
+    Helper function used by collect_agg_data
+
+    No need to override since its caller (collect_agg_data) is overrided
+    """
     def where_gen(self, where_list):
         for puzzle_name_str, geo_type_str in where_list:
             puzzle_names = puzzle_name_str.split(',')
@@ -493,7 +515,9 @@ class FeatStatTabler(Tabler):
                 yield n, t
 
     """
-    Aggregrate the dict into paper-ready csv
+    Aggregate the dict into paper-ready csv
+
+    Commonly override
     """
     def collect_agg_data(self, dic):
         adic = {}
@@ -512,18 +536,33 @@ class FeatStatTabler(Tabler):
             adic[name] = ad
         return adic
 
+    """
+    Read header of the table as the first row of matrix
+
+    Commonly override
+    """
     def get_matrix_cols(self):
         row = []
         for scheme, stat in itertools.product(self.SCHEMES, ['mean', 'stdev']):
             row += [f'{scheme}.{stat}']
         return row
 
+    """
+    Read the matrix item from the aggressive dict
+
+    Commonly override
+    """
     def get_matrix_item(self, adic, row_name, col_name):
         p = [row_name, col_name]
         # print(f"fetching {p}")
         f = _dic_fetch_path(adic, p)
         return f
 
+    """
+    Translate the aggressive dict into read-to-print matrix
+
+    Rarely override
+    """
     def collect_matrix(self, adic):
         matrix = []
         row = ['Puzzle Name'] + self.get_matrix_cols()
@@ -536,6 +575,14 @@ class FeatStatTabler(Tabler):
             matrix.append(row)
         return matrix
 
+    """
+    Run the whole tabler engine, including:
+        1. Collect raw data
+        2. Aggressive statistical data into dict
+        3. Translate dict into ready-for-print matrix.
+
+    Rarely override
+    """
     def print(self):
         dic = self.collect_raw_data()
         print(dic)
@@ -608,6 +655,7 @@ class SolveStatTabler(FeatStatTabler):
         else:
             yield 'solve', None # TODO: add baseline support
 
+    # TODO: merge this with KeyStatTabler's collect_agg_data
     def collect_agg_data(self, dic):
         adic = {}
         for puzzle_name in dic.keys():
@@ -627,10 +675,7 @@ class SolveStatTabler(FeatStatTabler):
         return adic
 
     def get_matrix_cols(self):
-        row = []
-        for scheme in self.SCHEMES:
-            row += [f'{scheme}']
-        return row
+        return self.SCHEMES
 
     def get_matrix_item(self, adic, row_name, col_name):
         p = [row_name, f'{col_name}.solve.solved']
@@ -644,6 +689,71 @@ class SolveStatTabler(FeatStatTabler):
 
 def solve(args):
     tabler = SolveStatTabler(args)
+    tabler.print()
+
+
+class PlannerTimingTabler(FeatStatTabler):
+    # SCHEMES = KEY_PRED_SCHEMES
+    SCHEMES = ['cmb']
+    """
+    PF_KEYS is the 'geo_type' of FeatStatTabler
+    """
+    PF_KEYS = ['PF_LOG_PLAN_T',
+            # 'PF_LOG_MCHECK_N',
+            'PF_LOG_MCHECK_T',
+            # 'PF_LOG_DCHECK_N',
+            'PF_LOG_KNN_QUERY_T',
+            'PF_LOG_KNN_DELETE_T',
+            ]
+
+    def __init__(self, args):
+        super().__init__(args)
+
+    def _fl_to_raw_data(self, fl):
+        """
+        Data from blooming tree
+        """
+        for i, fn in fl.bloom_fn_gen:
+            d = matio.safeopen(fn)
+            for k in self.PF_KEYS:
+                if k in d:
+                    yield k, d[k]
+        for i, fn in fl.knn_fn_gen:
+            d = matio.safeopen(fn)
+            for k in self.PF_KEYS:
+                if k in d:
+                    yield k, d[k]
+
+    # TODO: merge this with KeyStatTabler's collect_agg_data
+    def collect_agg_data(self, dic):
+        adic = {}
+        for puzzle_name in dic.keys():
+            ad = {}
+            for scheme, pf_key in itertools.product(self.SCHEMES, self.PF_KEYS):
+                p = [puzzle_name, scheme, pf_key]
+                l = _dic_fetch_path(dic, p)
+                ad[f'{scheme}.{pf_key}.list'] = l
+                ad[f'{scheme}.{pf_key}.mean'] = [float(np.mean(l))]
+                ad[f'{scheme}.{pf_key}.stdev'] = [float(np.std(l))]
+                ad[f'{scheme}.{pf_key}.sum'] = [float(np.sum(l))]
+            if puzzle_name in self.PAPER_TRANSLATION:
+                name = self.PAPER_TRANSLATION[puzzle_name]
+            else:
+                name = puzzle_name
+            adic[name] = ad
+        return adic
+
+    def get_matrix_cols(self):
+        return self.PF_KEYS
+
+    def get_matrix_item(self, adic, row_name, col_name):
+        p = [row_name, f'cmb.{col_name}.sum']
+        # print(f"fetching {p}")
+        f = _dic_fetch_path(adic, p)
+        return [f'{f[0] / 1e3 / 3600:.2f} hrs']
+
+def timing_the_planner(args):
+    tabler = PlannerTimingTabler(args)
     tabler.print()
 
 def _print_latex(matrix, float_fmt="{0:.2f}", file=None, align=4):
@@ -680,6 +790,7 @@ function_dict = {
         'feat' : feat,
         'keyq' : keyq,
         'solve' : solve,
+        'timing_the_planner' : timing_the_planner,
 }
 
 def setup_parser(subparsers):
@@ -726,6 +837,11 @@ def setup_parser(subparsers):
     p = toolp.add_parser('solve', help='Collect chance to solve into a table')
     p.add_argument('--trial_range', help='range of trials', type=str, required=True)
     p.add_argument('--tex', help='Output paper-ready table body TeX', default='sol.tex')
+    p.add_argument('dirs', help='Archived workspace directory.', nargs='+')
+
+    p = toolp.add_parser('timing_the_planner', help='Collect timing of the blooming and forest connection into a table')
+    p.add_argument('--trial_range', help='range of trials', type=str, required=True)
+    p.add_argument('--tex', help='Output paper-ready table body TeX', default='planner_pf.tex')
     p.add_argument('dirs', help='Archived workspace directory.', nargs='+')
 
 def run(args):
