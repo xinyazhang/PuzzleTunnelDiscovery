@@ -68,6 +68,7 @@ def visnnpred(args):
         if args.puzzle_name and puzzle_name != args.puzzle_name:
             continue
         cfg, config = parse_ompl.parse_simple(puzzle_fn)
+        """
         env_npz = ws.atex_prediction_file(puzzle_fn, 'env', trial_override=args.current_trial)
         util.shell(['./atex2green.py', env_npz])
         rob_npz = ws.atex_prediction_file(puzzle_fn, 'rob', trial_override=args.current_trial)
@@ -76,6 +77,13 @@ def visnnpred(args):
         util.shell(['./vistexture', cfg.env_fn, str(p.with_suffix('.png'))])
         p = pathlib.Path(rob_npz)
         util.shell(['./vistexture', cfg.rob_fn, str(p.with_suffix('.png'))])
+        """
+        env_npz = ws.atex_prediction_file(puzzle_fn, 'env', trial_override=args.current_trial)
+        rob_npz = ws.atex_prediction_file(puzzle_fn, 'rob', trial_override=args.current_trial)
+        p = pathlib.Path(env_npz)
+        util.shell(['./vistexture.py', cfg.env_fn, str(p)])
+        p = pathlib.Path(rob_npz)
+        util.shell(['./vistexture.py', cfg.rob_fn, str(p)])
 
 def visnnsample(args):
     import pyosr

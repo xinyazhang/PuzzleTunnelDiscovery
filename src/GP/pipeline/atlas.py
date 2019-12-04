@@ -1,5 +1,6 @@
 import numpy as np
 import sys
+import random
 
 from scipy.interpolate import interp2d
 NAN = np.NAN
@@ -48,19 +49,14 @@ def _bilinear(raster, u, v):
            _sample(pixi[0], pixi[1]+1) * (1.0 - r[0]) * r[1] + \
            _sample(pixi[0] + 1, pixi[1] + 1) * r[0] * r[1]
 
-class AtlasSampler(object):
+class SingleChannelAtlasSampler(object):
 
-    def __init__(self, atlas2prim_fn, surface_prediction_fn, geo_type, geo_id):
+    def __init__(self, atlas2prim, atlas, geo_type, geo_id):
         self._geo_type = geo_type
         self._geo_id = geo_id
         # FIXME: Notify users to run corresponding commands when files not found
-        self._atlas2prim = np.load(atlas2prim_fn)['PRIM']
-        if surface_prediction_fn is not None:
-            d = np.load(surface_prediction_fn)
-            self._atlas = d['ATEX']
-        else:
-            # surface_prediction_fn is None -> uniform distribution
-            self._atlas = np.clip(self._atlas2prim + 1, a_min=0, a_max=1).astype(np.float64)
+        self._atlas2prim = atlas2prim
+        self._atlas = atlas
         #np.clip(self._atlas, 0.0, None, out=self._atlas) # Clips out negative weights
         print("RAW ATLAS Sum {} Max {} Min {} Mean {} Stddev {}".format(
             np.sum(self._atlas),
@@ -229,3 +225,18 @@ class AtlasSampler(object):
         if self._debug_v3d is not None:
             self._debug_v3d.append(v3d)
         return v3d, normal, uv, prim
+
+class AtlasSampler(object):
+    def __init__(self, atlas2prim_fn, surface_prediction_fn, geo_type, geo_id):
+        self._atlas2prim = np.load(atlas2prim_fn)['PRIM']
+        if surface_prediction_fn is None:
+            self._mc_atlas = np.clip(self._atlas2prim + 1, a_min=0, a_max=1).astype(np.float64)
+        else:
+            self._mc_atlas = matio.load(surface_prediction_fn, key='ATEX')
+        if len(self._mc_atlas.shape) == 2:
+            self._mc_atlas = np.expand_dims(self._mc_atlas, 2)
+        self._as = [SingleChannelAtlasSampler(self._atlas2prim, self._mc_atlas[:,:,i], geo_type, geo_id) for i in range(self._mc_atlas.shape[2]) ]
+
+    def sample(self, r, unit=True):
+        ats = random.choice(self._as)
+        return ats.sample(r, unit)
