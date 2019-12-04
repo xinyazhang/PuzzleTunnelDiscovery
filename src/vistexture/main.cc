@@ -22,7 +22,7 @@ void usage()
 	std::cerr << R"xxx(Usage: vistexture <.obj file> <.png texture> [optional point cloud OBJ file] [optional point size])xxx" << std::endl;
 }
 
-bool key_up(Viewer& viewer, unsigned char key, int modifier)
+bool key_up(Viewer& viewer, unsigned int key, int modifier)
 {
 #if 0
 	if (key == 'f' or key == 'F') {
