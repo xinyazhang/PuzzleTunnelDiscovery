@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <queue>
 #include <random>
+#include <omp.h>
 #include <igl/doublearea.h>
 #include <igl/cross.h>
 #include <igl/barycentric_coordinates.h>

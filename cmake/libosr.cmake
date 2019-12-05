@@ -13,6 +13,8 @@ target_include_directories(osr BEFORE PRIVATE ${ODE_INCLUDE_DIRS})
 target_compile_definitions(osr PRIVATE ${ODE_CFLAGS}) # Required, float or double
 target_link_libraries(osr PRIVATE ${ODE_LIBRARIES})
 
+target_link_libraries(osr PUBLIC OpenMP::OpenMP_CXX)
+
 ## OPTIONAL FUNCTION 1: rendering
 if (USE_GPU)
 	target_compile_definitions(osr PUBLIC GPU_ENABLED=1)

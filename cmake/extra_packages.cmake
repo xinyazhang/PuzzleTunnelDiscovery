@@ -6,7 +6,7 @@ find_package(Threads REQUIRED)
 SET(CMAKE_THREAD_LIBS_INIT Threads::Threads)
 MESSAGE("Threads: ${CMAKE_THREAD_LIBS_INIT}")
 message(STATUS "AFTER Thread CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
-find_package(OpenMP)
+find_package(OpenMP REQUIRED)
 
 # GPU and visualizer
 SET(USE_GPU FALSE)
