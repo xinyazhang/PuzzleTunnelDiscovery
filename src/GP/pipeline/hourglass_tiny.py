@@ -350,7 +350,7 @@ class HourglassModel():
                 for i in range(validIter):
                     img_valid, gt_valid, w_valid = next(self.generator)
                     accuracy_pred = self.Session.run(self.joint_accur, feed_dict = {self.img : img_valid, self.gtMaps: gt_valid})
-                    accuracy_array += np.array(accuracy_pred, dtype = self.fp_type) / validIter
+                    accuracy_array += np.array(accuracy_pred) / validIter
                 print('--Avg. Accuracy =', str((np.sum(accuracy_array) / len(accuracy_array)) * 100)[:6], '%' )
                 self.resume['accur'].append(accuracy_pred)
                 self.resume['err'].append(np.sum(accuracy_array) / len(accuracy_array))
@@ -414,7 +414,7 @@ class HourglassModel():
             assert saveStep <= 0
             tres = 2048
             ndim = self.njoints
-            atex = np.zeros(shape=(tres,tres, ndim), dtype=self.fp_type) # accumulator texture
+            atex = np.zeros(shape=(tres,tres, ndim), dtype=np.float32) # accumulator texture
             atex_count = np.zeros(shape=(tres,tres, ndim), dtype=np.int) # present in the input image
 
             debug_out_dir = 'debug-test'
