@@ -47,7 +47,30 @@ class HourglassModel():
     Generate TensorFlow model to train and predict Human Pose from images (soon videos)
     Please check README.txt for further information on model management.
     """
-    def __init__(self, nFeat = 512, nStack = 4, nModules = 1, nLow = 4, outputDim = 16, batch_size = 16, drop_rate = 0.2, lear_rate = 2.5e-4, decay = 0.96, decay_step = 2000, dataset = None, dataset_name='', training = True, w_summary = True, logdir_train = None, logdir_test = None,tiny = True, attention = False,modif = True,w_loss = False, ckpt_dir = 'tiny_hourglass',  joints = ['r_anckle', 'r_knee', 'r_hip', 'l_hip', 'l_knee', 'l_anckle', 'pelvis', 'thorax', 'neck', 'head', 'r_wrist', 'r_elbow', 'r_shoulder', 'l_shoulder', 'l_elbow', 'l_wrist']):
+    def __init__(self,
+                 nFeat = 512,
+                 nStack = 4,
+                 nModules = 1,
+                 nLow = 4,
+                 outputDim = 16,
+                 batch_size = 16,
+                 drop_rate = 0.2,
+                 lear_rate = 2.5e-4,
+                 decay = 0.96,
+                 decay_step = 2000,
+                 dataset = None,
+                 dataset_name='',
+                 training = True,
+                 w_summary = True,
+                 logdir_train = None,
+                 logdir_test = None,
+                 tiny = True,
+                 attention = False,
+                 modif = True,
+                 w_loss = False,
+                 ckpt_dir = 'tiny_hourglass',
+                 joints = ['r_anckle', 'r_knee', 'r_hip', 'l_hip', 'l_knee', 'l_anckle', 'pelvis', 'thorax', 'neck', 'head', 'r_wrist', 'r_elbow', 'r_shoulder', 'l_shoulder', 'l_elbow', 'l_wrist'],
+                 use_fp16 = False):
         """ Initializer
         Args:
             nStack                : number of stacks (stage/Hourglass modules)
@@ -95,6 +118,7 @@ class HourglassModel():
         self.w_loss = w_loss
         self.c_dim = dataset.c_dim
         self._model_hash = b''
+        self.fp_type = tf.float16 if use_fp16 else tf.float32
         assert self.njoints == dataset.d_dim, 'Number of joints ({}) does not match output dimensions ({})'.format(self.njoints, dataset.d_dim)
 
     # ACCESSOR
@@ -103,7 +127,7 @@ class HourglassModel():
         """ Returns Input (Placeholder) Tensor
         Image Input :
             Shape: (None,256,256,c_dim)
-            Type : tf.float32
+            Type : self.fp_type
         Warning:
             Be sure to build the model first
         """
@@ -112,7 +136,7 @@ class HourglassModel():
         """ Returns Output Tensor
         Output Tensor :
             Shape: (None, nbStacks, 64, 64, outputDim)
-            Type : tf.float32
+            Type : self.fp_type
         Warning:
             Be sure to build the model first
         """
@@ -121,7 +145,7 @@ class HourglassModel():
         """ Returns Label (Placeholder) Tensor
         Image Input :
             Shape: (None, nbStacks, 64, 64, outputDim)
-            Type : tf.float32
+            Type : self.fp_type
         Warning:
             Be sure to build the model first
         """
@@ -130,7 +154,7 @@ class HourglassModel():
         """ Returns Loss Tensor
         Image Input :
             Shape: (1,)
-            Type : tf.float32
+            Type : self.fp_type
         Warning:
             Be sure to build the model first
         """
@@ -152,19 +176,19 @@ class HourglassModel():
         with tf.device(self.gpu):
             with tf.name_scope('inputs'):
                 # Shape Input Image - batchSize: None, height: 256, width: 256, channel: 3 (RGB)
-                self.img = tf.placeholder(dtype= tf.float32, shape= (None, 256, 256, self.c_dim), name = 'input_img')
+                self.img = tf.placeholder(dtype = self.fp_type, shape= (None, 256, 256, self.c_dim), name = 'input_img')
                 if self.w_loss:
-                    self.weights = tf.placeholder(dtype = tf.float32, shape = (None, self.outDim))
+                    self.weights = tf.placeholder(dtype = self.fp_type, shape = (None, self.outDim))
                 if self.nLow == 4:
                     # Shape Ground Truth Map: batchSize x nStack x 64 x 64 x outDim
-                    self.gtMaps = tf.placeholder(dtype = tf.float32, shape = (None, self.nStack, 64, 64, self.outDim))
+                    self.gtMaps = tf.placeholder(dtype = self.fp_type, shape = (None, self.nStack, 64, 64, self.outDim))
                 elif self.nLow == 6:
                     # Ground Truth Map Ver 2: batchSize x nStack x 256 x 256 x outDim
-                    self.gtMaps = tf.placeholder(dtype = tf.float32, shape = (None, self.nStack, 256, 256, self.outDim))
+                    self.gtMaps = tf.placeholder(dtype = self.fp_type, shape = (None, self.nStack, 256, 256, self.outDim))
 
                 # TODO : Implement weighted loss function
                 # NOT USABLE AT THE MOMENT
-                #weights = tf.placeholder(dtype = tf.float32, shape = (None, self.nStack, 1, 1, self.outDim))
+                #weights = tf.placeholder(dtype = self.fp_type, shape = (None, self.nStack, 1, 1, self.outDim))
             inputTime = time.time()
             print('---Inputs : Done (' + str(int(abs(inputTime-startTime))) + ' sec.)')
             if self.attention:
@@ -179,6 +203,7 @@ class HourglassModel():
                 else:
                     print(f'--Loss b/w: {self.output.shape} and {self.gtMaps.shape}')
                     self.loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=self.output, labels= self.gtMaps), name= 'cross_entropy_loss')
+                print(f'--Loss {self.loss}')
             lossTime = time.time()
             print('---Loss : Done (' + str(int(abs(graphTime-lossTime))) + ' sec.)')
         with tf.device(self.cpu):
@@ -325,7 +350,7 @@ class HourglassModel():
                 for i in range(validIter):
                     img_valid, gt_valid, w_valid = next(self.generator)
                     accuracy_pred = self.Session.run(self.joint_accur, feed_dict = {self.img : img_valid, self.gtMaps: gt_valid})
-                    accuracy_array += np.array(accuracy_pred, dtype = np.float32) / validIter
+                    accuracy_array += np.array(accuracy_pred, dtype = self.fp_type) / validIter
                 print('--Avg. Accuracy =', str((np.sum(accuracy_array) / len(accuracy_array)) * 100)[:6], '%' )
                 self.resume['accur'].append(accuracy_pred)
                 self.resume['err'].append(np.sum(accuracy_array) / len(accuracy_array))
@@ -389,7 +414,7 @@ class HourglassModel():
             assert saveStep <= 0
             tres = 2048
             ndim = self.njoints
-            atex = np.zeros(shape=(tres,tres, ndim), dtype=np.float32) # accumulator texture
+            atex = np.zeros(shape=(tres,tres, ndim), dtype=self.fp_type) # accumulator texture
             atex_count = np.zeros(shape=(tres,tres, ndim), dtype=np.int) # present in the input image
 
             debug_out_dir = 'debug-test'
@@ -577,9 +602,12 @@ class HourglassModel():
         WORK IN PROGRESS <- should work now
         """
         # sigmoid_cross_entropy_with_logits output: (batch, GlassNo., W, H, C)
+        print(f'--Loss among: {self.output.shape}, {self.gtMaps.shape} and {self.weights.shape}')
         xe = tf.nn.sigmoid_cross_entropy_with_logits(logits=self.output, labels= self.gtMaps, name='cross_entropy_loss_ND')
+        print(f'--xe: {xe.shape}')
         self.xe_batch_channel = tf.reduce_mean(xe, axis=[1,2,3], keepdims=False)
-        return tf.multiply(xe_batch_channel, self.weights, name = 'lossW')
+        print(f'--xe_batch_channel: {self.xe_batch_channel.shape}')
+        return tf.multiply(self.xe_batch_channel, self.weights, name = 'lossW')
         """
         self.bceloss = tf.reduce_mean(, name=)
         e1 = tf.expand_dims(self.weights,axis = 1, name = 'expdim01')
@@ -776,7 +804,8 @@ class HourglassModel():
         """
         with tf.name_scope(name):
             # Kernel for convolution, Xavier Initialisation
-            kernel = tf.Variable(tf.contrib.layers.xavier_initializer(uniform=False)([kernel_size,kernel_size, inputs.get_shape().as_list()[3], filters]), name= 'weights')
+            print(f"{inputs.dtype}")
+            kernel = tf.Variable(tf.contrib.layers.xavier_initializer(uniform=False, dtype=inputs.dtype)([kernel_size,kernel_size, inputs.get_shape().as_list()[3], filters]), name= 'weights', dtype=inputs.dtype)
             conv = tf.nn.conv2d(inputs, kernel, [1,strides,strides,1], padding=pad, data_format='NHWC')
             if self.w_summary:
                 with tf.device('/cpu:0'):
@@ -796,7 +825,8 @@ class HourglassModel():
             norm            : Output Tensor
         """
         with tf.name_scope(name):
-            kernel = tf.Variable(tf.contrib.layers.xavier_initializer(uniform=False)([kernel_size,kernel_size, inputs.get_shape().as_list()[3], filters]), name= 'weights')
+            print(f"{inputs.dtype}")
+            kernel = tf.Variable(tf.contrib.layers.xavier_initializer(uniform=False, dtype=inputs.dtype)([kernel_size,kernel_size, inputs.get_shape().as_list()[3], filters]), name= 'weights', dtype=inputs.dtype)
             conv = tf.nn.conv2d(inputs, kernel, [1,strides,strides,1], padding='VALID', data_format='NHWC')
             norm = tf.contrib.layers.batch_norm(conv, 0.9, epsilon=1e-5, activation_fn = tf.nn.relu, is_training = self.training)
             if self.w_summary:
@@ -967,7 +997,7 @@ class HourglassModel():
             pad = tf.pad(inputs, np.array([[0,0],[1,1],[1,1],[0,0]]))
             U = self._conv(pad, filters=1, kernel_size=3, strides=1)
             pad_2 = tf.pad(U, np.array([[0,0],[padding,padding],[padding,padding],[0,0]]))
-            sharedK = tf.Variable(tf.contrib.layers.xavier_initializer(uniform=False)([lrnSize,lrnSize, 1, 1]), name= 'shared_weights')
+            sharedK = tf.Variable(tf.contrib.layers.xavier_initializer(uniform=False)([lrnSize,lrnSize, 1, 1]), name= 'shared_weights', dtype=pad_2.dtype)
             Q = []
             C = []
             for i in range(itersize):

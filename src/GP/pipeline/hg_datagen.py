@@ -14,6 +14,7 @@ sys.path.append(os.getcwd())
 from . import image_augmentation as aug
 from . import parse_ompl
 import pyosr
+from . import util
 
 class OsrDataSet(object):
     dpy = None
@@ -89,7 +90,7 @@ class MultiPuzzleDataSet(object):
     def __init__(self, render_flag, q_range=1.0, res=256,
                  patch_size=32, aug_patch=False, aug_scaling=0.0, aug_dict={},
                  flat_surface=False, gen_surface_normal=False,
-                 weighted_loss=False, multichannel=None):
+                 weighted_loss=False, multichannel=None, use_fp16=False):
         self.gen_surface_normal = gen_surface_normal
         self.c_dim = 1 + 3 + 1 if gen_surface_normal else 4
         self.render_flag = render_flag
@@ -102,6 +103,7 @@ class MultiPuzzleDataSet(object):
         self.renders = []
         self.weighted_loss = weighted_loss
         self.multichannel = multichannel
+        self.fp_type = np.float16 if use_fp16 else np.float32
 
     @property
     def d_dim(self):
@@ -128,20 +130,22 @@ class MultiPuzzleDataSet(object):
         '''
         aug_scaling = self.aug_scaling
         while True:
-            subds_index = random.randint(0, self.number_of_geometries - 1)
-            subds = self.renders[subds_index]
-            # subds = random.choice(self.renders)
-            r = subds.r
-            train_img = np.zeros((batch_size, self.res, self.res, self.c_dim), dtype = np.float32)
+            train_img = np.zeros((batch_size, self.res, self.res, self.c_dim), dtype = self.fp_type)
             if is_training:
-                train_gtmap = np.zeros((batch_size, stacks, self.res, self.res, self.d_dim), np.float32)
+                train_gtmap = np.zeros((batch_size, stacks, self.res, self.res, self.d_dim), self.fp_type)
             else:
-                uv_map = np.zeros((batch_size, self.res, self.res, 2), np.float32)
-            if self.weighted_loss:
-                train_weights = np.zeros((batch_size, self.d_dim), np.float32)
+                uv_map = np.zeros((batch_size, self.res, self.res, 2), self.fp_type)
+            if self.weighted_loss or self.multichannel is not None:
+                train_weights = np.zeros((batch_size, self.d_dim), self.fp_type)
             else:
                 train_weights = None
             for i in range(batch_size):
+                subds_index = random.randint(0, self.number_of_geometries - 1)
+                subds = self.renders[subds_index]
+                # subds = random.choice(self.renders)
+                r = subds.r
+                if self.multichannel is not None:
+                    train_weights[i, subds_index] = 1
                 """
                 Scaling
                 """
@@ -193,7 +197,7 @@ class MultiPuzzleDataSet(object):
 def create_multidataset(ompl_cfgs, geo_type, res=256,
                         aug_patch=True, aug_scaling=1.0, aug_dict={},
                         gen_surface_normal=False, weighted_loss=False,
-                        multichannel=None
+                        multichannel=None, params={}
                         ):
     render_flag = pyosr.Renderer.NO_SCENE_RENDERING
     patch_size=64
@@ -205,7 +209,8 @@ def create_multidataset(ompl_cfgs, geo_type, res=256,
                             aug_scaling=aug_scaling,
                             gen_surface_normal=gen_surface_normal,
                             weighted_loss=weighted_loss,
-                            multichannel=multichannel
+                            multichannel=multichannel,
+                            use_fp16=params['fp16']
                             )
     def gen_from_geo_type(cfg, geo_type):
         p = pathlib.Path(cfg.rob_fn).parents[0]
@@ -221,6 +226,9 @@ def create_multidataset(ompl_cfgs, geo_type, res=256,
     for ompl_cfg in ompl_cfgs:
         cfg, _ = parse_ompl.parse_simple(ompl_cfg)
         for rob, env, rob_texfn in gen_from_geo_type(cfg, geo_type):
+            if not os.path.isfile(rob_texfn):
+                util.warn(f'{ompl_cfgs} does not contain ground truth file {rob_texfn}')
+                continue
             ds.add_puzzle(rob=rob, env=env, rob_texfn=rob_texfn)
     return ds
 
@@ -250,7 +258,8 @@ def create_dataset_from_params(params):
                                   aug_dict=aug_dict,
                                   gen_surface_normal=gen_surface_normal,
                                   weighted_loss=params['weighted_loss'],
-                                  multichannel=nchannel
+                                  multichannel=nchannel,
+                                  params=params
                                   )
     if params['multichannel']:
         assert dataset.d_dim == nchannel

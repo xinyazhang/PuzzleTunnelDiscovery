@@ -37,6 +37,7 @@ checkpoint_dir: '/CHECK/POINT/DIRECTORY/'
 #       Its default value is set by _process_config
 epoch_to_load: -1
 multichannel: False
+fp16: False
 
 nFeats: 256
 nStacks: 2 # 2 is good enough
@@ -61,6 +62,7 @@ learning_rate: 0.00025
 learning_rate_decay: 0.96
 decay_step: 3000
 weighted_loss: False
+
 [Validation]
 # valid_iteration: 10
 
@@ -134,11 +136,17 @@ def create_config_from_tagstring(tagstring):
         ret['training_data_include_surface_normal'] = 1
     if '+weight' in tags:
         ret['weighted_loss'] = True
+    if '+tiny' in tags:
+        ret['tiny'] = True
+    if '+fp16' in tags:
+        ret['fp16'] = True
     if '-aug' in tags:
         ret['enable_augmentation'] = False
     if '+multichannel' in tags:
         # Note 'joints' should also be modified, but we do not have this info yet.
         #      This info is added at hg_datagen.create_dataset_from_params()
+        #      Also, the 'weighted_loss' should be orthogonal to mutichannel; they share the same loss function,
+        #      but with different way to generate weigths.
         ret['multichannel'] = True
     if 'lowmem' in tags:
         ret['batch_size'] = 2
@@ -155,7 +163,7 @@ def launch_with_params(params, do_training, load=False):
     dataset = datagen.create_dataset_from_params(params)
     params['nepochs'] = 25 + 75 * dataset.number_of_geometries
 
-    assert dataset.d_dim == 4
+    assert dataset.d_dim == 4, f'{dataset.d_dim} != 4'
     params['num_joints'] = dataset.d_dim
     assert params['weighted_loss'] is False, "No support for weighted loss for now"
 
@@ -184,9 +192,10 @@ def launch_with_params(params, do_training, load=False):
                            logdir_train=join(params['checkpoint_dir'], 'training.log'),
                            logdir_test=join(params['checkpoint_dir'], 'testing.log'),
                            tiny=params['tiny'],
-                           w_loss=params['weighted_loss'],
+                           w_loss=params['weighted_loss'] or params['multichannel'],
                            joints= params['joint_list'],
-                           modif=False)
+                           modif=False,
+                           use_fp16=params['fp16'])
     """
     Cached output
     """
