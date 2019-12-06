@@ -54,7 +54,7 @@ PYBIND11_MODULE(pyse3ompl, m) {
 		     py::arg("days"),
 		     py::arg("output_fn") = std::string(),
 		     py::arg("return_ve") = false,
-		     py::arg("sbudget") = -1,
+		     py::arg("ec_budget") = -1,
 		     py::arg("record_compact_tree") = false,
 		     py::arg("continuous_motion_validator") = false
 		    )

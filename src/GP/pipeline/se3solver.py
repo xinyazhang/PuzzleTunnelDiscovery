@@ -125,10 +125,13 @@ def solve(args):
 
     if args.replace_istate is None and args.replace_gstate is None:
         return_ve = args.bloom_out is not None
-        V, _ = driver.solve(args.days, args.out, sbudget=args.sbudget, return_ve=return_ve)
+        V, _ = driver.solve(args.days, args.out, ec_budget=args.ec_budget, return_ve=return_ve)
         if args.trajectory_out:
             is_complete = (driver.latest_solution_status == plan.EXACT_SOLUTION)
-            np.savez(args.trajectory_out, OMPL_TRAJECTORY=driver.latest_solution, FLAG_IS_COMPLETE=is_complete)
+            dic = { 'OMPL_TRAJECTORY' : driver.latest_solution,
+                    'FLAG_IS_COMPLETE' : is_complete }
+            add_performance_numbers_to_dic(driver, dic)
+            np.savez(args.trajectory_out, **dic)
         return
 
     h5traj = None
@@ -147,7 +150,7 @@ def solve(args):
                 print("skipping exising file {} and {}".format(ssc_fn, tree_fn))
                 continue
         return_ve = bool(args.bloom_out is not None or args.trajectory_out)
-        V,E = driver.solve(args.days, return_ve=return_ve, sbudget=args.sbudget, record_compact_tree=record_compact_tree, continuous_motion_validator=ccd)
+        V,E = driver.solve(args.days, return_ve=return_ve, ec_budget=args.ec_budget, record_compact_tree=record_compact_tree, continuous_motion_validator=ccd)
         '''
         if isdir(out_path):
             savemat('{}/tree-{}.mat'.format(out_path, index), dict(V=V, E=E), do_compression=True)
@@ -208,7 +211,7 @@ def merge_forest(args):
     for fn in matgen(args.trees):
         d = loadmat(fn)
         driver.add_existing_graph(d['V'], d['E'])
-    V,E = driver.solve(args.days, return_ve=True, sbudget=args.sbudget)
+    V,E = driver.solve(args.days, return_ve=True, ec_budget=args.ec_budget)
     if args.out is not None:
         savemat(args.out, dict(V=V, E=E), do_compression=True)
 

@@ -10,7 +10,7 @@ std::tuple<GraphV, GraphE>
 OmplDriver::solve(double days,
                   const std::string& output_fn,
 		  bool return_ve,
-		  int_least64_t sbudget,
+		  int_least64_t ec_budget,
 		  bool record_compact_tree,
 		  bool continuous)
 {
@@ -46,12 +46,38 @@ OmplDriver::solve(double days,
 			throw std::runtime_error("record_compact_tree requires set_sample_set");
 		}
 	}
-	if (sbudget > 0)
-		throw std::runtime_error("sbudget is not implemented");
 	latest_solution_.resize(0, 0);
 	latest_solution_status_ = ompl::base::PlannerStatus::UNKNOWN;
 	auto plan_start = hclock::now();
-	auto status = setup.solve(3600 * 24 * days);
+	ompl::base::PlannerStatus status;
+	if (ec_budget > 0) {
+		auto si = setup.getSpaceInformation();
+		auto validator = si->getMotionValidator();
+		auto last_mc_count = validator->getCheckedMotionCount();
+		auto last_mc_change = hclock::now();
+		ompl::base::PlannerTerminationConditionFn ptc;
+		ptc = [&validator, ec_budget, &last_mc_count, &last_mc_change]() -> bool {
+			auto mc_count = validator->getCheckedMotionCount();
+			if (mc_count == last_mc_count) {
+				auto delta = hclock::now() - last_mc_change;
+				if (delta > std::chrono::minutes(15)) {
+					std::cout << "FATAL: DETECTED STAGNATIATION OF MOTION CHECK."
+					          << " THE COUNTER STAYED AT " << last_mc_count
+					          << " FOR MORE THAN 15 MINUTES. "
+					          << " CANCELLING FUTURE EXECUTION"
+					          << std::endl;
+					return true;
+				}
+			} else {
+				last_mc_count = mc_count;
+				last_mc_change = hclock::now();
+			}
+			return mc_count > ec_budget;
+		};
+		status = setup.solve(ptc);
+	} else {
+		status = setup.solve(3600 * 24 * days);
+	}
 	std::chrono::duration<uint64_t, std::nano> plan_dur = hclock::now() - plan_start;
 	latest_pn_.planning_time = plan_dur.count() * 1e-6;
 	if (status) {
