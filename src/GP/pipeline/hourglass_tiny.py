@@ -221,7 +221,10 @@ class HourglassModel():
             #with tf.name_scope('rmsprop'):
                 #self.optimizer = tf.train.RMSPropOptimizer(learning_rate= self.lr)
             with tf.name_scope('adam'):
-                self.optimizer = tf.train.AdamOptimizer(learning_rate=self.lr)
+                if self.fp_type == tf.float16:
+                    self.optimizer = tf.train.AdamOptimizer(learning_rate=self.lr, epsilon=1e-4)
+                else:
+                    self.optimizer = tf.train.AdamOptimizer(learning_rate=self.lr)
             optimTime = time.time()
             print('---Optim : Done (' + str(int(abs(optimTime-lrTime))) + ' sec.)')
             with tf.name_scope('minimizer'):
