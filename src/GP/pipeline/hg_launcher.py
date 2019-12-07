@@ -162,6 +162,8 @@ def launch_with_params(params, do_training, load=False):
     ds_name = params['dataset_name']
     dataset = datagen.create_dataset_from_params(params)
     params['nepochs'] = 25 + 75 * dataset.number_of_geometries
+    if 'max_epoch' in params:
+        params['nepochs'] = params['max_epoch']
 
     assert dataset.d_dim == 4, f'{dataset.d_dim} != 4'
     params['num_joints'] = dataset.d_dim

@@ -226,9 +226,11 @@ def create_multidataset(ompl_cfgs, geo_type, res=256,
     for ompl_cfg in ompl_cfgs:
         cfg, _ = parse_ompl.parse_simple(ompl_cfg)
         for rob, env, rob_texfn in gen_from_geo_type(cfg, geo_type):
+            """
             if not os.path.isfile(rob_texfn):
                 util.warn(f'{ompl_cfgs} does not contain ground truth file {rob_texfn}')
                 continue
+            """
             ds.add_puzzle(rob=rob, env=env, rob_texfn=rob_texfn)
     return ds
 

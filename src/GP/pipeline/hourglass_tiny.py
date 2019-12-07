@@ -367,6 +367,7 @@ class HourglassModel():
         ckpt = tf.train.get_checkpoint_state(load)
         if load_at is None:
             return ckpt.model_checkpoint_path
+        print(f"get_checkpoint_name: load {load} load_at {load_at} ckpt {ckpt} ckpt_name {ckpt_name}")
         ckpt_name = f'_{load_at}'
         return os.path.join(load, ckpt_name)
 
@@ -399,6 +400,7 @@ class HourglassModel():
                         ckpt_name = f'_{load_at}'
                     ckpt_fn = os.path.join(load, ckpt_name)
                     """
+                    print(f"Loading ckpt from dir {load} at index {load_at}")
                     ckpt_fn = self.get_checkpoint_name(load, load_at)
                     print(f"Restore ckpt from {ckpt_fn}")
                     self.saver.restore(self.Session, ckpt_fn)
@@ -409,7 +411,7 @@ class HourglassModel():
 
     def _test(self, nEpochs = 1, epochSize = 1000, saveStep = 500, out_dir=None, prediction_output=None, load_at=-1, debug_predction=False):
             assert nEpochs == 1
-            assert self.w_loss is False
+            # assert self.w_loss is False
             assert out_dir is not None
             assert saveStep <= 0
             tres = 2048
