@@ -370,8 +370,8 @@ class HourglassModel():
         ckpt = tf.train.get_checkpoint_state(load)
         if load_at is None:
             return ckpt.model_checkpoint_path
-        print(f"get_checkpoint_name: load {load} load_at {load_at} ckpt {ckpt} ckpt_name {ckpt_name}")
         ckpt_name = f'_{load_at}'
+        print(f"get_checkpoint_name: load {load} load_at {load_at} ckpt {ckpt} ckpt_name {ckpt_name}")
         return os.path.join(load, ckpt_name)
 
     def hash_saved_model(self, load : str, load_at : int = None):
