@@ -142,6 +142,8 @@ def create_config_from_tagstring(tagstring):
         ret['fp16'] = True
     if '-aug' in tags:
         ret['enable_augmentation'] = False
+    if 'feat128' in tags:
+        ret['nfeats'] = 128
     if '+multichannel' in tags:
         # Note 'joints' should also be modified, but we do not have this info yet.
         #      This info is added at hg_datagen.create_dataset_from_params()
