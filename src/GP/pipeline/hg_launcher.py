@@ -167,7 +167,7 @@ def launch_with_params(params, do_training, load=False):
     if 'max_epoch' in params:
         params['nepochs'] = params['max_epoch']
 
-    assert dataset.d_dim == 4, f'{dataset.d_dim} != 4'
+    # assert dataset.d_dim == 4, f'{dataset.d_dim} != 4'
     params['num_joints'] = dataset.d_dim
     assert params['weighted_loss'] is False, "No support for weighted loss for now"
 
