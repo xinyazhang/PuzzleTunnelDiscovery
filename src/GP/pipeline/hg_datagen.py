@@ -197,7 +197,7 @@ class MultiPuzzleDataSet(object):
 def create_multidataset(ompl_cfgs, geo_type, res=256,
                         aug_patch=True, aug_scaling=1.0, aug_dict={},
                         gen_surface_normal=False, weighted_loss=False,
-                        multichannel=None, params={}
+                        multichannel=None, params={}, for_training=False
                         ):
     render_flag = pyosr.Renderer.NO_SCENE_RENDERING
     patch_size=64
@@ -223,7 +223,8 @@ def create_multidataset(ompl_cfgs, geo_type, res=256,
             yield cfg.env_fn, cfg.env_fn, str(p.joinpath('env_chart_screened_uniform.png'))
         else:
             assert False
-    for ompl_cfg in ompl_cfgs:
+    piece_id = 0
+    for ompl_cfg in sorted(ompl_cfgs): # has to be sorted, to have a consistent order
         cfg, _ = parse_ompl.parse_simple(ompl_cfg)
         for rob, env, rob_texfn in gen_from_geo_type(cfg, geo_type):
             """
@@ -231,7 +232,9 @@ def create_multidataset(ompl_cfgs, geo_type, res=256,
                 util.warn(f'{ompl_cfgs} does not contain ground truth file {rob_texfn}')
                 continue
             """
-            ds.add_puzzle(rob=rob, env=env, rob_texfn=rob_texfn)
+            if not for_training or not params['single_piece'] or piece_id == params['piece_id']:
+                ds.add_puzzle(rob=rob, env=env, rob_texfn=rob_texfn)
+            piece_id += 1
     return ds
 
 def craft_dict(params):
@@ -243,7 +246,7 @@ def craft_dict(params):
             dic[k] = 0.0
     return dic
 
-def create_dataset_from_params(params):
+def create_dataset_from_params(params, for_training=False):
     assert 'all_ompl_configs' in params, "all_ompl_configs is mandatory"
     geo_type = params['what_to_render']
     aug_dict = craft_dict(params)
@@ -261,7 +264,8 @@ def create_dataset_from_params(params):
                                   gen_surface_normal=gen_surface_normal,
                                   weighted_loss=params['weighted_loss'],
                                   multichannel=nchannel,
-                                  params=params
+                                  params=params,
+                                  for_training=for_training
                                   )
     if params['multichannel']:
         assert dataset.d_dim == nchannel

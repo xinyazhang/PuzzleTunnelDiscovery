@@ -222,7 +222,7 @@ class HourglassModel():
                 #self.optimizer = tf.train.RMSPropOptimizer(learning_rate= self.lr)
             with tf.name_scope('adam'):
                 if self.fp_type == tf.float16:
-                    self.optimizer = tf.train.AdamOptimizer(learning_rate=self.lr, epsilon=1e-4)
+                    self.optimizer = tf.train.AdamOptimizer(learning_rate=self.lr, epsilon=1e-4, beta1=0.5)
                 else:
                     self.optimizer = tf.train.AdamOptimizer(learning_rate=self.lr)
             optimTime = time.time()

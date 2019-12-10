@@ -37,6 +37,7 @@ checkpoint_dir: '/CHECK/POINT/DIRECTORY/'
 #       Its default value is set by _process_config
 epoch_to_load: -1
 multichannel: False
+multichannel_no_weight: False
 fp16: False
 
 nFeats: 256
@@ -62,6 +63,8 @@ learning_rate: 0.00025
 learning_rate_decay: 0.96
 decay_step: 3000
 weighted_loss: False
+single_piece: False
+piece_id: -1
 
 [Validation]
 # valid_iteration: 10
@@ -132,6 +135,8 @@ def create_config_from_tagstring(tagstring):
         ret['batch_size'] = 4
     if 'hg4' in tags:
         ret['nstacks'] = 4
+    if 'hg1' in tags:
+        ret['nstacks'] = 1
     if '+normal' in tags:
         ret['training_data_include_surface_normal'] = 1
     if '+weight' in tags:
@@ -150,6 +155,18 @@ def create_config_from_tagstring(tagstring):
         #      Also, the 'weighted_loss' should be orthogonal to mutichannel; they share the same loss function,
         #      but with different way to generate weigths.
         ret['multichannel'] = True
+    if '+multichannel_no_weight' in tags:
+        ret['multichannel_no_weight'] = True
+    if '+single_piece' in tags:
+        assert ret['multichannel'] == False, '+single_piece is incompatible with +multichannel'
+        piece_id = None
+        for tag in tags:
+            if tag.startswith('piece#'):
+                assert piece_id is None, 'multiple piece# is not allowed'
+                piece_id = int(tag[len('piece#'):])
+        assert piece_id is not None, '+single_piece requires piece# tag'
+        ret['single_piece'] = True
+        ret['piece_id'] = piece_id
     if 'lowmem' in tags:
         ret['batch_size'] = 2
         ret['epoch_size'] = 2000
@@ -162,7 +179,7 @@ def launch_with_params(params, do_training, load=False):
     # Note: all traing data are named after 'train'
     assert 'dataset_name' in params
     ds_name = params['dataset_name']
-    dataset = datagen.create_dataset_from_params(params)
+    dataset = datagen.create_dataset_from_params(params, for_training=do_training)
     params['nepochs'] = 25 + 75 * dataset.number_of_geometries
     if 'max_epoch' in params:
         params['nepochs'] = params['max_epoch']
@@ -178,6 +195,7 @@ def launch_with_params(params, do_training, load=False):
     except ImportError as e:
         util.warn(str(e))
         raise e
+    w_loss = params['weighted_loss'] or (params['multichannel'] and not params['multichannel_no_weight'])
     model = HourglassModel(nFeat=params['nfeats'],
                            nStack=params['nstacks'],
                            nModules=params['nmodules'],
@@ -196,7 +214,7 @@ def launch_with_params(params, do_training, load=False):
                            logdir_train=join(params['checkpoint_dir'], 'training.log'),
                            logdir_test=join(params['checkpoint_dir'], 'testing.log'),
                            tiny=params['tiny'],
-                           w_loss=params['weighted_loss'] or params['multichannel'],
+                           w_loss=w_loss,
                            joints= params['joint_list'],
                            modif=False,
                            use_fp16=params['fp16'])
