@@ -25,6 +25,9 @@ class OsrDataSet(object):
             pyosr.init()
             self.dpy = pyosr.create_display()
         self.glctx = pyosr.create_gl_context(self.dpy)
+        self.env_fn = env
+        self.rob_fn = rob
+        self.name = 'Unnamed'
 
         r = pyosr.Renderer()
         r.avi = True
@@ -49,6 +52,9 @@ class OsrDataSet(object):
         self.rgb_shape = (res,res,3)
         self.dep_shape = (res,res,1)
         self.gen_surface_normal = gen_surface_normal
+
+    def report_data(self, prefix=''):
+        util.log(f'{prefix} OsrDataSet: puzzle_name {self.name} env_fn {self.env_fn} rob_fn {self.rob_fn}')
 
     def render_rgbd(self, q, flags=0):
         r = self.r
@@ -105,6 +111,11 @@ class MultiPuzzleDataSet(object):
         self.multichannel = multichannel
         self.fp_type = np.float16 if use_fp16 else np.float32
 
+    def report_data(self):
+        util.log('MultiPuzzleDataSet, including:')
+        for ds in self.renders:
+            ds.report_data(prefix='\t')
+
     @property
     def d_dim(self):
         return self.multichannel if self.multichannel is not None else 1
@@ -113,11 +124,12 @@ class MultiPuzzleDataSet(object):
     def number_of_geometries(self):
         return len(self.renders)
 
-    def add_puzzle(self, rob, env, rob_texfn, flat_surface=False):
+    def add_puzzle(self, rob, env, rob_texfn, name, flat_surface=False):
         ds = OsrDataSet(rob=rob, env=env, rob_texfn=rob_texfn,
                         center=None, res=self.res,
                         flat_surface=flat_surface,
                         gen_surface_normal=self.gen_surface_normal)
+        ds.name = name
         self.renders.append(ds)
 
     def _aux_generator(self, batch_size=16, stacks=4, normalize=True, sample_set='train'):
@@ -212,28 +224,37 @@ def create_multidataset(ompl_cfgs, geo_type, res=256,
                             multichannel=multichannel,
                             use_fp16=params['fp16']
                             )
-    def gen_from_geo_type(cfg, geo_type):
+    cfg_to_puzzle_names = params['cfg_to_puzzle_names']
+    def gen_from_geo_type(cfg, geo_type, cfgfn):
         p = pathlib.Path(cfg.rob_fn).parents[0]
+        pnames = cfg_to_puzzle_names[cfgfn]
         if geo_type == 'rob':
-            yield cfg.rob_fn, cfg.env_fn, str(p.joinpath('rob_chart_screened_uniform.png'))
+            yield cfg.rob_fn, cfg.env_fn, str(p.joinpath('rob_chart_screened_uniform.png')), pnames[0]
         elif geo_type == 'env':
-            yield cfg.env_fn, cfg.env_fn, str(p.joinpath('env_chart_screened_uniform.png'))
+            yield cfg.env_fn, cfg.env_fn, str(p.joinpath('env_chart_screened_uniform.png')), pnames[1]
         elif geo_type == 'both':
-            yield cfg.rob_fn, cfg.env_fn, str(p.joinpath('rob_chart_screened_uniform.png'))
-            yield cfg.env_fn, cfg.env_fn, str(p.joinpath('env_chart_screened_uniform.png'))
+            yield cfg.rob_fn, cfg.env_fn, str(p.joinpath('rob_chart_screened_uniform.png')), pnames[0]
+            yield cfg.env_fn, cfg.env_fn, str(p.joinpath('env_chart_screened_uniform.png')), pnames[1]
         else:
             assert False
     piece_id = 0
     for ompl_cfg in sorted(ompl_cfgs): # has to be sorted, to have a consistent order
         cfg, _ = parse_ompl.parse_simple(ompl_cfg)
-        for rob, env, rob_texfn in gen_from_geo_type(cfg, geo_type):
+        for rob, env, rob_texfn, puzzle_name in gen_from_geo_type(cfg, geo_type, cfgfn=ompl_cfg):
             """
             if not os.path.isfile(rob_texfn):
                 util.warn(f'{ompl_cfgs} does not contain ground truth file {rob_texfn}')
                 continue
             """
-            if not for_training or not params['single_piece'] or piece_id == params['piece_id']:
-                ds.add_puzzle(rob=rob, env=env, rob_texfn=rob_texfn)
+            do_add = False
+            if not for_training:
+                do_add = True
+            elif not params['selective_piece']:
+                do_add = True
+            elif piece_id in params['piece_ids']:
+                do_add = True
+            if do_add:
+                ds.add_puzzle(rob=rob, env=env, rob_texfn=rob_texfn, name=puzzle_name)
             piece_id += 1
     return ds
 

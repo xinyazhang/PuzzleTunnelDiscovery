@@ -71,12 +71,15 @@ def _train(args, ws, geo_type):
 
     all_omplcfgs = []
     all_puzzle_names = []
+    cfg_to_puzzle_names = {}
     for puzzle_fn, puzzle_name in ws.training_puzzle_generator():
         all_omplcfgs.append(puzzle_fn)
-        all_puzzle_names.append(f'{puzzle_name}.piece1')
-        all_puzzle_names.append(f'{puzzle_name}.piece2')
+        pnames = [f'{puzzle_name}.piece1', f'{puzzle_name}.piece2']
+        cfg_to_puzzle_names[puzzle_fn] = pnames
+        all_puzzle_names += pnames
     params['all_ompl_configs'] = all_omplcfgs
     params['all_puzzle_names'] = all_puzzle_names
+    params['cfg_to_puzzle_names'] = cfg_to_puzzle_names
 
     params['what_to_render'] = geo_type
     params['checkpoint_dir'] = ws.checkpoint_dir(geo_type) + '/'

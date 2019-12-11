@@ -275,6 +275,7 @@ class HourglassModel():
         """
         """
         with tf.name_scope('Train'):
+            self.dataset.report_data()
             self.generator = self.dataset._aux_generator(self.batchSize, self.nStack, normalize = True, sample_set = 'train')
             if False:
                 debug_generator = self.dataset._aux_generator(64, self.nStack, normalize = True, sample_set = 'train')

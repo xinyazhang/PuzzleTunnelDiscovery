@@ -63,8 +63,9 @@ learning_rate: 0.00025
 learning_rate_decay: 0.96
 decay_step: 3000
 weighted_loss: False
-single_piece: False
-piece_id: -1
+selective_piece: False
+# Should be a list if selective_piece is True
+piece_ids: False
 
 [Validation]
 # valid_iteration: 10
@@ -157,19 +158,22 @@ def create_config_from_tagstring(tagstring):
         ret['multichannel'] = True
     if '+multichannel_no_weight' in tags:
         ret['multichannel_no_weight'] = True
-    if '+single_piece' in tags:
-        assert ret['multichannel'] == False, '+single_piece is incompatible with +multichannel'
-        piece_id = None
-        for tag in tags:
-            if tag.startswith('piece#'):
-                assert piece_id is None, 'multiple piece# is not allowed'
-                piece_id = int(tag[len('piece#'):])
-        assert piece_id is not None, '+single_piece requires piece# tag'
-        ret['single_piece'] = True
-        ret['piece_id'] = piece_id
     if 'lowmem' in tags:
         ret['batch_size'] = 2
         ret['epoch_size'] = 2000
+
+    piece_id_list_int = None
+    for i,tag in enumerate(tags):
+        if tag.startswith('piece#'):
+            assert piece_id_list_int is None, 'multiple piece# is not allowed'
+            piece_id_str = tag[len('piece#'):]
+            piece_id_list = sorted(piece_id_str.split(','))
+            piece_id_list_int = sorted([int(i) for i in piece_id_list])
+            tags[i] = 'piece#' + ','.join([str(i) for i in piece_id_list_int])
+    if piece_id_list_int is not None:
+        assert ret['multichannel'] == False, '+selective_piece is incompatible with +multichannel'
+        ret['selective_piece'] = True
+        ret['piece_ids'] = piece_id_list_int
     util.log("[create_config_from_tagstring] {} -> {} -> {}".format(tagstring, tags, ret))
     return ret, '.'.join(tags)
 
