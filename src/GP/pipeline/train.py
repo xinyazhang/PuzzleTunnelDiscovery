@@ -27,7 +27,10 @@ try:
     def global_gpu_lock(ws):
         util.log('waiting for GPU resource')
         ws.timekeeper_start('wait for GPU resource')
-        ws.gpu_lock_fd = open('/tmp/mkobs3d.gpulock', 'w')
+        gpu_lock_fn = '/tmp/mkobs3d.gpulock'
+        if 'CUDA_VISIBLE_DEVICES' in os.environ:
+            gpu_lock_fn += '-'+os.environ['CUDA_VISIBLE_DEVICES']
+        ws.gpu_lock_fd = open(gpu_lock_fn, 'w')
         fcntl.lockf(ws.gpu_lock_fd, fcntl.LOCK_EX)
         pid = os.getpid()
         print(pid, file=ws.gpu_lock_fd)
