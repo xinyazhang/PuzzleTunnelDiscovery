@@ -166,6 +166,7 @@ def _predict_surface(args, ws, geo_type, generator, checkpoint_geo_type=None):
 
     if checkpoint_geo_type is None:
         checkpoint_geo_type = geo_type
+    cfg_to_puzzle_names = {}
     for puzzle_fn, puzzle_name in generator():
         if ws.nn_tags:
             params, rews.nn_profile = hg_launcher.create_config_from_tagstring(ws.nn_tags)
@@ -173,10 +174,9 @@ def _predict_surface(args, ws, geo_type, generator, checkpoint_geo_type=None):
             params = hg_launcher.create_config_from_profile(ws.nn_profile)
         else:
             params = hg_launcher.create_default_config()
-        if params['multichannel']:
-            params['all_puzzle_names'] = all_puzzle_names
-        else:
-            assert False
+        pnames = [f'{puzzle_name}.piece1', f'{puzzle_name}.piece2']
+        params['all_puzzle_names'] = pnames
+        params['cfg_to_puzzle_names'] = {puzzle_fn: pnames}
         if args.puzzle_name is not None and args.puzzle_name != puzzle_name:
             continue
         global_gpu_lock(ws)
