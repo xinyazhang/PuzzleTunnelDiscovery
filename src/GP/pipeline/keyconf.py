@@ -354,6 +354,18 @@ def collect_stages(variant=0):
                 ),
                 ('estimate_keyconf_clearance', remote_estimate_keyconf_clearance)
               ]
+    elif variant in [7]:
+        ret = [
+                ('generate_atlas2prim', lambda ws: generate_atlas2prim(None, ws)),
+                ('oversample_keyconf', lambda ws: oversample_keyconf_multinet(None, ws)),
+                ('deploy_to_condor',
+                  lambda ws: ws.deploy_to_condor(util.WORKSPACE_SIGNATURE_FILE,
+                                                 util.WORKSPACE_CONFIG_FILE,
+                                                 util.CONDOR_TEMPLATE,
+                                                 util.TESTING_DIR+'/')
+                ),
+                ('estimate_keyconf_clearance', remote_estimate_keyconf_clearance)
+              ]
     else:
         assert False, f'Keyconf Pipeline Variant {variant} has not been implemented'
     return ret

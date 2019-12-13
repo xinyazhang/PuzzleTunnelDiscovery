@@ -234,7 +234,7 @@ def launch_with_params(params, do_training, load=False):
             from . import matio
             new_hash = model.hash_saved_model(load=params['checkpoint_dir'], load_at=params['epoch_to_load'])
             if not isfile(prediction_output):
-                print(f"[hg_launcher][cache miss] {prediction_output} does exist")
+                print(f"[hg_launcher][cache miss] {prediction_output} does not exist")
                 return False
             d = matio.load(prediction_output)
             if 'MODEL_BLAKE2B' not in d:

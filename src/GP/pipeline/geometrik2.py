@@ -199,7 +199,7 @@ def remote_predict_notch_key_conf(ws):
     _remote_command(ws, 'predict_notch_key_conf')
 
 def collect_stages(variant=0):
-    if variant in [6]:
+    if variant in [6,7]:
         ret = [
                 ('refine_mesh', remote_refine_mesh),
                 ('detect_geratio_feature', remote_detect_geratio_feature),

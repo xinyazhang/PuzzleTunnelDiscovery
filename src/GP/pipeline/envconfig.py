@@ -116,6 +116,13 @@ MeshBoolGranularity = 1024
 # Minimal task size hint: mesh boolean
 # UVProjectGranularity = 1024
 
+[TrainingCluster]
+# Format Group# = <puzzle name>.piece1,<puzzle name>.piece2
+# Example
+# Group0 = alpha.piece1,alpha.piece2
+# Group1 = duet.piece1
+# Group2 = duet.piece2
+
 [Prediction]
 Enable = yes
 # Set the number of processes that predict the key configuration from

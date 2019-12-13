@@ -225,22 +225,10 @@ def create_multidataset(ompl_cfgs, geo_type, res=256,
                             use_fp16=params['fp16']
                             )
     cfg_to_puzzle_names = params['cfg_to_puzzle_names']
-    def gen_from_geo_type(cfg, geo_type, cfgfn):
-        p = pathlib.Path(cfg.rob_fn).parents[0]
-        pnames = cfg_to_puzzle_names[cfgfn]
-        if geo_type == 'rob':
-            yield cfg.rob_fn, cfg.env_fn, str(p.joinpath('rob_chart_screened_uniform.png')), pnames[0]
-        elif geo_type == 'env':
-            yield cfg.env_fn, cfg.env_fn, str(p.joinpath('env_chart_screened_uniform.png')), pnames[1]
-        elif geo_type == 'both':
-            yield cfg.rob_fn, cfg.env_fn, str(p.joinpath('rob_chart_screened_uniform.png')), pnames[0]
-            yield cfg.env_fn, cfg.env_fn, str(p.joinpath('env_chart_screened_uniform.png')), pnames[1]
-        else:
-            assert False
     piece_id = 0
     for ompl_cfg in sorted(ompl_cfgs): # has to be sorted, to have a consistent order
         cfg, _ = parse_ompl.parse_simple(ompl_cfg)
-        for rob, env, rob_texfn, puzzle_name in gen_from_geo_type(cfg, geo_type, cfgfn=ompl_cfg):
+        for rob, env, rob_texfn, puzzle_name in util.dataset_arguments_gen_from_geo_type(cfg, geo_type, cfg_to_puzzle_names=cfg_to_puzzle_names, cfgfn=ompl_cfg):
             """
             if not os.path.isfile(rob_texfn):
                 util.warn(f'{ompl_cfgs} does not contain ground truth file {rob_texfn}')

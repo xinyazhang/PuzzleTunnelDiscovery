@@ -203,6 +203,8 @@ class Workspace(object):
         # self._override_condor_host = None
         self._extra_condor_hosts = None
         self._override_config_string = None
+        self._training_groups = None
+        self._piece_list = None
 
     def get_path(self, optname):
         return self.config.get('SYSTEM', optname)
@@ -416,12 +418,43 @@ class Workspace(object):
         exdir = self.local_ws(EXTRA_TRAINING_DIR)
         if not os.path.isdir(exdir):
             return
-        for ent in os.listdir(exdir):
+        for ent in sorted(os.listdir(exdir)):
             puzzle_fn = self.local_ws(EXTRA_TRAINING_DIR, ent, 'puzzle.cfg')
             if not os.path.isfile(puzzle_fn):
                 log("Cannot find puzzle file {}. continue to next dir".format(puzzle_fn))
                 continue
             yield puzzle_fn, ent
+
+    @property
+    def training_groups(self):
+        if self._training_groups is None:
+            tg = {}
+            for netid in itertools.count(0):
+                group_string = self.config.get('TrainingCluster', f'Group{netid}', fallback=None)
+                if group_string is None:
+                    break
+                tg[netid] = group_string.split(',')
+            self._training_groups = tg
+            ack(f'training_groups {tg}')
+        assert self._training_groups
+        return self._training_groups
+
+    def netid_to_tag(self, netid):
+        piece_names = self.training_groups[netid]
+        if self._piece_list is None:
+            pl = []
+            for puzzle_fn, puzzle_name in self.training_puzzle_generator():
+                pl += [f'{puzzle_name}.piece1', f'{puzzle_name}.piece2']
+            self._piece_list = pl
+        piece_ids = []
+        for pname in piece_names:
+            piece_ids.append(str(self._piece_list.index(pname)))
+        piece_tag = '+selective_piece.piece#' + ','.join(piece_ids)
+        return piece_tag
+
+    def net_generator(self, existing_tags):
+        for netid in self.training_groups:
+            yield netid, f'{existing_tags}.{self.netid_to_tag(netid)}'
 
     def test_puzzle_generator(self, target_puzzle_name=''):
         for ent in os.listdir(self.local_ws(TESTING_DIR)):
@@ -438,9 +471,11 @@ class Workspace(object):
         for i,(puzzle_fn,puzzle_name) in enumerate(self.test_puzzle_generator()):
             yield hosts[i % len(hosts)], puzzle_fn, puzzle_name
 
-    def atex_prediction_file(self, puzzle_fn, geo_type, trial_override=None):
+    def atex_prediction_file(self, puzzle_fn, geo_type, trial_override=None, netid=None):
         trial = self.current_trial if trial_override is None else trial_override
-        return os.path.join(pathlib.Path(puzzle_fn).parent, '{}-atex_{}.npz'.format(geo_type, trial))
+        if netid is None:
+            return os.path.join(pathlib.Path(puzzle_fn).parent, '{}-atex_{}.npz'.format(geo_type, trial))
+        return os.path.join(pathlib.Path(puzzle_fn).parent, f'{geo_type}-atex-from-netgroup#{netid}_{trial}.npz')
 
     def keypoint_prediction_file(self, puzzle_name, geo_type, trial_override=None):
         trial = self.current_trial if trial_override is None else trial_override
@@ -629,3 +664,16 @@ def lsv2(indir, prefix, suffix):
 
 def lsv(indir, prefix, suffix):
     return lsv2(indir, prefix, suffix)[0]
+
+def dataset_arguments_gen_from_geo_type(cfg, geo_type, cfg_to_puzzle_names, cfgfn):
+    p = pathlib.Path(cfg.rob_fn).parents[0]
+    pnames = cfg_to_puzzle_names[cfgfn]
+    if geo_type == 'rob':
+        yield cfg.rob_fn, cfg.env_fn, str(p.joinpath('rob_chart_screened_uniform.png')), pnames[0]
+    elif geo_type == 'env':
+        yield cfg.env_fn, cfg.env_fn, str(p.joinpath('env_chart_screened_uniform.png')), pnames[1]
+    elif geo_type == 'both':
+        yield cfg.rob_fn, cfg.env_fn, str(p.joinpath('rob_chart_screened_uniform.png')), pnames[0]
+        yield cfg.env_fn, cfg.env_fn, str(p.joinpath('env_chart_screened_uniform.png')), pnames[1]
+    else:
+        assert False

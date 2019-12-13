@@ -229,6 +229,56 @@ def validate_rob(args, ws):
 def validate_env(args, ws):
     _predict_surface(args, ws, 'env', ws.training_puzzle_generator)
 
+def _multinet_predict_surface(args, ws, geo_type):
+    rews_dir = ws.config.get('Prediction', 'ReuseWorkspace', fallback='')
+    assert rews_dir, "Prediction.ReuseWorkspace is mandatory for current prediction stages"
+    rews_dir = join(ws.dir, rews_dir) # Relative path
+    rews = util.Workspace(rews_dir)
+    rews.nn_profile = ws.nn_profile
+
+    checkpoint_geo_type = 'both'
+    cfg_to_puzzle_names = {}
+    for netid, nettags in rews.net_generator(ws.nn_tags):
+        params, rews.nn_profile = hg_launcher.create_config_from_tagstring(nettags)
+        for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+            pnames = [f'{puzzle_name}.piece1', f'{puzzle_name}.piece2']
+            params['all_puzzle_names'] = pnames
+            params['cfg_to_puzzle_names'] = {puzzle_fn: pnames}
+            params['all_ompl_configs'] = [puzzle_fn]
+            params['what_to_render'] = geo_type
+            params['checkpoint_dir'] = rews.checkpoint_dir(checkpoint_geo_type) + '/'
+            if args.load_epoch is not None:
+                params['epoch_to_load'] = args.load_epoch
+                params['debug_predction'] = True
+                params['prediction_epoch_size'] = 32
+            os.makedirs(ws.checkpoint_dir(checkpoint_geo_type), exist_ok=True)
+            params['output_dir'] = ws.checkpoint_dir(checkpoint_geo_type) + '/'
+            params['prediction_output'] = ws.atex_prediction_file(puzzle_fn, geo_type, netid=netid)
+            params['dataset_name'] = puzzle_name # Enforce the generated filename
+
+            global_gpu_lock(ws)
+            pred_name = 'predict_{}_with_netgroup#{}'.format(geo_type, netid)
+            ws.timekeeper_start(pred_name, puzzle_name)
+            util.log("[prediction] Predicting {}:{}".format(puzzle_fn, geo_type))
+            # NEVER call launch_with_params in the same process for multiple times
+            # TODO: add assertion to handle this problem
+            proc = Process(target=hg_launcher.launch_with_params, args=(params, False))
+            # hg_launcher.launch_with_params(params, do_training=False)
+            proc.start()
+            proc.join()
+            """
+            src = join(ws.checkpoint_dir(checkpoint_geo_type), '{}-atex.npz'.format(puzzle_name))
+            dst = ws.atex_prediction_file(puzzle_fn, geo_type)
+            util.log("[prediction] Copy surface prediction file {} => {}".format(src, dst))
+            shutil.copy(src, dst)
+            """
+            ws.timekeeper_finish(pred_name, puzzle_name)
+            global_gpu_unlock(ws)
+
+def multinet_predict(args, ws):
+    _multinet_predict_surface(args, ws, 'rob')
+    _multinet_predict_surface(args, ws, 'env')
+
 function_dict = {
         'train_rob' : train_rob,
         'train_env' : train_env,
@@ -237,6 +287,7 @@ function_dict = {
         'predict_rob' : predict_rob,
         'predict_env' : predict_env,
         'predict_both' : predict_both,
+        'multinet_predict' : multinet_predict,
         'validate_rob' : validate_rob,
         'validate_env' : validate_env,
 }
@@ -305,6 +356,12 @@ def remote_predict_env(ws):
 def remote_predict_both(ws):
     _remote_command(ws, 'predict_both', auto_retry=True, in_tmux=False)
 
+def remote_predict_with_all_nets(ws):
+    ws.nn_profile = 'tag:256hg.+normal.hg1.feat128'
+    ws.nn_tags = '256hg.+normal.hg1.feat128'
+    # assert ws.nn_tags, 'predict_with_all_nets requires --nn_profile tags: '
+    _remote_command(ws, 'predict_with_all_nets', auto_retry=True, in_tmux=False)
+
 def collect_stages(variant=0):
     if variant in [0]:
         return [ ('deploy_to_gpu', _deploy),
@@ -322,6 +379,12 @@ def collect_stages(variant=0):
                  # ('predict_rob', remote_predict_rob),
                  # ('predict_env', remote_predict_env),
                  ('predict_both', remote_predict_both),
+                 ('fetch_from_gpu', _fetch),
+               ]
+    elif variant in [7]:
+        return [
+                 ('deploy_to_gpu', _deploy),
+                 ('predict_with_all_nets', remote_predict_with_all_nets),
                  ('fetch_from_gpu', _fetch),
                ]
     assert False, f'Train Pipeline Variant {variant} has not been implemented'

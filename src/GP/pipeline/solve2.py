@@ -814,7 +814,7 @@ def get_schemed_remoter(stage_name, is_async=False):
     return ret
 
 def collect_stages(variant=0):
-    if variant in [6]:
+    if variant in [6,7]:
         ret = [
                 ('least_visible_keyconf_fixed', remote_least_visible_keyconf_fixed),
                 ('assemble_raw_keyconf', remote_assemble_raw_keyconf),

@@ -28,3 +28,4 @@ from . import autorun4
 from . import autorun5
 from . import autorun5_1
 from . import autorun6
+from . import autorun7
