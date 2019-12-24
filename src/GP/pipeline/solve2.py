@@ -297,8 +297,9 @@ Note: In stage starting from bloomings, we are NOT going to evaluate the schemes
 """
 def valid_puzzle_generator(ws, args):
     # ALGO_VERSION = 3
-    ALGO_VERSION = 4 if args.algorithm_version is None else args.algorithm_version
+    # ALGO_VERSION = 4 if args.algorithm_version is None else args.algorithm_version
     # ALGO_VERSION = 5
+    ALGO_VERSION = 6 if args.algorithm_version is None else args.algorithm_version
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
         fl = FileLocations(args, ws, puzzle_name, ALGO_VERSION=ALGO_VERSION)
         key_fn = fl.screened_key_fn

@@ -28,7 +28,7 @@ SCHEME_FEAT_NPZ_KEY = {
 }
 
 class FileLocations(object):
-    def __init__(self, args, ws, puzzle_name, scheme=None, ALGO_VERSION=3):
+    def __init__(self, args, ws, puzzle_name, scheme=None, ALGO_VERSION=6):
         self._args = args
         self._ws = ws
         self._puzzle_name = puzzle_name
