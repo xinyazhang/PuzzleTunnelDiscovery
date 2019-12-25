@@ -117,6 +117,7 @@ def setup_parser(subparsers):
     p.add_argument('--use_all_planners', action='store_true')
     p.add_argument('--reference_trials', help='Use existing trials as reference to set --', type=str, default=None)
     p.add_argument('--nrepeats', help='Number of repeats', type=int, default=100)
+    p.add_argument('--remote_hosts', help='Run the baseline remotely', nargs='*', type=str, default=None)
     p.add_argument('--planner_id', help='Planner ID', nargs='*', type=int,
                    default=[util.RDT_FOREST_ALGORITHM_ID])
     p.add_argument('--time_limit', help='Time Limit in day(s)', type=float, default=1.0)
@@ -149,4 +150,23 @@ def run(args):
                 plan.PLANNER_FMT,
                 ]
     ws = util.Workspace(args.dir)
-    run_baseline(args, ws)
+    ws.current_trial = args.current_trial
+    print(args)
+    if args.remote_hosts is None:
+        run_baseline(args, ws)
+        return
+    NHOST = len(args.remote_hosts)
+    for index, planner in enumerate(args.planner_id):
+        host = args.remote_hosts[(index + NHOST//2) % NHOST]
+        extra_args = ''
+        extra_args += f'--reference_trials {args.reference_trials} '
+        extra_args += f'--nrepeats {args.nrepeats} '
+        extra_args += f'--planner_id {planner} '
+        extra_args += f'--time_limit {args.time_limit} '
+        extra_args += f'--scheme {args.scheme} '
+        extra_args += f'--no_wait '
+        # print(host)
+        ws.remote_command(host=host, exec_path=ws.condor_exec(), ws_path=ws.condor_ws(),
+                          pipeline_part='baseline', cmd=None,
+                          in_tmux=False, with_trial=True,
+                          extra_args=extra_args)

@@ -360,7 +360,9 @@ class Workspace(object):
         script += 'cd {}\n'.format(exec_path)
         if in_tmux:
             script += 'tmux new-session -A -s puzzle_workspace '
-        script += './facade.py {ppl} --stage {cmd} '.format(ppl=pipeline_part, cmd=cmd)
+        script += f'./facade.py {pipeline_part} '
+        if cmd is not None:
+            script += f'--stage {cmd} '
         if with_trial:
             script += ' --current_trial {} '.format(self.current_trial)
         if use_nn_profile and self.nn_profile:
