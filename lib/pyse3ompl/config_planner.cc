@@ -19,6 +19,8 @@
 #include <ompl/geometric/planners/prm/SPARS.h>
 #include <ompl/geometric/planners/rrt/ReRRT.h>
 #include <ompl/geometric/planners/rrt/RRTForest.h>
+#include <ompl/geometric/planners/stride/STRIDE.h>
+#include <ompl/geometric/planners/fmt/FMT.h>
 
 #include <ompl/base/samplers/UniformValidStateSampler.h>
 #include <ompl/base/samplers/GaussianValidStateSampler.h>
@@ -26,6 +28,8 @@
 #include <ompl/base/samplers/MaximizeClearanceValidStateSampler.h>
 #include <ompl/base/ProxyStateSampler.h>
 // #include <ompl/base/samplers/ProxyValidStateSampler.h>
+
+#include <ompl/base/ProxyStateSampler.h>
 
 #include <fstream>
 
@@ -159,6 +163,12 @@ void config_planner(app::SE3RigidBodyPlanning& setup, int planner_id, int sample
 				load_inj(rrt_forest.get(), saminjfn);
 				setup.setPlanner(rrt_forest);
 			}
+			break;
+		case PLANNER_STRIDE:
+			set_planner<geometric::STRIDE>(setup);
+			break;
+		case PLANNER_FMT:
+			set_planner<geometric::FMT>(setup);
 			break;
 		default:
 			break;

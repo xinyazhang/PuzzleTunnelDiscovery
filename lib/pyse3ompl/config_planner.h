@@ -36,6 +36,8 @@ enum {
 	PLANNER_ReRRT       = 15,
 	PLANNER_RRTForest   = 16,
 	PLANNER_RDT_CONNECT = 17,
+	PLANNER_STRIDE      = 18,
+	PLANNER_FMT         = 19,
 };
 
 #endif
