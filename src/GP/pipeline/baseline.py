@@ -149,5 +149,4 @@ def run(args):
                 plan.PLANNER_FMT,
                 ]
     ws = util.Workspace(args.dir)
-    print(args)
     run_baseline(args, ws)

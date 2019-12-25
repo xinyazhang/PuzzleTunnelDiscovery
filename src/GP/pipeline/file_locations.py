@@ -107,8 +107,14 @@ class FileLocations(object):
 
     @property
     def raw_key_fn(self):
+        if self.scheme == 'cmb':
+            return self.assembled_raw_key_fn
         return self._ws.keyconf_file_from_fmt(self._puzzle_name,
                                               SCHEME_TO_FMT[self.scheme])
+
+    def cmb_raw_key_fn(self):
+        return self.assembled_raw_key_fn
+
     @property
     def rel_screen(self):
         return join(util.SOLVER_SCRATCH, self._puzzle_name,
@@ -120,11 +126,17 @@ class FileLocations(object):
 
     @property
     def screened_key_fn(self):
+        if self._ws.config.getboolean('Solver', 'EnableKeyConfScreening', fallback=True) == False:
+            return self.raw_key_fn
+
         return self._ws.keyconf_file_from_fmt(self._puzzle_name,
                                               'screened_'+SCHEME_TO_FMT[self.scheme])
 
     @property
     def cmb_screened_key_fn(self):
+        if ws.config.getboolean('Solver', 'EnableKeyConfScreening', fallback=True) == False:
+            return self.cmb_raw_key_fn
+
         return self._ws.keyconf_file_from_fmt(self._puzzle_name,
                                               'screened_'+SCHEME_TO_FMT['cmb'])
 

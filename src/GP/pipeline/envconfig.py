@@ -152,6 +152,7 @@ EnvKeyPoints = 1024
 KeyConfigRotations = 64
 
 [Solver]
+EnableKeyConfScreening = yes
 # Number of samples in the PreDefined Sample set
 # Not used
 # PDSSize = 4194304

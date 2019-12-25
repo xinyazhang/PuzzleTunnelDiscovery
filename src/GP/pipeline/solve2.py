@@ -159,6 +159,9 @@ def assemble_raw_keyconf(args, ws):
         util.ack(f'[assemble_raw_keyconf] save {save_dic["KEYQ_OMPL"].shape} to {fl.assembled_raw_key_fn}')
 
 def screen_keyconf(args, ws):
+    if ws.config.getboolean('Solver', 'EnableKeyConfScreening', fallback=True) == False:
+        util.ack("[screen_keyconf][scheme {scheme}] Skipped since Solver.EnableKeyConfScreening=no")
+        return
     if args.rerun:
         for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
             fl = FileLocations(args, ws, puzzle_name)
@@ -226,6 +229,10 @@ def screen_keyconf(args, ws):
         condor.local_wait(fl.screen)
 
 def assemble_roots(args, ws):
+    if ws.config.getboolean('Solver', 'EnableKeyConfScreening', fallback=True) == False:
+        util.ack("[assemble_roots] Skipped since Solver.EnableKeyConfScreening=no")
+        return
+
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
         fl = FileLocations(args, ws, puzzle_name)
         uw = util.create_unit_world(puzzle_fn)
