@@ -356,11 +356,11 @@ def remote_predict_env(ws):
 def remote_predict_both(ws):
     _remote_command(ws, 'predict_both', auto_retry=True, in_tmux=False)
 
-def remote_predict_with_all_nets(ws):
+def remote_multinet_predict(ws):
     ws.nn_profile = 'tag:256hg.+normal.hg1.feat128'
     ws.nn_tags = '256hg.+normal.hg1.feat128'
     # assert ws.nn_tags, 'predict_with_all_nets requires --nn_profile tags: '
-    _remote_command(ws, 'predict_with_all_nets', auto_retry=True, in_tmux=False)
+    _remote_command(ws, 'multinet_predict', auto_retry=True, in_tmux=False)
 
 def collect_stages(variant=0):
     if variant in [0]:
@@ -384,7 +384,7 @@ def collect_stages(variant=0):
     elif variant in [7]:
         return [
                  ('deploy_to_gpu', _deploy),
-                 ('predict_with_all_nets', remote_predict_with_all_nets),
+                 ('multinet_predict', remote_multinet_predict),
                  ('fetch_from_gpu', _fetch),
                ]
     assert False, f'Train Pipeline Variant {variant} has not been implemented'

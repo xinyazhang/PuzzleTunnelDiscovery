@@ -1,6 +1,7 @@
 import numpy as np
 import sys
 import random
+from abc import ABC, abstractmethod
 
 from scipy.interpolate import interp2d
 NAN = np.NAN
@@ -49,11 +50,35 @@ def _bilinear(raster, u, v):
            _sample(pixi[0], pixi[1]+1) * (1.0 - r[0]) * r[1] + \
            _sample(pixi[0] + 1, pixi[1] + 1) * r[0] * r[1]
 
+class AtlasSamplerInterface(ABC):
+    def __init__(self):
+        pass
+
+    def enable_debugging(self):
+        pass
+
+    def dump_debugging(self, prefix='./'):
+        pass
+
+    def debug_surface_sampler(self, ofn):
+        pass
+
+    def get_top_k_surface_tups(self, r, top_k):
+        pass
+
+    @abstractmethod
+    def sample(self, r, unit=True):
+        pass
+
 class SingleChannelAtlasSampler(object):
 
     def __init__(self, atlas2prim, atlas, geo_type, geo_id):
         self._geo_type = geo_type
         self._geo_id = geo_id
+        assert len(atlas.shape) <= 3
+        if len(atlas.shape) == 3:
+            assert atlas.shape[-1] == 1
+            atlas = atlas[:,:,0]
         # FIXME: Notify users to run corresponding commands when files not found
         self._atlas2prim = atlas2prim
         self._atlas = atlas
@@ -72,6 +97,7 @@ class SingleChannelAtlasSampler(object):
         self._atlas *= 255.0
         self._atlas = self._atlas.astype(np.uint).astype(np.float32)
         self._atlas[self._atlas < 32.0] = 0.0
+        print("Atlas2Prim resolution {}".format(self._atlas2prim.shape))
         print("Atlas resolution {}".format(self._atlas.shape))
         self._nzpix = np.nonzero(self._atlas)
         self._nzpixweight = self._atlas[self._nzpix]
@@ -226,8 +252,9 @@ class SingleChannelAtlasSampler(object):
             self._debug_v3d.append(v3d)
         return v3d, normal, uv, prim
 
-class AtlasSampler(object):
+class AtlasSampler(AtlasSamplerInterface):
     def __init__(self, atlas2prim_fn, surface_prediction_fn, geo_type, geo_id):
+        super().__init__()
         self._atlas2prim = np.load(atlas2prim_fn)['PRIM']
         if surface_prediction_fn is None:
             self._mc_atlas = np.clip(self._atlas2prim + 1, a_min=0, a_max=1).astype(np.float64)
@@ -236,6 +263,19 @@ class AtlasSampler(object):
         if len(self._mc_atlas.shape) == 2:
             self._mc_atlas = np.expand_dims(self._mc_atlas, 2)
         self._as = [SingleChannelAtlasSampler(self._atlas2prim, self._mc_atlas[:,:,i], geo_type, geo_id) for i in range(self._mc_atlas.shape[2]) ]
+
+    def sample(self, r, unit=True):
+        ats = random.choice(self._as)
+        return ats.sample(r, unit)
+
+class CompositeAtlasSampler(AtlasSamplerInterface):
+    def __init__(self, atlas2prim_fn, surface_prediction_fn_list, geo_type, geo_id):
+        super().__init__()
+        self._atlas2prim = np.load(atlas2prim_fn)['PRIM']
+        def create_as(fn):
+            atlas = matio.load(fn, key='ATEX')
+            return SingleChannelAtlasSampler(self._atlas2prim, atlas, geo_type, geo_id)
+        self._as = [create_as(fn) for fn in surface_prediction_fn_list ]
 
     def sample(self, r, unit=True):
         ats = random.choice(self._as)

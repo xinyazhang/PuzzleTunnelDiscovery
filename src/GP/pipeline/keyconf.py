@@ -93,18 +93,22 @@ def export_keyconf(ws, uw, puzzle_fn, puzzle_name, key_conf, FMT=util.UNSCREENED
     matio.savetxt(key_fn + 'unit.txt', unit_q)
     return key_fn
 
+def single_as_factory(ws, uw, puzzle_fn, puzzle_name, geo_type):
+    GEO_TYPE_TO_ID = { 'rob' : uw.GEO_ROB, 'env': uw.GEO_ENV }
+    return atlas.AtlasSampler(ws.local_ws(util.TESTING_DIR, puzzle_name, f'{geo_type}-a2p.npz'),
+                              ws.atex_prediction_file(puzzle_fn, geo_type),
+                              geo_type, GEO_TYPE_TO_ID[geo_type])
+
+
 def _predict_worker(tup):
     DEBUG = True
-    ws_dir, puzzle_fn, puzzle_name, trial, FMT, samples_per_puzzle = tup
+    ws_dir, puzzle_fn, puzzle_name, trial, FMT, samples_per_puzzle, as_factory = tup
     ws = util.Workspace(ws_dir)
     ws.current_trial = trial
     uw = util.create_unit_world(puzzle_fn)
-    rob_sampler = atlas.AtlasSampler(ws.local_ws(util.TESTING_DIR, puzzle_name, 'rob-a2p.npz'),
-                                     ws.atex_prediction_file(puzzle_fn, 'rob'),
-                                     'rob', uw.GEO_ROB)
-    env_sampler = atlas.AtlasSampler(ws.local_ws(util.TESTING_DIR, puzzle_name, 'env-a2p.npz'),
-                                     ws.atex_prediction_file(puzzle_fn, 'env'),
-                                     'env', uw.GEO_ENV)
+    rob_sampler = as_factory(ws, uw, puzzle_fn, puzzle_name, 'rob')
+    env_sampler = as_factory(ws, uw, puzzle_fn, puzzle_name, 'env')
+
     if DEBUG:
         rob_sampler.enable_debugging()
         env_sampler.enable_debugging()
@@ -178,7 +182,35 @@ def oversample_keyconf(args, ws, worker=_predict_worker):
         task_tup.append((ws.dir, puzzle_fn, puzzle_name,
                          ws.current_trial,
                          util.OVERSAMPLED_KEY_PREDICTION_FMT,
-                         samples_per_puzzle))
+                         samples_per_puzzle,
+                         single_as_factory))
+        util.log('[predict_keyconf] found puzzle {} at {}'.format(puzzle_name, puzzle_fn))
+    for tup in task_tup:
+        worker(tup)
+
+
+def multinet_oversample_keyconf(args, ws, worker=_predict_worker):
+    task_tup = []
+    samples_per_puzzle = ws.config.getint('Prediction', 'SurfacePairsToSample') * ws.config.getint('Prediction', 'OversamplingRatio')
+    rews_dir = ws.config.get('Prediction', 'ReuseWorkspace', fallback='')
+    assert rews_dir, 'Prediction.ReuseWorkspace is required for multinet_oversample_keyconf'
+
+    rews_dir = join(ws.dir, rews_dir) # Relative path
+    rews = util.Workspace(rews_dir)
+    rews.nn_profile = ws.nn_profile
+
+    def composite_as_factory(ws, uw, puzzle_fn, puzzle_name, geo_type):
+        GEO_TYPE_TO_ID = { 'rob' : uw.GEO_ROB, 'env': uw.GEO_ENV }
+        a2p_fn = ws.local_ws(util.TESTING_DIR, puzzle_name, f'{geo_type}-a2p.npz')
+        pred_list = [ws.atex_prediction_file(puzzle_fn, geo_type, netid=netid) for netid in rews.training_groups]
+        return atlas.CompositeAtlasSampler(a2p_fn, pred_list, geo_type, GEO_TYPE_TO_ID[geo_type])
+
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+        task_tup.append((ws.dir, puzzle_fn, puzzle_name,
+                         ws.current_trial,
+                         util.OVERSAMPLED_KEY_PREDICTION_FMT,
+                         samples_per_puzzle,
+                         composite_as_factory))
         util.log('[predict_keyconf] found puzzle {} at {}'.format(puzzle_name, puzzle_fn))
     for tup in task_tup:
         worker(tup)
@@ -293,6 +325,7 @@ function_dict = {
         'predict_keyconf' : predict_keyconf,
         'predict_keyconf_2d' : predict_keyconf_2d,
         'oversample_keyconf' : oversample_keyconf,
+        'multinet_oversample_keyconf' : multinet_oversample_keyconf,
         'estimate_keyconf_clearance' : estimate_keyconf_clearance,
 }
 
@@ -357,7 +390,7 @@ def collect_stages(variant=0):
     elif variant in [7]:
         ret = [
                 ('generate_atlas2prim', lambda ws: generate_atlas2prim(None, ws)),
-                ('oversample_keyconf', lambda ws: oversample_keyconf_multinet(None, ws)),
+                ('multinet_oversample_keyconf', lambda ws: multinet_oversample_keyconf(None, ws)),
                 ('deploy_to_condor',
                   lambda ws: ws.deploy_to_condor(util.WORKSPACE_SIGNATURE_FILE,
                                                  util.WORKSPACE_CONFIG_FILE,
