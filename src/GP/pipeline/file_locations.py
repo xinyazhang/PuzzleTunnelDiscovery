@@ -134,7 +134,7 @@ class FileLocations(object):
 
     @property
     def cmb_screened_key_fn(self):
-        if ws.config.getboolean('Solver', 'EnableKeyConfScreening', fallback=True) == False:
+        if self._ws.config.getboolean('Solver', 'EnableKeyConfScreening', fallback=True) == False:
             return self.cmb_raw_key_fn
 
         return self._ws.keyconf_file_from_fmt(self._puzzle_name,
