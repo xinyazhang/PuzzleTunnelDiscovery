@@ -111,7 +111,7 @@ class FileLocations(object):
             return self.assembled_raw_key_fn
         return self._ws.keyconf_file_from_fmt(self._puzzle_name,
                                               SCHEME_TO_FMT[self.scheme])
-
+    @property
     def cmb_raw_key_fn(self):
         return self.assembled_raw_key_fn
 
