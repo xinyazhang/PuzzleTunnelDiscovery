@@ -39,8 +39,7 @@ def load(fn, key=None):
         d = _SUFFIX_TO_LOADER[p.suffix](fn)
     except Exception as e:
         print("error in loading {}".format(fn))
-        print(e)
-        exit()
+        raise e
     if p.suffix == '.txt':
         return d
     if key is not None:

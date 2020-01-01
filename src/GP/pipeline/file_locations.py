@@ -126,9 +126,10 @@ class FileLocations(object):
 
     @property
     def screened_key_fn(self):
-        if self._ws.config.getboolean('Solver', 'EnableKeyConfScreening', fallback=True) == False:
+        conf = self._ws.config.getboolean('Solver', 'EnableKeyConfScreening', fallback=True)
+        print(f'Solver.EnableKeyConfScreening == {conf}')
+        if conf == False:
             return self.raw_key_fn
-
         return self._ws.keyconf_file_from_fmt(self._puzzle_name,
                                               'screened_'+SCHEME_TO_FMT[self.scheme])
 

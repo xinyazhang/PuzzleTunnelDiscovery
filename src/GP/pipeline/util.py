@@ -224,6 +224,9 @@ class Workspace(object):
     def config_as_dict(self):
         return { s:dict(self.config.items(s)) for s in self.config.sections() }
 
+    def get_override_config_string(self):
+        return self._override_config_string
+
     def override_config(self, optstr):
         if not optstr:
             return

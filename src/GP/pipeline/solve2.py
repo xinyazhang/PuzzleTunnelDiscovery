@@ -478,8 +478,10 @@ def pairwise_knn(args, ws):
                     '--current_trial', str(args.current_trial),
                     '--puzzle_name', puzzle_name,
                     '--scheme', args.scheme,
-                    '--task_id', '$(Process)',
-                    ws.local_ws()]
+                    '--task_id', '$(Process)']
+            if ws.get_override_config_string():
+                condor_job_args += ['--override_config', ws.get_override_config_string() ]
+            condor_job_args += [ws.local_ws()]
             condor.local_submit(ws,
                                 util.PYTHON,
                                 iodir_rel=fl.rel_knn,
