@@ -142,12 +142,37 @@ def main():
     bpy.utils.register_class(SimplePanel)
     bpy.utils.register_class(Prev)
     bpy.utils.register_class(Next)
+    bpy.context.scene.render.engine = 'CYCLES'
+
+    def glossy_mat(mat, val):
+        mat.use_nodes = True # First, otherwise node_tree won't be avaliable
+        nodes = mat.node_tree.nodes
+        glossy = nodes.new('ShaderNodeBsdfGlossy')
+        glossy.inputs[0].default_value = val
+        glossy.inputs[1].default_value = 0.316
+        links = mat.node_tree.links
+        out = nodes.get('Material Output')
+        links.new(glossy.outputs[0], out.inputs[0])
+    cyan_mat = bpy.data.materials.new(name='Material Cyan')
+    glossy_mat(cyan_mat, [0.0, 0.748, 0.8, 1.0])
+
+    gold_mat = bpy.data.materials.new(name='Material Gold')
+    glossy_mat(gold_mat, [0.777, 0.8, 0.0, 1.0])
 
     # Load meshes
     bpy.ops.import_scene.obj(filepath=args.env, axis_forward='Y', axis_up='Z')
-    bpy.context.selected_objects[0].name = 'Env'
+    env = bpy.context.selected_objects[0]
+    env.name = 'Env'
+    def add_mat(obj, mat):
+        if obj.data.materials:
+            obj.data.materials[0] = mat
+        else:
+            obj.data.materials.append(mat)
+    add_mat(env, cyan_mat)
     bpy.ops.import_scene.obj(filepath=args.rob, axis_forward='Y', axis_up='Z')
-    bpy.context.selected_objects[0].name = 'Rob'
+    rob = bpy.context.selected_objects[0]
+    rob.name = 'Rob'
+    add_mat(rob, gold_mat)
     bpy.ops.mesh.primitive_uv_sphere_add()
     bpy.context.selected_objects[0].name = 'Witness'
     bpy.data.meshes.remove(bpy.data.meshes['Cube'])
