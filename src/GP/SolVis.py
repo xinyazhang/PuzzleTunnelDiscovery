@@ -16,7 +16,7 @@ class SimplePanel(bpy.types.Panel):
     bl_id_name = "object.simple_operator"
     bl_space_type = "VIEW_3D"
     bl_region_type = "TOOLS"
-    bl_category = "Motion planning"
+    # bl_category = "Motion planning"
     bl_label = "Simple Panel"
 
     def draw(self, context):
@@ -100,10 +100,12 @@ def _add_key(rob, t, quat, frame):
     rob.rotation_quaternion.y = quat[1]
     rob.rotation_quaternion.z = quat[2]
     rob.rotation_quaternion.w = quat[3]
-    rob.select = True
+    # rob.select = True
+    rob.select_set(True)
     rob.keyframe_insert(data_path="location", frame=frame)
     rob.keyframe_insert(data_path="rotation_quaternion", frame=frame)
-    rob.select = False
+    # rob.select = False
+    rob.select_set(False)
 
 def displace(initCoords, transCoords, obj):
     """applies rigid body transform to obj, with initial position (x,y,z) initCoords"""
@@ -148,6 +150,7 @@ def main():
     bpy.context.selected_objects[0].name = 'Rob'
     bpy.ops.mesh.primitive_uv_sphere_add()
     bpy.context.selected_objects[0].name = 'Witness'
+    bpy.data.meshes.remove(bpy.data.meshes['Cube'])
     print(bpy.data.objects)
 
     # matrix detailing path of the object. framesamples[i] is coordinates of the robot at step i
@@ -216,7 +219,8 @@ def main():
 
     desiredFrames = args.total_frames
 
-    bpy.context.user_preferences.edit.keyframe_new_interpolation_type ='LINEAR'
+    # bpy.context.user_preferences.edit.keyframe_new_interpolation_type ='LINEAR'
+    bpy.types.PreferencesEdit.keyframe_new_interpolation_type = 'LINEAR'
 
 #initial coordinates of point on robot when robot's position is identity
     witnessCoords = np.array([40,41,-2])
@@ -271,8 +275,8 @@ def main():
             key_0 = key_confs[index_0]
             key_1 = key_confs[index_1]
             tau = (d - d_0) / (d_1 - d_0)
-            if frame == 107:
-                print(f"Frame 107 is interpolated from {index_0} and {index_1}, with tau {tau}")
+            # if frame == 107:
+            #    print(f"Frame 107 is interpolated from {index_0} and {index_1}, with tau {tau}")
             t,r = _mix(tau, key_0, key_1)
             t = t - r.apply(O) # Translate back to vanilla
             quat = r.as_quat()
@@ -280,6 +284,7 @@ def main():
 
     ob = bpy.data.objects["Witness"]
     mp = ob.motion_path
+    bpy.context.scene.frame_end = desiredFrames - 1
 
     """
     '''I copied this code from the web... it appears to sometimes bug out.
