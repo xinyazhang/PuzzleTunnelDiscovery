@@ -435,8 +435,9 @@ def blender_animate(args):
         return
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
         cfg, config = parse_ompl.parse_simple(puzzle_fn)
-        unit_path = ws.solution_file(puzzle_name, type_name='unit')
-        vanilla_path = ws.solution_file(puzzle_name, type_name='vanilla')
+        fl = FileLocations(args, ws, puzzle_name)
+        unit_path = fl.unit_out_fn
+        vanilla_path = fl.vanilla_out_fn
         if not os.path.isfile(unit_path):
             util.warn(f'[blender_animate] The solution file {unit_path} does not exist')
             continue
@@ -655,6 +656,7 @@ def setup_parser(subparsers):
     p = toolp.add_parser('blender', help='Invoke blender to render the trajectory')
     p.add_argument('--current_trial', help='Trial that has the solution trajectory', type=int, default=None)
     p.add_argument('--puzzle_name', help='Puzzle selection. Will exit after displaying all puzzle names if not present', default='')
+    p.add_argument('--scheme', help='Scheme selection', choices=KEY_PRED_SCHEMES, default='cmb')
     p.add_argument('dir', help='Workspace directory')
     p.add_argument('outdir', help='Output directory')
 

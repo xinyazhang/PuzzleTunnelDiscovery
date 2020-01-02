@@ -217,5 +217,9 @@ class FileLocations(object):
         return self._ws.solution_file(self._puzzle_name, type_name=self.scheme_prefix+'unit')
 
     @property
+    def vanilla_out_fn(self):
+        return self._ws.solution_file(self._puzzle_name, type_name=self.scheme_prefix+'vanilla')
+
+    @property
     def performance_log(self):
         return self._ws.local_ws(util.PERFORMANCE_LOG_DIR, 'log.{}'.format(self.trial))
