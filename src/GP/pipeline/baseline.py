@@ -60,14 +60,30 @@ def mean_ec_from_output(args, ws, puzzle_name):
 def mean_ec_from_pflog(args, ws, puzzle_name):
     ref_trial_list = util.rangestring_to_list(args.reference_trials)
     total_ec = 0
+    total_ec_time = 0.0
+    valid_trials = []
     for trial in ref_trial_list:
         ws.current_trial = trial
-        fl = FileLocations(args, ws, puzzle_name, ALGO_VERSION=6)
-        for i, bloom_fn in fl.bloom_fn_gen:
-            total_ec += int(matio.load(bloom_fn, key='PF_LOG_MCHECK_N'))
-        for i, knn_fn in fl.knn_fn_gen:
-            total_ec += int(matio.load(knn_fn, key='PF_LOG_MCHECK_N'))
-    return int(total_ec/len(ref_trial_list))
+        try:
+            cur_ec = 0
+            cur_ec_time = 0
+            fl = FileLocations(args, ws, puzzle_name, ALGO_VERSION=6)
+            for i, bloom_fn in fl.bloom_fn_gen:
+                # util.log(f'loading {bloom_fn}')
+                d = matio.load(bloom_fn)
+                cur_ec += int(d['PF_LOG_MCHECK_N'])
+                cur_ec_time += float(d['PF_LOG_MCHECK_T'])
+            for i, knn_fn in fl.knn_fn_gen:
+                # util.log(f'loading {knn_fn}')
+                d = matio.load(knn_fn)
+                cur_ec += int(d['PF_LOG_MCHECK_N'])
+                cur_ec_time += float(d['PF_LOG_MCHECK_T'])
+            valid_trials.append(trial)
+            total_ec += cur_ec
+            total_ec_time += cur_ec_time
+        except Exception as e:
+            util.log(f'[{puzzle_name}][trial {trial}] is incomplete, some file is missing')
+    return int(total_ec/len(valid_trials)), total_ec, total_ec_time
 
 def mean_ec(args, ws, puzzle_name):
     return mean_ec_from_pflog(args, ws, puzzle_name)
@@ -76,7 +92,11 @@ def run_baseline(args, ws):
     trial_str = 'trial-{}'.format(args.current_trial)
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
         if args.reference_trials:
-            ec_budget = mean_ec(args, ws, puzzle_name)
+            ec_budget, ec_total, ec_time_sum = mean_ec(args, ws, puzzle_name)
+        if args.dry:
+            assert args.reference_trials
+            util.ack(f'Puzzle {puzzle_name} trial {args.reference_trials} EC Budget {ec_budget} EC total {ec_total} EC time {ec_time_sum} Ave EC per sec {ec_total / (ec_time_sum/1000.0)}')
+            continue
         _, config = parse_ompl.parse_simple(puzzle_fn)
         for planner_id in args.planner_id:
             rel_scratch_dir = join(util.BASELINE_SCRATCH,
@@ -90,7 +110,7 @@ def run_baseline(args, ws):
             condor_job_args = ['se3solver.py',
                     'solve',
                     '--cdres', config.getfloat('problem', 'collision_resolution', fallback=0.0001),
-                    '--trajectory_out', '{}/traj_$(Process).npz'.format(scratch_dir)]
+                    '--trajectory_out', f'{scratch_dir}/traj_$(Process).npz']
             if args.reference_trials:
                 condor_job_args += ['--ec_budget', str(ec_budget)]
                 util.log('[baseline][{}] ec_budget {}'.format(puzzle_name, ec_budget))
@@ -102,7 +122,10 @@ def run_baseline(args, ws):
                                 iodir_rel=rel_scratch_dir,
                                 arguments=condor_job_args,
                                 instances=args.nrepeats,
-                                wait=False) # do NOT wait here, we have to submit EVERY puzzle at once
+                                wait=False,
+                                dryrun=not args.no_submit) # do NOT wait here, we have to submit EVERY puzzle at once
+    if args.dry:
+        return
     if args.no_wait:
         return
     if not args.only_wait:
@@ -114,16 +137,20 @@ def setup_parser(subparsers):
     p = subparsers.add_parser('baseline', help='Solve all testing puzzle with baseline algorithms', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     p.add_argument('--only_wait', action='store_true')
     p.add_argument('--no_wait', action='store_true')
+    p.add_argument('--no_submit', action='store_true')
     p.add_argument('--use_all_planners', action='store_true')
     p.add_argument('--reference_trials', help='Use existing trials as reference to set --', type=str, default=None)
     p.add_argument('--nrepeats', help='Number of repeats', type=int, default=100)
     p.add_argument('--remote_hosts', help='Run the baseline remotely', nargs='*', type=str, default=None)
+    p.add_argument('--remote_host_shift', help='shift the list of remote hosts, for load balance', type=int, default=None)
     p.add_argument('--planner_id', help='Planner ID', nargs='*', type=int,
                    default=[util.RDT_FOREST_ALGORITHM_ID])
     p.add_argument('--time_limit', help='Time Limit in day(s)', type=float, default=1.0)
-    p.add_argument('--current_trial', help='Trial to solve the puzzle', type=int, required=True)
     p.add_argument('--scheme', help='Choose key prediction scheme', choices=KEY_PRED_SCHEMES, default='cmb')
-    p.add_argument('dir', help='Workspace directory')
+    p.add_argument('--dry', help='Only print ec_budget and exit', action='store_true')
+    p.add_argument('--current_trial', help='Trial to solve the puzzle', type=int, required=True)
+    p.add_argument('--override_config', help='Override the options. Syntax: SECTION.OPTION=VALUE Separated with semicolon (;)', type=str, default=None)
+    p.add_argument('dirs', help='Workspace directory', nargs='+')
 
 def run(args):
     '''
@@ -149,24 +176,27 @@ def run(args):
                 plan.PLANNER_STRIDE,
                 plan.PLANNER_FMT,
                 ]
-    ws = util.Workspace(args.dir)
-    ws.current_trial = args.current_trial
-    print(args)
-    if args.remote_hosts is None:
-        run_baseline(args, ws)
-        return
-    NHOST = len(args.remote_hosts)
-    for index, planner in enumerate(args.planner_id):
-        host = args.remote_hosts[(index + NHOST//2) % NHOST]
-        extra_args = ''
-        extra_args += f'--reference_trials {args.reference_trials} '
-        extra_args += f'--nrepeats {args.nrepeats} '
-        extra_args += f'--planner_id {planner} '
-        extra_args += f'--time_limit {args.time_limit} '
-        extra_args += f'--scheme {args.scheme} '
-        extra_args += f'--no_wait '
-        # print(host)
-        ws.remote_command(host=host, exec_path=ws.condor_exec(), ws_path=ws.condor_ws(),
-                          pipeline_part='baseline', cmd=None,
-                          in_tmux=False, with_trial=True,
-                          extra_args=extra_args)
+    NHOST = len(args.remote_hosts) if args.remote_hosts is not None else 1
+    host_index = NHOST//2 if args.remote_host_shift is None else args.remote_host_shift
+    for d in args.dirs:
+        args.dir = d
+        ws = util.create_workspace_from_args(args)
+        print(args)
+        if args.remote_hosts is None:
+            run_baseline(args, ws)
+            return
+        for planner in args.planner_id:
+            host = args.remote_hosts[host_index % NHOST]
+            host_index += 1
+            extra_args = ''
+            extra_args += f'--reference_trials {args.reference_trials} '
+            extra_args += f'--nrepeats {args.nrepeats} '
+            extra_args += f'--planner_id {planner} '
+            extra_args += f'--time_limit {args.time_limit} '
+            extra_args += f'--scheme {args.scheme} '
+            extra_args += f'--no_wait '
+            # print(host)
+            ws.remote_command(host=host, exec_path=ws.condor_exec(), ws_path=ws.condor_ws(),
+                              pipeline_part='baseline', cmd=None,
+                              in_tmux=False, with_trial=True,
+                              extra_args=extra_args)
