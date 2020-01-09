@@ -43,6 +43,10 @@ class FileLocations(object):
         self._task_id = task_id
 
     @property
+    def puzzle_name(self):
+        return self._puzzle_name
+
+    @property
     def scheme(self):
         return self._scheme
 
@@ -223,3 +227,13 @@ class FileLocations(object):
     @property
     def performance_log(self):
         return self._ws.local_ws(util.PERFORMANCE_LOG_DIR, 'log.{}'.format(self.trial))
+
+    def get_baseline_dir(self, planner_id, trial_id, reference_scheme='cmb'):
+        rel_scratch_dir = join(util.BASELINE_SCRATCH,
+                               self._puzzle_name,
+                               f'planner-{planner_id}',
+                               f'trial-{trial_id}.{reference_scheme}')
+        return self._ws.local_ws(rel_scratch_dir)
+
+    def get_baseline_files(self, baseline_dir):
+        return sorted(pathlib.Path(baseline_dir).glob("traj_*.npz"))

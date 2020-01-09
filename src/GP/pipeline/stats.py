@@ -6,18 +6,33 @@ import itertools
 import numpy as np
 from collections import OrderedDict
 
+import pyse3ompl as plan
 from . import util
 from . import matio
 from . import condor
 from .file_locations import FEAT_PRED_SCHEMES, KEY_PRED_SCHEMES, FileLocations
 
+def human_format(num):
+    magnitude = 0
+    while abs(num) >= 1000:
+        magnitude += 1
+        num /= 1000.0
+    # add more suffixes if you need them
+    return '%.2f%s' % (num, ['', 'K', 'M', 'G', 'T', 'P'][magnitude])
+
 def _dic_add(dic, key, v):
     if v is None:
         return
     if key in dic:
-        dic[key].append(v)
+        if isinstance(v, list):
+            dic[key] += v
+        else:
+            dic[key].append(v)
     else:
-        dic[key] = [v]
+        if isinstance(v, list):
+            dic[key] = v
+        else:
+            dic[key] = [v]
 
 def _dic_add_path(dic, keys, v):
     if v is None:
@@ -483,7 +498,7 @@ class FeatStatTabler(Tabler):
             for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
                 for trial in trial_list:
                     ws.current_trial = trial
-                    fl = FileLocations(args, ws, puzzle_name, ALGO_VERSION=4)
+                    fl = FileLocations(args, ws, puzzle_name, ALGO_VERSION=6)
                     for scheme in self.SCHEMES:
                         fl.update_scheme(scheme)
                         for geo_type, data in self._fl_to_raw_data(fl):
@@ -639,10 +654,16 @@ def keyq(args):
 
 class SolveStatTabler(FeatStatTabler):
     BASELINES =  ['rdt', 'rdtc', 'prm']
-    SCHEMES = KEY_PRED_SCHEMES + BASELINES
+    BASELINE_IDS = {
+            'rdt' : plan.PLANNER_RDT,
+            'rdtc' : plan.PLANNER_RDT_CONNECT,
+            'prm' : plan.PLANNER_PRM,
+            }
+    SCHEMES = KEY_PRED_SCHEMES + ['mcheck'] + BASELINES
 
     def __init__(self, args):
         super().__init__(args)
+        self._collected_baseline = []
 
     def _fl_to_raw_data(self, fl):
         if fl.scheme in KEY_PRED_SCHEMES:
@@ -652,8 +673,48 @@ class SolveStatTabler(FeatStatTabler):
                 yield 'solve', 0
             else:
                 yield 'solve', None
+        elif fl.scheme == 'mcheck':
+            fl.update_scheme('cmb') # Choose read mcheck data from 'cmb' scheme
+            try:
+                cur_ec = 0
+                cur_ec_time = 0
+                for i, bloom_fn in fl.bloom_fn_gen:
+                    # util.warn(f'loading {bloom_fn}')
+                    d = matio.load(bloom_fn)
+                    cur_ec += int(d['PF_LOG_MCHECK_N'])
+                    cur_ec_time += float(d['PF_LOG_MCHECK_T'])
+                for i, knn_fn in fl.knn_fn_gen:
+                    # util.warn(f'loading {knn_fn}')
+                    d = matio.load(knn_fn)
+                    cur_ec += int(d['PF_LOG_MCHECK_N'])
+                    cur_ec_time += float(d['PF_LOG_MCHECK_T'])
+            except Exception as e:
+                util.warn(f'[{fl.puzzle_name}][trial {fl.trial}] is incomplete, some file is missing')
+                yield 'solve', None
+                return
+            yield 'solve', cur_ec
         else:
-            yield 'solve', None # TODO: add baseline support
+            baseline_trial = self.args.baseline_trial
+            if baseline_trial is None:
+                yield 'solve', None
+            baseline_dir = fl.get_baseline_dir(planner_id=self.BASELINE_IDS[fl.scheme],
+                                               trial_id=baseline_trial)
+            baseline_dir = str(baseline_dir)
+            if baseline_dir in self._collected_baseline:
+                yield 'solve', None # Already collected
+                return
+            print(f'collecting {baseline_dir}')
+            # print(f'{self._collected_baseline}')
+            # for c in self._collected_baseline:
+            #     assert c != baseline_dir
+            self._collected_baseline.append(baseline_dir)
+            solution_list = []
+            for fn in fl.get_baseline_files(baseline_dir):
+                if matio.load(fn, key='FLAG_IS_COMPLETE') != 0:
+                    solution_list.append(1)
+                else:
+                    solution_list.append(0)
+            yield 'solve', solution_list # TODO: add baseline support
 
     # TODO: merge this with KeyStatTabler's collect_agg_data
     def collect_agg_data(self, dic):
@@ -678,6 +739,14 @@ class SolveStatTabler(FeatStatTabler):
         return self.SCHEMES
 
     def get_matrix_item(self, adic, row_name, col_name):
+        if col_name == 'mcheck':
+            p = [row_name, f'{col_name}.solve.list']
+            list_with_none = _dic_fetch_path(adic, p)
+            list_wo_none = []
+            for e in list_with_none:
+                if e is not None:
+                    list_wo_none.append(e)
+            return [f'{human_format(np.mean(list_wo_none))}']
         p = [row_name, f'{col_name}.solve.solved']
         # print(f"fetching {p}")
         solved = _dic_fetch_path(adic, p)
@@ -836,6 +905,7 @@ def setup_parser(subparsers):
 
     p = toolp.add_parser('solve', help='Collect chance to solve into a table')
     p.add_argument('--trial_range', help='range of trials', type=str, required=True)
+    p.add_argument('--baseline_trial', help='Trial of running baseline', type=int, default=None)
     p.add_argument('--tex', help='Output paper-ready table body TeX', default='sol.tex')
     p.add_argument('dirs', help='Archived workspace directory.', nargs='+')
 
