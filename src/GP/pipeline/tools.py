@@ -460,7 +460,10 @@ def blender_animate(args):
             van3 = pyosr.interpolate(ompl_q[44], ompl_q[45], tau).reshape((1,7))
             van3 = uw.translate_ompl_to_vanilla(van3)
             print(f'OMPL interpolate: {van3}')
-        calls = ['blender', '-P', 'SolVis.py', '--']
+        calls = ['blender']
+        if args.background:
+            calls += ['-b']
+        calls += ['-P', 'SolVis.py', '--']
         calls += [cfg.env_fn, cfg.rob_fn, vanilla_path, args.outdir, '--O'] + ocstr
         if args.flat_env:
             calls += ['--flat_env']
@@ -480,8 +483,14 @@ def blender_animate(args):
             calls += ['--light_panel_lookat'] + ["{:.17f}".format(e) for e in args.light_panel_lookat]
         if args.light_panel_up is not None:
             calls += ['--light_panel_up'] + ["{:.17f}".format(e) for e in args.light_panel_up]
+        if args.light_auto:
+            calls += ['--light_auto']
         if args.saveas:
             calls += ['--saveas', args.saveas]
+        if args.image_frame is not None:
+            calls += ['--image_frame', str(args.image_frame)]
+        if args.quit or args.background:
+            calls += ['--quit']
         util.shell(calls)
 
 def dump_training_data(args):
@@ -687,8 +696,12 @@ def setup_parser(subparsers):
     p.add_argument('--light_panel_origin', help='Origin of light_panel', type=float, nargs=3, default=None)
     p.add_argument('--light_panel_lookat', help='Point to Look At of light_panel', type=float, nargs=3, default=None)
     p.add_argument('--light_panel_up', help='Up direction of light_panel', type=float, nargs=3, default=None)
+    p.add_argument('--light_auto', help='Set the light configuration automatically', action='store_true')
     p.add_argument('--flat_env', help='Flat shading', action='store_true')
+    p.add_argument('--image_frame', help='Image Frame', type=int, default=None)
     p.add_argument('--saveas', help='Save the Blender file as', default='')
+    p.add_argument('--quit', help='Quit without running blender', action='store_true')
+    p.add_argument('--background', help='Run blender in background. Implies --quit', action='store_true')
     p.add_argument('dir', help='Workspace directory')
     p.add_argument('outdir', help='Output directory')
 
