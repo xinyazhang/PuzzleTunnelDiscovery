@@ -6,9 +6,16 @@ import sys
 import bpy
 import argparse
 import math
+from math import pi as PI
 import numpy as np
 from scipy.spatial.transform import Rotation, Slerp
 
+def norm(vec):
+    return np.linalg.norm(vec)
+
+def normalized(vec):
+    a = np.array(vec)
+    return a / norm(vec)
 
 #ui stuff... can ignore this
 
@@ -133,6 +140,22 @@ def parse_args():
     p.add_argument('out', help='Output dir')
     p.add_argument('--total_frames', help='Total number of frames to render', default=1440)
     p.add_argument('--O', help='OMPL center of gemoetry', type=float, nargs=3, required=True)
+    p.add_argument('--camera_origin', help='Origin of camera', type=float, nargs=3, default=None)
+    p.add_argument('--camera_lookat', help='Point to Look At of camera', type=float, nargs=3, default=None)
+    p.add_argument('--camera_up', help='Up direction of camera', type=float, nargs=3, default=None)
+    p.add_argument('--light_panel_origin', help='Origin of light_panel', type=float, nargs=3, default=None)
+    p.add_argument('--light_panel_lookat', help='Point to Look At of light_panel', type=float, nargs=3, default=None)
+    p.add_argument('--light_panel_up', help='Up direction of light_panel', type=float, nargs=3, default=None)
+    p.add_argument('--floor_origin', help='Center of the floor',
+                                     type=float, nargs=3, default=[0, 0, -40])
+    p.add_argument('--floor_euler', help='Rotate the floor with euler angle',
+                                    type=float, nargs=3,
+                                    default=[0,0,0])
+    p.add_argument('--floor_size', help='Size of the floor, from the center to the edge',
+                                   type=float, default=2500)
+    p.add_argument('--flat_env', help='Flat shading', action='store_true')
+    p.add_argument('--saveas', help='Save the Blender file as', default='')
+    p.add_argument('--quit', help='Quit without running blender', action='store_true')
     argv = sys.argv
     return p.parse_args(argv[argv.index("--") + 1:])
 
@@ -144,39 +167,117 @@ def main():
     bpy.utils.register_class(Next)
     bpy.context.scene.render.engine = 'CYCLES'
 
-    def glossy_mat(mat, val):
+    def make_mat_glossy(mat, val):
         mat.use_nodes = True # First, otherwise node_tree won't be avaliable
         nodes = mat.node_tree.nodes
         glossy = nodes.new('ShaderNodeBsdfGlossy')
         glossy.inputs[0].default_value = val
+        # glossy.inputs[1].default_value = 0.618
         glossy.inputs[1].default_value = 0.316
         links = mat.node_tree.links
         out = nodes.get('Material Output')
         links.new(glossy.outputs[0], out.inputs[0])
     cyan_mat = bpy.data.materials.new(name='Material Cyan')
-    glossy_mat(cyan_mat, [0.0, 0.748, 0.8, 1.0])
+    make_mat_glossy(cyan_mat, [0.0, 0.748, 0.8, 1.0])
 
     gold_mat = bpy.data.materials.new(name='Material Gold')
-    glossy_mat(gold_mat, [0.777, 0.8, 0.0, 1.0])
+    make_mat_glossy(gold_mat, [0.777, 0.8, 0.0, 1.0])
 
-    # Load meshes
-    bpy.ops.import_scene.obj(filepath=args.env, axis_forward='Y', axis_up='Z')
-    env = bpy.context.selected_objects[0]
-    env.name = 'Env'
+    def make_mat_diffuse(mat, val):
+        mat.use_nodes = True # First, otherwise node_tree won't be avaliable
+        nodes = mat.node_tree.nodes
+        glossy = nodes.new('ShaderNodeBsdfDiffuse')
+        glossy.inputs[0].default_value = val
+        glossy.inputs[1].default_value = 0.0
+        links = mat.node_tree.links
+        out = nodes.get('Material Output')
+        links.new(glossy.outputs[0], out.inputs[0])
+    diffuse_mat = bpy.data.materials.new(name='Diffuse White')
+    make_mat_diffuse(diffuse_mat, [1.0, 1.0, 1.0, 1.0])
+
+    def make_mat_emissive(mat, val):
+        mat.use_nodes = True # First, otherwise node_tree won't be avaliable
+        nodes = mat.node_tree.nodes
+        glossy = nodes.new('ShaderNodeEmission')
+        glossy.inputs[0].default_value = val
+        glossy.inputs[1].default_value = 300.0
+        links = mat.node_tree.links
+        out = nodes.get('Material Output')
+        links.new(glossy.outputs[0], out.inputs[0])
+    emission_mat = bpy.data.materials.new(name='Emission White')
+    make_mat_emissive(emission_mat, [1.0, 1.0, 1.0, 1.0])
+
+
     def add_mat(obj, mat):
         if obj.data.materials:
             obj.data.materials[0] = mat
         else:
             obj.data.materials.append(mat)
+
+    def add_square(name, origin, euler_in_deg, size):
+        euler = [e / 180.0 * PI for e in euler_in_deg]
+        bpy.ops.mesh.primitive_plane_add(size=2.0 * size,
+                                         align='WORLD',
+                                         location=origin,
+                                         rotation=euler)
+        p = bpy.context.selected_objects[0]
+        p.name = name
+        return p
+    floor = add_square('Floor', args.floor_origin, args.floor_euler, args.floor_size)
+    add_mat(floor, diffuse_mat)
+
+    # Load meshes
+    bpy.ops.import_scene.obj(filepath=args.env, axis_forward='Y', axis_up='Z')
+    env = bpy.context.selected_objects[0]
+    env.name = 'Env'
     add_mat(env, cyan_mat)
+    if args.flat_env:
+        bpy.ops.object.shade_flat()
     bpy.ops.import_scene.obj(filepath=args.rob, axis_forward='Y', axis_up='Z')
     rob = bpy.context.selected_objects[0]
     rob.name = 'Rob'
     add_mat(rob, gold_mat)
+    '''
     bpy.ops.mesh.primitive_uv_sphere_add()
     bpy.context.selected_objects[0].name = 'Witness'
+    '''
     bpy.data.meshes.remove(bpy.data.meshes['Cube'])
+    bpy.data.objects.remove(bpy.data.objects['Light'])
+    print(bpy.data.objects['Camera'].matrix_world)
+    def set_matrix_world(name, origin, lookat, up):
+        origin = np.array(origin)
+        lookat = np.array(lookat)
+        up = np.array(up)
+        lookdir = normalized(lookat - origin)
+        up -= np.dot(up, lookdir) * lookdir
+        mat = np.eye(4)
+        mat[:3, 3] = origin
+        mat[:3, 2] = -lookdir
+        mat[:3, 1] = normalized(up)
+        mat[:3, 0] = normalized(np.cross(lookdir, up))
+        obj = bpy.data.objects[name]
+        mw = obj.matrix_world
+        for i in range(4):
+            for j in range(4):
+                mw[i][j] = mat[i, j]
+        return origin, lookat, up, lookdir
+
+    if args.camera_origin is not None and args.camera_lookat is not None and args.camera_up is not None:
+        camera_origin, camera_lookat, camera_up, camera_lookdir = set_matrix_world('Camera', args.camera_origin, args.camera_lookat, args.camera_up)
+        cam_obj = bpy.data.objects['Camera']
+        # cam_obj.data.clip_end = 2.0 * norm(camera_origin - camera_lookat)
+        cam_obj.data.clip_end = 1000.0
+        alight = add_square('Area light', camera_origin - 10.0 * camera_lookdir,
+                            [45, 0, 0], 20)
+        add_mat(alight, emission_mat)
+        if args.light_panel_origin is not None and args.light_panel_lookat is not None and args.light_panel_up is not None:
+            set_matrix_world('Area light',
+                             args.light_panel_origin,
+                             args.light_panel_lookat,
+                             args.light_panel_up)
     print(bpy.data.objects)
+    print(bpy.data.objects['Camera'].matrix_world)
+
 
     # matrix detailing path of the object. framesamples[i] is coordinates of the robot at step i
     frameSamples = []
@@ -307,11 +408,12 @@ def main():
             quat = r.as_quat()
             _add_key(rob, t, quat, frame+1)
 
-    ob = bpy.data.objects["Witness"]
-    mp = ob.motion_path
     bpy.context.scene.frame_end = desiredFrames - 1
 
     """
+    ob = bpy.data.objects["Witness"]
+    mp = ob.motion_path
+
     '''I copied this code from the web... it appears to sometimes bug out.
     This generates a curve along the path of the witness point '''
     # FIXME: it certainly would be buggy, we are expecting a piecewise linear curve,
@@ -329,6 +431,11 @@ def main():
             o.handle_right_type = 'AUTO'
             o.handle_left_type = 'AUTO'
     """
+    if args.saveas:
+        bpy.ops.wm.save_as_mainfile(filepath=args.saveas)
+    if args.quit:
+        bpy.ops.wm.quit_blender()
+
 
 if __name__ == "__main__":
     main()

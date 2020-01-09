@@ -460,7 +460,29 @@ def blender_animate(args):
             van3 = pyosr.interpolate(ompl_q[44], ompl_q[45], tau).reshape((1,7))
             van3 = uw.translate_ompl_to_vanilla(van3)
             print(f'OMPL interpolate: {van3}')
-        util.shell(['blender', '-P', 'SolVis.py', '--', cfg.env_fn, cfg.rob_fn, vanilla_path, args.outdir, '--O'] + ocstr)
+        calls = ['blender', '-P', 'SolVis.py', '--']
+        calls += [cfg.env_fn, cfg.rob_fn, vanilla_path, args.outdir, '--O'] + ocstr
+        if args.flat_env:
+            calls += ['--flat_env']
+        if args.camera_origin is not None:
+            calls += ['--camera_origin'] + ["{:.17f}".format(e) for e in args.camera_origin]
+        if args.camera_lookat is not None:
+            calls += ['--camera_lookat'] + ["{:.17f}".format(e) for e in args.camera_lookat]
+        if args.floor_origin is not None:
+            calls += ['--floor_origin'] + ["{:.17f}".format(e) for e in args.floor_origin]
+        if args.floor_euler is not None:
+            calls += ['--floor_euler'] + ["{:.17f}".format(e) for e in args.floor_euler]
+        if args.camera_up is not None:
+            calls += ['--camera_up'] + ["{:.17f}".format(e) for e in args.camera_up]
+        if args.light_panel_origin is not None:
+            calls += ['--light_panel_origin'] + ["{:.17f}".format(e) for e in args.light_panel_origin]
+        if args.light_panel_lookat is not None:
+            calls += ['--light_panel_lookat'] + ["{:.17f}".format(e) for e in args.light_panel_lookat]
+        if args.light_panel_up is not None:
+            calls += ['--light_panel_up'] + ["{:.17f}".format(e) for e in args.light_panel_up]
+        if args.saveas:
+            calls += ['--saveas', args.saveas]
+        util.shell(calls)
 
 def dump_training_data(args):
     ws = util.Workspace(args.dir)
@@ -657,6 +679,16 @@ def setup_parser(subparsers):
     p.add_argument('--current_trial', help='Trial that has the solution trajectory', type=int, default=None)
     p.add_argument('--puzzle_name', help='Puzzle selection. Will exit after displaying all puzzle names if not present', default='')
     p.add_argument('--scheme', help='Scheme selection', choices=KEY_PRED_SCHEMES, default='cmb')
+    p.add_argument('--camera_origin', help='Origin of camera', type=float, nargs=3, default=None)
+    p.add_argument('--camera_lookat', help='Point to Look At of camera', type=float, nargs=3, default=None)
+    p.add_argument('--camera_up', help='Up direction of camera', type=float, nargs=3, default=None)
+    p.add_argument('--floor_origin', help='Center of the floor', type=float, nargs=3, default=None)
+    p.add_argument('--floor_euler', help='Rotate the floor with euler angle', type=float, nargs=3, default=None)
+    p.add_argument('--light_panel_origin', help='Origin of light_panel', type=float, nargs=3, default=None)
+    p.add_argument('--light_panel_lookat', help='Point to Look At of light_panel', type=float, nargs=3, default=None)
+    p.add_argument('--light_panel_up', help='Up direction of light_panel', type=float, nargs=3, default=None)
+    p.add_argument('--flat_env', help='Flat shading', action='store_true')
+    p.add_argument('--saveas', help='Save the Blender file as', default='')
     p.add_argument('dir', help='Workspace directory')
     p.add_argument('outdir', help='Output directory')
 
