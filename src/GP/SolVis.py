@@ -132,6 +132,24 @@ def increase (i,m):
     if (i==m-1): return 0
     return i+1
 
+def set_matrix_world(name, origin, lookat, up):
+    origin = np.array(origin)
+    lookat = np.array(lookat)
+    up = np.array(up)
+    lookdir = normalized(lookat - origin)
+    up -= np.dot(up, lookdir) * lookdir
+    mat = np.eye(4)
+    mat[:3, 3] = origin
+    mat[:3, 2] = -lookdir
+    mat[:3, 1] = normalized(up)
+    mat[:3, 0] = normalized(np.cross(lookdir, up))
+    obj = bpy.data.objects[name]
+    mw = obj.matrix_world
+    for i in range(4):
+        for j in range(4):
+            mw[i][j] = mat[i, j]
+    return origin, lookat, up, lookdir
+
 def parse_args():
     p = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     p.add_argument('env', help='ENV geometry')
@@ -143,6 +161,7 @@ def parse_args():
     p.add_argument('--camera_origin', help='Origin of camera', type=float, nargs=3, default=None)
     p.add_argument('--camera_lookat', help='Point to Look At of camera', type=float, nargs=3, default=None)
     p.add_argument('--camera_up', help='Up direction of camera', type=float, nargs=3, default=None)
+    p.add_argument('--light_auto', help='Set the light configuration automatically', action='store_true')
     p.add_argument('--light_panel_origin', help='Origin of light_panel', type=float, nargs=3, default=None)
     p.add_argument('--light_panel_lookat', help='Point to Look At of light_panel', type=float, nargs=3, default=None)
     p.add_argument('--light_panel_up', help='Up direction of light_panel', type=float, nargs=3, default=None)
@@ -154,6 +173,7 @@ def parse_args():
     p.add_argument('--floor_size', help='Size of the floor, from the center to the edge',
                                    type=float, default=2500)
     p.add_argument('--flat_env', help='Flat shading', action='store_true')
+    p.add_argument('--image_frame', help='Image Frame', type=int, default=None)
     p.add_argument('--saveas', help='Save the Blender file as', default='')
     p.add_argument('--quit', help='Quit without running blender', action='store_true')
     argv = sys.argv
@@ -179,6 +199,9 @@ def main():
         links.new(glossy.outputs[0], out.inputs[0])
     cyan_mat = bpy.data.materials.new(name='Material Cyan')
     make_mat_glossy(cyan_mat, [0.0, 0.748, 0.8, 1.0])
+
+    green_mat = bpy.data.materials.new(name='Material Pure Green')
+    make_mat_glossy(green_mat, [0.0, 1.0, 0.0, 1.0])
 
     gold_mat = bpy.data.materials.new(name='Material Gold')
     make_mat_glossy(gold_mat, [0.777, 0.8, 0.0, 1.0])
@@ -230,7 +253,7 @@ def main():
     bpy.ops.import_scene.obj(filepath=args.env, axis_forward='Y', axis_up='Z')
     env = bpy.context.selected_objects[0]
     env.name = 'Env'
-    add_mat(env, cyan_mat)
+    add_mat(env, green_mat)
     if args.flat_env:
         bpy.ops.object.shade_flat()
     bpy.ops.import_scene.obj(filepath=args.rob, axis_forward='Y', axis_up='Z')
@@ -243,34 +266,23 @@ def main():
     '''
     bpy.data.meshes.remove(bpy.data.meshes['Cube'])
     bpy.data.objects.remove(bpy.data.objects['Light'])
-    print(bpy.data.objects['Camera'].matrix_world)
-    def set_matrix_world(name, origin, lookat, up):
-        origin = np.array(origin)
-        lookat = np.array(lookat)
-        up = np.array(up)
-        lookdir = normalized(lookat - origin)
-        up -= np.dot(up, lookdir) * lookdir
-        mat = np.eye(4)
-        mat[:3, 3] = origin
-        mat[:3, 2] = -lookdir
-        mat[:3, 1] = normalized(up)
-        mat[:3, 0] = normalized(np.cross(lookdir, up))
-        obj = bpy.data.objects[name]
-        mw = obj.matrix_world
-        for i in range(4):
-            for j in range(4):
-                mw[i][j] = mat[i, j]
-        return origin, lookat, up, lookdir
+    # print(bpy.data.objects['Camera'].matrix_world)
 
     if args.camera_origin is not None and args.camera_lookat is not None and args.camera_up is not None:
         camera_origin, camera_lookat, camera_up, camera_lookdir = set_matrix_world('Camera', args.camera_origin, args.camera_lookat, args.camera_up)
         cam_obj = bpy.data.objects['Camera']
         # cam_obj.data.clip_end = 2.0 * norm(camera_origin - camera_lookat)
         cam_obj.data.clip_end = 1000.0
-        alight = add_square('Area light', camera_origin - 10.0 * camera_lookdir,
+        alight = add_square('Area light', [0,0,0],
                             [45, 0, 0], 20)
         add_mat(alight, emission_mat)
-        if args.light_panel_origin is not None and args.light_panel_lookat is not None and args.light_panel_up is not None:
+        if args.light_auto:
+            camera_right = normalized(np.cross(camera_lookdir, camera_up))
+            set_matrix_world('Area light',
+                             camera_origin + camera_right * norm(camera_lookat - camera_origin),
+                             camera_lookat,
+                             args.camera_up)
+        elif args.light_panel_origin is not None and args.light_panel_lookat is not None and args.light_panel_up is not None:
             set_matrix_world('Area light',
                              args.light_panel_origin,
                              args.light_panel_lookat,
@@ -409,6 +421,8 @@ def main():
             _add_key(rob, t, quat, frame+1)
 
     bpy.context.scene.frame_end = desiredFrames - 1
+    if args.image_frame is not None:
+        bpy.context.scene.frame_set(args.image_frame)
 
     """
     ob = bpy.data.objects["Witness"]
