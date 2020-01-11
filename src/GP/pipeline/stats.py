@@ -495,6 +495,7 @@ class FeatStatTabler(Tabler):
         trial_list = util.rangestring_to_list(args.trial_range)
         for d in args.dirs:
             ws = util.Workspace(d)
+            ws.override_config(args.override_config)
             for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
                 for trial in trial_list:
                     ws.current_trial = trial
@@ -754,7 +755,7 @@ class SolveStatTabler(FeatStatTabler):
         p = [row_name, f'{col_name}.solve.total']
         total = _dic_fetch_path(adic, p)
         total_int = total[0] if total else 0
-        return [f'{solved_int}/{total_int}'] if total_int > 0 else ['TBD']
+        return [f'{100*solved_int/total_int:.1f}\%'] if total_int > 0 else ['TBD']
 
 def solve(args):
     tabler = SolveStatTabler(args)
@@ -907,6 +908,7 @@ def setup_parser(subparsers):
     p.add_argument('--trial_range', help='range of trials', type=str, required=True)
     p.add_argument('--baseline_trial', help='Trial of running baseline', type=int, default=None)
     p.add_argument('--tex', help='Output paper-ready table body TeX', default='sol.tex')
+    p.add_argument('--override_config', help='Override workspace config', default='')
     p.add_argument('dirs', help='Archived workspace directory.', nargs='+')
 
     p = toolp.add_parser('timing_the_planner', help='Collect timing of the blooming and forest connection into a table')
