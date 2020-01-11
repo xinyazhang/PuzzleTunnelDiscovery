@@ -123,8 +123,8 @@ def run_baseline(args, ws):
                                 arguments=condor_job_args,
                                 instances=args.nrepeats,
                                 wait=False,
-                                dryrun=not args.no_submit) # do NOT wait here, we have to submit EVERY puzzle at once
-    if args.dry:
+                                dryrun=args.no_submit) # do NOT wait here, we have to submit EVERY puzzle at once
+    if args.dry or args.no_submit:
         return
     if args.no_wait:
         return
