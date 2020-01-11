@@ -5,5 +5,6 @@
 	--camera_lookat 20 -20 0 \
 	--camera_up 0 0 1 \
 	--light_auto \
+	--animation_end 797 \
 	--saveas blender/blender_ag.blend \
 	"$@" \

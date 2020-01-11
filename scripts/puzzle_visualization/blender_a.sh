@@ -5,5 +5,6 @@
 	--camera_lookat 25 10 0 \
 	--camera_up 0 0 1 \
 	--light_auto \
+	--animation_end 1254 \
 	--saveas blender/blender_alpha.blend \
 	"$@" \

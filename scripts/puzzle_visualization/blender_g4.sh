@@ -8,6 +8,7 @@
 	--light_auto \
 	--image_frame 147 \
 	--saveas blender/blender_g4.blend \
+	--animation_end 890 \
+	--animation_floor_origin 0 0 -20 \
 	"$@" \
 	--flat_env \
-	~/HGSTArchive/blenderout/

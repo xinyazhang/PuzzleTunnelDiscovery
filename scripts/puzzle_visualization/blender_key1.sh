@@ -8,5 +8,6 @@
 	--floor_euler -75 85 -35 \
 	--light_auto \
 	--saveas blender/blender_key1.blend \
+	--animation_end 1363 \
+	--animation_floor_origin 75 0 0 \
 	"$@" \
-	~/HGSTArchive/blenderout/

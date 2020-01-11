@@ -7,5 +7,7 @@
 	--floor_origin 0 0 -20 \
 	--light_auto \
 	--saveas blender/blender_g2.blend \
-	"$@" \
+	--animation_end 644 \
+	--animation_floor_origin 0 0 -20 \
 	--flat_env \
+	"$@" \

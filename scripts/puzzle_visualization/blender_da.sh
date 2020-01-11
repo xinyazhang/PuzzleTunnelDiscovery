@@ -6,5 +6,7 @@
 	--camera_up 0 -1 0 \
 	--light_auto \
 	--floor_origin 0 0 -10 \
+	--animation_end 1247 \
+	--animation_floor_origin 0 0 -40 \
 	--saveas blender/blender_doublealpha.blend \
 	"$@" \
