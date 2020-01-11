@@ -632,6 +632,7 @@ def connect_knn(args, ws):
             util.log('Forest-level shortest path {}'.format(ids))
         except nx.exception.NetworkXNoPath:
             util.warn(f'[connect_knn] Cannot find path for puzzle {puzzle_name}')
+            util.warn(f'[connect_knn] Connected components from 0 {nx.algorithms.components.node_connected_component(G, 0)}')
             with ws.open_performance_log() as f:
                 print(f"<{ws.current_trial}> [solve2][connect_knn][{args.scheme}] FAIL_TO_SOLVE {puzzle_name}", file=f)
             continue
