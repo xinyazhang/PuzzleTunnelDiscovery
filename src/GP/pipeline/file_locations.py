@@ -105,6 +105,11 @@ class FileLocations(object):
                                                              SCHEME_TO_FMT[scheme])
         return gen()
 
+    def get_assembled_raw_key_fn(self, trial):
+        return self._ws.keyconf_file_from_fmt(self._puzzle_name,
+                                              'all_raw_keyconf-{trial}.npz',
+                                              trial_override=trial)
+
     @property
     def assembled_raw_key_fn(self):
         return self._ws.keyconf_file_from_fmt(self._puzzle_name, 'all_raw_keyconf-{trial}.npz')
@@ -144,6 +149,14 @@ class FileLocations(object):
 
         return self._ws.keyconf_file_from_fmt(self._puzzle_name,
                                               'screened_'+SCHEME_TO_FMT['cmb'])
+
+    def get_cmb_screened_key_fn(self, trial):
+        if self._ws.config.getboolean('Solver', 'EnableKeyConfScreening', fallback=True) == False:
+            return self.get_assembled_raw_key_fn(trial=trial)
+
+        return self._ws.keyconf_file_from_fmt(self._puzzle_name,
+                                              'screened_'+SCHEME_TO_FMT['cmb'],
+                                              trial_override=trial)
 
     @property
     def rel_pds(self):

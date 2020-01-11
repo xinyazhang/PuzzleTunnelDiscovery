@@ -23,6 +23,9 @@ def main():
     parser.add_argument('--sampler_id', help='Valid state sampler', type=int, default=0)
     parser.add_argument('--saminj', help='Sample injection file', type=str, default='')
     parser.add_argument('--samset', help='Predefined sample set (PDS) file', type=str, default='')
+    parser.add_argument('--use_roots_from',
+                        help='Use predicated roots from file. Commonly used as baseline comparison',
+                        type=str, nargs='*', default=[])
     parser.add_argument('--use_blooming_tree',
                         help='Use blooming tree in Phase 2. '
                         'If current RDT tree directly connected to a PDS sample, '

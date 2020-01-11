@@ -98,6 +98,7 @@ def run_baseline(args, ws):
             util.ack(f'Puzzle {puzzle_name} trial {args.reference_trials} EC Budget {ec_budget} EC total {ec_total} EC time {ec_time_sum} Ave EC per sec {ec_total / (ec_time_sum/1000.0)}')
             continue
         _, config = parse_ompl.parse_simple(puzzle_fn)
+        fl = FileLocations(args, ws, puzzle_name, ALGO_VERSION=6)
         for planner_id in args.planner_id:
             rel_scratch_dir = join(util.BASELINE_SCRATCH,
                                    puzzle_name,
@@ -114,6 +115,16 @@ def run_baseline(args, ws):
             if args.reference_trials:
                 condor_job_args += ['--ec_budget', str(ec_budget)]
                 util.log('[baseline][{}] ec_budget {}'.format(puzzle_name, ec_budget))
+                ex_args = []
+                if args.use_roots_from_reference_trials:
+                    ref_trial_list = util.rangestring_to_list(args.reference_trials)
+                    for trial in ref_trial_list:
+                        fn = fl.get_cmb_screened_key_fn(trial)
+                        # util.log(f'Checking {fn}')
+                        if os.path.isfile(fn):
+                            ex_args += [fn]
+                if ex_args:
+                    condor_job_args += ['--use_roots_from'] + ex_args + ['--']
             condor_job_args += [puzzle_fn,
                     planner_id,
                     args.time_limit]
@@ -140,6 +151,7 @@ def setup_parser(subparsers):
     p.add_argument('--no_submit', action='store_true')
     p.add_argument('--use_all_planners', action='store_true')
     p.add_argument('--reference_trials', help='Use existing trials as reference to set --', type=str, default=None)
+    p.add_argument('--use_roots_from_reference_trials', help='Use roots generated from reference trials', action='store_true')
     p.add_argument('--nrepeats', help='Number of repeats', type=int, default=100)
     p.add_argument('--remote_hosts', help='Run the baseline remotely', nargs='*', type=str, default=None)
     p.add_argument('--remote_host_shift', help='shift the list of remote hosts, for load balance', type=int, default=None)
@@ -189,12 +201,17 @@ def run(args):
             host = args.remote_hosts[host_index % NHOST]
             host_index += 1
             extra_args = ''
-            extra_args += f'--reference_trials {args.reference_trials} '
+            if args.reference_trials:
+                extra_args += f'--reference_trials {args.reference_trials} '
             extra_args += f'--nrepeats {args.nrepeats} '
             extra_args += f'--planner_id {planner} '
             extra_args += f'--time_limit {args.time_limit} '
             extra_args += f'--scheme {args.scheme} '
             extra_args += f'--no_wait '
+            if args.use_roots_from_reference_trials:
+                assert args.planner_id == [plan.PLANNER_PRM]
+                assert args.reference_trials is not None
+                extra_args += f'--use_roots_from_reference_trials '
             # print(host)
             ws.remote_command(host=host, exec_path=ws.condor_exec(), ws_path=ws.condor_ws(),
                               pipeline_part='baseline', cmd=None,
