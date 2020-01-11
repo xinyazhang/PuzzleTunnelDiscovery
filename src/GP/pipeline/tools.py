@@ -474,7 +474,7 @@ def blender_animate(args):
         if args.floor_origin is not None:
             calls += ['--floor_origin'] + ["{:.17f}".format(e) for e in args.floor_origin]
         if args.animation_floor_origin is not None:
-            calls += ['--animation_floor_origin'] + ["{:.17f}".format(e) for e in args.floor_origin]
+            calls += ['--animation_floor_origin'] + ["{:.17f}".format(e) for e in args.animation_floor_origin]
         if args.floor_euler is not None:
             calls += ['--floor_euler'] + ["{:.17f}".format(e) for e in args.floor_euler]
         if args.camera_up is not None:

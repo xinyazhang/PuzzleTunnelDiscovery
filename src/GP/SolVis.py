@@ -175,7 +175,7 @@ def parse_args():
     p.add_argument('--image_frame', help='Image Frame', type=int, default=0)
     p.add_argument('--animation_end', help='End frame of animation', type=int, default=-1)
     p.add_argument('--animation_floor_origin', help='Center of the floor when rendering the animation',
-                                     type=float, nargs=3, default=[0, 0, -40])
+                                     type=float, nargs=3, default=None)
     p.add_argument('--saveas', help='Save the Blender file as', default='')
     p.add_argument('--save_image', help='Save the Rendered image as', default='')
     p.add_argument('--save_animation_dir', help='Save the Rendered animation sequence image to', default='')
@@ -258,7 +258,10 @@ def main():
         p = bpy.context.selected_objects[0]
         p.name = name
         return p
-    floor = add_square('Floor', args.animation_floor_origin if args.save_animation_dir else args.floor_origin, args.floor_euler, args.floor_size)
+    floor_origin = args.floor_origin
+    if args.save_animation_dir and args.animation_floor_origin is not None:
+        floor_origin = args.animation_floor_origin
+    floor = add_square('Floor', floor_origin, args.floor_euler, args.floor_size)
     add_mat(floor, diffuse_mat)
 
     # Load meshes
