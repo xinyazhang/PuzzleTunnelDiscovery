@@ -173,8 +173,9 @@ def parse_args():
     p.add_argument('--floor_size', help='Size of the floor, from the center to the edge',
                                    type=float, default=2500)
     p.add_argument('--flat_env', help='Flat shading', action='store_true')
-    p.add_argument('--image_frame', help='Image Frame', type=int, default=None)
+    p.add_argument('--image_frame', help='Image Frame', type=int, default=0)
     p.add_argument('--saveas', help='Save the Blender file as', default='')
+    p.add_argument('--save_image', help='Save the Rendered image as', default='')
     p.add_argument('--quit', help='Quit without running blender', action='store_true')
     argv = sys.argv
     return p.parse_args(argv[argv.index("--") + 1:])
@@ -197,6 +198,10 @@ def main():
         links = mat.node_tree.links
         out = nodes.get('Material Output')
         links.new(glossy.outputs[0], out.inputs[0])
+        if args.flat_env:
+            geo = nodes.new('ShaderNodeNewGeometry')
+            links.new(geo.outputs[3], glossy.inputs[2])
+            print("Applying flat shading")
     cyan_mat = bpy.data.materials.new(name='Material Cyan')
     make_mat_glossy(cyan_mat, [0.0, 0.748, 0.8, 1.0])
 
@@ -205,6 +210,9 @@ def main():
 
     gold_mat = bpy.data.materials.new(name='Material Gold')
     make_mat_glossy(gold_mat, [0.777, 0.8, 0.0, 1.0])
+
+    red_mat = bpy.data.materials.new(name='Material Red')
+    make_mat_glossy(red_mat, [1.0, 0.0, 0.0, 1.0])
 
     def make_mat_diffuse(mat, val):
         mat.use_nodes = True # First, otherwise node_tree won't be avaliable
@@ -254,12 +262,23 @@ def main():
     env = bpy.context.selected_objects[0]
     env.name = 'Env'
     add_mat(env, green_mat)
+    # IMPORTANT: For some reason we don't know, Mobius needs this explicitly.
+    if not args.flat_env:
+        bpy.ops.object.shade_smooth()
+    """
     if args.flat_env:
         bpy.ops.object.shade_flat()
+    """
     bpy.ops.import_scene.obj(filepath=args.rob, axis_forward='Y', axis_up='Z')
     rob = bpy.context.selected_objects[0]
     rob.name = 'Rob'
-    add_mat(rob, gold_mat)
+    if not args.flat_env:
+        bpy.ops.object.shade_smooth()
+    """
+    if args.flat_env:
+        bpy.ops.object.shade_flat()
+    """
+    add_mat(rob, red_mat)
     '''
     bpy.ops.mesh.primitive_uv_sphere_add()
     bpy.context.selected_objects[0].name = 'Witness'
@@ -273,13 +292,14 @@ def main():
         cam_obj = bpy.data.objects['Camera']
         # cam_obj.data.clip_end = 2.0 * norm(camera_origin - camera_lookat)
         cam_obj.data.clip_end = 1000.0
+        camera_dist = norm(camera_lookat - camera_origin)
         alight = add_square('Area light', [0,0,0],
-                            [45, 0, 0], 20)
+                            [45, 0, 0], 0.2 * camera_dist)
         add_mat(alight, emission_mat)
         if args.light_auto:
             camera_right = normalized(np.cross(camera_lookdir, camera_up))
             set_matrix_world('Area light',
-                             camera_origin + camera_right * norm(camera_lookat - camera_origin),
+                             camera_origin + camera_right * camera_dist,
                              camera_lookat,
                              args.camera_up)
         elif args.light_panel_origin is not None and args.light_panel_lookat is not None and args.light_panel_up is not None:
@@ -421,7 +441,7 @@ def main():
             _add_key(rob, t, quat, frame+1)
 
     bpy.context.scene.frame_end = desiredFrames - 1
-    if args.image_frame is not None:
+    if args.image_frame >= 0:
         bpy.context.scene.frame_set(args.image_frame)
 
     """
@@ -446,7 +466,11 @@ def main():
             o.handle_left_type = 'AUTO'
     """
     if args.saveas:
-        bpy.ops.wm.save_as_mainfile(filepath=args.saveas)
+        bpy.ops.wm.save_as_mainfile(filepath=args.saveas, check_existing=False)
+    if args.save_image:
+        bpy.context.scene.cycles.samples = 512
+        bpy.context.scene.render.filepath = args.save_image
+        bpy.ops.render.render(write_still=True)
     if args.quit:
         bpy.ops.wm.quit_blender()
 

@@ -487,6 +487,8 @@ def blender_animate(args):
             calls += ['--light_auto']
         if args.saveas:
             calls += ['--saveas', args.saveas]
+        if args.save_image:
+            calls += ['--save_image', args.save_image]
         if args.image_frame is not None:
             calls += ['--image_frame', str(args.image_frame)]
         if args.quit or args.background:
@@ -700,6 +702,7 @@ def setup_parser(subparsers):
     p.add_argument('--flat_env', help='Flat shading', action='store_true')
     p.add_argument('--image_frame', help='Image Frame', type=int, default=None)
     p.add_argument('--saveas', help='Save the Blender file as', default='')
+    p.add_argument('--save_image', help='Save the Rendered image as', default='')
     p.add_argument('--quit', help='Quit without running blender', action='store_true')
     p.add_argument('--background', help='Run blender in background. Implies --quit', action='store_true')
     p.add_argument('dir', help='Workspace directory')
