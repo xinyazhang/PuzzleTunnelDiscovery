@@ -1,5 +1,6 @@
 #include "ompldriver.h"
 #include <chrono>
+#include <ctime>
 #include <unordered_set>
 
 using hclock = std::chrono::high_resolution_clock;
@@ -55,9 +56,24 @@ OmplDriver::solve(double days,
 		auto validator = si->getMotionValidator();
 		auto last_mc_count = validator->getCheckedMotionCount();
 		auto last_mc_change = hclock::now();
+		auto last_minute_change = hclock::now();
 		ompl::base::PlannerTerminationConditionFn ptc;
-		ptc = [&validator, ec_budget, &last_mc_count, &last_mc_change]() -> bool {
+		ptc = [&validator, ec_budget, &last_mc_count, &last_mc_change, &last_minute_change]() -> bool {
 			auto mc_count = validator->getCheckedMotionCount();
+			auto now = hclock::now();
+			auto delta_from_last_minute_change = now - last_minute_change;
+			if (delta_from_last_minute_change > std::chrono::minutes(1)) {
+				std::time_t ctime_now = std::chrono::system_clock::to_time_t(now);
+				std::string tstr = std::ctime(&ctime_now);
+				tstr[tstr.size() - 1] = '\0'; // remove the trailing \n
+				std::cerr << '\r'
+					  << tstr
+					  << "\tMotion Check: " << mc_count
+					  << " / " << ec_budget
+					  << " (" << 100 * mc_count / ec_budget << "%)"
+					  ;
+				last_minute_change = now;
+			}
 			if (mc_count == last_mc_count) {
 				auto delta = hclock::now() - last_mc_change;
 				if (delta > std::chrono::minutes(15)) {
