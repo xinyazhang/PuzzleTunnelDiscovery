@@ -7,4 +7,3 @@
 	--light_auto \
 	--saveas blender/blender_alpha.blend \
 	"$@" \
-	~/HGSTArchive/blenderout/

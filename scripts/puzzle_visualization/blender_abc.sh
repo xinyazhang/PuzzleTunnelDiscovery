@@ -9,4 +9,3 @@
 	--light_auto \
 	--saveas blender/abc.blend \
 	"$@" \
-	~/HGSTArchive/blenderout/

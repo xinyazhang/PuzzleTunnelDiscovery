@@ -464,7 +464,7 @@ def blender_animate(args):
         if args.background:
             calls += ['-b']
         calls += ['-P', 'SolVis.py', '--']
-        calls += [cfg.env_fn, cfg.rob_fn, vanilla_path, args.outdir, '--O'] + ocstr
+        calls += [cfg.env_fn, cfg.rob_fn, vanilla_path, '--O'] + ocstr
         if args.flat_env:
             calls += ['--flat_env']
         if args.camera_origin is not None:
@@ -473,6 +473,8 @@ def blender_animate(args):
             calls += ['--camera_lookat'] + ["{:.17f}".format(e) for e in args.camera_lookat]
         if args.floor_origin is not None:
             calls += ['--floor_origin'] + ["{:.17f}".format(e) for e in args.floor_origin]
+        if args.animation_floor_origin is not None:
+            calls += ['--animation_floor_origin'] + ["{:.17f}".format(e) for e in args.floor_origin]
         if args.floor_euler is not None:
             calls += ['--floor_euler'] + ["{:.17f}".format(e) for e in args.floor_euler]
         if args.camera_up is not None:
@@ -489,6 +491,8 @@ def blender_animate(args):
             calls += ['--saveas', args.saveas]
         if args.save_image:
             calls += ['--save_image', args.save_image]
+        if args.save_animation_dir:
+            calls += ['--save_animation_dir', args.save_animation_dir]
         if args.image_frame is not None:
             calls += ['--image_frame', str(args.image_frame)]
         if args.quit or args.background:
@@ -701,12 +705,15 @@ def setup_parser(subparsers):
     p.add_argument('--light_auto', help='Set the light configuration automatically', action='store_true')
     p.add_argument('--flat_env', help='Flat shading', action='store_true')
     p.add_argument('--image_frame', help='Image Frame', type=int, default=None)
+    p.add_argument('--animation_end', help='End frame of animation', type=int, default=-1)
+    p.add_argument('--animation_floor_origin', help='Center of the floor when rendering the animation',
+                                     type=float, nargs=3, default=[0, 0, -40])
     p.add_argument('--saveas', help='Save the Blender file as', default='')
     p.add_argument('--save_image', help='Save the Rendered image as', default='')
+    p.add_argument('--save_animation_dir', help='Save the Rendered animation sequence image to', default='')
     p.add_argument('--quit', help='Quit without running blender', action='store_true')
     p.add_argument('--background', help='Run blender in background. Implies --quit', action='store_true')
     p.add_argument('dir', help='Workspace directory')
-    p.add_argument('outdir', help='Output directory')
 
     p = toolp.add_parser('dump_training_data', help='Dump the training data to output file')
     p.add_argument('--puzzle_name', help='Training Puzzle selection. The name of the default puzzle is "train".', default='')

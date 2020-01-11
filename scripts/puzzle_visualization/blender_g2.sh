@@ -9,4 +9,3 @@
 	--saveas blender/blender_g2.blend \
 	"$@" \
 	--flat_env \
-	~/HGSTArchive/blenderout/

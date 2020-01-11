@@ -155,12 +155,11 @@ def parse_args():
     p.add_argument('env', help='ENV geometry')
     p.add_argument('rob', help='ROB geometry')
     p.add_argument('qpath', help='Vanilla configuration path')
-    p.add_argument('out', help='Output dir')
     p.add_argument('--total_frames', help='Total number of frames to render', default=1440)
     p.add_argument('--O', help='OMPL center of gemoetry', type=float, nargs=3, required=True)
     p.add_argument('--camera_origin', help='Origin of camera', type=float, nargs=3, default=None)
     p.add_argument('--camera_lookat', help='Point to Look At of camera', type=float, nargs=3, default=None)
-    p.add_argument('--camera_up', help='Up direction of camera', type=float, nargs=3, default=None)
+    p.add_argument('--camera_up', help='Up direction of the camera in the world, i.e. human that holds the camera.', type=float, nargs=3, default=None)
     p.add_argument('--light_auto', help='Set the light configuration automatically', action='store_true')
     p.add_argument('--light_panel_origin', help='Origin of light_panel', type=float, nargs=3, default=None)
     p.add_argument('--light_panel_lookat', help='Point to Look At of light_panel', type=float, nargs=3, default=None)
@@ -174,8 +173,12 @@ def parse_args():
                                    type=float, default=2500)
     p.add_argument('--flat_env', help='Flat shading', action='store_true')
     p.add_argument('--image_frame', help='Image Frame', type=int, default=0)
+    p.add_argument('--animation_end', help='End frame of animation', type=int, default=-1)
+    p.add_argument('--animation_floor_origin', help='Center of the floor when rendering the animation',
+                                     type=float, nargs=3, default=[0, 0, -40])
     p.add_argument('--saveas', help='Save the Blender file as', default='')
     p.add_argument('--save_image', help='Save the Rendered image as', default='')
+    p.add_argument('--save_animation_dir', help='Save the Rendered animation sequence image to', default='')
     p.add_argument('--quit', help='Quit without running blender', action='store_true')
     argv = sys.argv
     return p.parse_args(argv[argv.index("--") + 1:])
@@ -219,19 +222,20 @@ def main():
         nodes = mat.node_tree.nodes
         glossy = nodes.new('ShaderNodeBsdfDiffuse')
         glossy.inputs[0].default_value = val
-        glossy.inputs[1].default_value = 0.0
+        glossy.inputs[1].default_value = 1.0
         links = mat.node_tree.links
         out = nodes.get('Material Output')
         links.new(glossy.outputs[0], out.inputs[0])
     diffuse_mat = bpy.data.materials.new(name='Diffuse White')
-    make_mat_diffuse(diffuse_mat, [1.0, 1.0, 1.0, 1.0])
+    # make_mat_diffuse(diffuse_mat, [1.0, 1.0, 1.0, 1.0])
+    make_mat_diffuse(diffuse_mat, [0.01, 0.01, 0.01, 1.0])
 
     def make_mat_emissive(mat, val):
         mat.use_nodes = True # First, otherwise node_tree won't be avaliable
         nodes = mat.node_tree.nodes
         glossy = nodes.new('ShaderNodeEmission')
         glossy.inputs[0].default_value = val
-        glossy.inputs[1].default_value = 300.0
+        glossy.inputs[1].default_value = 1200.0
         links = mat.node_tree.links
         out = nodes.get('Material Output')
         links.new(glossy.outputs[0], out.inputs[0])
@@ -254,7 +258,7 @@ def main():
         p = bpy.context.selected_objects[0]
         p.name = name
         return p
-    floor = add_square('Floor', args.floor_origin, args.floor_euler, args.floor_size)
+    floor = add_square('Floor', args.animation_floor_origin if args.save_animation_dir else args.floor_origin, args.floor_euler, args.floor_size)
     add_mat(floor, diffuse_mat)
 
     # Load meshes
@@ -298,8 +302,15 @@ def main():
         add_mat(alight, emission_mat)
         if args.light_auto:
             camera_right = normalized(np.cross(camera_lookdir, camera_up))
+            '''
             set_matrix_world('Area light',
-                             camera_origin + camera_right * camera_dist,
+                             camera_origin + camera_right * camera_dist + 1.0 * camera_dist * normalized(np.array(args.camera_up)),
+                             camera_lookat,
+                             args.camera_up)
+            '''
+            world_up = normalized(np.array(args.camera_up))
+            set_matrix_world('Area light',
+                             camera_lookat + camera_dist * camera_up + camera_dist * camera_right,
                              camera_lookat,
                              args.camera_up)
         elif args.light_panel_origin is not None and args.light_panel_lookat is not None and args.light_panel_up is not None:
@@ -440,7 +451,10 @@ def main():
             quat = r.as_quat()
             _add_key(rob, t, quat, frame+1)
 
-    bpy.context.scene.frame_end = desiredFrames - 1
+    if args.animation_end >= 0:
+        bpy.context.scene.frame_end = min(args.animation_end, desiredFrames - 1)
+    else:
+        bpy.context.scene.frame_end = desiredFrames - 1
     if args.image_frame >= 0:
         bpy.context.scene.frame_set(args.image_frame)
 
@@ -471,6 +485,10 @@ def main():
         bpy.context.scene.cycles.samples = 512
         bpy.context.scene.render.filepath = args.save_image
         bpy.ops.render.render(write_still=True)
+    if args.save_animation_dir:
+        bpy.context.scene.cycles.samples = 512
+        bpy.context.scene.render.filepath = args.save_animation_dir
+        bpy.ops.render.render(animation=True)
     if args.quit:
         bpy.ops.wm.quit_blender()
 

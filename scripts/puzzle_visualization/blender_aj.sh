@@ -8,4 +8,3 @@
 	--image_frame 485 \
 	--saveas blender/blender_aj.blend \
 	"$@" \
-	~/HGSTArchive/blenderout/

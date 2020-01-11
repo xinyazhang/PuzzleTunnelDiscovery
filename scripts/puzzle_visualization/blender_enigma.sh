@@ -9,4 +9,3 @@
 	--saveas blender/blender_enigma.blend \
 	--floor_origin 0 0 -5 \
 	"$@" \
-	~/HGSTArchive/blenderout/

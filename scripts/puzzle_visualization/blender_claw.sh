@@ -9,4 +9,3 @@
 	--saveas blender/blender_claw.blend \
 	--floor_origin 0 0 -0.25 \
 	"$@" \
-	~/HGSTArchive/blenderout/

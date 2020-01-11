@@ -7,4 +7,3 @@
 	--light_auto \
 	--saveas blender/blender_az.blend \
 	"$@" \
-	~/HGSTArchive/blenderout/

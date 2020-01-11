@@ -8,4 +8,3 @@
 	--floor_origin 0 0 -10 \
 	--saveas blender/blender_doublealpha.blend \
 	"$@" \
-	~/HGSTArchive/blenderout/
