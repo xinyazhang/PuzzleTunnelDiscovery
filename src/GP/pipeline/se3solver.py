@@ -124,7 +124,7 @@ def solve(args):
         record_compact_tree = False
     if args.use_roots_from:
         root_fn = random.choice(args.use_roots_from)
-        roots = matio.load(root_fn)['KEYQ_OMPL']
+        roots = matio.load(root_fn)['KEYQ_OMPL'][2:,:]
         util.log(f'Read {roots.shape} configurations from {root_fn} as initial roots.')
         import scipy.sparse
         nullsparse = scipy.sparse.csr_matrix((1,1))
