@@ -209,6 +209,7 @@ def run(args):
             extra_args += f'--scheme {args.scheme} '
             extra_args += f'--no_wait '
             if args.use_roots_from_reference_trials:
+                import pyse3ompl as plan
                 assert args.planner_id == [plan.PLANNER_PRM]
                 assert args.reference_trials is not None
                 extra_args += f'--use_roots_from_reference_trials '
