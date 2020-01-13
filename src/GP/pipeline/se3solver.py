@@ -132,6 +132,15 @@ def solve(args):
     print("solve args {}".format(args))
 
     if args.replace_istate is None and args.replace_gstate is None:
+        if args.trajectory_out:
+            """
+            Do not rerun if the output file is present
+            """
+            try:
+                d = matio.load(args.trajectory_out)
+                return
+            except Exception as e:
+                pass
         return_ve = args.bloom_out is not None
         V, _ = driver.solve(args.days, args.out, ec_budget=args.ec_budget, return_ve=return_ve)
         if args.trajectory_out:
