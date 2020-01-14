@@ -236,8 +236,28 @@ def main():
     # make_mat_diffuse(diffuse_mat, [1.0, 1.0, 1.0, 1.0])
     make_mat_diffuse(diffuse_mat, [0.01, 0.01, 0.01, 1.0])
 
-    diffuse_green_mat = bpy.data.materials.new(name='Material Diffuse Green')
-    make_mat_diffuse(diffuse_green_mat, [0.0, 0.35, 0.0, 1.0])
+    def make_mat_ao_diffuse(mat, val):
+        mat.use_nodes = True # First, otherwise node_tree won't be avaliable
+        nodes = mat.node_tree.nodes
+        diffuse = nodes.new('ShaderNodeBsdfDiffuse')
+        diffuse.inputs[0].default_value = val
+        diffuse.inputs[1].default_value = 1.0
+        ao = nodes.new('ShaderNodeAmbientOcclusion')
+        ao.inputs[0].default_value = val
+
+        links = mat.node_tree.links
+        out = nodes.get('Material Output')
+        links.new(diffuse.outputs[0], out.inputs[0])
+        links.new(ao.outputs[0], diffuse.inputs[0])
+        if args.flat_env:
+            geo = nodes.new('ShaderNodeNewGeometry')
+            links.new(geo.outputs[3], diffuse.inputs[2])
+            links.new(geo.outputs[3], ao.inputs[2])
+            print("Applying flat shading")
+        else:
+            links.new(geo.outputs[1], ao.inputs[2])
+    ao_diffuse_green_mat = bpy.data.materials.new(name='Material Diffuse Green with AO')
+    make_mat_ao_diffuse(ao_diffuse_green_mat, [0.0, 0.35, 0.0, 1.0])
 
     def make_mat_emissive(mat, val):
         mat.use_nodes = True # First, otherwise node_tree won't be avaliable
@@ -285,7 +305,7 @@ def main():
     env = bpy.context.selected_objects[0]
     env.name = 'Env'
     # add_mat(env, green_mat)
-    add_mat(env, diffuse_green_mat)
+    add_mat(env, ao_diffuse_green_mat)
     # IMPORTANT: For some reason we don't know, Mobius needs this explicitly.
     if not args.flat_env:
         bpy.ops.object.shade_smooth()
