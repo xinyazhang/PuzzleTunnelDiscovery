@@ -249,8 +249,8 @@ def main():
         out = nodes.get('Material Output')
         links.new(diffuse.outputs[0], out.inputs[0])
         links.new(ao.outputs[0], diffuse.inputs[0])
+        geo = nodes.new('ShaderNodeNewGeometry')
         if args.flat_env:
-            geo = nodes.new('ShaderNodeNewGeometry')
             links.new(geo.outputs[3], diffuse.inputs[2])
             links.new(geo.outputs[3], ao.inputs[2])
             print("Applying flat shading")
