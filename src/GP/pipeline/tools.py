@@ -493,6 +493,8 @@ def blender_animate(args):
             calls += ['--save_image', args.save_image]
         if args.save_animation_dir:
             calls += ['--save_animation_dir', args.save_animation_dir]
+        if args.enable_animation_preview:
+            calls += ['--enable_animation_preview']
         if args.image_frame is not None:
             calls += ['--image_frame', str(args.image_frame)]
         if args.quit or args.background:
@@ -711,6 +713,7 @@ def setup_parser(subparsers):
     p.add_argument('--saveas', help='Save the Blender file as', default='')
     p.add_argument('--save_image', help='Save the Rendered image as', default='')
     p.add_argument('--save_animation_dir', help='Save the Rendered animation sequence image to', default='')
+    p.add_argument('--enable_animation_preview', action='store_true')
     p.add_argument('--quit', help='Quit without running blender', action='store_true')
     p.add_argument('--background', help='Run blender in background. Implies --quit', action='store_true')
     p.add_argument('dir', help='Workspace directory')

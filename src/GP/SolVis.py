@@ -155,6 +155,7 @@ def parse_args():
     p.add_argument('env', help='ENV geometry')
     p.add_argument('rob', help='ROB geometry')
     p.add_argument('qpath', help='Vanilla configuration path')
+    p.add_argument('--rendering_styles', help="Rendering styles", choices=['Physical', 'ShadowOnWhite'], default='ShadowOnWhite')
     p.add_argument('--total_frames', help='Total number of frames to render', default=1440)
     p.add_argument('--O', help='OMPL center of gemoetry', type=float, nargs=3, required=True)
     p.add_argument('--camera_origin', help='Origin of camera', type=float, nargs=3, default=None)
@@ -179,6 +180,7 @@ def parse_args():
     p.add_argument('--saveas', help='Save the Blender file as', default='')
     p.add_argument('--save_image', help='Save the Rendered image as', default='')
     p.add_argument('--save_animation_dir', help='Save the Rendered animation sequence image to', default='')
+    p.add_argument('--enable_animation_preview', action='store_true')
     p.add_argument('--quit', help='Quit without running blender', action='store_true')
     argv = sys.argv
     return p.parse_args(argv[argv.index("--") + 1:])
@@ -226,16 +228,24 @@ def main():
         links = mat.node_tree.links
         out = nodes.get('Material Output')
         links.new(glossy.outputs[0], out.inputs[0])
+        if args.flat_env:
+            geo = nodes.new('ShaderNodeNewGeometry')
+            links.new(geo.outputs[3], glossy.inputs[2])
+            print("Applying flat shading")
     diffuse_mat = bpy.data.materials.new(name='Diffuse White')
     # make_mat_diffuse(diffuse_mat, [1.0, 1.0, 1.0, 1.0])
     make_mat_diffuse(diffuse_mat, [0.01, 0.01, 0.01, 1.0])
+
+    diffuse_green_mat = bpy.data.materials.new(name='Material Diffuse Green')
+    make_mat_diffuse(diffuse_green_mat, [0.0, 0.35, 0.0, 1.0])
 
     def make_mat_emissive(mat, val):
         mat.use_nodes = True # First, otherwise node_tree won't be avaliable
         nodes = mat.node_tree.nodes
         glossy = nodes.new('ShaderNodeEmission')
         glossy.inputs[0].default_value = val
-        glossy.inputs[1].default_value = 1200.0
+        # glossy.inputs[1].default_value = 120.0
+        glossy.inputs[1].default_value = 30.0
         links = mat.node_tree.links
         out = nodes.get('Material Output')
         links.new(glossy.outputs[0], out.inputs[0])
@@ -261,14 +271,21 @@ def main():
     floor_origin = args.floor_origin
     if args.save_animation_dir and args.animation_floor_origin is not None:
         floor_origin = args.animation_floor_origin
+    if args.enable_animation_preview and args.animation_floor_origin is not None:
+        floor_origin = args.animation_floor_origin
     floor = add_square('Floor', floor_origin, args.floor_euler, args.floor_size)
-    add_mat(floor, diffuse_mat)
+
+    if args.rendering_styles == 'ShadowOnWhite':
+        floor.cycles.is_shadow_catcher = True
+    else:
+        add_mat(floor, diffuse_mat)
 
     # Load meshes
     bpy.ops.import_scene.obj(filepath=args.env, axis_forward='Y', axis_up='Z')
     env = bpy.context.selected_objects[0]
     env.name = 'Env'
-    add_mat(env, green_mat)
+    # add_mat(env, green_mat)
+    add_mat(env, diffuse_green_mat)
     # IMPORTANT: For some reason we don't know, Mobius needs this explicitly.
     if not args.flat_env:
         bpy.ops.object.shade_smooth()
@@ -316,6 +333,10 @@ def main():
                              camera_lookat + camera_dist * camera_up + camera_dist * camera_right,
                              camera_lookat,
                              args.camera_up)
+            sun_light = bpy.ops.object.light_add(type='SUN',
+                                                 location = camera_lookat + camera_dist * camera_up - camera_dist * camera_right
+            )
+            bpy.data.lights["Sun"].energy = 10.0
         elif args.light_panel_origin is not None and args.light_panel_lookat is not None and args.light_panel_up is not None:
             set_matrix_world('Area light',
                              args.light_panel_origin,
@@ -460,6 +481,23 @@ def main():
         bpy.context.scene.frame_end = desiredFrames - 1
     if args.image_frame >= 0:
         bpy.context.scene.frame_set(args.image_frame)
+
+    if args.rendering_styles == 'ShadowOnWhite':
+        bpy.context.scene.render.film_transparent = True
+        # switch on nodes and get reference
+        scene = bpy.data.scenes['Scene']
+        scene.use_nodes = True
+        tree = bpy.context.scene.node_tree
+
+        # create input image node
+        r_layer = tree.nodes.get('Render Layers')
+        alpha_node = tree.nodes.new('CompositorNodeAlphaOver')
+        out_node = tree.nodes.get('Composite')
+
+        # link nodes
+        links = tree.links
+        link1 = links.new(r_layer.outputs[0], alpha_node.inputs[2])
+        link2 = links.new(alpha_node.outputs[0], out_node.inputs[0])
 
     """
     ob = bpy.data.objects["Witness"]
