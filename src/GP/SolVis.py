@@ -236,12 +236,14 @@ def main():
     # make_mat_diffuse(diffuse_mat, [1.0, 1.0, 1.0, 1.0])
     make_mat_diffuse(diffuse_mat, [0.01, 0.01, 0.01, 1.0])
 
-    def make_mat_ao_diffuse(mat, val):
+    def make_mat_ao(mat, val):
         mat.use_nodes = True # First, otherwise node_tree won't be avaliable
         nodes = mat.node_tree.nodes
-        diffuse = nodes.new('ShaderNodeBsdfDiffuse')
+        # diffuse = nodes.new('ShaderNodeBsdfDiffuse')
+        diffuse = nodes.new('ShaderNodeBsdfGlossy')
         diffuse.inputs[0].default_value = val
-        diffuse.inputs[1].default_value = 1.0
+        # diffuse.inputs[1].default_value = 1.0
+        diffuse.inputs[1].default_value = 0.316
         ao = nodes.new('ShaderNodeAmbientOcclusion')
         ao.inputs[0].default_value = val
 
@@ -256,16 +258,17 @@ def main():
             print("Applying flat shading")
         else:
             links.new(geo.outputs[1], ao.inputs[2])
-    ao_diffuse_green_mat = bpy.data.materials.new(name='Material Diffuse Green with AO')
-    make_mat_ao_diffuse(ao_diffuse_green_mat, [0.0, 0.35, 0.0, 1.0])
+            links.new(geo.outputs[1], diffuse.inputs[2])
+    ao_green_mat = bpy.data.materials.new(name='Material Green with AO')
+    make_mat_ao(ao_green_mat, [0.0, 0.35, 0.0, 1.0])
 
     def make_mat_emissive(mat, val):
         mat.use_nodes = True # First, otherwise node_tree won't be avaliable
         nodes = mat.node_tree.nodes
         glossy = nodes.new('ShaderNodeEmission')
         glossy.inputs[0].default_value = val
-        # glossy.inputs[1].default_value = 120.0
-        glossy.inputs[1].default_value = 30.0
+        glossy.inputs[1].default_value = 600.0
+        # glossy.inputs[1].default_value = 90.0
         links = mat.node_tree.links
         out = nodes.get('Material Output')
         links.new(glossy.outputs[0], out.inputs[0])
@@ -295,6 +298,7 @@ def main():
         floor_origin = args.animation_floor_origin
     floor = add_square('Floor', floor_origin, args.floor_euler, args.floor_size)
 
+    floor.cycles_visibility.glossy = False
     if args.rendering_styles == 'ShadowOnWhite':
         floor.cycles.is_shadow_catcher = True
     else:
@@ -305,7 +309,7 @@ def main():
     env = bpy.context.selected_objects[0]
     env.name = 'Env'
     # add_mat(env, green_mat)
-    add_mat(env, ao_diffuse_green_mat)
+    add_mat(env, ao_green_mat)
     # IMPORTANT: For some reason we don't know, Mobius needs this explicitly.
     if not args.flat_env:
         bpy.ops.object.shade_smooth()
@@ -350,13 +354,26 @@ def main():
             '''
             world_up = normalized(np.array(args.camera_up))
             set_matrix_world('Area light',
-                             camera_lookat + camera_dist * camera_up + camera_dist * camera_right,
+                             # camera_lookat + camera_dist * camera_up - camera_dist * camera_right,
+                             camera_origin - camera_dist * camera_right,
                              camera_lookat,
                              args.camera_up)
-            sun_light = bpy.ops.object.light_add(type='SUN',
-                                                 location = camera_lookat + camera_dist * camera_up - camera_dist * camera_right
+
+            sun_light = bpy.ops.object.light_add(type='SUN')
+            set_matrix_world('Sun',
+                             # camera_lookat + camera_dist * camera_up - camera_dist * camera_right,
+                             camera_lookat + 1.0 * camera_dist * camera_up,
+                             camera_lookat,
+                             args.camera_up)
+            bpy.data.lights["Sun"].energy = camera_dist * 0.05
+
+            '''
+            bpy.ops.object.light_add(type='POINT',
+                                     location = camera_origin + 2.0 * (camera_origin - camera_lookat)
             )
-            bpy.data.lights["Sun"].energy = 10.0
+            point = bpy.data.lights["Point"]
+            point.energy = camera_dist * 10.0
+            '''
         elif args.light_panel_origin is not None and args.light_panel_lookat is not None and args.light_panel_up is not None:
             set_matrix_world('Area light',
                              args.light_panel_origin,
