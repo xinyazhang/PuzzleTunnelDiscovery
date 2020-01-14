@@ -260,7 +260,7 @@ def main():
             links.new(geo.outputs[1], ao.inputs[2])
             links.new(geo.outputs[1], diffuse.inputs[2])
     ao_green_mat = bpy.data.materials.new(name='Material Green with AO')
-    make_mat_ao(ao_green_mat, [0.0, 0.35, 0.0, 1.0])
+    make_mat_ao(ao_green_mat, [0.0, 0.4, 0.4, 1.0])
 
     def make_mat_emissive(mat, val):
         mat.use_nodes = True # First, otherwise node_tree won't be avaliable
