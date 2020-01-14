@@ -256,7 +256,6 @@ def _multinet_predict_surface(args, ws, geo_type):
             params['prediction_output'] = ws.atex_prediction_file(puzzle_fn, geo_type, netid=netid)
             params['dataset_name'] = puzzle_name # Enforce the generated filename
 
-            global_gpu_lock(ws)
             pred_name = 'predict_{}_with_netgroup#{}'.format(geo_type, netid)
             ws.timekeeper_start(pred_name, puzzle_name)
             util.log("[prediction] Predicting {}:{}".format(puzzle_fn, geo_type))
@@ -273,11 +272,12 @@ def _multinet_predict_surface(args, ws, geo_type):
             shutil.copy(src, dst)
             """
             ws.timekeeper_finish(pred_name, puzzle_name)
-            global_gpu_unlock(ws)
 
 def multinet_predict(args, ws):
+    global_gpu_lock(ws)
     _multinet_predict_surface(args, ws, 'rob')
     _multinet_predict_surface(args, ws, 'env')
+    global_gpu_unlock(ws)
 
 function_dict = {
         'train_rob' : train_rob,
