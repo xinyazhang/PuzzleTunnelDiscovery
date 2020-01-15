@@ -89,5 +89,9 @@ PYBIND11_MODULE(pyse3ompl, m) {
 		.def_property_readonly("latest_solution", &OmplDriver::getLatestSolution)
 		.def_property_readonly("latest_solution_status", &OmplDriver::getLatestSolutionStatus)
 		.def_property_readonly("latest_performance_numbers", &OmplDriver::getLatestPerformanceNumbers)
+		.def("optimize", &OmplDriver::optimize,
+		     py::arg("path"),
+		     py::arg("days")
+		    )
 		;
 }

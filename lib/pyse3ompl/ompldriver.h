@@ -248,6 +248,10 @@ public:
 	{
 		return latest_pn_;
 	}
+
+	Eigen::MatrixXd
+	optimize(Eigen::MatrixXd eigen3_path, // MUST be Value, this function modified this internally
+	         double days);
 private:
 	int planner_id_;
 	int vs_sampler_id_;

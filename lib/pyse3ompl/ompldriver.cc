@@ -1,4 +1,6 @@
 #include "ompldriver.h"
+#include <ompl/geometric/PathSimplifier.h>
+
 #include <chrono>
 #include <ctime>
 #include <unordered_set>
@@ -612,6 +614,22 @@ OmplDriver::validateMotionPairs(const Eigen::MatrixXd& qs0,
 	return ret;
 }
 
+
+
+Eigen::MatrixXd
+OmplDriver::optimize(Eigen::MatrixXd eigen3_path,
+                     double days)
+{
+	ompl::app::SE3RigidBodyPlanning setup;
+	configSE3RigidBodyPlanning(setup, false);
+	ompl::geometric::PathGeometric path(setup.getSpaceInformation());
+	path.appendFromMatrix(eigen3_path);
+	ompl::geometric::PathSimplifier ps(setup.getSpaceInformation());
+	ps.simplify(path, days * 3600.0 * 24.0);
+	Eigen::MatrixXd out;
+	path.toMatrix(eigen3_path);
+	return eigen3_path;
+}
 
 void
 OmplDriver::configSE3RigidBodyPlanning(ompl::app::SE3RigidBodyPlanning& setup,
