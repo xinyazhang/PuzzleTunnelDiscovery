@@ -6,6 +6,7 @@ import sys
 import bpy
 import argparse
 import math
+import os
 from math import pi as PI
 import numpy as np
 from scipy.spatial.transform import Rotation, Slerp
@@ -150,6 +151,18 @@ def set_matrix_world(name, origin, lookat, up):
             mw[i][j] = mat[i, j]
     return origin, lookat, up, lookdir
 
+def enable_cuda():
+    """
+    Enable CUDA
+    """
+    P=bpy.context.preferences
+    prefs=P.addons['cycles'].preferences
+    prefs.compute_device_type='CUDA'
+    print(prefs.compute_device_type)
+    print(prefs.get_devices())
+    for scene in bpy.data.scenes:
+        scene.cycles.device = 'GPU'
+
 def parse_args():
     p = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     p.add_argument('env', help='ENV geometry')
@@ -181,6 +194,8 @@ def parse_args():
     p.add_argument('--save_image', help='Save the Rendered image as', default='')
     p.add_argument('--save_animation_dir', help='Save the Rendered animation sequence image to', default='')
     p.add_argument('--enable_animation_preview', action='store_true')
+    p.add_argument('--cuda', action='store_true')
+    p.add_argument('--preview', action='store_true')
     p.add_argument('--quit', help='Quit without running blender', action='store_true')
     argv = sys.argv
     return p.parse_args(argv[argv.index("--") + 1:])
@@ -561,12 +576,20 @@ def main():
         bpy.ops.wm.save_as_mainfile(filepath=args.saveas, check_existing=False)
     if args.save_image:
         bpy.context.scene.cycles.samples = 512
+        if args.cuda:
+            enable_cuda()
         bpy.context.scene.render.filepath = args.save_image
         bpy.ops.render.render(write_still=True)
     if args.save_animation_dir:
+        os.makedirs(args.save_animation_dir, exist_ok=True)
         bpy.context.scene.cycles.samples = 512
+        if args.cuda:
+            enable_cuda()
         bpy.context.scene.render.filepath = args.save_animation_dir
-        bpy.ops.render.render(animation=True)
+        if args.preview:
+            bpy.ops.render.opengl(animation=True, view_context=False)
+        else:
+            bpy.ops.render.render(animation=True)
     if args.quit:
         bpy.ops.wm.quit_blender()
 
