@@ -14,7 +14,7 @@ from .file_locations import FEAT_PRED_SCHEMES, KEY_PRED_SCHEMES, FileLocations
 
 def human_format(num):
     magnitude = 0
-    while abs(num) >= 1000:
+    while abs(num) >= 100:
         magnitude += 1
         num /= 1000.0
     # add more suffixes if you need them
@@ -747,6 +747,8 @@ class SolveStatTabler(FeatStatTabler):
             for e in list_with_none:
                 if e is not None:
                     list_wo_none.append(e)
+            if len(list_wo_none) == 0:
+                return [f'TBD']
             return [f'{human_format(np.mean(list_wo_none))}']
         p = [row_name, f'{col_name}.solve.solved']
         # print(f"fetching {p}")

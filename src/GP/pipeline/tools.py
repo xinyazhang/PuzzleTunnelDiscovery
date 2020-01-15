@@ -436,13 +436,27 @@ def blender_animate(args):
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
         cfg, config = parse_ompl.parse_simple(puzzle_fn)
         fl = FileLocations(args, ws, puzzle_name)
-        unit_path = fl.unit_out_fn
+        in_path = fl.unit_out_fn if args.use_unoptimized else fl.sim_out_fn
         vanilla_path = fl.vanilla_out_fn
-        if not os.path.isfile(unit_path):
-            util.warn(f'[blender_animate] The solution file {unit_path} does not exist')
-            continue
+        if not os.path.isfile(in_path):
+            if not args.use_unoptimized:
+                util.log(f'[blender_animate] The optimized solution file {in_path} does not exist')
+                util.log(f'[blender_animate] Trying to run the path optimizer')
+                class TmpDriverArgs(object):
+                    pass
+                o_args = TmpDriverArgs()
+                o_args.current_trial = args.current_trial
+                o_args.days = 0.01
+                o_args.dir = args.dir
+                simplify(o_args)
+                if not os.path.isfile(in_path):
+                    util.warn(f'[blender_animate] The path optimizer cannot get simplified solution')
+                    continue
+            else:
+                util.warn(f'[blender_animate] The solution file {in_path} does not exist')
+                continue
         uw = util.create_unit_world(puzzle_fn)
-        unit_q = matio.load(unit_path)
+        unit_q = matio.load(in_path)
         van_q = uw.translate_ompl_to_vanilla(uw.translate_unit_to_ompl(unit_q))
         matio.savetxt(vanilla_path, van_q)
         oc = uw.get_ompl_center()
@@ -506,6 +520,24 @@ def blender_animate(args):
         if args.quit or args.background:
             calls += ['--quit']
         util.shell(calls)
+
+def simplify(args):
+    from . import solve2
+    ws = util.Workspace(args.dir)
+    ws.current_trial = args.current_trial
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+        fl = FileLocations(args, ws, puzzle_name)
+        fl.update_scheme('cmb')
+        unit_path = fl.unit_out_fn
+        util.log(f'Simplifiying trajectory from {unit_path}')
+        unit_q = matio.load(unit_path)
+        uw = util.create_unit_world(puzzle_fn)
+        ompl_q = uw.translate_unit_to_ompl(unit_q)
+        driver = solve2.create_driver(puzzle_fn)
+        sim_q = driver.optimize(ompl_q, args.days)
+        unit_sim_q = uw.translate_ompl_to_unit(sim_q)
+        matio.savetxt(fl.sim_out_fn, unit_sim_q)
+        util.log(f'Simplified trajectory written to {fl.sim_out_fn}')
 
 def dump_training_data(args):
     ws = util.Workspace(args.dir)
@@ -610,6 +642,7 @@ function_dict = {
         'vistouchdisp' : vistouchdisp,
         'animate' : animate,
         'blender' : blender_animate,
+        'simplify' : simplify,
         'dump_training_data' : dump_training_data,
         'debug' : debug,
 }
@@ -702,6 +735,7 @@ def setup_parser(subparsers):
     p.add_argument('--current_trial', help='Trial that has the solution trajectory', type=int, default=None)
     p.add_argument('--puzzle_name', help='Puzzle selection. Will exit after displaying all puzzle names if not present', default='')
     p.add_argument('--scheme', help='Scheme selection', choices=KEY_PRED_SCHEMES, default='cmb')
+    p.add_argument('--use_unoptimized', action='store_true')
     p.add_argument('--camera_origin', help='Origin of camera', type=float, nargs=3, default=None)
     p.add_argument('--camera_lookat', help='Point to Look At of camera', type=float, nargs=3, default=None)
     p.add_argument('--camera_up', help='Up direction of camera', type=float, nargs=3, default=None)
@@ -732,6 +766,11 @@ def setup_parser(subparsers):
     p.add_argument('--nn_profile', help='NN profile', default='256hg+normal')
     p.add_argument('dir', help='Workspace directory')
     p.add_argument('out', help='Output directory')
+
+    p = toolp.add_parser('simplify', help='Simplify the trajectory')
+    p.add_argument('--current_trial', help='Trial to simplify', type=int, default=0)
+    p.add_argument('--days', help='Time limit of optimization', type=float, default=0.01)
+    p.add_argument('dir', help='Workspace directory')
 
     p = toolp.add_parser('debug', help='Temporary debugging code. Eveything should be hardcoded')
 
