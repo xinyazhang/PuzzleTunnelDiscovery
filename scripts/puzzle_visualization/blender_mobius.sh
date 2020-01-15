@@ -10,5 +10,5 @@
 	--image_frame 398 \
 	--saveas blender/blender_mobius.blend \
 	--animation_end 1366 \
-	--animation_floor_origin 30 0 0 \
+	--animation_floor_origin 50 0 0 \
 	"$@" \
