@@ -501,6 +501,8 @@ def blender_animate(args):
             calls += ['--preview']
         if args.image_frame is not None:
             calls += ['--image_frame', str(args.image_frame)]
+        if args.animation_end >= 0:
+            calls += ['--animation_end', str(args.animation_end)]
         if args.quit or args.background:
             calls += ['--quit']
         util.shell(calls)
