@@ -186,7 +186,8 @@ def parse_args():
     p.add_argument('--floor_size', help='Size of the floor, from the center to the edge',
                                    type=float, default=2500)
     p.add_argument('--flat_env', help='Flat shading', action='store_true')
-    p.add_argument('--image_frame', help='Image Frame', type=int, default=0)
+    p.add_argument('--image_frame', help='Still Image Frame. Use in conjuction with --save_image', type=int, default=0)
+    p.add_argument('--animation_single_frame', help='Render single frame of animation. Use in conjuction with --save_animation_dir. Override animation_end.', type=int, default=None)
     p.add_argument('--animation_end', help='End frame of animation', type=int, default=-1)
     p.add_argument('--animation_floor_origin', help='Center of the floor when rendering the animation',
                                      type=float, nargs=3, default=None)
@@ -586,6 +587,9 @@ def main():
         if args.cuda:
             enable_cuda()
         bpy.context.scene.render.filepath = args.save_animation_dir
+        if args.animation_single_frame is not None:
+            bpy.context.scene.frame_start = args.animation_single_frame
+            bpy.context.scene.frame_end = args.animation_single_frame
         if args.preview:
             bpy.ops.render.opengl(animation=True, view_context=False)
         else:

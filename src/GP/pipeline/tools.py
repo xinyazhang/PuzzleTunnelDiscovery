@@ -515,6 +515,8 @@ def blender_animate(args):
             calls += ['--preview']
         if args.image_frame is not None:
             calls += ['--image_frame', str(args.image_frame)]
+        if args.animation_single_frame is not None:
+            calls += ['--animation_single_frame', str(args.animation_single_frame)]
         if args.animation_end >= 0:
             calls += ['--animation_end', str(args.animation_end)]
         if args.quit or args.background:
@@ -746,7 +748,8 @@ def setup_parser(subparsers):
     p.add_argument('--light_panel_up', help='Up direction of light_panel', type=float, nargs=3, default=None)
     p.add_argument('--light_auto', help='Set the light configuration automatically', action='store_true')
     p.add_argument('--flat_env', help='Flat shading', action='store_true')
-    p.add_argument('--image_frame', help='Image Frame', type=int, default=None)
+    p.add_argument('--image_frame', help='Still Image Frame. Use in conjuction with --save_image', type=int, default=None)
+    p.add_argument('--animation_single_frame', help='Render single frame of animation. Use in conjuction with --save_animation_dir. Override animation_end.', type=int, default=None)
     p.add_argument('--animation_end', help='End frame of animation', type=int, default=-1)
     p.add_argument('--animation_floor_origin', help='Center of the floor when rendering the animation',
                                      type=float, nargs=3, default=[0, 0, -40])
