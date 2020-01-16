@@ -7,7 +7,7 @@
 	--floor_origin 40 0 0 \
 	--floor_euler 0 90 0 \
 	--light_auto \
-	--animation_end 1318 \
+	--animation_end 1424 \
 	--animation_floor_origin 50 0 0 \
 	--saveas blender/abc.blend \
 	"$@" \

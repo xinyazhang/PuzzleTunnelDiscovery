@@ -6,7 +6,7 @@
 	--camera_up 0 0 1 \
 	--light_auto \
 	--image_frame 485 \
-	--animation_end 722 \
+	--animation_end 1267 \
 	--animation_floor_origin 0 0 -60 \
 	--saveas blender/blender_aj.blend \
 	"$@" \

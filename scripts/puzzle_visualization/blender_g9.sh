@@ -6,6 +6,7 @@
 	--camera_up 0 0 1 \
 	--floor_origin 0 0 -15 \
 	--light_auto \
+	--animation_end 1369 \
 	--saveas blender/blender_g9.blend \
 	--animation_floor_origin 0 0 -20 \
 	"$@" \
