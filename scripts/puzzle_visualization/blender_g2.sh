@@ -10,4 +10,5 @@
 	--animation_end 644 \
 	--animation_floor_origin 0 0 -20 \
 	--flat_env \
+	--use_unoptimized \
 	"$@" \

@@ -7,7 +7,6 @@
 	--floor_origin 0 0 -15 \
 	--light_auto \
 	--saveas blender/blender_g9.blend \
-	--animation_end 1352 \
 	--animation_floor_origin 0 0 -20 \
 	"$@" \
 	--flat_env
