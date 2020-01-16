@@ -45,13 +45,16 @@ def local_submit(ws,
                  arguments,
                  instances,
                  wait=True,
-                 dryrun=False):
+                 dryrun=False,
+                 local_scratch=None
+                 ):
     if xfile is None or xfile == '':
         msg = "[condor.local_submit] xfile is None or empty, current value {}".format(xfile)
         util.fatal(msg)
         raise RuntimeError(msg)
     SUBMISSION_FILE = 'submission.condor'
-    local_scratch = ws.local_ws(iodir_rel)
+    if local_scratch is None:
+        local_scratch = ws.local_ws(iodir_rel)
     os.makedirs(local_scratch, exist_ok=True)
     util.log("[local_submit] using scratch directory {}".format(local_scratch))
     local_sub = os.path.join(local_scratch, SUBMISSION_FILE)
@@ -73,11 +76,12 @@ def local_submit(ws,
     if dryrun:
         util.log("[local_submit] dryrun, existing without submitting")
         util.log("[local_submit] HTCondor file has been written to {}".format(local_sub))
-        return
+        return local_sub
     util.log("[local_submit] submitting {}".format(local_sub))
     util.shell(['condor_submit', local_sub])
     if wait:
         local_wait(local_scratch)
+    return local_sub
 
 def query_last_cputime(ws,
                        iodir_rel):

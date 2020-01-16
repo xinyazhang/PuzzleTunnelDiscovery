@@ -477,6 +477,8 @@ def blender_animate(args):
         calls = ['blender']
         if args.background:
             calls += ['-b']
+        if args.condor_generate:
+            calls += ['-t', '1'] # Single thread
         calls += ['-P', 'SolVis.py', '--']
         calls += [cfg.env_fn, cfg.rob_fn, vanilla_path, '--O'] + ocstr
         if args.flat_env:
@@ -516,12 +518,29 @@ def blender_animate(args):
         if args.image_frame is not None:
             calls += ['--image_frame', str(args.image_frame)]
         if args.animation_single_frame is not None:
+            assert not args.condor_generate
             calls += ['--animation_single_frame', str(args.animation_single_frame)]
         if args.animation_end >= 0:
             calls += ['--animation_end', str(args.animation_end)]
         if args.quit or args.background:
             calls += ['--quit']
-        util.shell(calls)
+        if args.condor_generate:
+            assert args.save_animation_dir
+            scratch = arg.save_animation_dir
+            end = args.animation_end if args.animation_end >= 0 else 1440
+            from . import condor
+            calls += ['--animation_single_frame', '$(Process)']
+            subfile= codor.local_submit(ws=ws,
+                                        xfile='blender',
+                                        iodir_rel='',
+                                        arguments=calls[1:],
+                                        instances=args.animation_end,
+                                        local_scratch=scratch,
+                                        wait=False,
+                                        dryrun=True)
+            util.ack(f'[tool blender] write condor submission file to {subfile}')
+        else:
+            util.shell(calls)
 
 def simplify(args):
     from . import solve2
@@ -737,6 +756,7 @@ def setup_parser(subparsers):
     p.add_argument('--current_trial', help='Trial that has the solution trajectory', type=int, default=None)
     p.add_argument('--puzzle_name', help='Puzzle selection. Will exit after displaying all puzzle names if not present', default='')
     p.add_argument('--scheme', help='Scheme selection', choices=KEY_PRED_SCHEMES, default='cmb')
+    p.add_argument('--condor_generate', help='Generate HTCondor submission file, instead of running locally. --save_animation_dir is mandatory and used as output and scratch dir', action='store_true')
     p.add_argument('--use_unoptimized', action='store_true')
     p.add_argument('--camera_origin', help='Origin of camera', type=float, nargs=3, default=None)
     p.add_argument('--camera_lookat', help='Point to Look At of camera', type=float, nargs=3, default=None)
