@@ -1,4 +1,5 @@
 import os
+from os.path import join
 import sys
 import csv
 import json
@@ -345,13 +346,17 @@ def forest_rdt_withbt_dir(puzzle_name, current_trial):
 def knn3_dir(puzzle_name, current_trial):
     return join(util.SOLVER_SCRATCH, puzzle_name, 'pairwise_knn-{}'.format(current_trial))
 
+def knn6_dir(puzzle_name, current_trial):
+    return join(util.SOLVER_SCRATCH, puzzle_name, 'pairwise_knn6-{}'.format(current_trial))
+
 _CONDOR_SOLSTAGE_TO_DIR = {
         'estimate_keyconf_clearance' : estimate_keyconf_clearance_dir,
         'screen_keyconf' : screen_keyconf_dir,
         'sample_pds' : sample_pds_dir,
         'forest_rdt' : forest_rdt_dir,
         'forest_rdt_withbt' : forest_rdt_withbt_dir,
-        'knn3' : knn3_dir,
+        #'knn3' : knn3_dir,
+        'knn6' : knn6_dir,
 }
 
 def condor_ppbreakdown(args):
@@ -438,12 +443,13 @@ class Tabler(object):
             'ag'        : [('ag-2', 'env,rob')],
             'aj'        : [('aj,aj-2', 'env,rob')],
             'az'        : [('az', 'env,rob')],
+            'double-alpha' : [('doublealpha-1.0', 'env')],
+            'claw'      : [('claw-rightbv.dt.tcp', 'env,rob')],
             'duet ring' : [('duet-g1,duet-g2,duet-g4,duet-g9,duet-g9-alternative', 'rob')],
             'duet-g1 grid' : [('duet-g1', 'env')],
             'duet-g2 grid' : [('duet-g2', 'env')],
             'duet-g4 grid' : [('duet-g4', 'env')],
             'duet-g9(a) grid' : [('duet-g9,duet-g9-alternative', 'env')],
-            'claw'      : [('claw-rightbv.dt.tcp', 'env,rob')],
             'enigma part 1' : [('enigma', 'env')],
             'enigma part 2' : [('enigma', 'rob')],
             'ABC part AB'   : [('abc_rec2m', 'env')],
@@ -828,6 +834,63 @@ def timing_the_planner(args):
     tabler = PlannerTimingTabler(args)
     tabler.print()
 
+class CondorHours(FeatStatTabler):
+    # SCHEMES = KEY_PRED_SCHEMES
+    SCHEMES = ['cmb']
+    """
+    PF_KEYS is the 'geo_type' of FeatStatTabler
+    """
+    # PF_KEYS = ['Clearance Estimation', 'Screening', 'Blooming', 'KNN' ]
+    PF_KEYS = ['Blooming', 'KNN' ]
+
+    def __init__(self, args):
+        super().__init__(args)
+
+    def _fl_to_raw_data(self, fl):
+        """
+        Data from blooming tree
+        """
+        for i, fn in fl.bloom_fn_gen:
+            d = matio.load(fn)
+            k = 'PF_LOG_PLAN_T'
+            yield 'Blooming', d[k]
+        for i, fn in fl.knn_fn_gen:
+            d = matio.load(fn)
+            k = 'PF_LOG_PLAN_T'
+            yield 'KNN', d[k]
+
+    # TODO: merge this with KeyStatTabler's collect_agg_data
+    def collect_agg_data(self, dic):
+        adic = {}
+        for puzzle_name in dic.keys():
+            ad = {}
+            for scheme, pf_key in itertools.product(self.SCHEMES, self.PF_KEYS):
+                p = [puzzle_name, scheme, pf_key]
+                l = _dic_fetch_path(dic, p)
+                ad[f'{scheme}.{pf_key}.list'] = l
+                ad[f'{scheme}.{pf_key}.mean'] = [float(np.mean(l))]
+                ad[f'{scheme}.{pf_key}.stdev'] = [float(np.std(l))]
+                ad[f'{scheme}.{pf_key}.sum'] = [float(np.sum(l))]
+            if puzzle_name in self.PAPER_TRANSLATION:
+                name = self.PAPER_TRANSLATION[puzzle_name]
+            else:
+                name = puzzle_name
+            adic[name] = ad
+        return adic
+
+    def get_matrix_cols(self):
+        return self.PF_KEYS
+
+    def get_matrix_item(self, adic, row_name, col_name):
+        p = [row_name, f'cmb.{col_name}.sum']
+        # print(f"fetching {p}")
+        f = _dic_fetch_path(adic, p)
+        return [f'{f[0] / 1e3 / 3600:.2f} hrs']
+
+def condor_hours(args):
+    tabler = CondorHours(args)
+    tabler.print()
+
 def _print_latex(matrix, float_fmt="{0:.2f}", file=None, align=4):
     print(matrix)
     f = sys.stdout if file is None else file
@@ -863,6 +926,7 @@ function_dict = {
         'keyq' : keyq,
         'solve' : solve,
         'timing_the_planner' : timing_the_planner,
+        'condor_hours' : condor_hours,
 }
 
 def setup_parser(subparsers):
@@ -899,11 +963,13 @@ def setup_parser(subparsers):
     p = toolp.add_parser('feat', help='Collect the feature points into a table')
     p.add_argument('--trial_range', help='range of trials', type=str, required=True)
     p.add_argument('--tex', help='Output paper-ready table body TeX', default='feat.tex')
+    p.add_argument('--override_config', help='Override workspace config', default='')
     p.add_argument('dirs', help='Archived workspace directory.', nargs='+')
 
     p = toolp.add_parser('keyq', help='Collect the key configurations into a table')
     p.add_argument('--trial_range', help='range of trials', type=str, required=True)
     p.add_argument('--tex', help='Output paper-ready table body TeX', default='keyq.tex')
+    p.add_argument('--override_config', help='Override workspace config', default='')
     p.add_argument('dirs', help='Archived workspace directory.', nargs='+')
 
     p = toolp.add_parser('solve', help='Collect chance to solve into a table')
@@ -917,6 +983,14 @@ def setup_parser(subparsers):
     p.add_argument('--trial_range', help='range of trials', type=str, required=True)
     p.add_argument('--tex', help='Output paper-ready table body TeX', default='planner_pf.tex')
     p.add_argument('dirs', help='Archived workspace directory.', nargs='+')
+
+    p = toolp.add_parser('condor_hours', help='Show CPU hours spent by HTCondor')
+    p.add_argument('--trial_range', help='range of trials', type=str, required=True)
+    p.add_argument('--puzzle_name', help='Only show one specific testing puzzle', default='')
+    p.add_argument('--tex', help='Output tex file', default='c.tex')
+    p.add_argument('--override_config', help='Override workspace config', default='')
+    p.add_argument('dirs', help='Archived workspace directory, must include condor log files',
+                   nargs='+')
 
 def run(args):
     function_dict[args.tool_name](args)
