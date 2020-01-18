@@ -840,24 +840,38 @@ class CondorHours(FeatStatTabler):
     """
     PF_KEYS is the 'geo_type' of FeatStatTabler
     """
-    # PF_KEYS = ['Clearance Estimation', 'Screening', 'Blooming', 'KNN' ]
-    PF_KEYS = ['Blooming', 'KNN' ]
+    PF_KEYS = ['Clearance Estimation', 'Screening', 'Blooming', 'KNN' ]
+    # PF_KEYS = ['Blooming', 'KNN' ]
 
     def __init__(self, args):
         super().__init__(args)
 
     def _fl_to_raw_data(self, fl):
+        from . import condor
+        yield 'Clearance Estimation', condor.query_last_cputime_from_log(join(fl.clearance, 'log'), translate_to_msecs=True)
         """
         Data from blooming tree
         """
+        total = 0
         for i, fn in fl.bloom_fn_gen:
-            d = matio.load(fn)
-            k = 'PF_LOG_PLAN_T'
-            yield 'Blooming', d[k]
+            try:
+                d = matio.load(fn)
+                total += d['PF_LOG_PLAN_T']
+            except:
+                pass
+        yield 'Blooming', total
+        if fl.has_screening:
+            yield 'Screening', condor.query_last_cputime_from_log(join(fl.screen, 'log'), translate_to_msecs=True)
+        else:
+            yield 'Screening', None
+        total = 0
         for i, fn in fl.knn_fn_gen:
-            d = matio.load(fn)
-            k = 'PF_LOG_PLAN_T'
-            yield 'KNN', d[k]
+            try:
+                d = matio.load(fn)
+                total += d['PF_LOG_PLAN_T']
+            except:
+                pass
+        yield 'KNN', total
 
     # TODO: merge this with KeyStatTabler's collect_agg_data
     def collect_agg_data(self, dic):
@@ -882,7 +896,7 @@ class CondorHours(FeatStatTabler):
         return self.PF_KEYS
 
     def get_matrix_item(self, adic, row_name, col_name):
-        p = [row_name, f'cmb.{col_name}.sum']
+        p = [row_name, f'cmb.{col_name}.mean']
         # print(f"fetching {p}")
         f = _dic_fetch_path(adic, p)
         return [f'{f[0] / 1e3 / 3600:.2f} hrs']

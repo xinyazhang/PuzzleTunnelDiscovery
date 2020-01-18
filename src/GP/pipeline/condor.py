@@ -83,20 +83,33 @@ def local_submit(ws,
         local_wait(local_scratch)
     return local_sub
 
-def query_last_cputime(ws,
-                       iodir_rel):
-    log_fn = ws.local_ws(iodir_rel, 'log')
+def query_last_cputime_from_log(log_fn, translate_to_msecs=False):
     if not os.path.isfile(log_fn):
         return None
-    '''
-    util.shell(['rsync', log_fn,
-                '{}:tmp/condor_log_to_analysis'.format(ws.condor_host)])
-    logbytes = subprocess.check_output(f'ssh {ws.condor_host} condor_userlog tmp/condor_log_to_analysis | tail -n 1', shell=True)
-    '''
     logbytes = subprocess.check_output(f'condor_userlog {log_fn} | tail -n 1', shell=True)
     logstr = logbytes.decode('utf-8')
     util.log(f"[logstr] {logstr}")
     sp = logstr.split()
     if sp[0] != 'Total':
         return None
-    return sp[3]
+    condor_str = sp[3]
+    if not translate_to_msecs:
+        return condor_str
+    day_break = condor_str.find('+')
+    hr_break = condor_str.find(':')
+    days = int(condor_str[:day_break])
+    hrs = int(condor_str[day_break+1:hr_break])
+    mins = int(condor_str[hr_break+1])
+    ret = 1e3 * 60 * (mins + 60 * (hrs + 24 * days))
+    print(f"translate {condor_str} to {ret} msecs")
+    return ret
+
+def query_last_cputime(ws,
+                       iodir_rel):
+    log_fn = ws.local_ws(iodir_rel, 'log')
+    '''
+    util.shell(['rsync', log_fn,
+                '{}:tmp/condor_log_to_analysis'.format(ws.condor_host)])
+    logbytes = subprocess.check_output(f'ssh {ws.condor_host} condor_userlog tmp/condor_log_to_analysis | tail -n 1', shell=True)
+    '''
+    return query_last_cputime_from_log(log_fn)

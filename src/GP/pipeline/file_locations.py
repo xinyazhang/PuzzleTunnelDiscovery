@@ -134,24 +134,30 @@ class FileLocations(object):
         return self._ws.local_ws(self.rel_screen)
 
     @property
+    def has_screening(self):
+        return self._ws.config.getboolean('Solver', 'EnableKeyConfScreening', fallback=True)
+
+    @property
     def screened_key_fn(self):
-        conf = self._ws.config.getboolean('Solver', 'EnableKeyConfScreening', fallback=True)
-        print(f'Solver.EnableKeyConfScreening == {conf}')
-        if conf == False:
+        # conf = self._ws.config.getboolean('Solver', 'EnableKeyConfScreening', fallback=True)
+        # print(f'Solver.EnableKeyConfScreening == {conf}')
+        if self.has_screening == False:
             return self.raw_key_fn
         return self._ws.keyconf_file_from_fmt(self._puzzle_name,
                                               'screened_'+SCHEME_TO_FMT[self.scheme])
 
     @property
     def cmb_screened_key_fn(self):
-        if self._ws.config.getboolean('Solver', 'EnableKeyConfScreening', fallback=True) == False:
+        #if self._ws.config.getboolean('Solver', 'EnableKeyConfScreening', fallback=True) == False:
+        if self.has_screening == False:
             return self.cmb_raw_key_fn
 
         return self._ws.keyconf_file_from_fmt(self._puzzle_name,
                                               'screened_'+SCHEME_TO_FMT['cmb'])
 
     def get_cmb_screened_key_fn(self, trial):
-        if self._ws.config.getboolean('Solver', 'EnableKeyConfScreening', fallback=True) == False:
+        # if self._ws.config.getboolean('Solver', 'EnableKeyConfScreening', fallback=True) == False:
+        if self.has_screening == False:
             return self.get_assembled_raw_key_fn(trial=trial)
 
         return self._ws.keyconf_file_from_fmt(self._puzzle_name,
