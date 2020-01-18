@@ -537,7 +537,7 @@ def blender_animate(args):
                                          xfile='/usr/bin/env',
                                          iodir_rel='',
                                          arguments=['blender'] + calls[1:],
-                                         instances=args.animation_end,
+                                         instances=end,
                                          local_scratch=scratch,
                                          wait=False,
                                          dryrun=False)
