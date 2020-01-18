@@ -528,18 +528,19 @@ def blender_animate(args):
             calls += ['--quit']
         if args.condor_generate:
             assert args.save_animation_dir
-            scratch = arg.save_animation_dir
+            scratch = args.save_animation_dir
             end = args.animation_end if args.animation_end >= 0 else 1440
             from . import condor
             calls += ['--animation_single_frame', '$(Process)']
-            subfile= codor.local_submit(ws=ws,
-                                        xfile='blender',
-                                        iodir_rel='',
-                                        arguments=calls[1:],
-                                        instances=args.animation_end,
-                                        local_scratch=scratch,
-                                        wait=False,
-                                        dryrun=True)
+            os.makedirs(scratch, exist_ok=True)
+            subfile= condor.local_submit(ws=ws,
+                                         xfile='/usr/bin/env',
+                                         iodir_rel='',
+                                         arguments=['blender'] + calls[1:],
+                                         instances=args.animation_end,
+                                         local_scratch=scratch,
+                                         wait=False,
+                                         dryrun=False)
             util.ack(f'[tool blender] write condor submission file to {subfile}')
         else:
             util.shell(calls)

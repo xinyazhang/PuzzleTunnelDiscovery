@@ -574,7 +574,7 @@ def main():
             o.handle_right_type = 'AUTO'
             o.handle_left_type = 'AUTO'
     """
-    if args.saveas:
+    if args.saveas and args.animation_single_frame is None:
         bpy.ops.wm.save_as_mainfile(filepath=args.saveas, check_existing=False)
     if args.save_image:
         bpy.context.scene.cycles.samples = 512
@@ -587,7 +587,7 @@ def main():
         bpy.context.scene.cycles.samples = 512
         if args.cuda:
             enable_cuda()
-        bpy.context.scene.render.filepath = args.save_animation_dir
+        bpy.context.scene.render.filepath = args.save_animation_dir + '/'
         if args.animation_single_frame is not None:
             bpy.context.scene.frame_start = args.animation_single_frame
             bpy.context.scene.frame_end = args.animation_single_frame
