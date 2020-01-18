@@ -495,6 +495,8 @@ def blender_animate(args):
             calls += ['--floor_euler'] + ["{:.17f}".format(e) for e in args.floor_euler]
         if args.camera_up is not None:
             calls += ['--camera_up'] + ["{:.17f}".format(e) for e in args.camera_up]
+        if args.camera_from_bottom:
+            calls += ['--camera_from_bottom']
         if args.light_panel_origin is not None:
             calls += ['--light_panel_origin'] + ["{:.17f}".format(e) for e in args.light_panel_origin]
         if args.light_panel_lookat is not None:
@@ -764,6 +766,7 @@ def setup_parser(subparsers):
     p.add_argument('--camera_origin', help='Origin of camera', type=float, nargs=3, default=None)
     p.add_argument('--camera_lookat', help='Point to Look At of camera', type=float, nargs=3, default=None)
     p.add_argument('--camera_up', help='Up direction of camera', type=float, nargs=3, default=None)
+    p.add_argument('--camera_from_bottom', help='flip_camera w.r.t. the lookat and up direction. This also make a transparent floor', action='store_true')
     p.add_argument('--floor_origin', help='Center of the floor', type=float, nargs=3, default=None)
     p.add_argument('--floor_euler', help='Rotate the floor with euler angle', type=float, nargs=3, default=None)
     p.add_argument('--light_panel_origin', help='Origin of light_panel', type=float, nargs=3, default=None)

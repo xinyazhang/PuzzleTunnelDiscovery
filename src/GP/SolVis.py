@@ -174,6 +174,7 @@ def parse_args():
     p.add_argument('--camera_origin', help='Origin of camera', type=float, nargs=3, default=None)
     p.add_argument('--camera_lookat', help='Point to Look At of camera', type=float, nargs=3, default=None)
     p.add_argument('--camera_up', help='Up direction of the camera in the world, i.e. human that holds the camera.', type=float, nargs=3, default=None)
+    p.add_argument('--camera_from_bottom', help='flip_camera w.r.t. the lookat and up direction. This also make a transparent floor', action='store_true')
     p.add_argument('--light_auto', help='Set the light configuration automatically', action='store_true')
     p.add_argument('--light_panel_origin', help='Origin of light_panel', type=float, nargs=3, default=None)
     p.add_argument('--light_panel_lookat', help='Point to Look At of light_panel', type=float, nargs=3, default=None)
@@ -396,6 +397,14 @@ def main():
                              args.light_panel_origin,
                              args.light_panel_lookat,
                              args.light_panel_up)
+        if args.camera_from_bottom:
+            world_up = normalized(np.array(args.camera_up))
+            height = np.dot(world_up, np.array(args.camera_origin) - np.array(args.camera_lookat))
+            print(f'height {height}')
+            rev_origin = np.array(args.camera_origin) - 2 * height * world_up
+            print(f'old origin {args.camera_origin} new origin {rev_origin}')
+            set_matrix_world('Camera', rev_origin, args.camera_lookat, args.camera_up)
+            floor.cycles_visibility.camera = False
     print(bpy.data.objects)
     print(bpy.data.objects['Camera'].matrix_world)
 
