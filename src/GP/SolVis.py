@@ -195,6 +195,7 @@ def parse_args():
     p.add_argument('--save_image', help='Save the Rendered image as', default='')
     p.add_argument('--save_animation_dir', help='Save the Rendered animation sequence image to', default='')
     p.add_argument('--enable_animation_preview', action='store_true')
+    p.add_argument('--enable_animation_overwrite', action='store_true')
     p.add_argument('--cuda', action='store_true')
     p.add_argument('--preview', action='store_true')
     p.add_argument('--quit', help='Quit without running blender', action='store_true')
@@ -593,6 +594,7 @@ def main():
         if args.preview:
             bpy.ops.render.opengl(animation=True, view_context=False)
         else:
+            bpy.context.scene.render.use_overwrite = args.enable_animation_overwrite
             bpy.ops.render.render(animation=True)
     if args.quit:
         bpy.ops.wm.quit_blender()
