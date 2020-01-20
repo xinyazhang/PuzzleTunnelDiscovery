@@ -151,6 +151,23 @@ def set_matrix_world(name, origin, lookat, up):
             mw[i][j] = mat[i, j]
     return origin, lookat, up, lookdir
 
+def make_mat_emissive(mat, val, energy=600.0):
+    mat.use_nodes = True # First, otherwise node_tree won't be avaliable
+    nodes = mat.node_tree.nodes
+    glossy = nodes.new('ShaderNodeEmission')
+    glossy.inputs[0].default_value = val
+    glossy.inputs[1].default_value = energy
+    # glossy.inputs[1].default_value = 90.0
+    links = mat.node_tree.links
+    out = nodes.get('Material Output')
+    links.new(glossy.outputs[0], out.inputs[0])
+
+def add_mat(obj, mat):
+    if obj.data.materials:
+        obj.data.materials[0] = mat
+    else:
+        obj.data.materials.append(mat)
+
 def enable_cuda():
     """
     Enable CUDA
@@ -280,25 +297,8 @@ def main():
     ao_green_mat = bpy.data.materials.new(name='Material Green with AO')
     make_mat_ao(ao_green_mat, [0.0, 0.4, 0.4, 1.0])
 
-    def make_mat_emissive(mat, val):
-        mat.use_nodes = True # First, otherwise node_tree won't be avaliable
-        nodes = mat.node_tree.nodes
-        glossy = nodes.new('ShaderNodeEmission')
-        glossy.inputs[0].default_value = val
-        glossy.inputs[1].default_value = 600.0
-        # glossy.inputs[1].default_value = 90.0
-        links = mat.node_tree.links
-        out = nodes.get('Material Output')
-        links.new(glossy.outputs[0], out.inputs[0])
     emission_mat = bpy.data.materials.new(name='Emission White')
-    make_mat_emissive(emission_mat, [1.0, 1.0, 1.0, 1.0])
-
-
-    def add_mat(obj, mat):
-        if obj.data.materials:
-            obj.data.materials[0] = mat
-        else:
-            obj.data.materials.append(mat)
+    make_mat_emissive(emission_mat, [1.0, 1.0, 1.0, 1.0], energy=600)
 
     def add_square(name, origin, euler_in_deg, size):
         euler = [e / 180.0 * PI for e in euler_in_deg]
