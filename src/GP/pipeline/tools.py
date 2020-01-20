@@ -436,6 +436,58 @@ def blender_animate(args):
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
         cfg, config = parse_ompl.parse_simple(puzzle_fn)
         fl = FileLocations(args, ws, puzzle_name)
+
+        calls = ['blender']
+        if args.background:
+            calls += ['-b']
+        if args.condor_generate:
+            calls += ['-t', '1'] # Single thread
+        if args.save_texture_visualization_dir:
+            calls += ['-P', 'BTexVis.py', '--']
+        else:
+            calls += ['-P', 'SolVis.py', '--']
+
+        """
+        Common
+        """
+        if args.saveas:
+            calls += ['--saveas', args.saveas]
+        if args.camera_origin is not None:
+            calls += ['--camera_origin'] + ["{:.17f}".format(e) for e in args.camera_origin]
+        if args.camera_lookat is not None:
+            calls += ['--camera_lookat'] + ["{:.17f}".format(e) for e in args.camera_lookat]
+        if args.camera_up is not None:
+            calls += ['--camera_up'] + ["{:.17f}".format(e) for e in args.camera_up]
+        if args.quit or args.background:
+            calls += ['--quit']
+        if args.cuda:
+            calls += ['--cuda']
+        if args.animation_single_frame is not None:
+            assert not args.condor_generate
+            calls += ['--animation_single_frame', str(args.animation_single_frame)]
+
+        """
+        BTexVis specific
+        """
+        if args.save_texture_visualization_dir:
+            if args.flat_env:
+                calls += ['--flat']
+            for geo_type, geo_fn in zip(['env', 'rob'], [cfg.env_fn, cfg.rob_fn]):
+                if geo_type == 'env':
+                    rx = args.env_camera_rotation_axis
+                else:
+                    rx = args.rob_camera_rotation_axis
+                for atex_id, atex in fl.get_atex_file_gen(puzzle_fn, geo_type):
+                    util.shell(calls +
+                               ['--camera_rotation_axis'] + ["{:.17f}".format(e) for e in rx] +
+                               ['--save_animation_dir', f'{args.save_texture_visualization_dir}/{geo_type}#{atex_id}'] +
+                               [geo_fn, atex] )
+                    break # Debug
+            continue
+
+        """
+        SolVis specific
+        """
         in_path = fl.unit_out_fn if args.use_unoptimized else fl.sim_out_fn
         vanilla_path = fl.vanilla_out_fn
         if not os.path.isfile(in_path):
@@ -474,27 +526,16 @@ def blender_animate(args):
             van3 = pyosr.interpolate(ompl_q[44], ompl_q[45], tau).reshape((1,7))
             van3 = uw.translate_ompl_to_vanilla(van3)
             print(f'OMPL interpolate: {van3}')
-        calls = ['blender']
-        if args.background:
-            calls += ['-b']
-        if args.condor_generate:
-            calls += ['-t', '1'] # Single thread
-        calls += ['-P', 'SolVis.py', '--']
+
         calls += [cfg.env_fn, cfg.rob_fn, vanilla_path, '--O'] + ocstr
         if args.flat_env:
             calls += ['--flat_env']
-        if args.camera_origin is not None:
-            calls += ['--camera_origin'] + ["{:.17f}".format(e) for e in args.camera_origin]
-        if args.camera_lookat is not None:
-            calls += ['--camera_lookat'] + ["{:.17f}".format(e) for e in args.camera_lookat]
         if args.floor_origin is not None:
             calls += ['--floor_origin'] + ["{:.17f}".format(e) for e in args.floor_origin]
         if args.animation_floor_origin is not None:
             calls += ['--animation_floor_origin'] + ["{:.17f}".format(e) for e in args.animation_floor_origin]
         if args.floor_euler is not None:
             calls += ['--floor_euler'] + ["{:.17f}".format(e) for e in args.floor_euler]
-        if args.camera_up is not None:
-            calls += ['--camera_up'] + ["{:.17f}".format(e) for e in args.camera_up]
         if args.camera_from_bottom:
             calls += ['--camera_from_bottom']
         if args.light_panel_origin is not None:
@@ -505,8 +546,6 @@ def blender_animate(args):
             calls += ['--light_panel_up'] + ["{:.17f}".format(e) for e in args.light_panel_up]
         if args.light_auto:
             calls += ['--light_auto']
-        if args.saveas:
-            calls += ['--saveas', args.saveas]
         if args.save_image:
             calls += ['--save_image', args.save_image]
         if args.save_animation_dir:
@@ -515,19 +554,12 @@ def blender_animate(args):
             calls += ['--enable_animation_preview']
         if args.enable_animation_overwrite:
             calls += ['--enable_animation_overwrite']
-        if args.cuda:
-            calls += ['--cuda']
         if args.preview:
             calls += ['--preview']
         if args.image_frame is not None:
             calls += ['--image_frame', str(args.image_frame)]
-        if args.animation_single_frame is not None:
-            assert not args.condor_generate
-            calls += ['--animation_single_frame', str(args.animation_single_frame)]
         if args.animation_end >= 0:
             calls += ['--animation_end', str(args.animation_end)]
-        if args.quit or args.background:
-            calls += ['--quit']
         if args.condor_generate:
             assert args.save_animation_dir
             scratch = args.save_animation_dir
@@ -767,6 +799,8 @@ def setup_parser(subparsers):
     p.add_argument('--camera_lookat', help='Point to Look At of camera', type=float, nargs=3, default=None)
     p.add_argument('--camera_up', help='Up direction of camera', type=float, nargs=3, default=None)
     p.add_argument('--camera_from_bottom', help='flip_camera w.r.t. the lookat and up direction. This also make a transparent floor', action='store_true')
+    p.add_argument('--env_camera_rotation_axis', type=float, nargs=3, default=None)
+    p.add_argument('--rob_camera_rotation_axis', type=float, nargs=3, default=None)
     p.add_argument('--floor_origin', help='Center of the floor', type=float, nargs=3, default=None)
     p.add_argument('--floor_euler', help='Rotate the floor with euler angle', type=float, nargs=3, default=None)
     p.add_argument('--light_panel_origin', help='Origin of light_panel', type=float, nargs=3, default=None)
@@ -782,6 +816,7 @@ def setup_parser(subparsers):
     p.add_argument('--saveas', help='Save the Blender file as', default='')
     p.add_argument('--save_image', help='Save the Rendered image as', default='')
     p.add_argument('--save_animation_dir', help='Save the Rendered animation sequence image to', default='')
+    p.add_argument('--save_texture_visualization_dir', help='Save the Rendered Texture Heatmap to', default='')
     p.add_argument('--enable_animation_preview', action='store_true')
     p.add_argument('--enable_animation_overwrite', action='store_true')
     p.add_argument('--cuda', action='store_true')

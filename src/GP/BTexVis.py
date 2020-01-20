@@ -106,8 +106,6 @@ def parse_args():
     p.add_argument('geo', help='Geometry')
     p.add_argument('tex', help='Texture File (in NPZ)')
     p.add_argument('--saveas', help='Save the Blender file as', default='')
-    p.add_argument('--save_image', help='Save the Rendered image as', default='')
-    # p.add_argument('--O', help='OMPL center of gemoetry', type=float, nargs=3, required=True)
     p.add_argument('--cuda', action='store_true')
     p.add_argument('--flat', help='Flat shading', action='store_true')
     p.add_argument('--quit', help='Quit without running blender', action='store_true')
@@ -132,6 +130,7 @@ def main():
 
     bpy.ops.import_scene.obj(filepath=args.geo, axis_forward='Y', axis_up='Z')
     geo = bpy.context.selected_objects[0]
+    bpy.ops.object.origin_set(type='ORIGIN_CENTER_OF_MASS')
     geo.name = 'Geo'
     if not args.flat:
         bpy.ops.object.shade_smooth()
@@ -167,12 +166,48 @@ def main():
 
     cam_obj = bpy.data.objects['Camera']
     cam_obj.data.clip_end = 1000.0
-    camera_lookat = np.array(args.camera_lookat)
-    camera_rotation_axis = np.array(args.camera_rotation_axis)
-    init_lookvec = norm(np.array(args.camera_lookat) - np.array(args.camera_origin)) * np.array(args.camera_up)
+    """
+    Auto center
+    """
+    args.camera_lookat = np.mean(np.array(geo.bound_box), axis=0)
 
-    if args.camera_lookat and args.camera_origin and args.camera_rotation_axis:
+    camera_lookat = np.array(args.camera_lookat)
+    # camera_rotation_axis = np.array(args.camera_rotation_axis)
+    """
+    Auto axis
+    """
+    min_bb = np.min(np.array(geo.bound_box), axis=0)
+    max_bb = np.max(np.array(geo.bound_box), axis=0)
+    A,B,C = diff_bb = max_bb - min_bb
+    if B > A > C or C > A > B:
+        camera_rotation_axis = np.array([1,0,0], dtype=np.float)
+        if A > C:
+            args.camera_up = np.array([0,0,1], dtype=np.float)
+        else:
+            args.camera_up = np.array([0,1,0], dtype=np.float)
+    elif A > B > C or C > B > A:
+        camera_rotation_axis = np.array([0,1,0], dtype=np.float)
+        if B > C:
+            args.camera_up = np.array([0,0,1], dtype=np.float)
+        else:
+            args.camera_up = np.array([1,0,0], dtype=np.float)
+    else:
+        assert A > C > B or B > C > A
+        if C > B:
+            args.camera_up = np.array([0,1,0], dtype=np.float)
+        else:
+            args.camera_up = np.array([1,0,0], dtype=np.float)
+        camera_rotation_axis = np.array([0,0,1], dtype=np.float)
+    init_lookvec = norm(np.array(args.camera_lookat) - np.array(args.camera_origin)) * np.array(args.camera_up)
+    print(f"camera_rotation_axis {camera_rotation_axis}")
+    print(f"camera_up {args.camera_up}")
+    print(f"camera_lookat {args.camera_lookat}")
+    print(f"init_lookvec {init_lookvec}")
+
+    if args.camera_lookat is not None and args.camera_origin and args.camera_rotation_axis:
         desiredFrames = args.total_frames
+        bpy.context.scene.frame_end = desiredFrames - 1
+        """
         cam_obj.rotation_mode = 'QUATERNION'
         for frame in range(desiredFrames):
             theta = frame * (PI * 2.0 / desiredFrames)
@@ -180,6 +215,19 @@ def main():
             t = lookvec + camera_lookat
             quat = Rotation.from_rotvec(camera_rotation_axis * theta).as_quat()
             _add_key(cam_obj, t, quat, frame)
+        """
+        set_matrix_world('Camera',
+                         np.array(args.camera_lookat) + init_lookvec,
+                         args.camera_lookat,
+                         camera_rotation_axis)
+        print(cam_obj.matrix_world)
+        geo.rotation_mode = 'QUATERNION'
+        for frame in range(desiredFrames):
+            theta = frame * (PI * 2.0 / desiredFrames)
+            lookvec = np.dot(M(camera_rotation_axis, theta), init_lookvec)
+            t = -args.camera_lookat
+            quat = Rotation.from_rotvec(camera_rotation_axis * theta).as_quat()
+            _add_key(geo, t, quat, frame)
 
     bpy.context.scene.cycles.samples = 4
     bpy.context.scene.render.film_transparent = True
@@ -193,11 +241,8 @@ def main():
         if args.animation_single_frame is not None:
             bpy.context.scene.frame_start = args.animation_single_frame
             bpy.context.scene.frame_end = args.animation_single_frame
-        if args.preview:
-            bpy.ops.render.opengl(animation=True, view_context=False)
-        else:
-            bpy.context.scene.render.use_overwrite = args.enable_animation_overwrite
-            bpy.ops.render.render(animation=True)
+        bpy.context.scene.render.use_overwrite = False
+        bpy.ops.render.render(animation=True)
     if args.quit:
         bpy.ops.wm.quit_blender()
 

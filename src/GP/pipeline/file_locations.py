@@ -84,6 +84,20 @@ class FileLocations(object):
     def clearance(self):
         return self._ws.local_ws(self.rel_clearance)
 
+    def get_atex_file_gen(self, puzzle_fn, geo_type):
+        def gen():
+            ws = self._ws
+            netid = 0
+            while True:
+                atex = ws.atex_prediction_file(puzzle_fn, geo_type, netid=netid)
+                util.log(f'checking {atex}')
+                if isfile(atex):
+                    yield netid, atex
+                    netid += 1
+                else:
+                    return
+        return gen()
+
     @property
     def downsampled_key_fn(self):
         return self._ws.keyconf_file_from_fmt(self._puzzle_name,

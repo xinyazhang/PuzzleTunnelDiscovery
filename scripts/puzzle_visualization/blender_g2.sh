@@ -11,4 +11,6 @@
 	--animation_floor_origin 0 0 -20 \
 	--flat_env \
 	--use_unoptimized \
+	--env_camera_rotation_axis 0 1 0 \
+	--rob_camera_rotation_axis 0 0 1 \
 	"$@" \
