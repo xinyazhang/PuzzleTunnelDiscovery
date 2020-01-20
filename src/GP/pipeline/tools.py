@@ -442,10 +442,7 @@ def blender_animate(args):
             calls += ['-b']
         if args.condor_generate:
             calls += ['-t', '1'] # Single thread
-        if args.save_texture_visualization_dir:
-            calls += ['-P', 'BTexVis.py', '--']
-        else:
-            calls += ['-P', 'SolVis.py', '--']
+        calls += ['-P', 'SolVis.py', '--']
 
         """
         Common
@@ -465,25 +462,6 @@ def blender_animate(args):
         if args.animation_single_frame is not None:
             assert not args.condor_generate
             calls += ['--animation_single_frame', str(args.animation_single_frame)]
-
-        """
-        BTexVis specific
-        """
-        if args.save_texture_visualization_dir:
-            if args.flat_env:
-                calls += ['--flat']
-            for geo_type, geo_fn in zip(['env', 'rob'], [cfg.env_fn, cfg.rob_fn]):
-                if geo_type == 'env':
-                    rx = args.env_camera_rotation_axis
-                else:
-                    rx = args.rob_camera_rotation_axis
-                for atex_id, atex in fl.get_atex_file_gen(puzzle_fn, geo_type):
-                    util.shell(calls +
-                               ['--camera_rotation_axis'] + ["{:.17f}".format(e) for e in rx] +
-                               ['--save_animation_dir', f'{args.save_texture_visualization_dir}/{geo_type}#{atex_id}'] +
-                               [geo_fn, atex] )
-                    break # Debug
-            continue
 
         """
         SolVis specific
@@ -508,8 +486,12 @@ def blender_animate(args):
                 util.warn(f'[blender_animate] The solution file {in_path} does not exist')
                 continue
         uw = util.create_unit_world(puzzle_fn)
-        unit_q = matio.load(in_path)
-        van_q = uw.translate_ompl_to_vanilla(uw.translate_unit_to_ompl(unit_q))
+        if args.subtask == 'keyconf':
+            ompl_q = matio.load(fl.get_assembled_raw_key_fn(trial=fl.trial))['KEYQ_OMPL']
+            van_q = uw.translate_ompl_to_vanilla(ompl_q)
+        else:
+            unit_q = matio.load(in_path)
+            van_q = uw.translate_ompl_to_vanilla(uw.translate_unit_to_ompl(unit_q))
         matio.savetxt(vanilla_path, van_q)
         oc = uw.get_ompl_center()
         ocstr = ["{:.17f}".format(oc[i]) for i in range(3)]
@@ -578,6 +560,63 @@ def blender_animate(args):
             util.ack(f'[tool blender] write condor submission file to {subfile}')
         else:
             util.shell(calls)
+
+def blender_texture(args):
+    ws = util.Workspace(args.dir)
+    ws.current_trial = args.current_trial
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+        cfg, config = parse_ompl.parse_simple(puzzle_fn)
+        fl = FileLocations(args, ws, puzzle_name)
+        calls = ['blender']
+        if args.background:
+            calls += ['-b']
+        if args.condor_generate:
+            calls += ['-t', '1'] # Single thread
+        calls += ['-P', 'BTexVis.py', '--']
+
+        """
+        Common
+        """
+        if args.saveas:
+            calls += ['--saveas', args.saveas]
+        if args.camera_origin is not None:
+            calls += ['--camera_origin'] + ["{:.17f}".format(e) for e in args.camera_origin]
+        if args.camera_lookat is not None:
+            calls += ['--camera_lookat'] + ["{:.17f}".format(e) for e in args.camera_lookat]
+        if args.camera_up is not None:
+            calls += ['--camera_up'] + ["{:.17f}".format(e) for e in args.camera_up]
+        if args.quit or args.background:
+            calls += ['--quit']
+        if args.cuda:
+            calls += ['--cuda']
+        if args.animation_single_frame is not None:
+            assert not args.condor_generate
+            calls += ['--animation_single_frame', str(args.animation_single_frame)]
+        if args.flat_env:
+            calls += ['--flat']
+
+        """
+        BTexVis specific
+        """
+        for geo_type, geo_fn in zip(['env', 'rob'], [cfg.env_fn, cfg.rob_fn]):
+            if geo_type == 'env':
+                rx = args.env_camera_rotation_axis
+            else:
+                rx = args.rob_camera_rotation_axis
+            for atex_id, atex in fl.get_atex_file_gen(puzzle_fn, geo_type):
+                util.shell(calls +
+                           ['--camera_rotation_axis'] + ["{:.17f}".format(e) for e in rx] +
+                           ['--save_animation_dir', f'{args.save_texture_visualization_dir}/{geo_type}#{atex_id}'] +
+                           [geo_fn, atex] )
+                # break # Debug
+
+def blender_entrance(args):
+    if args.save_texture_visualization_dir:
+        blender_texture(args)
+    elif args.subtask == 'keyconf':
+        blender_animate(args)
+    else:
+        blender_animate(args)
 
 def simplify(args):
     from . import solve2
@@ -790,6 +829,9 @@ def setup_parser(subparsers):
     p.add_argument('dir', help='Workspace directory')
 
     p = toolp.add_parser('blender', help='Invoke blender to render the trajectory')
+    p.add_argument('--subtask', help='Which task to perform',
+                   choices=['texture', 'keyconf', 'solution_trajectory'],
+                   default='solution_trajectory')
     p.add_argument('--current_trial', help='Trial that has the solution trajectory', type=int, default=None)
     p.add_argument('--puzzle_name', help='Puzzle selection. Will exit after displaying all puzzle names if not present', default='')
     p.add_argument('--scheme', help='Scheme selection', choices=KEY_PRED_SCHEMES, default='cmb')

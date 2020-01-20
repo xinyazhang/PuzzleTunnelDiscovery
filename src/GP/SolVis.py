@@ -217,6 +217,7 @@ def parse_args():
     p.add_argument('--cuda', action='store_true')
     p.add_argument('--preview', action='store_true')
     p.add_argument('--quit', help='Quit without running blender', action='store_true')
+    p.add_argument('--discrete_points', help='Render each independent configurations in the file, rather than a trajectory', action='store_true')
     argv = sys.argv
     return p.parse_args(argv[argv.index("--") + 1:])
 
@@ -520,6 +521,15 @@ def main():
         t = t - r.apply(O) # Translate back to vanilla
         quat = r.as_quat()
         _add_key(rob, t, quat, 3)
+    elif args.discrete_points:
+        desiredFrames = vanilla_path.shape[0]
+        for frame in range(desiredFrames):
+            el = vanilla_path[frame]
+            el = [float(el) for el in el]
+            t = el[:3]
+            r = Rotation.from_quat(el[3:7]) # w-last
+            quat = r.as_quat()
+            _add_key(rob, t, quat, frame+1)
     else:
         for frame in range(desiredFrames):
             d = frame * distance_per_frame
