@@ -525,6 +525,7 @@ def main():
         _add_key(rob, t, quat, 3)
     elif args.discrete_points:
         desiredFrames = vanilla_path.shape[0]
+        print(f'Total {desiredFrames} frames')
         for frame in range(desiredFrames):
             el = vanilla_path[frame]
             el = [float(el) for el in el]
@@ -532,6 +533,7 @@ def main():
             r = Rotation.from_quat(el[3:7]) # w-last
             quat = r.as_quat()
             _add_key(rob, t, quat, frame+1)
+        args.animation_end = desiredFrames - 1
     else:
         for frame in range(desiredFrames):
             d = frame * distance_per_frame

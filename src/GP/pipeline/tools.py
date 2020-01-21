@@ -510,6 +510,8 @@ def blender_animate(args):
             print(f'OMPL interpolate: {van3}')
 
         calls += [cfg.env_fn, cfg.rob_fn, vanilla_path, '--O'] + ocstr
+        if args.subtask == 'keyconf':
+            calls += ['--discrete_points']
         if args.flat_env:
             calls += ['--flat_env']
         if args.floor_origin is not None:
