@@ -4,7 +4,7 @@
 	--camera_origin -175 -125 -20 \
 	--camera_lookat 0 0 0 \
 	--camera_up 0.8 0.99 0.1 \
-	--floor_origin 20 0 0 \
+	--floor_origin 50 0 0 \
 	--floor_euler 0 90 0 \
 	--light_auto \
 	--image_frame 398 \

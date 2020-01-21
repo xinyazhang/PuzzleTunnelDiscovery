@@ -8,6 +8,7 @@
 	--floor_euler 0 0 180 \
 	--light_auto \
 	--saveas blender/blender_g1.blend \
+	--animation_floor_origin 0 0 50 \
 	--animation_end 1352 \
 	--flat_env \
 	"$@" \
