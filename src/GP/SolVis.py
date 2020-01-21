@@ -206,6 +206,7 @@ def parse_args():
     p.add_argument('--flat_env', help='Flat shading', action='store_true')
     p.add_argument('--image_frame', help='Still Image Frame. Use in conjuction with --save_image', type=int, default=0)
     p.add_argument('--animation_single_frame', help='Render single frame of animation. Use in conjuction with --save_animation_dir. Override animation_end.', type=int, default=None)
+    p.add_argument('--animation_start', help='Start frame of animation', type=int, default=-1)
     p.add_argument('--animation_end', help='End frame of animation', type=int, default=-1)
     p.add_argument('--animation_floor_origin', help='Center of the floor when rendering the animation',
                                      type=float, nargs=3, default=None)
@@ -553,6 +554,8 @@ def main():
         bpy.context.scene.frame_end = min(args.animation_end, desiredFrames - 1)
     else:
         bpy.context.scene.frame_end = desiredFrames - 1
+    if args.animation_start >= 0:
+        bpy.context.scene.frame_start = args.animation_start
     if args.image_frame >= 0:
         bpy.context.scene.frame_set(args.image_frame)
 
