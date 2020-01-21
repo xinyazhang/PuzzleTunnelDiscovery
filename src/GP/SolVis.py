@@ -406,6 +406,7 @@ def main():
             print(f'old origin {args.camera_origin} new origin {rev_origin}')
             set_matrix_world('Camera', rev_origin, args.camera_lookat, args.camera_up)
             floor.cycles_visibility.camera = False
+            bpy.data.objects.remove(bpy.data.objects['Floor'])
     print(bpy.data.objects)
     print(bpy.data.objects['Camera'].matrix_world)
 
