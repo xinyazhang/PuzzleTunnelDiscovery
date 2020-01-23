@@ -119,6 +119,7 @@ class HourglassModel():
         self.c_dim = dataset.c_dim
         self._model_hash = b''
         self.fp_type = tf.float16 if use_fp16 else tf.float32
+        self._dump_nn_input_to = ''
         assert self.njoints == dataset.d_dim, 'Number of joints ({}) does not match output dimensions ({})'.format(self.njoints, dataset.d_dim)
 
     # ACCESSOR
@@ -166,7 +167,26 @@ class HourglassModel():
             Be sure to build the model first
         """
         return self.saver
+    def get_dump_to(self):
+        return self._dump_nn_input_to
+    def set_dump_to(self, tgt):
+        self._dump_nn_input_to = tgt
 
+    def do_dump(self, epoch, index, batch_image, batch_gt):
+        assert self.dataset.gen_surface_normal
+        out_dir = self.get_dump_to()
+        if not out_dir:
+            return False
+        bindex = 0
+        for img, gt in zip(batch_image, batch_gt):
+            rgb = np.zeros((img.shape[0], img.shape[1], 1), dtype=img.dtype)
+            rgb[:, :, 0] = img[:,:,0]
+            imsave(f'{out_dir}/{index:04d}-{bindex}-luminance.png', rgb)
+            imsave(f'{out_dir}/{index:04d}-{bindex}-normal.png', img[:,:,1:4])
+            imsave(f'{out_dir}/{index:04d}-{bindex}-dep.png', img[:,:,4])
+            imsave(f'{out_dir}/{index:04d}-{bindex}-psi.png', gt[0])
+            bindex += 1
+        return True
 
     def generate_model(self):
         """ Create the complete graph
@@ -277,24 +297,6 @@ class HourglassModel():
         with tf.name_scope('Train'):
             self.dataset.report_data()
             self.generator = self.dataset._aux_generator(self.batchSize, self.nStack, normalize = True, sample_set = 'train')
-            if False:
-                debug_generator = self.dataset._aux_generator(64, self.nStack, normalize = True, sample_set = 'train')
-                img_train, gt_train, weight_train = next(debug_generator)
-                out_dir = 'debug-test'
-                index = 0
-                for img, gt in zip(img_train, gt_train):
-                    if self.dataset.gen_surface_normal:
-                        rgb = np.zeros((img.shape[0], img.shape[1], 3), dtype=img.dtype)
-                        rgb[:, :, 0] = img[:,:,0]
-                        imsave(f'{out_dir}/{index}-rgb.png', rgb)
-                        imsave(f'{out_dir}/{index}-normal.png', img[:,:,1:4])
-                        imsave(f'{out_dir}/{index}-dep.png', img[:,:,4])
-                        imsave(f'{out_dir}/{index}-hm.png', gt[0])
-                    else:
-                        imsave(f'{out_dir}/{index}-rgb.png', img[:,:,0:3])
-                        imsave(f'{out_dir}/{index}-dep.png', img[:,:,3])
-                        imsave(f'{out_dir}/{index}-hm.png', gt[0])
-                    index += 1
             # self.valid_gen = self.dataset._aux_generator(self.batchSize, self.nStack, normalize = True, sample_set = 'valid')
             startTime = time.time()
             self.resume = {}
@@ -319,6 +321,8 @@ class HourglassModel():
                     sys.stdout.write(f'\r Train: {pgbar}||{str(percent)[:4]}% -cost: {str(cost)[:6]} -avg_loss: {str(avg_cost)[:5]} -last_loss {str(c)[:5]} -timeToEnd: {tToEpoch} sec.')
                     sys.stdout.flush()
                     img_train, gt_train, weight_train = next(self.generator)
+                    if self.do_dump(epoch=epoch, index=i, batch_image=img_train, batch_gt=gt_train):
+                        continue
                     assert gt_train.any() >= 0
                     if saveStep >= 0 and i % saveStep == 0:
                         if self.w_loss:

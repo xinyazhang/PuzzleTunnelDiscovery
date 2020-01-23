@@ -90,6 +90,9 @@ def _train(args, ws, geo_type):
     params['suppress_cold'] = 0.7
     params['dataset_name'] = f'{ws.dir}.{geo_type}'
     params['load_epoch'] = args.load_epoch
+    params['dump_nn_input_data_to'] = args.dump_nn_input_data_to
+    if args.dump_nn_input_data_to:
+        params['epoch_size'] = 100
     if args.max_epoch is not None:
         params['max_epoch'] = args.max_epoch
     global_gpu_lock(ws)
@@ -302,6 +305,7 @@ def setup_parser(subparsers):
                    default='',
                    metavar='')
     p.add_argument('--only_wait', action='store_true')
+    p.add_argument('--dump_nn_input_data_to', default='')
     p.add_argument('--nn_profile', help="NN Profile", default='256hg')
     p.add_argument('--load', help="Load existing checkpoints and continue", action='store_true')
     p.add_argument('--load_epoch', help="Load checkpoint at specific epoch either as the starting epoch to train or predict", default=None, type=int)
