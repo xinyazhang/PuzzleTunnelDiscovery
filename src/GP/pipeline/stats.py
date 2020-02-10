@@ -298,28 +298,6 @@ def _parse_log(logfn, single_puzzle):
             _update_ret_dic(ret_dic[puzzle_name], stage_name, cost_str)
     return ret_dic
 
-def breakdown(args):
-    grand_dict = {}
-    trial_list = util.rangestring_to_list(args.trial_range)
-
-    for ws_dir in args.dirs:
-        ws = util.Workspace(ws_dir)
-        single_puzzle = _detect_single_puzzle(ws)
-        for trial in trial_list:
-            if trial not in grand_dict:
-                grand_dict[trial] = {}
-            logfn = ws.local_ws(util.PERFORMANCE_LOG_DIR, 'log.{}'.format(trial))
-            if not os.path.exists(logfn):
-                util.log("{} does not exist, skipping".format(logfn))
-                continue
-            grand_dict[trial].update(_parse_log(logfn, single_puzzle))
-
-    f = open(args.out, 'w')
-    writer = csv.writer(f)
-    for row in _get_rows(grand_dict, args):
-        writer.writerow(row)
-    f.close()
-
 _CONDOR_PPSTAGE_TO_DIR = {
         'find_trajectory': util.PREP_TRAJECTORY_SCRATCH,
         'estimate_clearance_volume': util.PREP_KEY_CAN_SCRATCH,
@@ -717,10 +695,14 @@ class SolveStatTabler(FeatStatTabler):
             self._collected_baseline.append(baseline_dir)
             solution_list = []
             for fn in fl.get_baseline_files(baseline_dir):
-                if matio.load(fn, key='FLAG_IS_COMPLETE') != 0:
-                    solution_list.append(1)
-                else:
-                    solution_list.append(0)
+                try:
+                    if matio.load(fn, key='FLAG_IS_COMPLETE') != 0:
+                        solution_list.append(1)
+                    else:
+                        solution_list.append(0)
+                except:
+                    util.log(f'{fn} cannot be read')
+                    solution_list.append(None)
             yield 'solve', solution_list # TODO: add baseline support
 
     # TODO: merge this with KeyStatTabler's collect_agg_data
@@ -763,12 +745,73 @@ class SolveStatTabler(FeatStatTabler):
         p = [row_name, f'{col_name}.solve.total']
         total = _dic_fetch_path(adic, p)
         total_int = total[0] if total else 0
-        return [f'{100*solved_int/total_int:.1f}\%'] if total_int > 0 else ['TBD']
+        return [f'{100*solved_int/total_int:.1f}'] if total_int > 0 else ['TBD']
+
+class WiderSolveStatTabler(SolveStatTabler):
+    BASELINES = [
+            'RRT-Connect',
+            'RRT',
+            'RDT',
+            'RDT-Connect',
+            'PRM',
+            'BITstar',
+            'EST',
+            'LBKPIECE1',
+            'BKPIECE1',
+            'KPIECE1',
+            'PDST',
+            'SBL',
+            'STRIDE',
+            'FMT',
+    ]
+
+    BASELINE_IDS = {
+            'RRT-Connect': plan.PLANNER_RRT_CONNECT,
+            'RRT':         plan.PLANNER_RRT,
+            'RDT':         plan.PLANNER_RDT,
+            'RDT-Connect': plan.PLANNER_RDT_CONNECT,
+            'PRM':         plan.PLANNER_PRM,
+            'BITstar':     plan.PLANNER_BITstar,
+            'EST':         plan.PLANNER_EST,
+            'LBKPIECE1':   plan.PLANNER_LBKPIECE1,
+            'BKPIECE1':    plan.PLANNER_BKPIECE1,
+            'KPIECE1':     plan.PLANNER_KPIECE1,
+            'PDST':        plan.PLANNER_PDST,
+            'SBL':         plan.PLANNER_SBL,
+            'STRIDE':      plan.PLANNER_STRIDE,
+            'FMT':         plan.PLANNER_FMT,
+            }
+    SCHEMES = BASELINES
+
+    def __init__(self, args):
+        super().__init__(args)
+        self._collected_baseline = []
+
+    def get_matrix_cols(self):
+        return self.BASELINES
+
+    '''
+    Override this to transpose this matrix
+    '''
+    def collect_matrix(self, adic):
+        matrix = []
+        testing_puzzles = ['alpha-1.0', 'duet-g2']
+        row = ['Planner Name'] + testing_puzzles
+        matrix.append(row)
+        for planner_name in self.BASELINES:
+            row = [planner_name]
+            for puzzle_name in testing_puzzles:
+                # print(f"fetch {p} as {f}")
+                row += self.get_matrix_item(adic, puzzle_name, planner_name)
+            matrix.append(row)
+        return matrix
 
 def solve(args):
-    tabler = SolveStatTabler(args)
+    if args.all_planners:
+        tabler = WiderSolveStatTabler(args)
+    else:
+        tabler = SolveStatTabler(args)
     tabler.print()
-
 
 class PlannerTimingTabler(FeatStatTabler):
     # SCHEMES = KEY_PRED_SCHEMES
@@ -905,6 +948,105 @@ def condor_hours(args):
     tabler = CondorHours(args)
     tabler.print()
 
+class WallclockBreakdownTimer(FeatStatTabler):
+    # SCHEMES = KEY_PRED_SCHEMES
+    SCHEMES = ['cmb']
+
+    def __init__(self, args):
+        super().__init__(args)
+        self.stage_set = set()
+        self.stage_list = []
+
+    def _fl_to_raw_data(self, fl):
+        logfn = fl.performance_log
+        if not os.path.isfile(logfn):
+            yield None, None
+            return
+        util.log(f'reading {logfn}')
+        BREAKER = ' cost '
+        cost_dic = {}
+        with open(logfn, 'r') as f:
+            for line in f:
+                loc = line.find(BREAKER)
+                if loc < 0:
+                    continue
+                cost_str = line[loc+len(BREAKER):].strip()
+                line = line.replace('[', ' ')
+                line = line.replace(']', ' ')
+                split = line.split()
+                stage_name = split[0]
+                day_break = cost_str.find('+')
+                hr_break = cost_str.find(':')
+                mi_break = cost_str.find(':', hr_break+1)
+                sec_break = cost_str.find(':', mi_break+1)
+                days = int(cost_str[:day_break])
+                hrs = int(cost_str[day_break+1:hr_break])
+                mins = int(cost_str[hr_break+1:mi_break])
+                sec = float(cost_str[mi_break+1:])
+                cost_in_msec = 1e3 * (3600*24*days + 3600 * hrs+ 60 * mins + sec)
+                if stage_name not in self.stage_set:
+                    self.stage_set.add(stage_name)
+                    self.stage_list.append(stage_name)
+                # util.log(f'stage {stage_name} cost {cost_str} ({cost_in_msec} in msec)')
+                cost_dic[stage_name] = cost_in_msec
+        for stage_name in self.stage_list:
+            # util.log(f'yielding {stage_name} cost_dic[stage_name]')
+            yield stage_name, cost_dic[stage_name] if stage_name in cost_dic else None
+
+    def collect_agg_data(self, dic):
+        adic = {}
+        for puzzle_name in dic.keys():
+            ad = {}
+            for scheme, pf_key in itertools.product(self.SCHEMES, self.stage_list):
+                p = [puzzle_name, scheme, pf_key]
+                l = _dic_fetch_path(dic, p)
+                ad[f'{scheme}.{pf_key}.list'] = l
+                ad[f'{scheme}.{pf_key}.mean'] = [float(np.mean(l))]
+                ad[f'{scheme}.{pf_key}.stdev'] = [float(np.std(l))]
+                ad[f'{scheme}.{pf_key}.sum'] = [float(np.sum(l))]
+            if puzzle_name in self.PAPER_TRANSLATION:
+                name = self.PAPER_TRANSLATION[puzzle_name]
+            else:
+                name = puzzle_name
+            adic[name] = ad
+        return adic
+
+    def get_matrix_cols(self):
+        return self.stage_list
+
+    def get_matrix_item(self, adic, row_name, col_name):
+        p = [row_name, f'cmb.{col_name}.mean']
+        # print(f"fetching {p}")
+        f = _dic_fetch_path(adic, p)
+        return [f'{f[0] / 1e3 / 3600:.2f} hrs']
+
+def breakdown(args):
+    breaker = WallclockBreakdownTimer(args)
+    breaker.print()
+
+    """
+    grand_dict = {}
+    trial_list = util.rangestring_to_list(args.trial_range)
+
+    for ws_dir in args.dirs:
+        ws = util.Workspace(ws_dir)
+        single_puzzle = _detect_single_puzzle(ws)
+        for trial in trial_list:
+            if trial not in grand_dict:
+                grand_dict[trial] = {}
+            logfn = ws.local_ws(util.PERFORMANCE_LOG_DIR, 'log.{}'.format(trial))
+            if not os.path.exists(logfn):
+                util.log("{} does not exist, skipping".format(logfn))
+                continue
+            grand_dict[trial].update(_parse_log(logfn, single_puzzle))
+
+    f = open(args.out, 'w')
+    writer = csv.writer(f)
+    for row in _get_rows(grand_dict, args):
+        writer.writerow(row)
+    f.close()
+    """
+
 def _print_latex(matrix, float_fmt="{0:.2f}", file=None, align=4):
     print(matrix)
     f = sys.stdout if file is None else file
@@ -957,8 +1099,9 @@ def setup_parser(subparsers):
     p = toolp.add_parser('breakdown', help='Show the per-stage runtime')
     p.add_argument('--trial_range', help='range of trials', type=str, required=True)
     p.add_argument('--puzzle_name', help='Only show one specific testing puzzle', default='')
+    p.add_argument('--override_config', help='Override workspace config', default='')
     p.add_argument('--type', help='Choose what kind of info to output', default='detail', choices=['detail', 'stat'])
-    p.add_argument('--out', help='Output CSV file', default='b.csv')
+    p.add_argument('--tex', help='Output paper-ready table body TeX', default='b.tex')
     p.add_argument('dirs', help='Workspace directory', nargs='+')
 
     p = toolp.add_parser('condor_breakdown', help='Show the solving per-stage runtime on HTCondor cluster')
@@ -991,6 +1134,7 @@ def setup_parser(subparsers):
     p.add_argument('--baseline_trial', help='Trial of running baseline', type=int, default=None)
     p.add_argument('--tex', help='Output paper-ready table body TeX', default='sol.tex')
     p.add_argument('--override_config', help='Override workspace config', default='')
+    p.add_argument('--all_planners', help='Use wider range of planners', action='store_true')
     p.add_argument('dirs', help='Archived workspace directory.', nargs='+')
 
     p = toolp.add_parser('timing_the_planner', help='Collect timing of the blooming and forest connection into a table')
