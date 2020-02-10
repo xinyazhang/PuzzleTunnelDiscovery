@@ -17,6 +17,9 @@ from . import atlas
 from . import partt
 from .file_locations import FEAT_PRED_SCHEMES, RAW_KEY_PRED_SCHEMES, KEY_PRED_SCHEMES, SCHEME_TO_FMT, SCHEME_FEAT_NPZ_KEY, FileLocations
 
+class TmpDriverArgs(object):
+    pass
+
 def read_roots(args):
     uw = util.create_unit_world(args.puzzle_fn)
     ompl_q = matio.load(args.roots, key=args.roots_key)
@@ -331,6 +334,21 @@ def _old_visfeat(args):
 
 
 def visnotch(args):
+    ws = util.Workspace(args.dir)
+    ws.current_trial = args.current_trial
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+        cfg, config = parse_ompl.parse_simple(puzzle_fn)
+        fl = FileLocations(args, ws, puzzle_name)
+        fl.update_scheme('nt')
+        uw = util.create_unit_world(puzzle_fn)
+        for geo_type, geo_flag in zip(['rob', 'env'], [uw.GEO_ROB, uw.GEO_ENV]):
+            key_fn = fl.get_feat_pts_fn(geo_type)
+            pts = matio.load(key_fn)[fl.feat_npz_key]
+            unit_imp_1 = uw.translate_vanilla_pts_to_unit(geo_flag, pts[:, 0:3])
+            unit_imp_2 = uw.translate_vanilla_pts_to_unit(geo_flag, pts[:, 3:6])
+            matio.savetxt('visfeat.tmp.txt', np.concatenate((unit_imp_1, unit_imp_2), axis=0))
+            util.shell(['./vispath', cfg.env_fn, cfg.rob_fn, 'visfeat.tmp.txt', '0.5'])
+    """
     # FIXME: this function is mostly copied from visfeat
     import pygeokey
     class WorkerArgs(object):
@@ -361,7 +379,7 @@ def visnotch(args):
         matio.savetxt('visfeat.tmp.txt', np.concatenate((unit_imp_1, unit_imp_2), axis=0))
         matio.savetxt('visfeat.vanilla.txt', np.concatenate((pts[:, 0:3], pts[:,3:6]), axis=0))
         util.shell(['./vispath', cfg.env_fn, cfg.rob_fn, 'visfeat.tmp.txt', '0.5'])
-
+    """
 
 def vistouchv(args):
     ws = util.Workspace(args.dir)
@@ -425,6 +443,7 @@ def vistouchdisp(args):
     plt.show()
 
 def blender_animate(args):
+    assert False
     ws = util.Workspace(args.dir)
     ws.current_trial = args.current_trial
     if not args.puzzle_name:
@@ -472,8 +491,6 @@ def blender_animate(args):
             if not args.use_unoptimized:
                 util.log(f'[blender_animate] The optimized solution file {in_path} does not exist')
                 util.log(f'[blender_animate] Trying to run the path optimizer')
-                class TmpDriverArgs(object):
-                    pass
                 o_args = TmpDriverArgs()
                 o_args.current_trial = args.current_trial
                 o_args.days = 0.01
@@ -608,14 +625,17 @@ def blender_texture(args):
             else:
                 rx = args.rob_camera_rotation_axis
             for atex_id, atex in fl.get_atex_file_gen(puzzle_fn, geo_type):
-                util.shell(calls +
-                           ['--camera_rotation_axis'] + ["{:.17f}".format(e) for e in rx] +
-                           ['--save_animation_dir', f'{args.save_texture_visualization_dir}/{geo_type}#{atex_id}'] +
-                           [geo_fn, atex] )
+                if args.netid is not None and atex_id != args.netid:
+                    continue
+                pc_calls = list(calls)
+               # ['--camera_rotation_axis'] + ["{:.17f}".format(e) for e in rx] +
+                if args.save_texture_visualization_dir:
+                    pc_calls += ['--save_animation_dir', f'{args.save_texture_visualization_dir}/{geo_type}#{atex_id}']
+                util.shell(pc_calls + [geo_fn, atex] )
                 # break # Debug
 
 def blender_entrance(args):
-    if args.save_texture_visualization_dir:
+    if args.subtask == 'texture':
         blender_texture(args)
     elif args.subtask == 'keyconf':
         blender_animate(args)
@@ -683,6 +703,34 @@ def dump_training_data(args):
         index += 1
 
 def debug(args):
+    from . import parse_ompl
+    for puzzle_fn in args.arguments:
+        cfg, config = parse_ompl.parse_simple(puzzle_fn)
+        p = pathlib.Path(puzzle_fn)
+        infile = str(p.with_suffix(".ompl.txt"))
+        insfile = str(p.with_suffix(".simplified.txt"))
+        outfn = str(p.with_suffix(".npz"))
+        if not isfile(infile):
+            continue
+        uw = util.create_unit_world(puzzle_fn)
+
+        """
+        ompl_q = matio.load(infile)
+        if not isfile(insfile):
+            from . import solve2
+            util.ack(f'Simplifiying {puzzle_fn}')
+            driver = solve2.create_driver(puzzle_fn)
+            sim_q = driver.optimize(ompl_q, 0.01)
+        else:
+            sim_q = matio.load(insfile)
+            sim_q = uw.translate_unit_to_ompl(sim_q)
+        oc = uw.get_ompl_center()
+        np.savez(outfn, OMPL_PATH=ompl_q, SIMPLIFIED_PATH=sim_q, REFERENCE_ORIGIN=oc)
+        util.ack(f'save file to {outfn}')
+        """
+        d = matio.load(outfn)
+        matio.savetxt(insfile, d['SIMPLIFIED_PATH'])
+    return
     puzzle_fn = 'u2/claw-rightbv.dt.tcp/test/claw-rightbv.dt.tcp/puzzle.cfg'
     # keys = matio.load('condor.u2/claw-rightbv.dt.tcp/test/claw-rightbv.dt.tcp/', KEY='KEYQ_OMPL')
     keys = matio.load('u2/claw-rightbv.dt.tcp/test/claw-rightbv.dt.tcp/geometrik_geratio_keyconf-20.npz', key='KEYQ_OMPL')
@@ -693,8 +741,6 @@ def debug(args):
                                        uw.recommended_cres,
                                        enable_mt=False))
     """
-    class TmpDriverArgs(object):
-        pass
     from . import se3solver
     driver_args = TmpDriverArgs()
     driver_args.puzzle = puzzle_fn
@@ -742,7 +788,7 @@ function_dict = {
         'vistouchv' : vistouchv,
         'vistouchdisp' : vistouchdisp,
         'animate' : animate,
-        'blender' : blender_animate,
+        'blender' : blender_entrance,
         'simplify' : simplify,
         'dump_training_data' : dump_training_data,
         'debug' : debug,
@@ -816,6 +862,7 @@ def setup_parser(subparsers):
     p.add_argument('dir', help='Workspace directory')
 
     p = toolp.add_parser('visnotch', help='Visualize Notch from geometric hueristics')
+    p.add_argument('--current_trial', help='Trial to predict the keyconf', type=int, default=None)
     p.add_argument('dir', help='Workspace directory')
 
     p = toolp.add_parser('vistouchv', help='Visualize the touch configurations in clearance estimation')
@@ -836,6 +883,7 @@ def setup_parser(subparsers):
     p.add_argument('--subtask', help='Which task to perform',
                    choices=['texture', 'keyconf', 'solution_trajectory'],
                    default='solution_trajectory')
+    p.add_argument('--netid', type=int, default=None)
     p.add_argument('--current_trial', help='Trial that has the solution trajectory', type=int, default=None)
     p.add_argument('--puzzle_name', help='Puzzle selection. Will exit after displaying all puzzle names if not present', default='')
     p.add_argument('--scheme', help='Scheme selection', choices=KEY_PRED_SCHEMES, default='cmb')
@@ -885,6 +933,7 @@ def setup_parser(subparsers):
     p.add_argument('dir', help='Workspace directory')
 
     p = toolp.add_parser('debug', help='Temporary debugging code. Eveything should be hardcoded')
+    p.add_argument('arguments', help='Custom arguments', nargs='*')
 
 def run(args):
     function_dict[args.tool_name](args)
