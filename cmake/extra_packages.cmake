@@ -127,5 +127,6 @@ endfunction(use_ccd)
 find_package(PNG REQUIRED) # Used by OSR
 
 find_package(Python3 COMPONENTS Development)
-find_package(pybind11 REQUIRED)
+# find_package(pybind11 REQUIRED)
+add_subdirectory(third-party/pybind11/)
 message(STATUS "Python version string: ${PYTHONLIBS_VERSION_STRING}")
