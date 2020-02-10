@@ -204,30 +204,30 @@ def main():
     print(f"camera_lookat {args.camera_lookat}")
     print(f"init_lookvec {init_lookvec}")
 
-    if args.camera_lookat is not None and args.camera_origin and args.camera_rotation_axis:
-        desiredFrames = args.total_frames
-        bpy.context.scene.frame_end = desiredFrames - 1
-        """
-        cam_obj.rotation_mode = 'QUATERNION'
-        for frame in range(desiredFrames):
-            theta = frame * (PI * 2.0 / desiredFrames)
-            lookvec = np.dot(M(camera_rotation_axis, theta), init_lookvec)
-            t = lookvec + camera_lookat
-            quat = Rotation.from_rotvec(camera_rotation_axis * theta).as_quat()
-            _add_key(cam_obj, t, quat, frame)
-        """
-        set_matrix_world('Camera',
-                         np.array(args.camera_lookat) + init_lookvec,
-                         args.camera_lookat,
-                         camera_rotation_axis)
-        print(cam_obj.matrix_world)
-        geo.rotation_mode = 'QUATERNION'
-        for frame in range(desiredFrames):
-            theta = frame * (PI * 2.0 / desiredFrames)
-            lookvec = np.dot(M(camera_rotation_axis, theta), init_lookvec)
-            t = -args.camera_lookat
-            quat = Rotation.from_rotvec(camera_rotation_axis * theta).as_quat()
-            _add_key(geo, t, quat, frame)
+    # if args.camera_lookat is not None and args.camera_origin and args.camera_rotation_axis:
+    desiredFrames = args.total_frames
+    bpy.context.scene.frame_end = desiredFrames - 1
+    """
+    cam_obj.rotation_mode = 'QUATERNION'
+    for frame in range(desiredFrames):
+        theta = frame * (PI * 2.0 / desiredFrames)
+        lookvec = np.dot(M(camera_rotation_axis, theta), init_lookvec)
+        t = lookvec + camera_lookat
+        quat = Rotation.from_rotvec(camera_rotation_axis * theta).as_quat()
+        _add_key(cam_obj, t, quat, frame)
+    """
+    set_matrix_world('Camera',
+                     np.array(args.camera_lookat) + init_lookvec,
+                     args.camera_lookat,
+                     camera_rotation_axis)
+    print(cam_obj.matrix_world)
+    geo.rotation_mode = 'QUATERNION'
+    for frame in range(desiredFrames):
+        theta = frame * (PI * 2.0 / desiredFrames)
+        lookvec = np.dot(M(camera_rotation_axis, theta), init_lookvec)
+        t = -args.camera_lookat
+        quat = Rotation.from_rotvec(camera_rotation_axis * theta).as_quat()
+        _add_key(geo, t, quat, frame)
 
     bpy.context.scene.cycles.samples = 4
     bpy.context.scene.render.film_transparent = True
