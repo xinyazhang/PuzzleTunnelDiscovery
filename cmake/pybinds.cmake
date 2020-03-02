@@ -10,3 +10,5 @@ add_dependencies(pygeokey ext_libgeokey)
 
 PYADD(pyvistexture osr ${VISUAL_PACK})
 add_dependencies(pyvistexture osr)
+
+PYADD(pycutec2)
