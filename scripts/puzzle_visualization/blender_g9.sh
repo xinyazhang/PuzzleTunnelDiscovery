@@ -1,6 +1,6 @@
 #!/bin/bash
 
-./facade.py tools blender --current_trial 35 condor.u3/duet-g9 --puzzle_name duet-g9 \
+./facade.py tools blender --current_trial 35 --dir condor.u3/duet-g9 --puzzle_name duet-g9 \
 	--camera_origin 200 150 150 \
 	--camera_lookat 30 30 0 \
 	--camera_up 0 0 1 \

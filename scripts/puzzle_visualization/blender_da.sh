@@ -1,6 +1,6 @@
 #!/bin/bash
 
-./facade.py tools blender --current_trial 20 condor.u3/doublealpha-1.0 --puzzle_name doublealpha-1.0 \
+./facade.py tools blender --current_trial 20 --dir condor.u3/doublealpha-1.0 --puzzle_name doublealpha-1.0 \
 	--camera_origin -10 75 200 \
 	--camera_lookat -5 -5 0 \
 	--camera_up 0 -1 0 \

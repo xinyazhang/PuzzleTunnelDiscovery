@@ -1,6 +1,6 @@
 #!/bin/bash
 
-./facade.py tools blender --current_trial 30 condor.u3/enigma/ --puzzle_name enigma \
+./facade.py tools blender --current_trial 30 --dir condor.u3/enigma/ --puzzle_name enigma \
 	--camera_origin 20 3.5 20 \
 	--camera_lookat 2 3.5 1 \
 	--camera_up 0 0 1 \

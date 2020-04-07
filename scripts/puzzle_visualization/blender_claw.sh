@@ -1,6 +1,6 @@
 #!/bin/bash
 
-./facade.py tools blender --current_trial 25 condor.u3/claw-rightbv.dt.tcp/ --puzzle_name claw-rightbv.dt.tcp \
+./facade.py tools blender --current_trial 25 --dir condor.u3/claw-rightbv.dt.tcp/ --puzzle_name claw-rightbv.dt.tcp \
 	--camera_origin -5 -10 -15 \
 	--camera_lookat 0 -1 0 \
 	--camera_up 0 0 -1 \

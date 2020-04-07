@@ -443,7 +443,7 @@ def vistouchdisp(args):
     plt.show()
 
 def blender_animate(args):
-    assert False
+    # assert False
     ws = util.Workspace(args.dir)
     ws.current_trial = args.current_trial
     if not args.puzzle_name:
@@ -506,6 +506,20 @@ def blender_animate(args):
         if args.subtask == 'keyconf':
             ompl_q = matio.load(fl.get_assembled_raw_key_fn(trial=fl.trial))['KEYQ_OMPL']
             van_q = uw.translate_ompl_to_vanilla(ompl_q)
+        elif args.subtask == 'keyconf_in_use':
+            path_unit_q = matio.load(in_path)
+            path_ompl_q = uw.translate_unit_to_ompl(path_unit_q)
+            allkey_ompl_q = matio.load(fl.get_assembled_raw_key_fn(trial=fl.trial))['KEYQ_OMPL']
+            key_ompl_q = allkey_ompl_q[2:,:] # Remove Initial state and goal state
+            import pyosr
+            ompl_q = []
+            for key in key_ompl_q:
+                dist = pyosr.multi_distance(key, path_ompl_q)
+                if dist.min() < 1e-3:
+                    ompl_q.append(key)
+            ompl_q = np.array([allkey_ompl_q[0]] + ompl_q + [allkey_ompl_q[1]])
+            print(f"keyconf_in_use shape {ompl_q.shape}")
+            van_q = uw.translate_ompl_to_vanilla(ompl_q)
         else:
             unit_q = matio.load(in_path)
             van_q = uw.translate_ompl_to_vanilla(uw.translate_unit_to_ompl(unit_q))
@@ -527,7 +541,7 @@ def blender_animate(args):
             print(f'OMPL interpolate: {van3}')
 
         calls += [cfg.env_fn, cfg.rob_fn, vanilla_path, '--O'] + ocstr
-        if args.subtask == 'keyconf':
+        if args.subtask == 'keyconf' or args.subtask == 'keyconf_in_use':
             calls += ['--discrete_points']
         if args.flat_env:
             calls += ['--flat_env']
@@ -569,6 +583,7 @@ def blender_animate(args):
             end = args.animation_end if args.animation_end >= 0 else 1440
             from . import condor
             calls += ['--animation_single_frame', '$(Process)']
+            calls += args.additional_arguments
             os.makedirs(scratch, exist_ok=True)
             subfile= condor.local_submit(ws=ws,
                                          xfile='/usr/bin/env',
@@ -580,6 +595,7 @@ def blender_animate(args):
                                          dryrun=False)
             util.ack(f'[tool blender] write condor submission file to {subfile}')
         else:
+            calls += args.additional_arguments
             util.shell(calls)
 
 def blender_texture(args):
@@ -635,9 +651,13 @@ def blender_texture(args):
                 # break # Debug
 
 def blender_entrance(args):
+    print(args)
     if args.subtask == 'texture':
         blender_texture(args)
     elif args.subtask == 'keyconf':
+        blender_animate(args)
+    elif args.subtask == 'keyconf_in_use':
+        args.use_unoptimized = True
         blender_animate(args)
     else:
         blender_animate(args)
@@ -881,7 +901,7 @@ def setup_parser(subparsers):
 
     p = toolp.add_parser('blender', help='Invoke blender to render the trajectory')
     p.add_argument('--subtask', help='Which task to perform',
-                   choices=['texture', 'keyconf', 'solution_trajectory'],
+                   choices=['texture', 'keyconf', 'keyconf_in_use', 'solution_trajectory'],
                    default='solution_trajectory')
     p.add_argument('--netid', type=int, default=None)
     p.add_argument('--current_trial', help='Trial that has the solution trajectory', type=int, default=None)
@@ -918,7 +938,8 @@ def setup_parser(subparsers):
     p.add_argument('--preview', action='store_true')
     p.add_argument('--quit', help='Quit without running blender', action='store_true')
     p.add_argument('--background', help='Run blender in background. Implies --quit', action='store_true')
-    p.add_argument('dir', help='Workspace directory')
+    p.add_argument('--dir', help='Workspace directory', required=True)
+    p.add_argument('additional_arguments', help='Addtional arguments passed to the underlying script', nargs="*")
 
     p = toolp.add_parser('dump_training_data', help='Dump the training data to output file')
     p.add_argument('--puzzle_name', help='Training Puzzle selection. The name of the default puzzle is "train".', default='')
