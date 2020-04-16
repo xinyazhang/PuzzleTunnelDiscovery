@@ -7,6 +7,6 @@
 	--light_auto \
 	--image_frame 0 \
 	--saveas blender/blender_enigma.blend \
-	--floor_origin 0 0 -5 \
+	--floor_origin 0 0 -7 \
 	--animation_floor_origin 0 0 -7 \
 	"$@" \
