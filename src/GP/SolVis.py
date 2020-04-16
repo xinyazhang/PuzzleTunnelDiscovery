@@ -182,11 +182,14 @@ def enable_cuda():
 
 def parse_args():
     p = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    p.add_argument('env', help='ENV geometry')
-    p.add_argument('rob', help='ROB geometry')
-    p.add_argument('qpath', help='Vanilla configuration path')
+    p.add_argument('--env', help='ENV geometry', required=True)
+    p.add_argument('--rob', help='ROB geometry', required=True)
+    p.add_argument('--qpath', help='Vanilla configuration path', required=True)
     p.add_argument('--rendering_styles', help="Rendering styles", choices=['Physical', 'ShadowOnWhite'], default='ShadowOnWhite')
     p.add_argument('--total_frames', help='Total number of frames to render', default=1440)
+    '''
+    Geometry Settings
+    '''
     p.add_argument('--O', help='OMPL center of gemoetry', type=float, nargs=3, required=True)
     p.add_argument('--camera_origin', help='Origin of camera', type=float, nargs=3, default=None)
     p.add_argument('--camera_lookat', help='Point to Look At of camera', type=float, nargs=3, default=None)
@@ -204,6 +207,10 @@ def parse_args():
     p.add_argument('--floor_size', help='Size of the floor, from the center to the edge',
                                    type=float, default=2500)
     p.add_argument('--flat_env', help='Flat shading', action='store_true')
+    p.add_argument('--mod_weighted_normal', help='Add modifier "Weighted Normal"', choices=['env', 'rob'], nargs='*', default=[])
+    '''
+    Selection of Rendering
+    '''
     p.add_argument('--image_frame', help='Still Image Frame. Use in conjuction with --save_image', type=int, default=0)
     p.add_argument('--animation_single_frame', help='Render single frame of animation. Use in conjuction with --save_animation_dir. Override animation_end.', type=int, default=None)
     p.add_argument('--animation_start', help='Start frame of animation', type=int, default=-1)
@@ -331,7 +338,11 @@ def main():
     # add_mat(env, green_mat)
     add_mat(env, ao_green_mat)
     # IMPORTANT: For some reason we don't know, Mobius needs this explicitly.
-    if not args.flat_env:
+    if 'env' in args.mod_weighted_normal:
+        env.data.use_auto_smooth = False
+        bpy.ops.object.modifier_add(type='WEIGHTED_NORMAL')
+        bpy.ops.object.modifier_apply(apply_as='DATA', modifier="Weighted Normal")
+    elif not args.flat_env:
         bpy.ops.object.shade_smooth()
     """
     if args.flat_env:
@@ -340,7 +351,11 @@ def main():
     bpy.ops.import_scene.obj(filepath=args.rob, axis_forward='Y', axis_up='Z')
     rob = bpy.context.selected_objects[0]
     rob.name = 'Rob'
-    if not args.flat_env:
+    if 'rob' in args.mod_weighted_normal:
+        rob.data.use_auto_smooth = False
+        bpy.ops.object.modifier_add(type='WEIGHTED_NORMAL')
+        bpy.ops.object.modifier_apply(apply_as='DATA', modifier="Weighted Normal")
+    elif not args.flat_env:
         bpy.ops.object.shade_smooth()
     """
     if args.flat_env:

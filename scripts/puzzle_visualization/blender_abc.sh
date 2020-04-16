@@ -9,5 +9,6 @@
 	--light_auto \
 	--animation_end 1424 \
 	--animation_floor_origin 50 0 0 \
+	--mod_weighted_normal env \
 	--saveas blender/abc.blend \
 	"$@" \

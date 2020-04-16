@@ -545,6 +545,8 @@ def blender_animate(args):
             calls += ['--discrete_points']
         if args.flat_env:
             calls += ['--flat_env']
+        if args.mod_weighted_normal:
+            calls += ['--mod_weighted_normal'] + args.mod_weighted_normal
         if args.floor_origin is not None:
             calls += ['--floor_origin'] + ["{:.17f}".format(e) for e in args.floor_origin]
         if args.animation_floor_origin is not None:
@@ -922,6 +924,7 @@ def setup_parser(subparsers):
     p.add_argument('--light_panel_up', help='Up direction of light_panel', type=float, nargs=3, default=None)
     p.add_argument('--light_auto', help='Set the light configuration automatically', action='store_true')
     p.add_argument('--flat_env', help='Flat shading', action='store_true')
+    p.add_argument('--mod_weighted_normal', help='Add modifier "Weighted Normal"', choices=['env', 'rob'], nargs='*', default=[])
     p.add_argument('--image_frame', help='Still Image Frame. Use in conjuction with --save_image', type=int, default=None)
     p.add_argument('--animation_single_frame', help='Render single frame of animation. Use in conjuction with --save_animation_dir. Override animation_end.', type=int, default=None)
     p.add_argument('--animation_start', help='Start frame of animation', type=int, default=-1)
