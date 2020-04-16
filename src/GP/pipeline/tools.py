@@ -540,7 +540,7 @@ def blender_animate(args):
             van3 = uw.translate_ompl_to_vanilla(van3)
             print(f'OMPL interpolate: {van3}')
 
-        calls += [cfg.env_fn, cfg.rob_fn, vanilla_path, '--O'] + ocstr
+        calls += ['--env', cfg.env_fn, '--rob', cfg.rob_fn, '--qpath', vanilla_path, '--O'] + ocstr
         if args.subtask == 'keyconf' or args.subtask == 'keyconf_in_use':
             calls += ['--discrete_points']
         if args.flat_env:
