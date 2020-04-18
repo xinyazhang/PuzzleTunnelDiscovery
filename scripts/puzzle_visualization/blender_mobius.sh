@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ./facade.py tools blender --current_trial 38 --dir condor.u3/mobius --puzzle_name mobius \
-	--camera_origin -175 -125 -20 \
+	--camera_origin -200 -150 -20 \
 	--camera_lookat 0 0 0 \
 	--camera_up 0.8 0.99 0.1 \
 	--floor_origin 50 0 0 \
