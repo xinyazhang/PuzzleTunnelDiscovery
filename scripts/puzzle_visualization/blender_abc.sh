@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ./facade.py tools blender --current_trial 50 --dir condor.u3/abc_rec2m/ --puzzle_name abc_rec2m \
-	--camera_origin -150 -100 -10 \
+	--camera_origin -157.5 -105 -10.5 \
 	--camera_lookat 0 0 0 \
 	--camera_up 0.8 0.99 0.1 \
 	--floor_origin 40 0 0 \
