@@ -115,6 +115,66 @@ def _add_key(rob, t, quat, frame):
     # rob.select = False
     rob.select_set(False)
 
+class SweepingCurve(object):
+
+    def __init__(self, O, frame_t, frame_r, mat_name='GP Material'):
+        self.O = O
+        self.frame_t = frame_t
+        self.frame_r = frame_r
+        self.mat_name = mat_name
+        self.mat = None if mat_name not in bpy.data.materials.keys() else bpy.data.materials[mat_name]
+
+    def add_sweeping_curve(self, frame, vid, v, t_from, t_to, mat=None):
+        frame_t = self.frame_t
+        frame_r = self.frame_r
+        mat_name = self.mat_name
+
+        bpy.ops.object.select_all(action='DESELECT')
+        bpy.ops.object.gpencil_add(type='EMPTY')
+        gp = bpy.context.selected_objects[0]
+        if frame > 1:
+            gp.hide_render = True
+            gp.keyframe_insert(data_path='hide_render', frame=frame-1)
+        gp.hide_render = False
+        gp.keyframe_insert(data_path='hide_render', frame=frame)
+        gp.hide_render = True
+        gp.keyframe_insert(data_path='hide_render', frame=frame+1)
+        gp.name = f'GPencil Frame {frame} Vertex {vid}'
+        gpd = gp.data
+        gpd.pixel_factor = 30.0
+        gpd.show_stroke_direction = True
+
+        gpl = gpd.layers.new('gpl', set_active = True )
+        fr = gpl.frames.new(1)
+        st = fr.strokes.new()
+        st.display_mode = '3DSPACE'
+        st.points.add(count=t_to-t_from+1)
+        points = st.points
+        for i, ti in enumerate(range(t_from, t_to+1)):
+            t = frame_t[ti]
+            r = Rotation.from_quat(frame_r[ti])
+            points[i].co = r.apply(v) + t
+
+        '''
+        Thickness
+        '''
+        bpy.ops.object.gpencil_modifier_add(type='GP_THICK')
+        tm = gp.grease_pencil_modifiers['Thickness']
+        tm.thickness = 50.0
+        tm.normalize_thickness = True
+        bpy.ops.object.gpencil_modifier_apply(apply_as='DATA')
+        '''
+        Mat
+        '''
+        if mat is None:
+            if self.mat is None:
+                bpy.data.materials.new(self.mat_name)
+                self.mat = bpy.data.materials[self.mat_name]
+                bpy.data.materials.create_gpencil_data(self.mat)
+                self.mat.grease_pencil.color = (1, 0, 0.818649, 1)
+            mat = self.mat
+        add_mat(gp, mat)
+
 def displace(initCoords, transCoords, obj):
     """applies rigid body transform to obj, with initial position (x,y,z) initCoords"""
     r = Rotation.from_quat(transCoords[3:7])
@@ -162,6 +222,28 @@ def make_mat_emissive(mat, val, energy=600.0):
     out = nodes.get('Material Output')
     links.new(glossy.outputs[0], out.inputs[0])
 
+'''
+FIXME: incomplete
+'''
+def make_mat_glass(mat, color):
+    mat.use_nodes = True # First, otherwise node_tree won't be avaliable
+    nodes = mat.node_tree.nodes
+    # glass = nodes.new('ShaderNodeBsdfGlass')
+    trans = nodes.new('ShaderNodeBsdfTransparent')
+    # trans.inputs[0].default_value = [1.0, 0.0, 0.0, 0.3]
+    trans.inputs[0].default_value = [1.0, 1.0, 1.0, 0.25]
+
+    glossy = nodes.new('ShaderNodeBsdfGlossy')
+    glossy.inputs[0].default_value = color
+    # glossy.inputs[1].default_value = 0.618
+    glossy.inputs[1].default_value = 0.316
+
+    mix = nodes.new('ShaderNodeMixShader')
+    # glass.inputs[1].default_value = 0.5
+    links = mat.node_tree.links
+    out = nodes.get('Material Output')
+    links.new(trans.outputs[0], out.inputs[0])
+
 def add_mat(obj, mat):
     if obj.data.materials:
         obj.data.materials[0] = mat
@@ -208,6 +290,9 @@ def parse_args():
                                    type=float, default=2500)
     p.add_argument('--flat_env', help='Flat shading', action='store_true')
     p.add_argument('--mod_weighted_normal', help='Add modifier "Weighted Normal"', choices=['env', 'rob'], nargs='*', default=[])
+    p.add_argument('--transparent_objects', help='Make object transparent',
+                   choices=['env', 'rob', 'prev_rob'],
+                   nargs='*', default=[])
     '''
     Selection of Rendering
     '''
@@ -222,10 +307,28 @@ def parse_args():
     p.add_argument('--save_animation_dir', help='Save the Rendered animation sequence image to', default='')
     p.add_argument('--enable_animation_preview', action='store_true')
     p.add_argument('--enable_animation_overwrite', action='store_true')
+    '''
+    Aux
+    '''
     p.add_argument('--cuda', action='store_true')
     p.add_argument('--preview', action='store_true')
     p.add_argument('--quit', help='Quit without running blender', action='store_true')
+    '''
+    Per Image rendering options
+    '''
+    p.add_argument('--path_tracing_samples',
+                   help='Number of path tracing samples in final rendering',
+                   type=int, default=512)
+    p.add_argument('--resolution_x', type=int, default=1920)
+    p.add_argument('--resolution_y', type=int, default=1080)
     p.add_argument('--discrete_points', help='Render each independent configurations in the file, rather than a trajectory', action='store_true')
+    p.add_argument('--overlay_from', help='Add multiple ROB objects set as the given key configurations at Frame 1', type=int, default=[], nargs='*')
+    p.add_argument('--overlay_from_all', action='store_true')
+    p.add_argument('--enable_freestyle', action='store_true')
+    p.add_argument('--selective_frames', help='Only add given frames (interpolated as normal animation) to the animation sequence', type=int, default=[], nargs='*')
+    p.add_argument('--grouping_selective', help='Grouping the selective frames with overlay', type=int, default=[], nargs='*')
+    p.add_argument('--sweeping_vertices', help='Add GPencil to track the path of vertices with in each group. A single negative number -N means random sampling N vertices', type=int, default=[], nargs='*')
+    p.add_argument('--enable_sweeping_curves', action='store_true')
     argv = sys.argv
     return p.parse_args(argv[argv.index("--") + 1:])
 
@@ -237,7 +340,7 @@ def main():
     bpy.utils.register_class(Next)
     bpy.context.scene.render.engine = 'CYCLES'
 
-    def make_mat_glossy(mat, val):
+    def make_mat_glossy(mat, val, transparent=None):
         mat.use_nodes = True # First, otherwise node_tree won't be avaliable
         nodes = mat.node_tree.nodes
         glossy = nodes.new('ShaderNodeBsdfGlossy')
@@ -246,11 +349,23 @@ def main():
         glossy.inputs[1].default_value = 0.316
         links = mat.node_tree.links
         out = nodes.get('Material Output')
-        links.new(glossy.outputs[0], out.inputs[0])
+        if transparent:
+            trans = nodes.new('ShaderNodeBsdfTransparent')
+            # trans.inputs[0].default_value = [1.0, 0.0, 0.0, 0.3]
+            trans.inputs[0].default_value = [1.0, 1.0, 1.0, 0.10]
+            # trans.inputs[0].default_value[3] = 0.25
+
+            mix = nodes.new('ShaderNodeMixShader')
+            links.new(trans.outputs[0], mix.inputs[1])
+            links.new(glossy.outputs[0], mix.inputs[2])
+            links.new(mix.outputs[0], out.inputs[0])
+        else:
+            links.new(glossy.outputs[0], out.inputs[0])
         if args.flat_env:
             geo = nodes.new('ShaderNodeNewGeometry')
             links.new(geo.outputs[3], glossy.inputs[2])
             print("Applying flat shading")
+
     cyan_mat = bpy.data.materials.new(name='Material Cyan')
     make_mat_glossy(cyan_mat, [0.0, 0.748, 0.8, 1.0])
 
@@ -261,7 +376,11 @@ def main():
     make_mat_glossy(gold_mat, [0.777, 0.8, 0.0, 1.0])
 
     red_mat = bpy.data.materials.new(name='Material Red')
-    make_mat_glossy(red_mat, [1.0, 0.0, 0.0, 1.0])
+    make_mat_glossy(red_mat, [1.0, 0.0, 0.0, 1.0],
+                    transparent=True if 'rob' in args.transparent_objects else False)
+    prev_red_mat = bpy.data.materials.new(name='Material Red (for Previous Object)')
+    make_mat_glossy(prev_red_mat, [1.0, 0.0, 0.0, 1.0],
+                    transparent=True if 'prev_rob' in args.transparent_objects else False)
 
     def make_mat_diffuse(mat, val):
         mat.use_nodes = True # First, otherwise node_tree won't be avaliable
@@ -280,7 +399,7 @@ def main():
     # make_mat_diffuse(diffuse_mat, [1.0, 1.0, 1.0, 1.0])
     make_mat_diffuse(diffuse_mat, [0.01, 0.01, 0.01, 1.0])
 
-    def make_mat_ao(mat, val):
+    def make_mat_ao(mat, val, transparent=None):
         mat.use_nodes = True # First, otherwise node_tree won't be avaliable
         nodes = mat.node_tree.nodes
         # diffuse = nodes.new('ShaderNodeBsdfDiffuse')
@@ -293,8 +412,18 @@ def main():
 
         links = mat.node_tree.links
         out = nodes.get('Material Output')
-        links.new(diffuse.outputs[0], out.inputs[0])
         links.new(ao.outputs[0], diffuse.inputs[0])
+        if transparent:
+            trans = nodes.new('ShaderNodeBsdfTransparent')
+            # trans.inputs[0].default_value = [1.0, 0.0, 0.0, 0.3]
+            trans.inputs[0].default_value = [1.0, 1.0, 1.0, 0.25]
+
+            mix = nodes.new('ShaderNodeMixShader')
+            links.new(trans.outputs[0], mix.inputs[1])
+            links.new(diffuse.outputs[0], mix.inputs[2])
+            links.new(mix.outputs[0], out.inputs[0])
+        else:
+            links.new(diffuse.outputs[0], out.inputs[0])
         geo = nodes.new('ShaderNodeNewGeometry')
         if args.flat_env:
             links.new(geo.outputs[3], diffuse.inputs[2])
@@ -304,7 +433,8 @@ def main():
             links.new(geo.outputs[1], ao.inputs[2])
             links.new(geo.outputs[1], diffuse.inputs[2])
     ao_green_mat = bpy.data.materials.new(name='Material Green with AO')
-    make_mat_ao(ao_green_mat, [0.0, 0.4, 0.4, 1.0])
+    make_mat_ao(ao_green_mat, [0.0, 0.4, 0.4, 1.0],
+                transparent=True if 'env' in args.transparent_objects else False)
 
     emission_mat = bpy.data.materials.new(name='Emission White')
     make_mat_emissive(emission_mat, [1.0, 1.0, 1.0, 1.0], energy=600)
@@ -522,6 +652,8 @@ def main():
     print(args.O)
     DEBUG = False
     rob = bpy.data.objects["Rob"]
+    frame_t = []
+    frame_r = []
     if DEBUG:
         key_0 = key_confs[44]
         key_1 = key_confs[45]
@@ -550,6 +682,9 @@ def main():
             _add_key(rob, t, quat, frame+1)
         args.animation_end = desiredFrames - 1
     else:
+        '''
+        Maunal Interpolation
+        '''
         for frame in range(desiredFrames):
             d = frame * distance_per_frame
             index_1 = np.argmax(distances > d)
@@ -565,7 +700,10 @@ def main():
             t,r = _mix(tau, key_0, key_1)
             t = t - r.apply(O) # Translate back to vanilla
             quat = r.as_quat()
-            _add_key(rob, t, quat, frame+1)
+            if not args.selective_frames or frame == 0:
+                _add_key(rob, t, quat, frame+1)
+            frame_t.append(t)
+            frame_r.append(quat)
 
     if args.animation_end >= 0:
         bpy.context.scene.frame_end = min(args.animation_end, desiredFrames - 1)
@@ -593,6 +731,111 @@ def main():
         link1 = links.new(r_layer.outputs[0], alpha_node.inputs[2])
         link2 = links.new(alpha_node.outputs[0], out_node.inputs[0])
 
+    cyanline_mat = bpy.data.materials.new(name='Material CyanLine')
+    cyanline_mat.line_color = (0.0, 0.4, 0.4, 1.0)
+    redline_mat = bpy.data.materials.new(name='Material RedLine')
+    redline_mat.line_color = (1.0, 0.0, 0.0, 1.0)
+    redline2_mat = bpy.data.materials.new(name='Material RedLine 2')
+    glass_redline_mat = bpy.data.materials.new(name='Material Glass RedLine')
+    glass_redline_mat.line_color = (1.0, 0.0, 0.0, 1.0)
+    make_mat_glass(glass_redline_mat, color=(1.0, 0.0, 0.0, 1.0))
+    glass_cyanline_mat = bpy.data.materials.new(name='Material Glass CyanLine')
+    glass_cyanline_mat.line_color = (0.0, 0.4, 0.4, 1.0)
+    make_mat_glass(glass_cyanline_mat, color=(0.0, 0.4, 0.4, 1.0))
+
+    if args.overlay_from_all:
+        args.overlay_from = list(range(1, args.animation_end + 1))
+    if args.overlay_from:
+        bpy.ops.object.select_all(action='DESELECT')
+        for key_id in args.overlay_from:
+            t = frame_t[key_id]
+            quat = frame_r[key_id]
+            rob.select_set(True)
+            bpy.ops.object.duplicate()
+            overlay_rob = bpy.context.selected_objects[0]
+            overlay_rob.name = f'Overlay Rob {key_id}'
+            if args.enable_freestyle:
+                overlay_rob.data.materials[0] = redline_mat
+            _add_key(overlay_rob, t, quat, 1)
+
+    scene = bpy.data.scenes['Scene']
+    sweeping_vertices = []
+    if args.sweeping_vertices:
+        if args.sweeping_vertices[0] < 0:
+            N = -args.sweeping_vertices[0]
+            sweeping_vertices = np.random.randint(0, len(rob.data.vertices), size=(N), dtype=np.int32)
+        else:
+            sweeping_vertices = args.sweeping_vertices
+    if args.selective_frames:
+        grouped_frames = []
+        if args.grouping_selective:
+            def chunks(lst, nframe_list):
+                i = 0
+                nf_idx = 0
+                while i < len(lst):
+                    n = nframe_list[nf_idx]
+                    assert n > 0, '--grouping_selective must be all positive'
+                    yield lst[i:i+n]
+                    i += n - 1 if n > 1 else 1 # connecting
+                    nf_idx = (nf_idx + 1) % len(nframe_list)
+            selective_frames =  [1] + args.selective_frames + [args.animation_end]
+            grouped_frames = [c for c in chunks(selective_frames, args.grouping_selective)]
+        else:
+            grouped_frames = [[f] for f in args.selective_frames]
+        rob_copies = [rob]
+        print(grouped_frames)
+        sc = SweepingCurve(O, frame_t, frame_r)
+        for i, group in enumerate(grouped_frames):
+            frame = i + 2
+            for obj_id, key_id in enumerate(reversed(group)):
+                if obj_id >= len(rob_copies):
+                    bpy.ops.object.select_all(action='DESELECT')
+                    rob.select_set(True)
+                    bpy.ops.object.duplicate()
+                    copied_rob = bpy.context.selected_objects[0]
+                    copied_rob.name = f'Copied Rob {obj_id}'
+                    rob_copies.append(copied_rob)
+                    copied_rob.data.materials[0] = prev_red_mat
+                    if args.enable_freestyle:
+                        copied_rob.data.materials[0] = glass_redline_mat
+                ani_obj = rob_copies[obj_id]
+                t = frame_t[key_id]
+                quat = frame_r[key_id]
+                _add_key(ani_obj, t, quat, frame)
+            if len(group) > 1 and len(sweeping_vertices) > 0 and args.enable_sweeping_curves:
+                print(rob.data.vertices)
+                for i, vid in enumerate(sweeping_vertices):
+                    v = rob.data.vertices[vid].co
+                    sc.add_sweeping_curve(frame, vid, v, group[0], group[-1])
+
+        '''
+        for i, key_id in enumerate(args.selective_frames):
+            t = frame_t[key_id]
+            quat = frame_r[key_id]
+            _add_key(rob, t, quat, i+2)
+        '''
+        bpy.context.scene.frame_end = len(grouped_frames) + 1
+
+    if args.enable_freestyle:
+        env.data.materials[0] = glass_cyanline_mat
+        rob.data.materials[0] = glass_redline_mat
+        # env.data.materials[0] = cyanline_mat
+        # rob.data.materials[0] = redline_mat
+        scene.render.use_freestyle = True
+        bpy.data.linestyles['LineStyle'].panel = 'COLOR'
+        bpy.ops.scene.freestyle_color_modifier_add(type='MATERIAL')
+        '''
+        Rendering options
+        '''
+        args.path_tracing_samples = 128 # No need for high quality result
+        bpy.ops.preferences.addon_enable(module='render_freestyle_svg')
+        scene.render.use_freestyle = True
+        args.resolution_x //= 4
+        args.resolution_y //= 4
+
+    scene.render.resolution_x = args.resolution_x
+    scene.render.resolution_y = args.resolution_y
+
     """
     ob = bpy.data.objects["Witness"]
     mp = ob.motion_path
@@ -614,28 +857,38 @@ def main():
             o.handle_right_type = 'AUTO'
             o.handle_left_type = 'AUTO'
     """
-    if args.saveas and args.animation_single_frame is None:
-        bpy.ops.wm.save_as_mainfile(filepath=args.saveas, check_existing=False)
     if args.save_image:
-        bpy.context.scene.cycles.samples = 512
+        bpy.context.scene.cycles.samples = args.path_tracing_samples
         if args.cuda:
             enable_cuda()
         bpy.context.scene.render.filepath = args.save_image
         bpy.ops.render.render(write_still=True)
     if args.save_animation_dir:
         os.makedirs(args.save_animation_dir, exist_ok=True)
-        bpy.context.scene.cycles.samples = 512
+        bpy.context.scene.cycles.samples = args.path_tracing_samples
         if args.cuda:
             enable_cuda()
         bpy.context.scene.render.filepath = args.save_animation_dir + '/'
+        print(f'bpy.data.filepath {bpy.data.filepath}')
         if args.animation_single_frame is not None:
             bpy.context.scene.frame_start = args.animation_single_frame
             bpy.context.scene.frame_end = args.animation_single_frame
-        if args.preview:
+        if scene.render.use_freestyle:
+            ''' Walkaround a blender bug (T60095) '''
+            frame_start = bpy.context.scene.frame_start
+            frame_end = bpy.context.scene.frame_end
+            for i in range(frame_start, frame_end + 1):
+                bpy.context.scene.render.filepath = f'{args.save_animation_dir}/{i:04d}.png'
+                scene.frame_current = i
+                bpy.ops.render.render(write_still=True)
+        elif args.preview:
             bpy.ops.render.opengl(animation=True, view_context=False)
         else:
             bpy.context.scene.render.use_overwrite = args.enable_animation_overwrite
             bpy.ops.render.render(animation=True)
+    if args.saveas and args.animation_single_frame is None:
+        ''' save_as_mainfile has side effects, do it last '''
+        bpy.ops.wm.save_as_mainfile(filepath=args.saveas, check_existing=False, relative_remap=False)
     if args.quit:
         bpy.ops.wm.quit_blender()
 
