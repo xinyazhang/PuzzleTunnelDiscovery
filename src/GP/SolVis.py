@@ -398,6 +398,7 @@ def parse_args():
     p.add_argument('--selective_frames', help='Only add given frames (interpolated as normal animation) to the animation sequence', type=int, default=[], nargs='*')
     p.add_argument('--grouping_selective', help='Grouping the selective frames with overlay', type=int, default=[], nargs='*')
     p.add_argument('--sweeping_vertices', help='Add GPencil to track the path of vertices with in each group. A single negative number -N means random sampling N vertices', type=int, default=[], nargs='*')
+    p.add_argument('--disable_intermediate_rob', action='store_true')
     p.add_argument('--enable_sweeping_curves', action='store_true')
     p.add_argument('--enable_sweeping_rob', action='store_true')
     argv = sys.argv
@@ -852,7 +853,7 @@ def main():
             grouped_frames = [c for c in chunks(selective_frames, args.grouping_selective)]
         else:
             grouped_frames = [[f] for f in args.selective_frames]
-        rob_copies = [rob]
+        rob_copies = {0: rob}
         print(grouped_frames)
         sc = SweepingCurve(O, frame_t, frame_r)
         sr = SweepingRob(args.sweeping_rob, args, frame_t, frame_r, mat=prev_red_mat)
@@ -860,13 +861,15 @@ def main():
         for i, group in enumerate(grouped_frames):
             frame = i + 2
             for obj_id, key_id in enumerate(reversed(group)):
-                if obj_id >= len(rob_copies):
+                if obj_id != 0 and obj_id != len(group) - 1 and args.disable_intermediate_rob:
+                    continue
+                if obj_id not in rob_copies:
                     bpy.ops.object.select_all(action='DESELECT')
                     rob.select_set(True)
                     bpy.ops.object.duplicate()
                     copied_rob = bpy.context.selected_objects[0]
                     copied_rob.name = f'Copied Rob {obj_id}'
-                    rob_copies.append(copied_rob)
+                    rob_copies[obj_id] = copied_rob
                     copied_rob.data.materials[0] = prev_red_mat
                     if args.enable_freestyle:
                         copied_rob.data.materials[0] = glass_redline_mat
