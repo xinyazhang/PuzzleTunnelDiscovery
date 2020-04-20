@@ -18,6 +18,18 @@ def normalized(vec):
     a = np.array(vec)
     return a / norm(vec)
 
+def rangestring_to_list(x):
+    result = []
+    for part in x.split(','):
+        if '-' in part:
+            a, b = part.split('-')
+            a, b = int(a), int(b)
+            result.extend(range(a, b + 1))
+        else:
+            a = int(part)
+            result.append(a)
+    return result
+
 #ui stuff... can ignore this
 
 class SimplePanel(bpy.types.Panel):
@@ -99,6 +111,14 @@ def _mix(tau, key_0, key_1):
     r, = slerp([tau])
     return (t, r)
 
+def _set_rob_rendering(rob, args):
+    if 'rob' in args.mod_weighted_normal:
+        rob.data.use_auto_smooth = False
+        bpy.ops.object.modifier_add(type='WEIGHTED_NORMAL')
+        bpy.ops.object.modifier_apply(apply_as='DATA', modifier="Weighted Normal")
+    elif not args.flat_env:
+        bpy.ops.object.shade_smooth()
+
 def _add_key(rob, t, quat, frame):
     rob.rotation_mode = 'QUATERNION'
     rob.location.x = t[0]
@@ -174,6 +194,54 @@ class SweepingCurve(object):
                 self.mat.grease_pencil.color = (1, 0, 0.818649, 1)
             mat = self.mat
         add_mat(gp, mat)
+
+class SweepingRob(object):
+    def __init__(self, rob_fn, args, frame_t, frame_r, mat):
+        self.O = args.O
+        self.frame_t = frame_t
+        self.frame_r = frame_r
+        self.mat = mat
+
+        self.srob = None
+        if args.sweeping_rob:
+            bpy.ops.object.select_all(action='DESELECT')
+            bpy.ops.import_scene.obj(filepath=args.sweeping_rob, axis_forward='Y', axis_up='Z')
+            rob = bpy.context.selected_objects[0]
+            rob.name = 'SRob'
+            _set_rob_rendering(rob, args)
+
+            self.srob = rob
+            self.instance_cache = [rob]
+
+    def add_sweeping_object(self, frame, t_from, t_to):
+        if self.srob is None:
+            return
+        frame_t = self.frame_t
+        frame_r = self.frame_r
+        mat = self.mat
+
+        last_render = 0
+        for i, ti in enumerate(range(t_from, t_to+1)):
+            while i >= len(self.instance_cache):
+                bpy.ops.object.select_all(action='DESELECT')
+                self.instance_cache[0].select_set(True)
+                bpy.ops.object.duplicate()
+                srob = bpy.context.selected_objects[0]
+                srob.name = f'SRob Copy {i}'
+                add_mat(srob, self.mat)
+                self.instance_cache.append(srob)
+            srob = self.instance_cache[i]
+            t = frame_t[ti]
+            quat = frame_r[ti]
+            _add_key(srob, t, quat, frame)
+            srob.hide_render = False
+            srob.keyframe_insert(data_path='hide_render', frame=frame)
+            last_render = i
+        for i in range(last_render + 1, len(self.instance_cache)):
+            srob = self.instance_cache[i]
+            srob.hide_render = True
+            srob.keyframe_insert(data_path='hide_render', frame=frame)
+
 
 def displace(initCoords, transCoords, obj):
     """applies rigid body transform to obj, with initial position (x,y,z) initCoords"""
@@ -269,6 +337,7 @@ def parse_args():
     p.add_argument('--qpath', help='Vanilla configuration path', required=True)
     p.add_argument('--rendering_styles', help="Rendering styles", choices=['Physical', 'ShadowOnWhite'], default='ShadowOnWhite')
     p.add_argument('--total_frames', help='Total number of frames to render', default=1440)
+    p.add_argument('--sweeping_rob', help='Sweeping ROB geometry', default='')
     '''
     Geometry Settings
     '''
@@ -323,12 +392,14 @@ def parse_args():
     p.add_argument('--resolution_y', type=int, default=1080)
     p.add_argument('--discrete_points', help='Render each independent configurations in the file, rather than a trajectory', action='store_true')
     p.add_argument('--overlay_from', help='Add multiple ROB objects set as the given key configurations at Frame 1', type=int, default=[], nargs='*')
+    p.add_argument('--overlay_from_ranges', type=str, default=[], nargs='*')
     p.add_argument('--overlay_from_all', action='store_true')
     p.add_argument('--enable_freestyle', action='store_true')
     p.add_argument('--selective_frames', help='Only add given frames (interpolated as normal animation) to the animation sequence', type=int, default=[], nargs='*')
     p.add_argument('--grouping_selective', help='Grouping the selective frames with overlay', type=int, default=[], nargs='*')
     p.add_argument('--sweeping_vertices', help='Add GPencil to track the path of vertices with in each group. A single negative number -N means random sampling N vertices', type=int, default=[], nargs='*')
     p.add_argument('--enable_sweeping_curves', action='store_true')
+    p.add_argument('--enable_sweeping_rob', action='store_true')
     argv = sys.argv
     return p.parse_args(argv[argv.index("--") + 1:])
 
@@ -481,12 +552,7 @@ def main():
     bpy.ops.import_scene.obj(filepath=args.rob, axis_forward='Y', axis_up='Z')
     rob = bpy.context.selected_objects[0]
     rob.name = 'Rob'
-    if 'rob' in args.mod_weighted_normal:
-        rob.data.use_auto_smooth = False
-        bpy.ops.object.modifier_add(type='WEIGHTED_NORMAL')
-        bpy.ops.object.modifier_apply(apply_as='DATA', modifier="Weighted Normal")
-    elif not args.flat_env:
-        bpy.ops.object.shade_smooth()
+    _set_rob_rendering(rob, args)
     """
     if args.flat_env:
         bpy.ops.object.shade_flat()
@@ -745,6 +811,10 @@ def main():
 
     if args.overlay_from_all:
         args.overlay_from = list(range(1, args.animation_end + 1))
+    elif args.overlay_from_ranges:
+        args.overlay_from = []
+        for e in args.overlay_from_ranges:
+            args.overlay_from += rangestring_to_list(e)
     if args.overlay_from:
         bpy.ops.object.select_all(action='DESELECT')
         for key_id in args.overlay_from:
@@ -785,6 +855,8 @@ def main():
         rob_copies = [rob]
         print(grouped_frames)
         sc = SweepingCurve(O, frame_t, frame_r)
+        sr = SweepingRob(args.sweeping_rob, args, frame_t, frame_r, mat=prev_red_mat)
+        sweeping_robs = []
         for i, group in enumerate(grouped_frames):
             frame = i + 2
             for obj_id, key_id in enumerate(reversed(group)):
@@ -802,6 +874,8 @@ def main():
                 t = frame_t[key_id]
                 quat = frame_r[key_id]
                 _add_key(ani_obj, t, quat, frame)
+            if args.enable_sweeping_rob:
+                sr.add_sweeping_object(frame, group[0], group[-1])
             if len(group) > 1 and len(sweeping_vertices) > 0 and args.enable_sweeping_curves:
                 print(rob.data.vertices)
                 for i, vid in enumerate(sweeping_vertices):
