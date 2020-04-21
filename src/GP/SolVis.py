@@ -135,6 +135,12 @@ def _add_key(rob, t, quat, frame):
     # rob.select = False
     rob.select_set(False)
 
+def _dup_rob(rob):
+    bpy.ops.object.select_all(action='DESELECT')
+    rob.select_set(True)
+    bpy.ops.object.duplicate()
+    return bpy.context.selected_objects[0]
+
 class SweepingCurve(object):
 
     def __init__(self, O, frame_t, frame_r, mat_name='GP Material'):
@@ -209,9 +215,10 @@ class SweepingRob(object):
             rob = bpy.context.selected_objects[0]
             rob.name = 'SRob'
             _set_rob_rendering(rob, args)
+            add_mat(rob, self.mat)
 
             self.srob = rob
-            self.instance_cache = [rob]
+            self.instance_cache = {0: rob}
 
     def add_sweeping_object(self, frame, t_from, t_to):
         if self.srob is None:
@@ -221,15 +228,14 @@ class SweepingRob(object):
         mat = self.mat
 
         last_render = 0
-        for i, ti in enumerate(range(t_from, t_to+1)):
-            while i >= len(self.instance_cache):
-                bpy.ops.object.select_all(action='DESELECT')
-                self.instance_cache[0].select_set(True)
-                bpy.ops.object.duplicate()
-                srob = bpy.context.selected_objects[0]
+        for i, ti in enumerate(range(t_from, t_to+1, 5)):
+            if i not in self.instance_cache:
+                srob = _dup_rob(self.instance_cache[0])
                 srob.name = f'SRob Copy {i}'
+                srob.cycles_visibility.shadow = False
+                srob.cycles_visibility.glossy = False
                 add_mat(srob, self.mat)
-                self.instance_cache.append(srob)
+                self.instance_cache[i] = srob
             srob = self.instance_cache[i]
             t = frame_t[ti]
             quat = frame_r[ti]
@@ -853,24 +859,49 @@ def main():
             grouped_frames = [c for c in chunks(selective_frames, args.grouping_selective)]
         else:
             grouped_frames = [[f] for f in args.selective_frames]
-        rob_copies = {0: rob}
-        print(grouped_frames)
+        prev_rob = _dup_rob(rob)
+        prev_rob.name = f'Copied Rob for Prev'
+        prev_rob.data.materials[0] = prev_red_mat
+        prev_rob.cycles_visibility.shadow = False
         sc = SweepingCurve(O, frame_t, frame_r)
         sr = SweepingRob(args.sweeping_rob, args, frame_t, frame_r, mat=prev_red_mat)
-        sweeping_robs = []
+
+        if args.enable_freestyle:
+            prev_rob.data.materials[0] = glass_redline_mat
         for i, group in enumerate(grouped_frames):
             frame = i + 2
-            for obj_id, key_id in enumerate(reversed(group)):
-                if obj_id != 0 and obj_id != len(group) - 1 and args.disable_intermediate_rob:
-                    continue
+            ani_objs = [rob, prev_rob]
+            keys = [group[-1], group[0]]
+            print(keys)
+            for ani_obj, key_id in zip(ani_objs, keys):
+                t = frame_t[key_id]
+                quat = frame_r[key_id]
+                _add_key(ani_obj, t, quat, frame)
+            if args.enable_sweeping_rob:
+                sr.add_sweeping_object(frame, group[0], group[-1])
+            if args.enable_sweeping_curves and len(group) > 1 and len(sweeping_vertices) > 0:
+                print(rob.data.vertices)
+                for i, vid in enumerate(sweeping_vertices):
+                    v = rob.data.vertices[vid].co
+                    sc.add_sweeping_curve(frame, vid, v, group[0], group[-1])
+        '''
+        print(grouped_frames)
+        for i, group in enumerate(grouped_frames):
+            frame = i + 2
+            for i, key_id in enumerate(reversed(group)):
+                obj_id = len(group) - i
+                if args.disable_intermediate_rob:
+                    if obj_id != len(group) - 1 and obj_id != 0:
+                        print(f'skip {obj_id}')
+                        continue
                 if obj_id not in rob_copies:
+                    copied_rob = _dup_rob(rob)
                     bpy.ops.object.select_all(action='DESELECT')
                     rob.select_set(True)
                     bpy.ops.object.duplicate()
                     copied_rob = bpy.context.selected_objects[0]
-                    copied_rob.name = f'Copied Rob {obj_id}'
+                    copied_rob.name = f'Copied Rob Prev {-obj_id}'
                     rob_copies[obj_id] = copied_rob
-                    copied_rob.data.materials[0] = prev_red_mat
                     if args.enable_freestyle:
                         copied_rob.data.materials[0] = glass_redline_mat
                 ani_obj = rob_copies[obj_id]
@@ -884,6 +915,7 @@ def main():
                 for i, vid in enumerate(sweeping_vertices):
                     v = rob.data.vertices[vid].co
                     sc.add_sweeping_curve(frame, vid, v, group[0], group[-1])
+        '''
 
         '''
         for i, key_id in enumerate(args.selective_frames):
