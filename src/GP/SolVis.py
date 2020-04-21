@@ -939,8 +939,8 @@ def main():
         args.path_tracing_samples = 128 # No need for high quality result
         bpy.ops.preferences.addon_enable(module='render_freestyle_svg')
         scene.render.use_freestyle = True
-        args.resolution_x //= 4
-        args.resolution_y //= 4
+        # args.resolution_x //= 4
+        # args.resolution_y //= 4
 
     scene.render.resolution_x = args.resolution_x
     scene.render.resolution_y = args.resolution_y
