@@ -6,7 +6,9 @@
 # ./blender_mobius.sh -- --overlay_from_all --rob ./mobius_teeth.obj
 # ./blender_mobius.sh -- --overlay_from_all --rob ./mobius_upper_tooth_surface.obj "$@"
 
-./blender_mobius.sh "$@" -- \
+./blender_mobius.sh \
+    --animation_start 2 \
+    "$@" -- \
     --sweeping_rob ./mobius_cylinder_tooth.obj \
     --enable_sweeping_rob \
 	--selective_frames 187 344 556 712 849 1054 1296 \
