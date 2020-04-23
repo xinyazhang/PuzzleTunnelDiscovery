@@ -454,7 +454,7 @@ def blender_animate(args):
         return
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
         cfg, config = parse_ompl.parse_simple(puzzle_fn)
-        fl = FileLocations(args, ws, puzzle_name)
+        fl = FileLocations(args, ws, puzzle_name, scheme=args.scheme)
 
         calls = ['blender']
         if args.background:
@@ -495,6 +495,7 @@ def blender_animate(args):
                 o_args.current_trial = args.current_trial
                 o_args.days = 0.01
                 o_args.dir = args.dir
+                o_args.scheme = args.scheme
                 simplify(o_args)
                 if not os.path.isfile(in_path):
                     util.warn(f'[blender_animate] The path optimizer cannot get simplified solution')
@@ -669,8 +670,7 @@ def simplify(args):
     ws = util.Workspace(args.dir)
     ws.current_trial = args.current_trial
     for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
-        fl = FileLocations(args, ws, puzzle_name)
-        fl.update_scheme('cmb')
+        fl = FileLocations(args, ws, puzzle_name, scheme=args.scheme)
         unit_path = fl.unit_out_fn
         util.log(f'Simplifiying trajectory from {unit_path}')
         unit_q = matio.load(unit_path)
