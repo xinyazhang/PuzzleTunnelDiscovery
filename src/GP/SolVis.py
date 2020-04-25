@@ -18,6 +18,7 @@ def normalized(vec):
     a = np.array(vec)
     return a / norm(vec)
 
+
 def rangestring_to_list(x):
     result = []
     for part in x.split(','):
@@ -111,8 +112,12 @@ def _mix(tau, key_0, key_1):
     r, = slerp([tau])
     return (t, r)
 
-def _set_rob_rendering(rob, args):
-    if 'rob' in args.mod_weighted_normal:
+def _set_rob_rendering(rob, args, arg_name='rob'):
+    if arg_name in args.remove_vn:
+        print("REMOVING VN")
+        bpy.context.view_layer.objects.active = rob
+        print(bpy.ops.mesh.customdata_custom_splitnormals_clear())
+    if arg_name in args.mod_weighted_normal:
         rob.data.use_auto_smooth = False
         bpy.ops.object.modifier_add(type='WEIGHTED_NORMAL')
         bpy.ops.object.modifier_apply(apply_as='DATA', modifier="Weighted Normal")
@@ -197,7 +202,7 @@ class SweepingCurve(object):
                 bpy.data.materials.new(self.mat_name)
                 self.mat = bpy.data.materials[self.mat_name]
                 bpy.data.materials.create_gpencil_data(self.mat)
-                self.mat.grease_pencil.color = (1, 0, 0.818649, 1)
+                self.mat.grease_pencil.color = (0.5, 0.5, 0.0, 0.5)
             mat = self.mat
         add_mat(gp, mat)
 
@@ -365,8 +370,10 @@ def parse_args():
                                    type=float, default=2500)
     p.add_argument('--flat_env', help='Flat shading', action='store_true')
     p.add_argument('--mod_weighted_normal', help='Add modifier "Weighted Normal"', choices=['env', 'rob'], nargs='*', default=[])
+    p.add_argument('--remove_vn', help='Remove VN from the mesh', choices=['env', 'rob'], nargs='*', default=[])
+    p.add_argument('--remove_ao', help='Remove VN from the mesh', choices=['env', 'rob'], nargs='*', default=[])
     p.add_argument('--transparent_objects', help='Make object transparent',
-                   choices=['env', 'rob', 'prev_rob'],
+                   choices=['env', 'rob', 'prev_rob', 'sweeping_rob'],
                    nargs='*', default=[])
     '''
     Selection of Rendering
@@ -459,6 +466,9 @@ def main():
     prev_red_mat = bpy.data.materials.new(name='Material Red (for Previous Object)')
     make_mat_glossy(prev_red_mat, [1.0, 0.0, 0.0, 1.0],
                     transparent=True if 'prev_rob' in args.transparent_objects else False)
+    sweeping_rob_mat = bpy.data.materials.new(name='Material Yellow')
+    make_mat_glossy(sweeping_rob_mat, [1.0, 1.0, 0.0, 1.0],
+                    transparent=True if 'sweeping_rob' in args.transparent_objects else False)
 
     def make_mat_diffuse(mat, val):
         mat.use_nodes = True # First, otherwise node_tree won't be avaliable
@@ -510,9 +520,14 @@ def main():
         else:
             links.new(geo.outputs[1], ao.inputs[2])
             links.new(geo.outputs[1], diffuse.inputs[2])
-    ao_green_mat = bpy.data.materials.new(name='Material Green with AO')
-    make_mat_ao(ao_green_mat, [0.0, 0.4, 0.4, 1.0],
-                transparent=True if 'env' in args.transparent_objects else False)
+    if 'env' in args.remove_ao:
+        ao_green_mat = bpy.data.materials.new(name='Material Green without AO')
+        make_mat_glossy(ao_green_mat, [0.0, 0.4, 0.4, 1.0],
+                        transparent=True if 'env' in args.transparent_objects else False)
+    else:
+        ao_green_mat = bpy.data.materials.new(name='Material Green with AO')
+        make_mat_ao(ao_green_mat, [0.0, 0.4, 0.4, 1.0],
+                    transparent=True if 'env' in args.transparent_objects else False)
 
     emission_mat = bpy.data.materials.new(name='Emission White')
     make_mat_emissive(emission_mat, [1.0, 1.0, 1.0, 1.0], energy=600)
@@ -545,13 +560,7 @@ def main():
     env.name = 'Env'
     # add_mat(env, green_mat)
     add_mat(env, ao_green_mat)
-    # IMPORTANT: For some reason we don't know, Mobius needs this explicitly.
-    if 'env' in args.mod_weighted_normal:
-        env.data.use_auto_smooth = False
-        bpy.ops.object.modifier_add(type='WEIGHTED_NORMAL')
-        bpy.ops.object.modifier_apply(apply_as='DATA', modifier="Weighted Normal")
-    elif not args.flat_env:
-        bpy.ops.object.shade_smooth()
+    _set_rob_rendering(env, args, arg_name='env')
     """
     if args.flat_env:
         bpy.ops.object.shade_flat()
@@ -565,6 +574,7 @@ def main():
         bpy.ops.object.shade_flat()
     """
     add_mat(rob, red_mat)
+
     '''
     bpy.ops.mesh.primitive_uv_sphere_add()
     bpy.context.selected_objects[0].name = 'Witness'
@@ -864,7 +874,7 @@ def main():
         prev_rob.data.materials[0] = prev_red_mat
         prev_rob.cycles_visibility.shadow = False
         sc = SweepingCurve(O, frame_t, frame_r)
-        sr = SweepingRob(args.sweeping_rob, args, frame_t, frame_r, mat=prev_red_mat)
+        sr = SweepingRob(args.sweeping_rob, args, frame_t, frame_r, mat=sweeping_rob_mat)
 
         if args.enable_freestyle:
             prev_rob.data.materials[0] = glass_redline_mat
