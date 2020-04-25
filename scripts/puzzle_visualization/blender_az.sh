@@ -8,3 +8,6 @@
 	--animation_end 912 \
 	--saveas blender/blender_az.blend \
 	"$@" \
+    -- \
+    --remove_vn env rob \
+    --remove_ao env rob \

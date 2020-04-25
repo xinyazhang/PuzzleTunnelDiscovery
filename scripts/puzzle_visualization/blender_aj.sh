@@ -10,3 +10,6 @@
 	--animation_floor_origin 0 0 -60 \
 	--saveas blender/blender_aj.blend \
 	"$@" \
+    -- \
+    --remove_vn env rob \
+    --remove_ao env rob \

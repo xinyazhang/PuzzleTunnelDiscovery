@@ -10,3 +10,5 @@
 	--saveas blender/blender_key1.blend \
 	--animation_floor_origin 100 0 0 \
 	"$@" \
+    -- \
+    --remove_ao env rob \

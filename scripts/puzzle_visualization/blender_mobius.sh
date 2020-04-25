@@ -12,3 +12,5 @@
 	--animation_end 1400 \
 	--animation_floor_origin 50 0 0 \
 	"$@" \
+    -- \
+    --remove_ao env rob \

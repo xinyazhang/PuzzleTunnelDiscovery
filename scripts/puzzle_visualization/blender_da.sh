@@ -10,3 +10,6 @@
 	--animation_floor_origin 0 0 -40 \
 	--saveas blender/blender_doublealpha.blend \
 	"$@" \
+    -- \
+    --remove_vn env rob \
+    --remove_ao env rob \

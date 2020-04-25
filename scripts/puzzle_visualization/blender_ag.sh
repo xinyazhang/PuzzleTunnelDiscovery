@@ -7,3 +7,6 @@
 	--light_auto \
 	--saveas blender/blender_ag.blend \
 	"$@" \
+    -- \
+    --remove_vn env rob \
+    --remove_ao env rob \

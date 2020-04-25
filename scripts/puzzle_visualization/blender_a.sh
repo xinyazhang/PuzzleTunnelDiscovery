@@ -8,3 +8,6 @@
 	--animation_end 1403 \
 	--saveas blender/blender_alpha.blend \
 	"$@" \
+    -- \
+    --remove_vn env rob \
+    --remove_ao env rob \

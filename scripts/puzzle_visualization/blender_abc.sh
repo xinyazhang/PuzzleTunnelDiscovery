@@ -12,3 +12,5 @@
 	--mod_weighted_normal env \
 	--saveas blender/abc.blend \
 	"$@" \
+    -- \
+    --remove_ao env rob \
