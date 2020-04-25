@@ -478,6 +478,8 @@ def blender_animate(args):
             calls += ['--quit']
         if args.cuda:
             calls += ['--cuda']
+        if args.rtx:
+            calls += ['--rtx']
         if args.animation_single_frame is not None:
             assert not args.condor_generate
             calls += ['--animation_single_frame', str(args.animation_single_frame)]
@@ -629,6 +631,8 @@ def blender_texture(args):
             calls += ['--quit']
         if args.cuda:
             calls += ['--cuda']
+        if args.rtx:
+            calls += ['--rtx']
         if args.animation_single_frame is not None:
             assert not args.condor_generate
             calls += ['--animation_single_frame', str(args.animation_single_frame)]
@@ -938,6 +942,7 @@ def setup_parser(subparsers):
     p.add_argument('--enable_animation_preview', action='store_true')
     p.add_argument('--enable_animation_overwrite', action='store_true')
     p.add_argument('--cuda', action='store_true')
+    p.add_argument('--rtx', action='store_true')
     p.add_argument('--preview', action='store_true')
     p.add_argument('--quit', help='Quit without running blender', action='store_true')
     p.add_argument('--background', help='Run blender in background. Implies --quit', action='store_true')

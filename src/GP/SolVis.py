@@ -329,13 +329,18 @@ def add_mat(obj, mat):
     else:
         obj.data.materials.append(mat)
 
-def enable_cuda():
+def enable_gpu(args):
     """
     Enable CUDA
     """
     P=bpy.context.preferences
     prefs=P.addons['cycles'].preferences
-    prefs.compute_device_type='CUDA'
+    if args.cuda:
+        prefs.compute_device_type='CUDA'
+    elif args.rtx:
+        prefs.compute_device_type='OPTIX'
+    else:
+        return
     print(prefs.compute_device_type)
     print(prefs.get_devices())
     for scene in bpy.data.scenes:
@@ -393,6 +398,7 @@ def parse_args():
     Aux
     '''
     p.add_argument('--cuda', action='store_true')
+    p.add_argument('--rtx', action='store_true')
     p.add_argument('--preview', action='store_true')
     p.add_argument('--quit', help='Quit without running blender', action='store_true')
     '''
@@ -976,17 +982,14 @@ def main():
             o.handle_right_type = 'AUTO'
             o.handle_left_type = 'AUTO'
     """
+    enable_gpu(args)
     if args.save_image:
         bpy.context.scene.cycles.samples = args.path_tracing_samples
-        if args.cuda:
-            enable_cuda()
         bpy.context.scene.render.filepath = args.save_image
         bpy.ops.render.render(write_still=True)
     if args.save_animation_dir:
         os.makedirs(args.save_animation_dir, exist_ok=True)
         bpy.context.scene.cycles.samples = args.path_tracing_samples
-        if args.cuda:
-            enable_cuda()
         bpy.context.scene.render.filepath = args.save_animation_dir + '/'
         print(f'bpy.data.filepath {bpy.data.filepath}')
         if args.animation_single_frame is not None:
