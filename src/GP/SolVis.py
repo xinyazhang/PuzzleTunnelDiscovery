@@ -335,10 +335,10 @@ def enable_gpu(args):
     """
     P=bpy.context.preferences
     prefs=P.addons['cycles'].preferences
-    if args.cuda:
-        prefs.compute_device_type='CUDA'
-    elif args.rtx:
+    if args.rtx:
         prefs.compute_device_type='OPTIX'
+    elif args.cuda:
+        prefs.compute_device_type='CUDA'
     else:
         return
     print(prefs.compute_device_type)
