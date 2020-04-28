@@ -117,6 +117,8 @@ def _set_rob_rendering(rob, args, arg_name='rob'):
         print("REMOVING VN")
         bpy.context.view_layer.objects.active = rob
         print(bpy.ops.mesh.customdata_custom_splitnormals_clear())
+    if arg_name in args.enable_autosmooth:
+        rob.data.use_auto_smooth = True
     if arg_name in args.mod_weighted_normal:
         rob.data.use_auto_smooth = False
         bpy.ops.object.modifier_add(type='WEIGHTED_NORMAL')
@@ -376,6 +378,7 @@ def parse_args():
     p.add_argument('--flat_env', help='Flat shading', action='store_true')
     p.add_argument('--mod_weighted_normal', help='Add modifier "Weighted Normal"', choices=['env', 'rob'], nargs='*', default=[])
     p.add_argument('--remove_vn', help='Remove VN from the mesh', choices=['env', 'rob'], nargs='*', default=[])
+    p.add_argument('--enable_autosmooth', help='Enable autosmooth (if not enabled by default)', choices=['env', 'rob'], nargs='*', default=[])
     p.add_argument('--remove_ao', help='Remove VN from the mesh', choices=['env', 'rob'], nargs='*', default=[])
     p.add_argument('--transparent_objects', help='Make object transparent',
                    choices=['env', 'rob', 'prev_rob', 'sweeping_rob'],

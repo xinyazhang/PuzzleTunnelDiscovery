@@ -10,3 +10,7 @@
 	--floor_origin 0 0 -7 \
 	--animation_floor_origin 0 0 -7 \
 	"$@" \
+    -- \
+    --remove_vn env rob \
+    --enable_autosmooth env rob \
+    --remove_ao env rob \
