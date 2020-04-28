@@ -176,6 +176,8 @@ def parse_args():
     p.add_argument('--floor_size', help='Size of the floor, from the center to the edge',
                                    type=float, default=2500)
     p.add_argument('--total_frames', help='Total number of frames to render', default=180)
+    p.add_argument('--remove_vn', help='Remove VN from the mesh', choices=['env', 'rob'], nargs='*', default=[])
+    p.add_argument('--enable_autosmooth', help='Enable autosmooth (if not enabled by default)', choices=['env', 'rob'], nargs='*', default=[])
     p.add_argument('--resolution_x', type=int, default=1920)
     p.add_argument('--resolution_y', type=int, default=1080)
     p.add_argument('--animation_single_frame', help='Render single frame of animation. Use in conjuction with --save_animation_dir. Override animation_end.', type=int, default=None)
@@ -195,6 +197,12 @@ class GeoWithFeat(object):
         add_mat(geo, mat)
         if not args.flat:
             bpy.ops.object.shade_smooth()
+        if name in args.remove_vn:
+            print("REMOVING VN")
+            bpy.context.view_layer.objects.active = geo
+            print(bpy.ops.mesh.customdata_custom_splitnormals_clear())
+        if name in args.enable_autosmooth:
+            geo.data.use_auto_smooth = True
 
         self._geo = geo
         self._mat = mat
@@ -318,10 +326,10 @@ def main():
         geo.add_animation(V=V, W=W)
         bpy.context.scene.frame_end = V.shape[0]
     else:
-        env = GeoWithFeat('Env', args.env,
+        env = GeoWithFeat('env', args.env,
                            mat=cyan_mat, cone_mat=green_mat, sp_mat=None,
                            args=args)
-        rob = GeoWithFeat('Rob', args.env,
+        rob = GeoWithFeat('rob', args.rob,
                            mat=red_mat, cone_mat=green_mat, sp_mat=gold_mat,
                            args=args)
         d = np.load(args.key_data)
