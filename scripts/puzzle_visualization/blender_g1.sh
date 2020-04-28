@@ -10,5 +10,7 @@
 	--saveas blender/blender_g1.blend \
 	--animation_floor_origin 0 0 50 \
 	--animation_end 1352 \
-	--flat_env \
 	"$@" \
+    -- \
+    --remove_vn env rob \
+    --enable_autosmooth env rob \

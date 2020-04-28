@@ -9,8 +9,10 @@
 	--saveas blender/blender_g2.blend \
 	--animation_end 644 \
 	--animation_floor_origin 0 0 -20 \
-	--flat_env \
 	--use_unoptimized \
 	--env_camera_rotation_axis 0 1 0 \
 	--rob_camera_rotation_axis 0 0 1 \
 	"$@" \
+    -- \
+    --remove_vn env rob \
+    --enable_autosmooth env rob \

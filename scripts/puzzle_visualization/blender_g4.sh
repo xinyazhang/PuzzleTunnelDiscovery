@@ -11,4 +11,6 @@
 	--animation_end 890 \
 	--animation_floor_origin 0 0 -20 \
 	"$@" \
-	--flat_env \
+    -- \
+    --remove_vn env rob \
+    --enable_autosmooth env rob \
