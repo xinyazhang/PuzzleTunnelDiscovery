@@ -116,7 +116,7 @@ include(cmake/libosr.cmake)
 
 EASYLIB(rectpack)
 use_fcl(rectpack)
-EASYADD(objautouv rectpack)
+EASYADD(objautouv rectpack ${CMAKE_THREAD_LIBS_INIT})
 
 # Blender PRM and RRT for RL's GT (Ground Truth)
 EASYADD(mtblender)
