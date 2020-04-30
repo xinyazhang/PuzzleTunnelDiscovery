@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include <libgeokey/KeyPoint.h>
+#include <libgeokey/PointRecorder.h>
 #include <libgeokey/KeySampler.h>
 
 namespace py = pybind11;
@@ -14,7 +15,8 @@ PYBIND11_MODULE(pygeokey, m) {
 		.def(py::init<const std::string&>())
 		.def("probe_key_points", &KeyPointProber::probeKeyPoints,
 		     py::arg("attempts"),
-		     py::arg("seed") = 0
+		     py::arg("seed") = 0,
+		     py::arg("recorder") = nullptr
 		    )
 		.def("probe_notch_points", &KeyPointProber::probeNotchPoints,
 		     py::arg("seed") = 0,
@@ -38,4 +40,9 @@ PYBIND11_MODULE(pygeokey, m) {
 		    )
 		.def_property("thresh_narrow_tunnel_ratio", &KeySampler::getThreshNarrowTunnelRatio, &KeySampler::setThreshNarrowTunnelRatio)
 		;
+	py::class_<PointRecorder, std::shared_ptr<PointRecorder>>(m, "PointRecorder")
+		.def(py::init<>())
+		.def("record_pair", &PointRecorder::record_pair)
+		.def("report_pairs", &PointRecorder::report_pairs)
+        ;
 }
