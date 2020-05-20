@@ -3,16 +3,16 @@
 	url = https://github.com/flexible-collision-library/fcl.git
 [submodule "third-party/ompl.app"]
 	path = third-party/ompl.app
-	url = git@github.com:xinyazhang/ompl.app.git
+	url = https://github.com/xinyazhang/ompl.app.git
 	branch = goct-1.4.1
 [submodule "third-party/libgeokey"]
 	path = third-party/libgeokey
-	url = git@gitlab.com:belfer2470/important-points-and-key-configurations.git
+	url = https://gitlab.com/belfer2470/important-points-and-key-configurations.git
 	branch = linux
 [submodule "third-party/pybind11"]
 	path = third-party/pybind11
 	url = https://github.com/pybind/pybind11.git
 [submodule "third-party/libigl"]
 	path = third-party/libigl
-	url = git@github.com:xinyazhang/libigl.git
+	url = https://github.com/xinyazhang/libigl.git
 	branch = customization-2.0.0
