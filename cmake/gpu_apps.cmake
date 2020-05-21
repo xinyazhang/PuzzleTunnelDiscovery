@@ -1,5 +1,5 @@
 EASYLIB(ccdxx)
-EASYLIB(omplaux ccdxx)
+EASYLIB(omplaux ccdxx ${CMAKE_THREAD_LIBS_INIT})
 
 #
 # All visualizer require GPU
