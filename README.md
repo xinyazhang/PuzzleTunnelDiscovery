@@ -33,14 +33,14 @@ python3 -m pip install --user cmake progressbar2 scipy numpy imageio colorama h5
 
 ### Install dependencies on Fedora 32
 ``` bash
-dnf -y install \
+sudo dnf -y install \
     sudo git bash-completion vim python3-pip \
     make cmake gcc gcc-g++ egl-utils pkgconf-pkg-config \
     boost-devel assimp-devel libpng-devel zlib-devel \
     ode-devel mesa-libgbm-devel mesa-libEGL-devel mesa-libGL-devel libccd-devel \
     libglvnd-devel gmp-devel mpfr-devel CGAL-devel \
     python3-devel glm-devel glfw-devel
-python3 -m pip install progressbar2 scipy numpy imageio colorama h5py networkx
+python3 -m pip install --user progressbar2 scipy numpy imageio colorama h5py networkx
 ```
 
 ## Build Instructions
@@ -58,7 +58,7 @@ git submodule update
 (cd third-party/libigl; git checkout customization-2.0.0)
 ```
 
-### Compile the source
+### Compile the source into binaries
 ``` bash
 mkdir build
 cd build
@@ -66,11 +66,15 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 make -j `nproc`
 ```
 
-The compiled files are placed under `PuzzleTunnelDiscovery/bin`
+The compiled files are placed under `PuzzleTunnelDiscovery/bin`.
+
+All binaries and python scripts are supposed to run inside `PuzzleTunnelDiscovery/bin`.
+Do **NOT** install the compiled files into your system. Our build system does not
+include essential commands for installation.
 
 ## Runtime Environment
 
-1. Our deep learning pipeline runs on `tensorflow==1.12.0`;
+1. Our deep learning pipeline runs on [Tensorflow](https://www.tensorflow.org/) 1.12.0;
 2. To generate images for training/inference, our system requires a
    [EGL](https://www.khronos.org/egl)-enabled GPU system to run. You can meet this requirement with
    1. [Docker base image cudagl](https://hub.docker.com/r/nvidia/cudagl), for
@@ -79,7 +83,8 @@ The compiled files are placed under `PuzzleTunnelDiscovery/bin`
       - You need [nvidia-container-runtime](https://github.com/NVIDIA/nvidia-container-runtime) to enable NVIDIA GPU support inside docker.
    2. Build the docker image with our Dockerfile, and run this image with `docker run --privileged --volume /dev/dri`;
       - Tested on [podman](https://podman.io/) engine, but should work with docker.
-   3. Running directly on any Ubuntu 18+/Fedora 30+ system with a OpenGL enabled GPU.
+      - Note this is only for rendering, you cannot run GPU-based tensorflow with this approach 
+   3. Running directly on any Ubuntu 18+/Fedora 30+ system with an OpenGL enabled GPU.
       - Tested with stock mesa driver;
       - For NVIDIA GPU it is recommended to update to 4xx series driver.
 3. We use [HTCondor](https://research.cs.wisc.edu/htcondor/) for parallel computing.
