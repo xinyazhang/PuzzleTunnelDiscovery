@@ -238,13 +238,13 @@ bool mouse_up(Viewer& viewer, int button, int modifier)
 	int fid;
 	Eigen::Vector3d bc;
 	double x = viewer.current_mouse_x;
-	double y = viewer.core().viewport(3) - viewer.current_mouse_y;
+	double y = viewer.core.viewport(3) - viewer.current_mouse_y;
 	const auto& V = viewer.data().V;
         const auto& F = viewer.data().F;
         bool unproj = igl::unproject_onto_mesh(Eigen::Vector2f(x,y),
-	                             viewer.core().view * viewer.data().transforms[0],
-	                             viewer.core().proj,
-	                             viewer.core().viewport,
+	                             viewer.core.view * viewer.data().transforms[0],
+	                             viewer.core.proj,
+	                             viewer.core.viewport,
 	                             V, F,
 	                             fid, bc);
 
