@@ -24,10 +24,11 @@ if (OpenGL_FOUND)
 	set_property(TARGET glad PROPERTY POSITION_INDEPENDENT_CODE ON)
 	set(OpenGL_Loader_Target glad)
 endif()
+pkg_search_module(GLFW3 QUIET glfw3)
 
-if (OpenGL_FOUND)
+if (OpenGL_FOUND AND GLFW3_FOUND)
 	SET(USE_GPU TRUE)
-	SET(VISUAL_PACK ${OPENGL_LIBRARIES} ${OpenGL_Loader_Target})
+	SET(VISUAL_PACK ${OPENGL_LIBRARIES} ${OpenGL_Loader_Target} ${GLFW3_LIBRARIES})
 	message("VISUAL_PACK ${VISUAL_PACK}")
 	
 	message(STATUS "Using GPU ${USE_GPU}")
