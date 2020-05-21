@@ -79,7 +79,7 @@ EASYADD(periodicalize tetio geopick ${CMAKE_THREAD_LIBS_INIT})
 EASYADD(tet2obj tetio geopick)
 EASYADD(mergep)
 EASYADD(evadiff tetio heatio)
-EASYADD(trmap omplaux)
+EASYADD(trmap omplaux ${CMAKE_THREAD_LIBS_INIT})
 use_fcl(trmap) # TODO: remove deps on fcl
 use_ccd(trmap)
 
