@@ -400,6 +400,8 @@ class Workspace(object):
     Note: directory must end with /
     '''
     def deploy_to_condor(self, *paths):
+        if self.condor_host == 'localhost':
+            return
         shell(['ssh', self.condor_host, 'mkdir', '-p', self.condor_ws()])
         _rsync(None, self.local_ws, self.condor_host, self.condor_ws, *paths)
 
@@ -407,6 +409,8 @@ class Workspace(object):
         _rsync(self.condor_host, self.condor_ws, None, self.local_ws, *paths)
 
     def deploy_to_gpu(self, *paths):
+        if self.gpu_host == 'localhost':
+            return
         shell(['ssh', self.gpu_host, 'mkdir', '-p', self.gpu_ws()])
         _rsync(None, self.local_ws, self.gpu_host, self.gpu_ws, *paths)
 

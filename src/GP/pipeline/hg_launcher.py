@@ -223,7 +223,8 @@ def launch_with_params(params, do_training, load=False):
                            modif=False,
                            use_fp16=params['fp16'])
 
-    model.set_dump_to(params['dump_nn_input_data_to'])
+    if 'dump_nn_input_data_to' in params:
+        model.set_dump_to(params['dump_nn_input_data_to'])
     """
     Cached output
     """
