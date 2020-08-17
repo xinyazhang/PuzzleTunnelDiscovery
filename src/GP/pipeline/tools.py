@@ -396,11 +396,10 @@ def vistouchv(args):
 def animate(args):
     ws = util.Workspace(args.dir)
     ws.current_trial = args.current_trial
-    for puzzle_fn, puzzle_name in ws.test_puzzle_generator():
+    for puzzle_fn, puzzle_name in ws.test_puzzle_generator(args.puzzle_name):
+        fl = FileLocations(args, ws, puzzle_name, scheme=args.scheme)
         cfg, config = parse_ompl.parse_simple(puzzle_fn)
-        if args.puzzle_name and puzzle_name != args.puzzle_name:
-            continue
-        sol_out = ws.solution_file(puzzle_name, type_name='unit')
+        sol_out = fl.unit_out_fn
         if os.path.exists(sol_out):
             if args.range:
                 li = util.rangestring_to_list(args.range)
@@ -903,6 +902,7 @@ def setup_parser(subparsers):
     p.add_argument('--current_trial', help='Trial to predict the keyconf', type=int, default=None)
     p.add_argument('--range', help='Only use a subset of the path, format example: 1,2,3,4-7,11', default='')
     p.add_argument('--puzzle_name', help='Only show one specific puzzle', default='')
+    p.add_argument('--scheme', help='Scheme selection', choices=KEY_PRED_SCHEMES, default='cmb')
     p.add_argument('dir', help='Workspace directory')
 
     p = toolp.add_parser('blender', help='Invoke blender to render the trajectory')
