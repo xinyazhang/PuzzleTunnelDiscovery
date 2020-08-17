@@ -387,7 +387,7 @@ def collect_stages(variant=0):
                 ),
                 ('estimate_keyconf_clearance', remote_estimate_keyconf_clearance)
               ]
-    elif variant in [7]:
+    elif variant in [7, 10]:
         ret = [
                 ('generate_atlas2prim', lambda ws: generate_atlas2prim(None, ws)),
                 ('multinet_oversample_keyconf', lambda ws: multinet_oversample_keyconf(None, ws)),

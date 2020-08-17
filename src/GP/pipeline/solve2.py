@@ -861,6 +861,19 @@ def collect_stages(variant=0):
         ret += get_schemed_remoter('pairwise_knn', is_async=True, schemes=schemes)
         ret += get_schemed_remoter('assemble_knn', schemes=schemes)
         ret += get_schemed_remoter('connect_knn', schemes=schemes)
+    elif variant in [10]:
+        ret = [
+                ('least_visible_keyconf_fixed', remote_least_visible_keyconf_fixed),
+                ('assemble_raw_keyconf', remote_assemble_raw_keyconf),
+                ('screen_keyconf', remote_screen_keyconf),
+                ('assemble_roots', remote_assemble_roots)
+              ]
+        schemes = ['nn']
+        ret += get_schemed_remoter('blooming', is_async=True, schemes=schemes)
+        ret += get_schemed_remoter('assemble_blooming', schemes=schemes)
+        ret += get_schemed_remoter('pairwise_knn', is_async=True, schemes=schemes)
+        ret += get_schemed_remoter('assemble_knn', schemes=schemes)
+        ret += get_schemed_remoter('connect_knn', schemes=schemes)
     else:
         assert False, f'Solve Pipeline Variant {variant} has not been implemented'
     return ret

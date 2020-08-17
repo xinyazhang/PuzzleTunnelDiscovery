@@ -385,7 +385,7 @@ def collect_stages(variant=0):
                  ('predict_both', remote_predict_both),
                  ('fetch_from_gpu', _fetch),
                ]
-    elif variant in [7]:
+    elif variant in [7, 10]:
         return [
                  ('deploy_to_gpu', _deploy),
                  ('multinet_predict', remote_multinet_predict),

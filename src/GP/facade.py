@@ -59,6 +59,7 @@ def main():
     pipeline.autorun7.setup_parser(subparsers)
     pipeline.autorun8.setup_parser(subparsers)
     pipeline.autorun9.setup_parser(subparsers)
+    pipeline.autorun10.setup_parser(subparsers)
     pipeline.copy_training_data.setup_parser(subparsers)
     # Occationally users want to run pipeline stages individually
     # This also provides the interface for remoters in autorun*

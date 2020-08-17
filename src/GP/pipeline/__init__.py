@@ -31,3 +31,4 @@ from . import autorun6
 from . import autorun7
 from . import autorun8
 from . import autorun9
+from . import autorun10
