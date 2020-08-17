@@ -114,14 +114,14 @@ def setup_autorun_parser(subparsers, name, pdesc, helptext='Run all pipelines au
 def _get_pipeline_stages():
     stages = []
     stages += [('Begin', lambda x: util.ack('Starting the pipeline'))]
-    for m in [preprocess_key, preprocess_surface, train, keyconf, solve]:
+    for m in [preprocess_key, preprocess_surface, train]:
         stages += m.collect_stages()
     stages += [('End', lambda x: util.ack('All pipeline finished'))]
     return stages
 
 def setup_parser(subparsers):
     setup_autorun_parser(subparsers, 'autorun', _get_pipeline_stages(),
-            helptext='NN pipeline')
+            helptext='NN training pipeline')
 
 def run(args):
     if args.stage is None:

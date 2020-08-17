@@ -63,7 +63,10 @@ def local_submit(ws,
         print('Executable = {}'.format(xfile), file=f)
         print('environment = "OMP_NUM_THREADS=1"', file=f)
         print('getenv = True', file=f) # We need it because
-        print('request_memory = 3072', file=f) # 3G memory
+        # 3G memory ensures our tasks run smoothly on our department machines,
+        # but this is commonly unsatisfiable for personal HTcondor cluster.
+        # So this is commented out in release.
+        # print('request_memory = 3072', file=f)
         print('on_exit_hold = (ExitBySignal != False) || (ExitCode != 0)', file=f) # hold the job for reruning when error occurs
         print('Output = {}/$(Process).out'.format(local_scratch), file=f)
         print('Error = {}/$(Process).err'.format(local_scratch), file=f)

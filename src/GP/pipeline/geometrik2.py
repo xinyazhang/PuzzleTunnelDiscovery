@@ -207,6 +207,19 @@ def collect_stages(variant=0):
                 ('predict_geratio_key_conf', remote_predict_geratio_key_conf),
                 ('predict_notch_key_conf', remote_predict_notch_key_conf),
               ]
+    elif variant in [8]:
+        ret = [
+                ('detect_geratio_feature', remote_detect_geratio_feature),
+                ('predict_geratio_key_conf', remote_predict_geratio_key_conf),
+              ]
+    elif variant in [9]:
+        ret = [
+                ('refine_mesh', remote_refine_mesh),
+                ('detect_geratio_feature', remote_detect_geratio_feature),
+                ('detect_notch_feature', remote_detect_notch_feature),
+                ('predict_geratio_key_conf', remote_predict_geratio_key_conf),
+                ('predict_notch_key_conf', remote_predict_notch_key_conf),
+              ]
     else:
         assert False, '[geometrik2] Unknown variant {}'.format(variant)
     return ret

@@ -46,14 +46,19 @@ def main():
     pipeline.mimic.setup_parser(subparsers)
     pipeline.add_puzzle.setup_parser(subparsers)
     pipeline.add_extra.setup_parser(subparsers)
+    # Only keep autorun and autorun7 to make things cleaner.
     pipeline.autorun.setup_parser(subparsers)
+    '''
     pipeline.autorun2.setup_parser(subparsers)
     # pipeline.autorun3.setup_parser(subparsers)
     pipeline.autorun4.setup_parser(subparsers)
     pipeline.autorun5.setup_parser(subparsers)
     pipeline.autorun5_1.setup_parser(subparsers)
     pipeline.autorun6.setup_parser(subparsers)
+    '''
     pipeline.autorun7.setup_parser(subparsers)
+    pipeline.autorun8.setup_parser(subparsers)
+    pipeline.autorun9.setup_parser(subparsers)
     pipeline.copy_training_data.setup_parser(subparsers)
     # Occationally users want to run pipeline stages individually
     # This also provides the interface for remoters in autorun*

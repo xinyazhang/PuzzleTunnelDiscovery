@@ -811,16 +811,16 @@ class Launcher(object):
     def __call__(self, ws):
         _remote_command(ws, self._stage_name, extra_args=self._extra_args)
 
-def get_schemed_remoter(stage_name, is_async=False):
+def get_schemed_remoter(stage_name, is_async=False, schemes=KEY_PRED_SCHEMES):
     ret = []
     if is_async:
-        for scheme in KEY_PRED_SCHEMES:
+        for scheme in schemes:
             ret.append((f'{stage_name}_{scheme}_launch', Launcher(stage_name, f'--no_wait --scheme {scheme}')))
 
-        for scheme in KEY_PRED_SCHEMES:
+        for scheme in schemes:
             ret.append((f'{stage_name}_{scheme}_sync', Launcher(stage_name, f'--only_wait --scheme {scheme}')))
     else:
-        for scheme in KEY_PRED_SCHEMES:
+        for scheme in schemes:
             ret.append((f'{stage_name}_{scheme}', Launcher(stage_name, f'--scheme {scheme}')))
     return ret
 
@@ -832,18 +832,35 @@ def collect_stages(variant=0):
                 ('screen_keyconf', remote_screen_keyconf),
                 ('assemble_roots', remote_assemble_roots)
               ]
-        stages = [
-                  'blooming',
-                  'assemble_blooming',
-                  'pairwise_knn',
-                  'assemble_knn',
-                  'connect_knn',
-                ]
         ret += get_schemed_remoter('blooming', is_async=True)
         ret += get_schemed_remoter('assemble_blooming')
         ret += get_schemed_remoter('pairwise_knn', is_async=True)
         ret += get_schemed_remoter('assemble_knn')
         ret += get_schemed_remoter('connect_knn')
+    elif variant in [8]:
+        ret = [
+                ('assemble_raw_keyconf', remote_assemble_raw_keyconf),
+                ('screen_keyconf', remote_screen_keyconf),
+                ('assemble_roots', remote_assemble_roots)
+              ]
+        schemes = ['ge']
+        ret += get_schemed_remoter('blooming', is_async=True, schemes=schemes)
+        ret += get_schemed_remoter('assemble_blooming', schemes=schemes)
+        ret += get_schemed_remoter('pairwise_knn', is_async=True, schemes=schemes)
+        ret += get_schemed_remoter('assemble_knn', schemes=schemes)
+        ret += get_schemed_remoter('connect_knn', schemes=schemes)
+    elif variant in [9]:
+        ret = [
+                ('assemble_raw_keyconf', remote_assemble_raw_keyconf),
+                ('screen_keyconf', remote_screen_keyconf),
+                ('assemble_roots', remote_assemble_roots)
+              ]
+        schemes = ['nt']
+        ret += get_schemed_remoter('blooming', is_async=True, schemes=schemes)
+        ret += get_schemed_remoter('assemble_blooming', schemes=schemes)
+        ret += get_schemed_remoter('pairwise_knn', is_async=True, schemes=schemes)
+        ret += get_schemed_remoter('assemble_knn', schemes=schemes)
+        ret += get_schemed_remoter('connect_knn', schemes=schemes)
     else:
         assert False, f'Solve Pipeline Variant {variant} has not been implemented'
     return ret
