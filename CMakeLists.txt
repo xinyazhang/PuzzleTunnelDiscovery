@@ -21,6 +21,9 @@ message(STATUS "AFTER C++14 CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
 message(STATUS "Initial CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
 message(STATUS "Initial Python links to: ${PYTHON_LIBRARY}")
 
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+
 include(cmake/bundles.cmake)
 include(cmake/extra_directories.cmake)
 include(cmake/extra_packages.cmake)
