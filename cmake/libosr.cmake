@@ -24,9 +24,6 @@ if (USE_GPU)
 	EASYADD(vistexture osr ${VISUAL_PACK})
 	# target_compile_definitions(vistexture PRIVATE GPU_ENABLED=1)
 
-	EASYADD(cfreeman osr ${VISUAL_PACK})
-	# target_compile_definitions(cfreeman PRIVATE GPU_ENABLED=1)
-
 	EASYADD(vispath osr ${VISUAL_PACK})
 	# target_compile_definitions(vispath PRIVATE GPU_ENABLED=1)
 
