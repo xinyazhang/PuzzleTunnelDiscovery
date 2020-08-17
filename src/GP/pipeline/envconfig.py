@@ -215,7 +215,7 @@ def init_config_file(args, ws, oldws=None):
                         'CondorHost': 'localhost',
                         'CondorExecPath': pwd,
                         'CondorWorkspacePath': wspath,
-                        'ReuseWorkspace': args.trained_workspace,
+                        'ReuseWorkspace': os.path.join(pwd, args.trained_workspace),
                       }
             else:
                 dic = {
