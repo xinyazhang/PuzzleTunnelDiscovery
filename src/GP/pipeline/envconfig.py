@@ -168,9 +168,12 @@ TimeThreshold = 0.02
 '''
 
 def init_config_file(args, ws, oldws=None):
+    print(f'calling init_config_file')
+    interactive = (not hasattr(args, 'quiet') or not args.quiet)
     try:
         condor.extract_template(open(args.condor, 'r'), open(ws.condor_template, 'w'))
         cfg = ws.configuration_file
+        print(f'config file {cfg}')
         if not os.path.isfile(cfg):
             if oldws is not None:
                 old_config = configparser.ConfigParser()
@@ -202,6 +205,18 @@ def init_config_file(args, ws, oldws=None):
                 if hasattr(args, 'override') and args.override is not None:
                     patch = dict(item.split("=") for item in args.override.split(","))
                     dic.update(patch)
+            elif not interactive:
+                pwd = str(os.getcwd())
+                wspath = os.path.join(pwd, ws.dir)
+                dic = {
+                        'GPUHost': 'localhost',
+                        'GPUExecPath': pwd,
+                        'GPUWorkspacePath': wspath,
+                        'CondorHost': 'localhost',
+                        'CondorExecPath': pwd,
+                        'CondorWorkspacePath': wspath,
+                        'ReuseWorkspace': args.trained_workspace,
+                      }
             else:
                 dic = {
                         'GPUHost': '',
@@ -210,10 +225,11 @@ def init_config_file(args, ws, oldws=None):
                         'CondorHost': '',
                         'CondorExecPath': '',
                         'CondorWorkspacePath': '',
-                        'ReuseWorkspace': '',
+                        'ReuseWorkspace': args.trained_workspace,
                       }
+            print(f'Creating config file at {cfg}')
             print(_CONFIG_TEMPLATE.format(**dic), file=open(cfg, 'w'))
-        if not hasattr(args, 'quiet') or not args.quiet:
+        if interactive:
             EDITOR = os.environ.get('EDITOR', 'vim')
             subprocess.run([EDITOR, cfg])
     except FileNotFoundError as e:

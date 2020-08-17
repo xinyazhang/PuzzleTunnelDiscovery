@@ -158,6 +158,8 @@ def create_offscreen_renderer(puzzle_file, resolution=256):
     return r
 
 def _rsync(from_host, from_pather, to_host, to_pather, *paths):
+    if from_host == 'localhost' or to_host == 'localhost':
+        return
     # Note: do NOT use single target multiple source syntax
     #       the target varies among source paths.
     from_prefix = '' if from_host is None else from_host+':'
@@ -375,7 +377,9 @@ class Workspace(object):
         if extra_args:
             script += ' {} '.format(extra_args)
         script += ' {ws}'.format(ws=ws_path)
-        if in_tmux:
+        if host == 'localhost':
+            remoter = ['bash', '-c']
+        elif in_tmux:
             # tmux needs a terminal
             remoter = ['ssh', '-t', host]
         else:
