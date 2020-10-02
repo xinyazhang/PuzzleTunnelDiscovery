@@ -1,3 +1,5 @@
+# Copyright (C) 2020 The University of Texas at Austin
+# SPDX-License-Identifier: BSD-3-Clause or GPL-2.0-or-later
 from curiosity import sess_no_hook
 import curiosity
 import pyosr

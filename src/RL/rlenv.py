@@ -1,3 +1,5 @@
+# Copyright (C) 2020 The University of Texas at Austin
+# SPDX-License-Identifier: BSD-3-Clause or GPL-2.0-or-later
 '''
 Overall design idea:
     separate the TF inferencing network, training network, rendering, and TF session

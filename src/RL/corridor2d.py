@@ -1,3 +1,5 @@
+# Copyright (C) 2020 The University of Texas at Austin
+# SPDX-License-Identifier: BSD-3-Clause or GPL-2.0-or-later
 # -*- coding: utf-8 -*-
 
 from __future__ import print_function

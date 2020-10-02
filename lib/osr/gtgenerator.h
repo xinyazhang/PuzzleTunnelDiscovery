@@ -1,3 +1,7 @@
+/**
+ * Copyright (C) 2020 The University of Texas at Austin
+ * SPDX-License-Identifier: BSD-3-Clause or GPL-2.0-or-later
+ */
 /*
  * Note: Logically GT Generator should not be a part of Off-Screen Rendering
  *       Module, but for simplicity it is here, and hence OSR is used rather

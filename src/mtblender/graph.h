@@ -1,3 +1,7 @@
+/**
+ * Copyright (C) 2020 The University of Texas at Austin
+ * SPDX-License-Identifier: BSD-3-Clause or GPL-2.0-or-later
+ */
 #ifndef MTBLENDER_GRAPH_H
 #define MTBLENDER_GRAPH_H
 

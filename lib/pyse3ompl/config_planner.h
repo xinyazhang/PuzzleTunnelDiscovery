@@ -1,3 +1,7 @@
+/**
+ * Copyright (C) 2020 The University of Texas at Austin
+ * SPDX-License-Identifier: BSD-3-Clause or GPL-2.0-or-later
+ */
 #ifndef DEOM_ALPHA_CONFIG_PLANNER_H
 #define DEOM_ALPHA_CONFIG_PLANNER_H
 
