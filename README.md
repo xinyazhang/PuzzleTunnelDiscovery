@@ -1,5 +1,9 @@
 # C-Space Tunnel Discovery for Puzzle Path Planning
 
+This software is dual licensed under [BSD3](LICENSE.BSD3) or [GPL2+](LICENSE.GPL2).
+Be aware GPL2+ is enforced by [ALGLIB](https://www.alglib.net/download.php),
+indirectly through [our libgeokey submodule](third-party/libgeokey/).
+
 * [Paper Link](https://xinyazhang.gitlab.io/puzzletunneldiscovery/assets/MainPaper.pdf)
 * [Website Link](https://xinyazhang.gitlab.io/puzzletunneldiscovery/)
 
