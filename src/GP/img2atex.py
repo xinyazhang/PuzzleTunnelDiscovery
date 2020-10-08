@@ -1,6 +1,4 @@
 #!/usr/bin/env python2
-# Copyright (C) 2020 The University of Texas at Austin
-# SPDX-License-Identifier: BSD-3-Clause or GPL-2.0-or-later
 
 import numpy as np
 from scipy.misc import imread

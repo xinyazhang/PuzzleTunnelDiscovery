@@ -1,5 +1,3 @@
-# Copyright (C) 2020 The University of Texas at Austin
-# SPDX-License-Identifier: BSD-3-Clause or GPL-2.0-or-later
 from .template import *
 
 STICK_LENGTH_X = 2 * HOLLOW_SQUARE_SIZE + 3 * STICK_WIDTH

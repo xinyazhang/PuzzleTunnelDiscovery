@@ -1,6 +1,4 @@
 #!/usr/bin/env -S blender  --
-# Copyright (C) 2020 The University of Texas at Austin
-# SPDX-License-Identifier: BSD-3-Clause or GPL-2.0-or-later
 # Note: the shebang line above requires coreutils 8.30 and above
 # It is recommended to invoke this script with facade.py for portability
 
