@@ -1,3 +1,8 @@
+/**
+ * SPDX-FileCopyrightText: Copyright © 2020 The University of Texas at Austin
+ * SPDX-FileContributor: Xinya Zhang <xinyazhang@utexas.edu>
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ */
 #include "scene_bounding_box.h"
 #include "bounding_sphere.h"
 
