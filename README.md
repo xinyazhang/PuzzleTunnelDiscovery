@@ -1,5 +1,10 @@
 # C-Space Tunnel Discovery for Puzzle Path Planning
 
+This software is licensed under [GPL2+](LICENSE.GPL2), mainly due to its
+dependencies.
+For additional licensing options, please contract [The Office of Technology
+Commercialization, The University of Texas at Austin](https://research.utexas.edu/otc/).
+
 * [Paper Link](https://xinyazhang.gitlab.io/puzzletunneldiscovery/assets/MainPaper.pdf)
 * [Website Link](https://xinyazhang.gitlab.io/puzzletunneldiscovery/)
 
