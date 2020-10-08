@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright © 2020 The University of Texas at Austin
+# SPDX-FileContributor: Xinya Zhang <xinyazhang@utexas.edu>
+# SPDX-License-Identifier: GPL-2.0-or-later
 '''
 RL Continuous Action
     - Input: output file of calibrate-distance.py
