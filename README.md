@@ -83,8 +83,9 @@ sudo apt install -y --no-install-recommends \
     libode-dev libgbm-dev libegl1-mesa-dev libccd-dev \
     linux-libc-dev libglvnd-dev libgmp-dev libmpfr-dev libcgal-dev \
     pkg-config mesa-utils-extra libgl1-mesa-dev cmake-curses-gui \
-    libeigen3-dev python3-dev libboost-filesystem-dev libboost-graph-dev libglm-dev libglfw3-dev
-python3 -m pip install --user cmake progressbar2 scipy numpy imageio colorama h5py networkx setuptools
+    libeigen3-dev python3-dev libboost-filesystem-dev libboost-graph-dev libglm-dev libglfw3-dev \
+    castxml python3-pygccxml
+python3 -m pip install --user cmake progressbar2 scipy numpy imageio colorama h5py networkx setuptools pyplusplus
 ```
 
 ### Install dependencies on Fedora 32
